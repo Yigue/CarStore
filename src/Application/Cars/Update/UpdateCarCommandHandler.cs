@@ -1,0 +1,46 @@
+﻿using Application.Abstractions.Authentication;
+using Application.Abstractions.Data;
+using Application.Abstractions.Messaging;
+using Domain.Cars;
+using Microsoft.EntityFrameworkCore;
+using SharedKernel;
+
+namespace Application.Cars.Update;
+
+internal sealed class UpdateCarCommandHandler(
+    IApplicationDbContext context,
+    IDateTimeProvider dateTimeProvider)
+    : ICommandHandler<UpdateCarCommand, Guid>
+{
+    public async Task<Result<Guid>> Handle(UpdateCarCommand command, CancellationToken cancellationToken)
+    {
+        Car? car = await context.Cars
+            .SingleOrDefaultAsync(c => c.Id == command.Id, cancellationToken);
+
+        if (car is null)
+        {
+           return Result.Failure<Guid>(CarErrors.NotFound(command.Id));
+        }
+
+        // Actualizar las propiedades del auto
+        car.Marca = command.Marca;
+        car.Modelo = command.Modelo;
+        car.Color = command.Color;
+        car.CarType = command.CarType;
+        car.CarStatus = command.CarStatus;
+        car.ServiceCar = command.ServiceCar;
+        car.CantidadPuertas = command.CantidadPuertas;
+        car.CantidadAsientos = command.CantidadAsientos;
+        car.Cilindrada = command.Cilindrada;
+        car.Kilometraje = command.Kilometraje;
+        car.Año = command.Anio;
+        car.Patente = command.Patente;
+        car.Descripcion = command.Descripcion;
+        car.Price = command.Price;
+        car.UpdatedAt = dateTimeProvider.UtcNow;
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(car.Id);
+    }
+}
