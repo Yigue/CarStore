@@ -166,8 +166,8 @@ public static class SeedDataExtensions
 
             var saleFaker = new Faker<Sale>()
                 .CustomInstantiator(f => new Sale(
-                    f.PickRandom(cars), // Usar PickRandom de Bogus
-                    f.PickRandom(clients),
+                    f.PickRandom(cars).Id, // Usar PickRandom de Bogus
+                    f.PickRandom(clients).Id,
                     f.PickRandom(cars).Price, // Obtener precio del Car seleccionado
                     PaymentMethod.Cash,
                     f.Random.Replace("#######"),

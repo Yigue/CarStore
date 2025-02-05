@@ -6,10 +6,9 @@ using Domain.Financial;
 using Domain.Financial.Attributes;
 using Domain.Sales.Events;
 
-
 namespace Domain.Sales;
 
-public sealed class Sale:Entity
+public sealed class Sale : Entity
 {
     public Guid CarId { get;  set; }
     public Car Car { get;  set; }
@@ -23,18 +22,22 @@ public sealed class Sale:Entity
     public string Comments { get;  set; }
     public List<FinancialTransaction> Transactions { get;  set; }
 
+    // Private parameterless constructor for EF Core
+    private Sale()
+    {
+        Transactions = new List<FinancialTransaction>();
+    }
+
     public Sale(
-        Car car,
-        Client client,
+        Guid carId,
+        Guid clientId,
         decimal finalPrice,
         PaymentMethod paymentMethod,
         string contractNumber,
-        string comments )
+        string comments)
     {
-        Car = car;
-        CarId = car.Id;
-        Client = client;
-        ClientId = client.Id;
+        CarId = carId;
+        ClientId = clientId;
         FinalPrice = finalPrice;
         PaymentMethod = paymentMethod;
         ContractNumber = contractNumber;
@@ -45,6 +48,6 @@ public sealed class Sale:Entity
         
         // Raise(new SaleCreatedDomainEvent(Id, CarId, ClientId, FinalPrice));
     }
-    
+
 
 }

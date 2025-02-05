@@ -20,7 +20,6 @@ public sealed class CreateClientCommandValidator : AbstractValidator<CreateClien
 
         RuleFor(x => x.Email)
             .NotEmpty()
-            .EmailAddress()
             .MaximumLength(255);
 
         RuleFor(x => x.Phone)

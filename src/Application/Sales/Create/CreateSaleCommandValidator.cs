@@ -10,6 +10,6 @@ internal sealed class CreateSaleCommandValidator : AbstractValidator<CreateSaleC
         RuleFor(x => x.ClientId).NotEmpty();
         RuleFor(x => x.FinalPrice).NotEmpty().GreaterThan(0);
         RuleFor(x => x.PaymentMethod).IsInEnum();
-        RuleFor(x => x.Status).NotEmpty().MaximumLength(50);
+        
     }
 }

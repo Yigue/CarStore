@@ -6,8 +6,8 @@ namespace Application.Cars.Update;
 
 public sealed record UpdateCarCommand(
     Guid Id,
-    Marca Marca,
-    Modelo Modelo,
+    Guid Marca,
+    Guid Modelo,
     Color Color,
     TypeCar CarType,
     StatusCar CarStatus,
@@ -16,7 +16,7 @@ public sealed record UpdateCarCommand(
     int CantidadAsientos,
     int Cilindrada,
     int Kilometraje,
-    int Anio,
+    int Año,
     string Patente,
     string Descripcion,
     decimal Price) : ICommand<Guid>;

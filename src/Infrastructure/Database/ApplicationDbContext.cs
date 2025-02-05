@@ -1,5 +1,6 @@
 using Application.Abstractions.Data;
 using Domain.Cars;
+using Domain.Cars.Atribbutes;
 using Domain.Clients;
 using Domain.Financial;
 using Domain.Financial.Attributes;
@@ -9,6 +10,7 @@ using Domain.Todos;
 using Domain.Users;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SharedKernel;
 
 namespace Infrastructure.Database;
@@ -26,10 +28,13 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Client> Clients { get; set; }
     public DbSet<Quote> Quotes { get; set; }
     public DbSet<Sale> Sales { get; set; }
+    public DbSet<Modelo> Modelo { get; set; }
+    public DbSet<Marca> Marca { get; set; }
     public DbSet<FinancialTransaction> Transactions { get; set; }
     public DbSet<TransactionCategory> TransactionCategories { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<TodoItem> TodoItems { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

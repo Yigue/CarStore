@@ -37,8 +37,8 @@ internal sealed class CreateSaleCommandHandler(
         }
 
         var sale = new Sale(
-            car,
-            client,
+            command.CarId,
+            command.ClientId,
             command.FinalPrice,
             command.PaymentMethod,
             command.ContractNumber,

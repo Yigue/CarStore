@@ -10,7 +10,7 @@ public class TransactionConfiguration : IEntityTypeConfiguration<FinancialTransa
     {
         builder.HasKey(t => t.Id);
 
-        builder.Property(t => t.k)
+        builder.Property(t => t.Amount)
             .HasColumnType("decimal(18,2)")
             .IsRequired();
 
@@ -43,7 +43,7 @@ public class TransactionConfiguration : IEntityTypeConfiguration<FinancialTransa
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(t => t.Sale)
-            .WithMany(s => s.Transactions)
+            .WithMany()
             .HasForeignKey(t => t.SaleId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);

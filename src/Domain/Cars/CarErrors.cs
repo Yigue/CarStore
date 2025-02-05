@@ -14,5 +14,8 @@ public static class CarErrors
     public static Error NotAllAtributes(Guid carId) => Error.NotFound(
         "Cars.NotAllAttributes",
         $"The car with the Id = '{carId}' was not found");
+    public static Error AtributesInvalid() => Error.NotFound(
+        "Cars.AtributesInvalid",
+        $"Atributes are invalid");
 }
 

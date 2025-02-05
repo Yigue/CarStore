@@ -23,11 +23,11 @@ public sealed class Car : Entity
     public DateTime CreatedAt { get;  set; }
     public decimal Price { get;  set; }
     public DateTime UpdatedAt { get;  set; }
-    // public decimal Price { get;  set; }
+   
     
     private Car()
     {
-       
+      
     }
     public Car(
         Marca marca, 

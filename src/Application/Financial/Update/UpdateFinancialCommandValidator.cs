@@ -36,16 +36,6 @@ public sealed class UpdateFinancialCommandValidator : AbstractValidator<UpdateFi
             .NotEmpty().WithMessage("La fecha de transacción es requerida")
             .LessThanOrEqualTo(DateTime.UtcNow).WithMessage("La fecha de transacción no puede ser futura");
 
-        RuleFor(x => x.Category)
-            .NotNull().WithMessage("La categoría es requerida");
-
-        RuleFor(x => x.Car)
-            .NotNull().WithMessage("El carro es requerido");
-
-        RuleFor(x => x.Client)
-            .NotNull().WithMessage("El cliente es requerido");
-
-        RuleFor(x => x.Sale)
-            .NotNull().WithMessage("La venta es requerida");
+        
     }
 }

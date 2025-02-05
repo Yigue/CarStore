@@ -9,15 +9,15 @@ namespace Domain.Quotes;
 public sealed class Quote : Entity
 {
     public Guid CarId { get; set; }
-    public Car Car { get; set; }
     public Guid ClientId { get; set; }
-    public Client Client { get; set; }
     public decimal ProposedPrice { get; set; }
     public QuoteStatus Status { get; set; }
     public DateTime ValidUntil { get; set; }
     public string Comments { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public Car Car { get; set; }
+    public Client Client { get; set; }
 
     private Quote() { }
 

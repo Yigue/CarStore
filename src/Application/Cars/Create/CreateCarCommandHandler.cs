@@ -2,9 +2,11 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars;
+using Domain.Cars.Atribbutes;
 using Domain.Cars.Events;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SharedKernel;
 
 namespace Application.Cars.Create;
@@ -17,9 +19,26 @@ internal sealed class CreateCarCommandHandler(
 {
     public async Task<Result<Guid>> Handle(CreateCarCommand command, CancellationToken cancellationToken)
     {
+        Marca marca = await context.Marca
+            .SingleOrDefaultAsync(m => m.Id == command.Marca, cancellationToken);
+
+        if (marca is null)
+        {
+            return Result.Failure<Guid>(CarErrors.AtributesInvalid());
+        }
+ 
+        Modelo modelo = await context.Modelo
+            .SingleOrDefaultAsync(m => m.Id == command.Modelo, cancellationToken);  
+
+        if (modelo is null)
+        {
+            return Result.Failure<Guid>(CarErrors.AtributesInvalid());
+        }
+
+
         var car = new Car(
-            command.Marca,
-            command.Modelo,
+            marca,
+            modelo,
             command.Color,
             command.CarType,
             command.CarStatus,
@@ -28,19 +47,19 @@ internal sealed class CreateCarCommandHandler(
             command.CantidadAsientos,
             command.Cilindrada,
             command.Kilometraje,
-            command.Anio,
+            command.Año,
             command.Patente,
             command.Descripcion,
             command.Price,
             dateTimeProvider.UtcNow
             );
-
+       
         car.Raise(new NewCarDomainEvent(car.Id));
 
         context.Cars.Add(car);
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return car.Id;
+        return Result.Success(car.Id);
     }
 }

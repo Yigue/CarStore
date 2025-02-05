@@ -14,12 +14,10 @@ public sealed record CarGetByIdResponse(
     int Asientos,
     int Cilindrada,
     decimal Kilometraje,
-    int Anio,
+    int Año,
     string Patente,
     string Description,
     decimal Precio,
     DateTime CreatedAt,
     DateTime UpdatedAt
 );
-
-

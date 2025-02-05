@@ -27,10 +27,10 @@ internal sealed class UpdateFinancialCommandHandler(
         financial.PaymentMethod = command.PaymentMethod;
         financial.ReferenceNumber = command.ReferenceNumber;
         financial.TransactionDate = command.TransactionDate;
-        financial.CategoryId = command.Category.Id;    
-        financial.CarId = command.Car.Id;
-        financial.ClientId = command.Client.Id;
-        financial.SaleId = command.Sale.Id;
+        financial.CategoryId = command.CategoryId;    
+        financial.CarId = command.CarId;
+        financial.ClientId = command.ClientId;
+        financial.SaleId = command.SaleId;
     
 
         await context.SaveChangesAsync(cancellationToken);

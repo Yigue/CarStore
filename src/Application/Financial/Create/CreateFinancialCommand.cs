@@ -11,7 +11,7 @@ public sealed record CreateFinancialCommand(
     decimal Amount,
     string Description,
     PaymentMethod PaymentMethod,
-    TransactionCategory Category,
-    Car? Car ,
-    Client Client ,
-    Sale? Sale ) : ICommand<Guid>;
+    Guid CategoryId,
+    Guid? CarId,
+    Guid? ClientId,
+    Guid? SaleId ) : ICommand<Guid>;
