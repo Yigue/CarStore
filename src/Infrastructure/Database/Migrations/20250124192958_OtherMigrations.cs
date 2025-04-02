@@ -1,6 +1,6 @@
+﻿
 #pragma warning disable IDE0161 // Convertir en namespace con ámbito de archivo
 #pragma warning disable IDE0053
-#pragma warning disable S4581
 using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -52,7 +52,7 @@ namespace Infrastructure.Migrations
                 table: "transactions",
                 type: "uuid",
                 nullable: false,
-                defaultValue: new Guid(),
+                defaultValue: Guid.Empty,
                 oldClrType: typeof(Guid),
                 oldType: "uuid",
                 oldNullable: true);

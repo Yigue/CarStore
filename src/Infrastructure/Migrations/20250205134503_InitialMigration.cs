@@ -1,17 +1,13 @@
-﻿
-#pragma warning disable IDE0161 // Convertir en namespace con ámbito de archivo
-#pragma warning disable IDE0053 // Usar cuerpo de expresiones para la expresión lambda
-
+﻿#pragma warning disable IDE0161
+#pragma warning disable IDE0053
 using System;
-using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore.Migrations;
-
 
 #nullable disable
 
 namespace Infrastructure.Migrations;
     /// <inheritdoc />
-    public partial class NombreDeLaMigracion : Migration
+    public partial class InitialMigration : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -107,33 +103,6 @@ namespace Infrastructure.Migrations;
                 });
 
             migrationBuilder.CreateTable(
-                name: "todo_items",
-                schema: "public",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    description = table.Column<string>(type: "text", nullable: false),
-                    due_date = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    labels = table.Column<List<string>>(type: "text[]", nullable: false),
-                    is_completed = table.Column<bool>(type: "boolean", nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    completed_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    priority = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_todo_items", x => x.id);
-                    table.ForeignKey(
-                        name: "fk_todo_items_users_user_id",
-                        column: x => x.user_id,
-                        principalSchema: "public",
-                        principalTable: "users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "cars",
                 schema: "public",
                 columns: table => new
@@ -153,8 +122,8 @@ namespace Infrastructure.Migrations;
                     año = table.Column<int>(type: "integer", nullable: false),
                     patente = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     descripcion = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    imagenes = table.Column<string>(type: "text", nullable: false),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    price = table.Column<decimal>(type: "numeric", nullable: false),
                     updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
@@ -259,8 +228,7 @@ namespace Infrastructure.Migrations;
                     category_id = table.Column<Guid>(type: "uuid", nullable: false),
                     car_id = table.Column<Guid>(type: "uuid", nullable: true),
                     client_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    sale_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    sale_id1 = table.Column<Guid>(type: "uuid", nullable: false)
+                    sale_id = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -286,13 +254,6 @@ namespace Infrastructure.Migrations;
                         principalTable: "sales",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_transactions_sales_sale_id1",
-                        column: x => x.sale_id1,
-                        principalSchema: "public",
-                        principalTable: "sales",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "fk_transactions_transaction_categories_category_id",
                         column: x => x.category_id,
@@ -359,12 +320,6 @@ namespace Infrastructure.Migrations;
                 column: "client_id");
 
             migrationBuilder.CreateIndex(
-                name: "ix_todo_items_user_id",
-                schema: "public",
-                table: "todo_items",
-                column: "user_id");
-
-            migrationBuilder.CreateIndex(
                 name: "ix_transactions_car_id",
                 schema: "public",
                 table: "transactions",
@@ -389,12 +344,6 @@ namespace Infrastructure.Migrations;
                 column: "sale_id");
 
             migrationBuilder.CreateIndex(
-                name: "ix_transactions_sale_id1",
-                schema: "public",
-                table: "transactions",
-                column: "sale_id1");
-
-            migrationBuilder.CreateIndex(
                 name: "ix_users_email",
                 schema: "public",
                 table: "users",
@@ -407,10 +356,6 @@ namespace Infrastructure.Migrations;
         {
             migrationBuilder.DropTable(
                 name: "quotes",
-                schema: "public");
-
-            migrationBuilder.DropTable(
-                name: "todo_items",
                 schema: "public");
 
             migrationBuilder.DropTable(

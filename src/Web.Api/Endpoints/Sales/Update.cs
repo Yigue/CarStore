@@ -13,8 +13,8 @@ internal sealed class Update : IEndpoint
     public sealed record Request(
     Guid Id,
     decimal FinalPrice,
-    PaymentMethod PaymentMethod,
-    SaleStatus Status,
+    int PaymentMethod,
+    int Status,
     string ContractNumber,
     string Comments);
 
@@ -25,7 +25,7 @@ internal sealed class Update : IEndpoint
             var command = new UpdateSaleCommand(
                 id,
                 request.FinalPrice,
-                request.PaymentMethod,
+                (PaymentMethod)request.PaymentMethod,
                 (SaleStatus)request.Status,
                 request.ContractNumber,
                 request.Comments);

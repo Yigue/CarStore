@@ -10,29 +10,29 @@ namespace Domain.Financial;
 public sealed class FinancialTransaction : Entity
 {
     // Propiedades principales
-    public TransactionType Type { get;  set; }
-    public decimal Amount { get;  set; }
-    public string Description { get;  set; }
-    public PaymentMethod PaymentMethod { get;  set; }
-    public string? ReferenceNumber { get;  set; }
-    public DateTime TransactionDate { get;  set; }
+    public TransactionType Type { get; private set; }
+    public decimal Amount { get; private set; }
+    public string Description { get; private set; }
+    public PaymentMethod PaymentMethod { get; private set; }
+    public string? ReferenceNumber { get; private set; }
+    public DateTime TransactionDate { get; private set; }
 
     // Claves externas
-    public Guid CategoryId { get;  set; }
-    public Guid? CarId { get;  set; }
-    public Guid? ClientId { get;  set; }
-    public Guid? SaleId { get;  set; }
+    public Guid CategoryId { get; private set; }
+    public Guid? CarId { get; private set; }
+    public Guid? ClientId { get; private set; }
+    public Guid? SaleId { get; private set; }
 
     // Propiedades de navegación - Cambiamos a init para EF Core
-    public TransactionCategory Category { get;  init; }
-    public Car? Car { get;  init; }
-    public Client? Client { get;  init; }
-    public Sale? Sale { get;  init; }
+    public TransactionCategory Category { get; private init; }
+    public Car? Car { get; private init; }
+    public Client? Client { get; private init; }
+    public Sale? Sale { get; private init; }
 
     // Constructor privado para EF Core - IMPORTANTE
     private FinancialTransaction() { }
 
-    // Constructor público con los campos mínimos requeridos
+    // Constructor con todos los parámetros
     public FinancialTransaction(
         TransactionType type,
         decimal amount,
@@ -67,5 +67,28 @@ public sealed class FinancialTransaction : Entity
         TransactionDate = DateTime.UtcNow;
     }
 
-
+    // Métodos para actualizar propiedades
+    public void Update(
+        TransactionType type,
+        decimal amount,
+        string description,
+        PaymentMethod paymentMethod,
+        string? referenceNumber,
+        DateTime transactionDate,
+        Guid categoryId,
+        Guid? carId,
+        Guid? clientId,
+        Guid? saleId)
+    {
+        Type = type;
+        Amount = amount;
+        Description = description;
+        PaymentMethod = paymentMethod;
+        ReferenceNumber = referenceNumber;
+        TransactionDate = transactionDate;
+        CategoryId = categoryId;
+        CarId = carId;
+        ClientId = clientId;
+        SaleId = saleId;
+    }
 }

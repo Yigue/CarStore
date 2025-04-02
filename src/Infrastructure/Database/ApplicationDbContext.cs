@@ -6,7 +6,7 @@ using Domain.Financial;
 using Domain.Financial.Attributes;
 using Domain.Quotes;
 using Domain.Sales;
-using Domain.Todos;
+
 using Domain.Users;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +33,6 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<FinancialTransaction> Transactions { get; set; }
     public DbSet<TransactionCategory> TransactionCategories { get; set; }
     public DbSet<User> Users { get; set; }
-    public DbSet<TodoItem> TodoItems { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

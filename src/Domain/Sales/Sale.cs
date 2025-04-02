@@ -20,12 +20,11 @@ public sealed class Sale : Entity
     public string ContractNumber { get;  set; }
     public DateTime SaleDate { get;  set; }
     public string Comments { get;  set; }
-    public List<FinancialTransaction> Transactions { get;  set; }
 
     // Private parameterless constructor for EF Core
     private Sale()
     {
-        Transactions = new List<FinancialTransaction>();
+    
     }
 
     public Sale(
@@ -44,7 +43,7 @@ public sealed class Sale : Entity
         Comments = comments;
         Status = SaleStatus.Pending;
         SaleDate = DateTime.UtcNow;
-        Transactions = new List<FinancialTransaction>();
+        
         
         // Raise(new SaleCreatedDomainEvent(Id, CarId, ClientId, FinalPrice));
     }

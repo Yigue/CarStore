@@ -15,7 +15,6 @@ internal sealed class GetSaleByIdQueryHandler(IApplicationDbContext context)
         Sale? sale = await context.Sales
             .Include(s => s.Car)
             .Include(s => s.Client)
-            .Include(s => s.Transactions)
             .FirstOrDefaultAsync(s => s.Id == query.Id, cancellationToken);
 
         if (sale is null)
@@ -37,14 +36,6 @@ internal sealed class GetSaleByIdQueryHandler(IApplicationDbContext context)
             CarBrand = sale.Car.Marca.Nombre,
             CarModel = sale.Car.Modelo.Nombre,
             ClientName = $"{sale.Client.FirstName} {sale.Client.LastName}",
-            Transactions = sale.Transactions.Select(t => new TransactionResponse
-            {
-                Id = t.Id,
-                Amount = t.Amount,
-                Type = t.Type.ToString(),
-                Date = t.TransactionDate,
-                Description = t.Description
-            }).ToList()
         };
 
         return response;

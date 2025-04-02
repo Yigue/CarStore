@@ -13,7 +13,6 @@ internal sealed class GetSalesQueryHandler(IApplicationDbContext context)
         List<SaleResponse> sales = await context.Sales
             .Include(s => s.Car)
             .Include(s => s.Client)
-            .Include(s => s.Transactions)
             .Select(sale => new SaleResponse
             {
                 Id = sale.Id,
@@ -28,14 +27,7 @@ internal sealed class GetSalesQueryHandler(IApplicationDbContext context)
                 CarBrand = sale.Car.Marca.Nombre,
                 CarModel = sale.Car.Modelo.Nombre,
                 ClientName = $"{sale.Client.FirstName} {sale.Client.LastName}",
-                Transactions = sale.Transactions.Select(t => new TransactionResponse
-                {
-                    Id = t.Id,
-                    Amount = t.Amount,
-                    Type = t.Type.ToString(),
-                    Date = t.TransactionDate,
-                    Description = t.Description
-                }).ToList()
+                
             })
             .ToListAsync(cancellationToken);
 

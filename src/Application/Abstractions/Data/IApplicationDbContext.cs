@@ -5,7 +5,6 @@ using Domain.Financial;
 using Domain.Financial.Attributes;
 using Domain.Quotes;
 using Domain.Sales;
-using Domain.Todos;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
@@ -23,7 +22,6 @@ public interface IApplicationDbContext
     DbSet<FinancialTransaction> Transactions { get; }
     DbSet<TransactionCategory> TransactionCategories { get; }
     DbSet<User> Users { get; }
-    DbSet<TodoItem> TodoItems { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

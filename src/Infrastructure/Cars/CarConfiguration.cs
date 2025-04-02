@@ -49,10 +49,7 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
         builder.Property(c => c.FuelType)
             .HasConversion<string>();
 
-        builder.Property(c => c.Imagenes)
-             .HasConversion(
-                 v => string.Join(",", v),
-                 v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList());
+  
         builder.Property(c => c.Price)
            .IsRequired();
 

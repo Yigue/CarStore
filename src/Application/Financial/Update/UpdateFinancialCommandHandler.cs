@@ -21,17 +21,18 @@ internal sealed class UpdateFinancialCommandHandler(
             return Result.Failure<Guid>(FinancialErrors.NotFound(command.Id));
         }
 
-        financial.Type = command.Type;
-        financial.Amount = command.Amount;
-        financial.Description = command.Description;
-        financial.PaymentMethod = command.PaymentMethod;
-        financial.ReferenceNumber = command.ReferenceNumber;
-        financial.TransactionDate = command.TransactionDate;
-        financial.CategoryId = command.CategoryId;    
-        financial.CarId = command.CarId;
-        financial.ClientId = command.ClientId;
-        financial.SaleId = command.SaleId;
-    
+        financial.Update(
+            command.Type,
+            command.Amount,
+            command.Description,
+            command.PaymentMethod,
+            command.ReferenceNumber,
+            command.TransactionDate,
+            command.CategoryId,
+            command.CarId,
+            command.ClientId,
+            command.SaleId
+        );
 
         await context.SaveChangesAsync(cancellationToken);
 
