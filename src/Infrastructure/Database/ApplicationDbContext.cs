@@ -33,6 +33,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<FinancialTransaction> Transactions { get; set; }
     public DbSet<TransactionCategory> TransactionCategories { get; set; }
     public DbSet<User> Users { get; set; }
+    public DbSet<CarImage> CarImages { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

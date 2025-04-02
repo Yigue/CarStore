@@ -17,5 +17,9 @@ public static class CarErrors
     public static Error AtributesInvalid() => Error.NotFound(
         "Cars.AtributesInvalid",
         $"Atributes are invalid");
+        
+    public static Error ImageNotFound(Guid imageId) => Error.NotFound(
+        "Cars.ImageNotFound",
+        $"The car image with the Id = '{imageId}' was not found");
 }
 

@@ -9,8 +9,8 @@ public class AzureBlobService
 
     public AzureBlobService(IConfiguration configuration)
     {
-        string connectionString = configuration["AzureStorage:ConnectionString"];
-        string containerName = configuration["AzureStorage:ContainerName"];
+        string connectionString = configuration["AzureBlobStorage:ConnectionString"];
+        string containerName = configuration["AzureBlobStorage:ContainerName"];
         _containerClient = new BlobContainerClient(connectionString, containerName);
         _containerClient.CreateIfNotExists();
     }

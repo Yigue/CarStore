@@ -5,7 +5,9 @@ namespace Domain.Cars;
 
 public sealed class Car : Entity
 {
+    public Guid MarcaId { get; set; }
     public Marca Marca { get; set; }
+    public Guid ModeloId { get; set; }
     public Modelo Modelo { get; set; }
     public Color Color { get; set; }
     public TypeCar CarType { get; set; }
@@ -50,7 +52,9 @@ public sealed class Car : Entity
     {
         Id = Guid.NewGuid();
         Marca = marca;
+        MarcaId = marca.Id;
         Modelo = modelo;
+        ModeloId = modelo.Id;
         Color = color;
         CarType = carType;
         CarStatus = carStatus;

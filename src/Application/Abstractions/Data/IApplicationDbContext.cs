@@ -22,6 +22,7 @@ public interface IApplicationDbContext
     DbSet<FinancialTransaction> Transactions { get; }
     DbSet<TransactionCategory> TransactionCategories { get; }
     DbSet<User> Users { get; }
+    DbSet<CarImage> CarImages { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

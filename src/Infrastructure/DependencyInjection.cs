@@ -1,10 +1,12 @@
 using System.Text;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
+using Application.Abstractions.Storage;
 using Application.Services;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
 using Infrastructure.Database;
+using Infrastructure.Storage;
 using Infrastructure.Time;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -32,8 +34,33 @@ public static class DependencyInjection
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
-  
-
+        
+        // Registrar servicios de almacenamiento según la configuración
+        services.AddSingleton<IBlobStorageService>(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var azureConnectionString = configuration["AzureBlobStorage:ConnectionString"];
+            
+            // Si la cadena de conexión de Azure existe y no está vacía, usar Azure Blob Storage
+            if (!string.IsNullOrEmpty(azureConnectionString))
+            {
+                try
+                {
+                    return new AzureBlobStorageService(configuration);
+                }
+                catch (Exception)
+                {
+                    // Si hay algún error inicializando Azure, usar almacenamiento local
+                    return new LocalFileStorageService(configuration);
+                }
+            }
+            else
+            {
+                // Si no hay cadena de conexión configurada, usar almacenamiento local
+                return new LocalFileStorageService(configuration);
+            }
+        });
+        
         return services;
     }
 
