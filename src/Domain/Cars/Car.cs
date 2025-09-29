@@ -1,4 +1,5 @@
 using Domain.Cars.Atribbutes;
+using Domain.Cars.Events;
 using SharedKernel;
 
 namespace Domain.Cars;
@@ -70,6 +71,8 @@ public sealed class Car : Entity
 
         CreatedAt = date;
         UpdatedAt = date;
+
+        Raise(new NewCarDomainEvent(Id));
     }
 
 
