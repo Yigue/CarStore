@@ -1,25 +1,93 @@
 **/.classpath
-**/.dockerignore
-**/.env
+# Docker ignore file for CarStore project
+
+# Version control
 **/.git
 **/.gitignore
+**/.gitattributes
+
+# IDE and editor files
+**/.vs
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+**/*.tmp
+
+# Build outputs
+**/bin
+**/obj
+**/out
+**/publish
+**/dist
+
+# Package managers
+**/node_modules
+**/packages
+**/npm-debug.log
+**/yarn-error.log
+
+# Test results
+**/TestResults
+**/coverage
+**/.coverage
+
+# Logs
+**/*.log
+**/logs
+
+# Environment files
+**/.env
+**/.env.local
+**/.env.development
+**/.env.test
+**/.env.production
+
+# Docker files
+**/Dockerfile*
+**/docker-compose*
+**/.dockerignore
+
+# Documentation
+**/README.md
+**/docs
+**/*.md
+
+# Secrets and sensitive files
+**/secrets.*
+**/appsettings.*.json
+!**/appsettings.json
+!**/appsettings.Development.json
+
+# OS generated files
+**/.DS_Store
+**/Thumbs.db
+**/Desktop.ini
+
+# Temporary files
+**/*.tmp
+**/*.temp
+**/temp
+
+# Database files
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# IDE specific
 **/.project
 **/.settings
 **/.toolstarget
-**/.vs
-**/.vscode
+**/azds.yaml
 **/*.*proj.user
 **/*.dbmdl
 **/*.jfm
-**/azds.yaml
-**/bin
+
+# Charts and Kubernetes
 **/charts
-**/docker-compose*
-**/Dockerfile*
-**/node_modules
-**/npm-debug.log
-**/obj
-**/secrets.dev.yaml
-**/values.dev.yaml
+**/values.*.yaml
+!**/values.yaml
+
+# License and legal
 LICENSE
-README.md
+CHANGELOG.md

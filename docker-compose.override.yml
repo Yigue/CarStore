@@ -4,9 +4,32 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
       - ASPNETCORE_HTTPS_PORTS=8081
+      - ConnectionStrings__Database=Host=postgres;Port=5432;Database=carstore_dev;Username=postgres;Password=postgres;
+      - Serilog__WriteTo__1__Args__ServerUrl=http://seq:5341
     ports:
-      - "8080"
-      - "8081"
+      - "8080:8080"
+      - "8081:8081"
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro
+      - ./src/Web.Api/uploads:/app/uploads
+    command: ["dotnet", "Web.Api.dll", "--urls", "http://+:8080;https://+:8081"]
+
+  postgres:
+    environment:
+      - POSTGRES_DB=carstore_dev
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+
+  seq:
+    environment:
+      - ACCEPT_EULA=Y
+    volumes:
+      - seq_dev_data:/data
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  seq_dev_data:
+    driver: local
