@@ -20,8 +20,9 @@
     <ProjectReference Include="..\Domain\Domain.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-	<InternalsVisibleTo Include="ArchitectureTests" />
-  </ItemGroup>
+    <ItemGroup>
+      <InternalsVisibleTo Include="ArchitectureTests" />
+      <InternalsVisibleTo Include="AuthenticationTests" />
+    </ItemGroup>
 
 </Project>
