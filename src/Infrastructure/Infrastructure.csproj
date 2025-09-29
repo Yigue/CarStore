@@ -21,7 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
-	<InternalsVisibleTo Include="ArchitectureTests" />
+        <InternalsVisibleTo Include="ArchitectureTests" />
+        <InternalsVisibleTo Include="InfrastructureTests" />
   </ItemGroup>
 
 </Project>
