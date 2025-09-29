@@ -17,16 +17,11 @@ internal sealed class RegisterUserCommandHandler(IApplicationDbContext context, 
             return Result.Failure<Guid>(UserErrors.EmailNotUnique);
         }
 
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = command.Email,
-            FirstName = command.FirstName,
-            LastName = command.LastName,
-            PasswordHash = passwordHasher.Hash(command.Password)
-        };
-
-        user.Raise(new UserRegisteredDomainEvent(user.Id));
+        var user = new User(
+            command.Email,
+            command.FirstName,
+            command.LastName,
+            passwordHasher.Hash(command.Password));
 
         context.Users.Add(user);
 

@@ -45,8 +45,6 @@ internal sealed class CreateSaleCommandHandler(
             command.Comments
             );
 
-        sale.Raise(new SaleCreatedDomainEvent(sale.Id, command.CarId, command.ClientId, command.FinalPrice));
-
         // Update car status
         car.ServiceCar = statusServiceCar.Vendido;
 
