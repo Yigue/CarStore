@@ -28,10 +28,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ArchitectureTests", "tests\
 EndProject
 
 
+
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SharedKernelTests", "tests\SharedKernelTests\SharedKernelTests.csproj", "{D87758B9-D3D6-4026-B352-FEE72709F7A5}"
 
 
-EndProject
+
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{34BB3069-D5D0-4046-ACAD-A2025ED7678F}"
 EndProject
 Global
@@ -66,10 +67,12 @@ Global
 
 		{8D8E2A8A-D3FE-4230-BEF7-C427D6BD87DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8D8E2A8A-D3FE-4230-BEF7-C427D6BD87DA}.Release|Any CPU.Build.0 = Release|Any CPU
+
         {D87758B9-D3D6-4026-B352-FEE72709F7A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
         {D87758B9-D3D6-4026-B352-FEE72709F7A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
         {D87758B9-D3D6-4026-B352-FEE72709F7A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
         {D87758B9-D3D6-4026-B352-FEE72709F7A5}.Release|Any CPU.Build.0 = Release|Any CPU
+
 
 
 	EndGlobalSection
@@ -85,6 +88,7 @@ Global
 
 		{C699FD09-4D82-4C4B-8744-4FD3B0D60EFC} = {64A28C1B-09AF-426E-8721-D002BE554B48}
 		{86506D03-3746-41E7-A645-97D3633981DB} = {64A28C1B-09AF-426E-8721-D002BE554B48}
+
 
 
         {D87758B9-D3D6-4026-B352-FEE72709F7A5} = {1EB88D85-BE1E-46DE-99A2-2F02363060AF}
