@@ -53,8 +53,6 @@ internal sealed class CreateCarCommandHandler(
             command.Price,
             dateTimeProvider.UtcNow
             );
-       
-        car.Raise(new NewCarDomainEvent(car.Id));
 
         context.Cars.Add(car);
 
