@@ -18,6 +18,7 @@
 
   <ItemGroup>
 	<InternalsVisibleTo Include="Application.UnitTests" />
+        <InternalsVisibleTo Include="BehaviorTests" />
   </ItemGroup>
 
 </Project>
