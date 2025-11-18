@@ -6,10 +6,10 @@ namespace Domain.Cars;
 
 public sealed class Car : Entity
 {
-    public Guid MarcaId { get; set; }
-    public Marca Marca { get; set; }
-    public Guid ModeloId { get; set; }
-    public Modelo Modelo { get; set; }
+public Guid MarcaId { get; set; }
+public Marca Marca { get; set; } = null!;
+public Guid ModeloId { get; set; }
+public Modelo Modelo { get; set; } = null!;
     public Color Color { get; set; }
     public TypeCar CarType { get; set; }
     public StatusCar CarStatus { get; set; }
@@ -20,8 +20,8 @@ public sealed class Car : Entity
     public int Cilindrada { get; set; }
     public int Kilometraje { get; set; }
     public int Año { get; set; }
-    public string Patente { get; set; }
-    public string Descripcion { get; set; }
+public string Patente { get; set; } = string.Empty;
+public string Descripcion { get; set; } = string.Empty;
     public ICollection<CarImage> Images { get; set; } = new List<CarImage>();
 
     public DateTime CreatedAt { get; set; }

@@ -19,21 +19,21 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
 {
     private readonly IPublisher publisher;
 
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IPublisher _publisher) : base(options)
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IPublisher publisher) : base(options)
     {
-        publisher = _publisher;
+        this.publisher = publisher;
     }
 
-    public DbSet<Car> Cars { get; set; }
-    public DbSet<Client> Clients { get; set; }
-    public DbSet<Quote> Quotes { get; set; }
-    public DbSet<Sale> Sales { get; set; }
-    public DbSet<Modelo> Modelo { get; set; }
-    public DbSet<Marca> Marca { get; set; }
-    public DbSet<FinancialTransaction> Transactions { get; set; }
-    public DbSet<TransactionCategory> TransactionCategories { get; set; }
-    public DbSet<User> Users { get; set; }
-    public DbSet<CarImage> CarImages { get; set; }
+    public DbSet<Car> Cars => Set<Car>();
+    public DbSet<Client> Clients => Set<Client>();
+    public DbSet<Quote> Quotes => Set<Quote>();
+    public DbSet<Sale> Sales => Set<Sale>();
+    public DbSet<Modelo> Modelo => Set<Modelo>();
+    public DbSet<Marca> Marca => Set<Marca>();
+    public DbSet<FinancialTransaction> Transactions => Set<FinancialTransaction>();
+    public DbSet<TransactionCategory> TransactionCategories => Set<TransactionCategory>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<CarImage> CarImages => Set<CarImage>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

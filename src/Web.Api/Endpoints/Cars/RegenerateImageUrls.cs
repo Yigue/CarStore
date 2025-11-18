@@ -2,6 +2,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Storage;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 using Web.Api.Infrastructure;
 
 namespace Web.Api.Endpoints.Cars;
@@ -38,31 +39,25 @@ internal sealed class RegenerateImageUrls : IEndpoint
                     // Extraer el nombre del contenedor y el blob de la URL
                     var uri = new Uri(image.ImageUrl);
                     var pathSegments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-                    
+
                     if (pathSegments.Length < 2)
                     {
                         continue;
                     }
-                        
+
                     string containerName = pathSegments[0];
-                    string blobName = pathSegments[1];
-                    
+                    string blobName = string.Join('/', pathSegments.Skip(1));
+
                     // Verificar si el blob existe
                     bool exists = await blobStorage.ExistsAsync(containerName, blobName, cancellationToken);
                     if (!exists)
                     {
                         continue;
                     }
-                    
-                    // Obtener el cliente de Azure Storage
-                    var blobServiceClient = new Azure.Storage.Blobs.BlobServiceClient(
-                        new Uri($"{uri.Scheme}://{uri.Host}"));
-                    var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-                    var blobClient = containerClient.GetBlobClient(blobName);
-                    
+
                     // Generar nueva URL con SAS
-                    string newUrl = blobStorage.GenerateSasUri(blobClient).ToString();
-                    
+                    string newUrl = await blobStorage.GenerateAccessUrlAsync(containerName, blobName, cancellationToken);
+
                     // Actualizar la URL en la base de datos
                     image.ImageUrl = newUrl;
                     updatedCount++;

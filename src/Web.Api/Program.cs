@@ -8,6 +8,7 @@ using Web.Api;
 using Web.Api.Extensions;
 using Microsoft.Extensions.FileProviders;
 using System.IO;
+using System.Linq;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -22,20 +23,34 @@ builder.Services
 
 builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 
-// Configurar CORS para permitir solicitudes desde la aplicación React
-// builder.Services.AddCors(options =>
-// {
-//     options.AddPolicy("CorsPolicy", policy =>
-//     {
-//         policy.AllowAnyOrigin() // En producción, restrinja esto a su dominio React
-//               .AllowAnyMethod()
-//               .AllowAnyHeader();
-//     });
-// });
+const string CorsPolicyName = "CorsPolicy";
+string[] allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? ["*"];
+bool allowCredentials = builder.Configuration.GetValue("Cors:AllowCredentials", false);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(CorsPolicyName, policy =>
+    {
+        policy.AllowAnyHeader()
+              .AllowAnyMethod();
+
+        if (allowedOrigins.Length == 0 || allowedOrigins.Contains("*"))
+        {
+            policy.AllowAnyOrigin();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins);
+
+            if (allowCredentials)
+            {
+                policy.AllowCredentials();
+            }
+        }
+    });
+});
 
 WebApplication app = builder.Build();
-
-app.MapEndpoints();
 
 if (app.Environment.IsDevelopment())
 {
@@ -43,15 +58,12 @@ if (app.Environment.IsDevelopment())
     app.ApplyMigrations();
 }
 
-// Habilitar CORS
-app.UseCors("CorsPolicy");
-
 // Configurar archivos estáticos
 // 1. Servir archivos estáticos desde wwwroot (predeterminado)
 app.UseStaticFiles();
 
 // 2. Si estás usando almacenamiento local, configura un proveedor de archivos adicional
-string uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
+string uploadPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
 if (!Directory.Exists(uploadPath))
 {
     Directory.CreateDirectory(uploadPath);
@@ -70,17 +82,18 @@ app.MapHealthChecks("health", new HealthCheckOptions
 });
 
 app.UseRequestContextLogging();
-
 app.UseSerilogRequestLogging();
 
 app.UseExceptionHandler();
 
-app.UseAuthentication();
+app.UseCors(CorsPolicyName);
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 // REMARK: If you want to use Controllers, you'll need this.
 app.MapControllers();
+app.MapEndpoints();
 
 await app.RunAsync();
 

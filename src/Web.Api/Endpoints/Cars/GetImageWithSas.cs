@@ -2,6 +2,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Storage;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 using Web.Api.Infrastructure;
 
 namespace Web.Api.Endpoints.Cars;
@@ -27,58 +28,46 @@ internal sealed class GetImageWithSas : IEndpoint
 
             try
             {
-                // Para URLs de Azure Blob Storage
-                if (image.ImageUrl.Contains("blob.core.windows.net"))
+                string imageUrl = image.ImageUrl ?? string.Empty;
+
+                if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out Uri? uri) ||
+                    !uri.Host.Contains("blob.core.windows.net", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Extraer el nombre del contenedor y el blob de la URL
-                    var uri = new Uri(image.ImageUrl);
-                    var pathSegments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-                    if (pathSegments.Length < 2)
-                    {
-                        return Results.BadRequest("URL de imagen inválida");
-                    }
-
-                    string containerName = pathSegments[0];
-                    string blobName = pathSegments[1];
-
-                    // Verificar si el blob existe
-                    bool exists = await blobStorage.ExistsAsync(containerName, blobName, cancellationToken);
-
-                    if (!exists)
-                    {
-                        return Results.NotFound("La imagen no existe en el almacenamiento");
-                    }
-
-                    // Obtener el cliente de Azure Storage desde el servicio en lugar de crearlo aquí
-                    var blobServiceClient = new Azure.Storage.Blobs.BlobServiceClient(
-                        new Uri($"{uri.Scheme}://{uri.Host}"));
-                    var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-                    var blobClient = containerClient.GetBlobClient(blobName);
-
-                    // Generar nueva URL con SAS
-                    string newUrl = blobStorage.GenerateSasUri(blobClient).ToString();
-
                     return Results.Ok(new
                     {
                         imageId = image.Id,
                         carId = image.CarId,
-                        url = newUrl,
+                        url = imageUrl,
                         isPrimary = image.IsPrimary
                     });
                 }
-                // Para URLs locales
-                else
+
+                string[] pathSegments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+                if (pathSegments.Length < 2)
                 {
-                    // Simplemente devolver la URL tal cual está
-                    return Results.Ok(new
-                    {
-                        imageId = image.Id,
-                        carId = image.CarId,
-                        url = image.ImageUrl,
-                        isPrimary = image.IsPrimary
-                    });
+                    return Results.BadRequest("URL de imagen inválida");
                 }
+
+                string containerName = pathSegments[0];
+                string blobName = string.Join('/', pathSegments.Skip(1));
+
+                bool exists = await blobStorage.ExistsAsync(containerName, blobName, cancellationToken);
+
+                if (!exists)
+                {
+                    return Results.NotFound("La imagen no existe en el almacenamiento");
+                }
+
+                string newUrl = await blobStorage.GenerateAccessUrlAsync(containerName, blobName, cancellationToken);
+
+                return Results.Ok(new
+                {
+                    imageId = image.Id,
+                    carId = image.CarId,
+                    url = newUrl,
+                    isPrimary = image.IsPrimary
+                });
             }
             catch (Exception ex)
             {
