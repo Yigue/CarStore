@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using SharedKernel;
 
@@ -34,33 +35,31 @@ public static class DependencyInjection
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
-        
-        // Registrar servicios de almacenamiento según la configuración
+
         services.AddSingleton<IBlobStorageService>(provider =>
         {
-            var configuration = provider.GetRequiredService<IConfiguration>();
-            var azureConnectionString = configuration["AzureBlobStorage:ConnectionString"];
-            
-            // Si la cadena de conexión de Azure existe y no está vacía, usar Azure Blob Storage
-            if (!string.IsNullOrEmpty(azureConnectionString))
+            IConfiguration configuration = provider.GetRequiredService<IConfiguration>();
+            string? azureConnectionString = configuration["AzureBlobStorage:ConnectionString"];
+
+            if (!string.IsNullOrWhiteSpace(azureConnectionString))
             {
                 try
                 {
-                    return new AzureBlobStorageService(configuration);
+                    return ActivatorUtilities.CreateInstance<AzureBlobStorageService>(provider);
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
-                    // Si hay algún error inicializando Azure, usar almacenamiento local
-                    return new LocalFileStorageService(configuration);
+                    ILogger logger = provider
+                        .GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("StorageConfiguration");
+
+                    logger.LogWarning(exception, "Fallo al inicializar Azure Blob Storage, se usará almacenamiento local.");
                 }
             }
-            else
-            {
-                // Si no hay cadena de conexión configurada, usar almacenamiento local
-                return new LocalFileStorageService(configuration);
-            }
+
+            return ActivatorUtilities.CreateInstance<LocalFileStorageService>(provider);
         });
-        
+
         return services;
     }
 

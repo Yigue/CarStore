@@ -1,0 +1,102 @@
+:root {
+  --swagger-primary: #0f172a;
+  --swagger-secondary: #1d4ed8;
+  --swagger-accent: #f97316;
+  --swagger-bg: #f5f5f4;
+}
+
+body.swagger-ui {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  min-height: 100vh;
+}
+
+.swagger-ui .topbar {
+  background-color: var(--swagger-primary);
+  padding: 1rem;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+}
+
+.swagger-ui .topbar-wrapper .link span {
+  color: #fff;
+  font-weight: 600;
+}
+
+.swagger-ui .scheme-container,
+.swagger-ui .information-container,
+.swagger-ui .opblock-tag-section {
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 25px 45px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.swagger-ui .opblock {
+  border-radius: 1rem;
+  margin-bottom: 1.5rem;
+  border: none;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.swagger-ui .opblock-summary-method {
+  border-radius: 999px;
+  padding: 0.3rem 1rem;
+  font-weight: 600;
+}
+
+.swagger-ui .btn.execute.opblock-control__btn {
+  background: linear-gradient(120deg, var(--swagger-secondary), var(--swagger-accent));
+  border: none;
+  border-radius: 999px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.swagger-ui .btn.execute.opblock-control__btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(249, 115, 22, 0.35);
+}
+
+.swagger-ui .opblock-tag {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--swagger-primary);
+}
+
+.swagger-ui section.models.is-open h4,
+.swagger-ui section.models h4 {
+  font-weight: 600;
+  color: var(--swagger-secondary);
+}
+
+.swagger-ui .model-box {
+  border-radius: 0.75rem;
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+@media (max-width: 1024px) {
+  .swagger-ui .opblock-summary {
+    flex-wrap: wrap;
+  }
+
+  .swagger-ui .opblock-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .swagger-ui .topbar {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .swagger-ui .opblock-summary-method,
+  .swagger-ui .opblock-summary-path,
+  .swagger-ui .opblock-summary-description {
+    width: 100%;
+    text-align: left;
+  }
+}

@@ -73,10 +73,16 @@ public class LocalFileStorageService : IBlobStorageService
         return Task.FromResult(exists);
     }
 
-    public Uri GenerateSasUri(Azure.Storage.Blobs.BlobClient blobClient)
+    public Task<string> GenerateAccessUrlAsync(string containerName, string blobName, CancellationToken cancellationToken = default)
     {
-        // Para almacenamiento local, simplemente devolvemos la URI original
-        // ya que no necesitamos tokens SAS para acceso local
-        return blobClient.Uri;
+        string filePath = Path.Combine(_basePath, containerName, blobName);
+
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException($"El archivo {blobName} no se encontró en el contenedor {containerName}");
+        }
+
+        string sanitizedBaseUrl = _baseUrl.TrimEnd('/');
+        return Task.FromResult($"{sanitizedBaseUrl}/{containerName}/{blobName}");
     }
-} 
+}
