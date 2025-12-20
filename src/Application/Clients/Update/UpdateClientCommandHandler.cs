@@ -22,14 +22,22 @@ internal sealed class UpdateClientCommandHandler(
             return Result.Failure<Guid>(ClientErrors.NotFound(command.Id));
         }
 
-        client.FirstName = command.FirstName;
-        client.LastName = command.LastName;
-        client.DNI = command.DNI;
-        client.Email = command.Email;
-        client.Phone = command.Phone;
-        client.Address = command.Address;
-        client.Status = command.Status;
-        client.UpdateAt = dateTimeProvider.UtcNow;
+        client.Update(
+            command.FirstName,
+            command.LastName,
+            command.Email,
+            command.Phone,
+            command.Address);
+        
+        // Handle status change using domain methods
+        if (command.Status == ClientStatus.Active && client.Status == ClientStatus.Inactive)
+        {
+            client.Activate();
+        }
+        else if (command.Status == ClientStatus.Inactive && client.Status == ClientStatus.Active)
+        {
+            client.Deactivate();
+        }
 
         await context.SaveChangesAsync(cancellationToken);
 

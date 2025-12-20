@@ -16,13 +16,14 @@ internal sealed class Get : IEndpoint
 
             Result<List<CarsResponses>> result = await sender.Send(query, cancellationToken);
 
-            if (result.IsFailure)
-            {
-                return Results.BadRequest(result.Error);
-            }
-
-            return Results.Ok(result.Value);
+            return result.Match(
+                cars => Results.Ok(cars),
+                CustomResults.Problem);
         })
-        .WithTags("Cars");
+        .HasPermission(Permissions.CarsRead)
+        .WithTags(Tags.Cars)
+        .WithName("GetAllCars")
+        .Produces<List<CarsResponses>>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

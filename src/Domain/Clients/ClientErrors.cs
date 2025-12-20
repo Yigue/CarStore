@@ -14,5 +14,9 @@ public static class ClientErrors
     public static Error NotAllAtributes(Guid carId) => Error.NotFound(
         "Clients.NotAllAttributes",
         $"The client with the Id = '{carId}' was not found");
+    
+    public static Error Inactive(Guid clientId) => Error.Problem(
+        "Clients.Inactive",
+        $"The client with Id = '{clientId}' is inactive and cannot be used in operations");
 }
 

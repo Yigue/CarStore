@@ -16,13 +16,15 @@ internal sealed class GetById : IEndpoint
 
             Result<CarGetByIdResponse> result = await sender.Send(query, cancellationToken);
 
-            if (result.IsFailure)
-            {
-                return Results.NotFound(result.Error);
-            }
-
-            return Results.Ok(result.Value);
+            return result.Match(
+                car => Results.Ok(car),
+                CustomResults.Problem);
         })
-        .WithTags("Cars");
+        .HasPermission(Permissions.CarsRead)
+        .WithTags(Tags.Cars)
+        .WithName("GetCarById")
+        .Produces<CarGetByIdResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

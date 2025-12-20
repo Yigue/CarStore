@@ -56,12 +56,12 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
 
         if (query.PriceFrom.HasValue)
         {
-            carsQuery = carsQuery.Where(c => c.Price >= query.PriceFrom);
+            carsQuery = carsQuery.Where(c => c.Price.Amount >= query.PriceFrom);
         }
 
         if (query.PriceTo.HasValue)
         {
-            carsQuery = carsQuery.Where(c => c.Price <= query.PriceTo);
+            carsQuery = carsQuery.Where(c => c.Price.Amount <= query.PriceTo);
         }
 
         if (query.ColorIds != null && query.ColorIds.Any())
@@ -93,8 +93,8 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
         carsQuery = query.SortBy?.ToUpperInvariant() switch
         {
             "PRICE" => query.SortDescending 
-                ? carsQuery.OrderByDescending(c => c.Price)
-                : carsQuery.OrderBy(c => c.Price),
+                ? carsQuery.OrderByDescending(c => c.Price.Amount)
+                : carsQuery.OrderBy(c => c.Price.Amount),
             "YEAR" => query.SortDescending 
                 ? carsQuery.OrderByDescending(c => c.Año)
                 : carsQuery.OrderBy(c => c.Año),
@@ -117,7 +117,7 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
             Marca = c.Marca.Nombre,
             Modelo = c.Modelo.Nombre,
             Año = c.Año,
-            Precio = c.Price,
+            Precio = c.Price.Amount,
             Descripcion = c.Descripcion,
             ImagenPrincipal = GetPrimaryImageUrl(c),
             CantidadPuertas = c.CantidadPuertas,

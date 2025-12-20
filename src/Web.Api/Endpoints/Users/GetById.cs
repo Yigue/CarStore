@@ -16,9 +16,15 @@ internal sealed class GetById : IEndpoint
 
             Result<UserResponse> result = await sender.Send(query, cancellationToken);
 
-            return result.Match(Results.Ok, CustomResults.Problem);
+            return result.Match(
+                user => Results.Ok(user),
+                CustomResults.Problem);
         })
         .HasPermission(Permissions.UsersAccess)
-        .WithTags(Tags.Users);
+        .WithTags(Tags.Users)
+        .WithName("GetUserById")
+        .Produces<UserResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

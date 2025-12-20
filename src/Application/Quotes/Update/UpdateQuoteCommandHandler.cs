@@ -23,11 +23,10 @@ internal sealed class UpdateQuoteCommandHandler(
         quote.Update(
             command.ProposedPrice,
             command.ValidUntil,
-            command.Status,
             command.Comments);
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return quote.Id;
+        return Result.Success(quote.Id);
     }
 }

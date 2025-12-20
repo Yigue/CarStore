@@ -1,5 +1,6 @@
 using Domain.Cars;
 using Domain.Cars.Atribbutes;
+using Infrastructure.Persistence.Configurations.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -12,6 +13,7 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
         builder.HasKey(c => c.Id);
 
         builder.Property(c => c.Patente)
+            .HasConversion(new LicensePlateValueConverter())
             .HasMaxLength(10)
             .IsRequired();
 
@@ -51,7 +53,9 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
 
   
         builder.Property(c => c.Price)
-           .IsRequired();
+            .HasConversion(new MoneyValueConverter())
+            .HasColumnName("price")
+            .IsRequired();
 
 
     }

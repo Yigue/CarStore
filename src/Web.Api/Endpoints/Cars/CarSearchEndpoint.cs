@@ -17,9 +17,10 @@ public class CarSearchEndpoint : ControllerBase
     }
 
     [HttpGet("search")]
-    [AllowAnonymous]
+    [AllowAnonymous] // Búsqueda pública, sin autenticación
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SearchCars([FromQuery] SearchCarsQuery query)
     {
         var result = await _sender.Send(query);

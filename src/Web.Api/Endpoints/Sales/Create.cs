@@ -32,14 +32,16 @@ internal sealed class Create : IEndpoint
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 
-            if (result.IsFailure)
-            {
-                return Results.BadRequest(result.Error);
-            }
-
-            return Results.Ok(result.Value);
+            return result.Match(
+                id => Results.Created($"/sales/{id}", new { id }),
+                CustomResults.Problem);
         })
-        .WithTags("Sales");
+        .HasPermission(Permissions.SalesCreate)
+        .WithTags(Tags.Sales)
+        .WithName("CreateSale")
+        .Produces<Guid>(StatusCodes.Status201Created)
+        .ProducesValidationProblem()
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }
 

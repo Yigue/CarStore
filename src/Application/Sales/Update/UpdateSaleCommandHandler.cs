@@ -20,15 +20,31 @@ internal sealed class UpdateSaleCommandHandler(
             return Result.Failure<Guid>(SalesErrors.NotFound(command.Id));
         }
 
-        // Update sale properties
-        sale.FinalPrice = command.FinalPrice;
-        sale.PaymentMethod = command.PaymentMethod;
-        sale.Status = command.Status;
-        sale.ContractNumber = command.ContractNumber;
-        sale.Comments = command.Comments;
+        // Update sale properties using domain method
+        if (command.Status == SaleStatus.Pending)
+        {
+            sale.Update(
+                command.FinalPrice,
+                command.PaymentMethod,
+                command.ContractNumber,
+                command.Comments);
+        }
+        else if (command.Status == SaleStatus.Completed && sale.Status == SaleStatus.Pending)
+        {
+            sale.Update(
+                command.FinalPrice,
+                command.PaymentMethod,
+                command.ContractNumber,
+                command.Comments);
+            sale.Complete();
+        }
+        else if (command.Status == SaleStatus.Cancelled && sale.Status == SaleStatus.Pending)
+        {
+            sale.Cancel("Cancelled via update");
+        }
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return sale.Id;
+        return Result.Success(sale.Id);
     }
 }

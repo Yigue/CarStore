@@ -29,9 +29,9 @@ internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context)
                 car.Cilindrada,
                 car.Kilometraje,
                 car.Año,
-                car.Patente,
+                car.Patente.Value,
                 car.Descripcion,
-                car.Price,
+                car.Price.Amount,
                 car.CreatedAt,
                 car.UpdatedAt
             ))

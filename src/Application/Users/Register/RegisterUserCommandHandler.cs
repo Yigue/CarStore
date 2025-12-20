@@ -27,6 +27,6 @@ internal sealed class RegisterUserCommandHandler(IApplicationDbContext context, 
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return user.Id;
+        return Result.Success(user.Id);
     }
 }

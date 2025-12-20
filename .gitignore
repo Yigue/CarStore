@@ -398,3 +398,8 @@ FodyWeavers.xsd
 *.sln.iml
 
 .containers/
+
+# Environment variables
+.env
+.env.local
+.env.*.local

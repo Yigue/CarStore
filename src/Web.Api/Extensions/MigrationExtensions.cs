@@ -1,4 +1,7 @@
-﻿using Infrastructure.Database;
+﻿using Application.Abstractions.Authentication;
+using Application.Abstractions.Data;
+using Infrastructure.Database;
+using Infrastructure.Database.SeedData;
 using Microsoft.EntityFrameworkCore;
 
 namespace Web.Api.Extensions;
@@ -13,7 +16,11 @@ public static class MigrationExtensions
             scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         dbContext.Database.Migrate();
-        SeedDataExtensions.SeedTestData(app);
-
+        
+        // Seed datos iniciales (solo en desarrollo)
+        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        
+        DatabaseSeeder.SeedAsync(context, passwordHasher).GetAwaiter().GetResult();
     }
 }

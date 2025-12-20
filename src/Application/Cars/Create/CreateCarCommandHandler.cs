@@ -19,6 +19,16 @@ internal sealed class CreateCarCommandHandler(
 {
     public async Task<Result<Guid>> Handle(CreateCarCommand command, CancellationToken cancellationToken)
     {
+        // Validate unique license plate before insert
+        var licensePlate = new Domain.Shared.ValueObjects.LicensePlate(command.Patente);
+        var existingCar = await context.Cars
+            .AnyAsync(c => c.Patente.Value == licensePlate.Value, cancellationToken);
+
+        if (existingCar)
+        {
+            return Result.Failure<Guid>(CarErrors.PatenteAlreadyExists(command.Patente));
+        }
+
         Marca marca = await context.Marca
             .SingleOrDefaultAsync(m => m.Id == command.Marca, cancellationToken);
 

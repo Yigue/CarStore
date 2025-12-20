@@ -4,6 +4,11 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
+# Install wget for healthcheck
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget && \
+    rm -rf /var/lib/apt/lists/*
+
 # Create a non-root user for security
 RUN addgroup --system --gid 1001 dotnet && \
     adduser --system --uid 1001 --ingroup dotnet --shell /bin/false dotnet
@@ -52,7 +57,7 @@ USER dotnet
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Set the entry point
 ENTRYPOINT ["dotnet", "Web.Api.dll"]

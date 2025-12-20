@@ -15,13 +15,14 @@ internal sealed class Get : IEndpoint
 
             Result<IReadOnlyList<FinancialResponses>> result = await sender.Send(query, cancellationToken);
 
-            if (result.IsFailure)
-            {
-                return Results.BadRequest(result.Error);
-            }
-
-            return Results.Ok(result.Value);
+            return result.Match(
+                financials => Results.Ok(financials),
+                CustomResults.Problem);
         })
-        .WithTags("Financial");
+        .HasPermission(Permissions.FinancialRead)
+        .WithTags(Tags.Financial)
+        .WithName("GetAllFinancials")
+        .Produces<IReadOnlyList<FinancialResponses>>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

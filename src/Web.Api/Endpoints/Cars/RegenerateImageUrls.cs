@@ -81,6 +81,10 @@ internal sealed class RegenerateImageUrls : IEndpoint
                 updatedCount
             });
         })
-        .WithTags(Tags.Cars);
+        .HasPermission(Permissions.CarsUpdate)
+        .WithTags(Tags.Cars)
+        .WithName("RegenerateCarImageUrls")
+        .Produces(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 } 

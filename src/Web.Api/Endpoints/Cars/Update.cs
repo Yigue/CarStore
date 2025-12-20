@@ -49,15 +49,18 @@ internal sealed class Update : IEndpoint
                 request.Precio
             );
 
-            Result result = await sender.Send(command, cancellationToken);
+            Result<Guid> result = await sender.Send(command, cancellationToken);
 
-            if (result.IsFailure)
-            {
-                return Results.NotFound(result.Error);
-            }
-
-            return Results.NoContent();
+            return result.Match(
+                _ => Results.NoContent(),
+                CustomResults.Problem);
         })
-        .WithTags("Cars");
+        .HasPermission(Permissions.CarsUpdate)
+        .WithTags(Tags.Cars)
+        .WithName("UpdateCar")
+        .Produces(StatusCodes.Status204NoContent)
+        .ProducesValidationProblem()
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

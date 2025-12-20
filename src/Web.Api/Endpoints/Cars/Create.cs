@@ -5,6 +5,7 @@ using MediatR;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
+using Web.Api.Endpoints.Cars;
 
 namespace Web.Api.Endpoints.Cars;
 
@@ -76,7 +77,9 @@ internal sealed class Create : IEndpoint
 
                 Result<Guid> result = await sender.Send(command, cancellationToken);
 
-                return result.Match(Results.Ok, CustomResults.Problem);
+                return result.Match(
+                    id => Results.Created($"/cars/{id}", new { id }),
+                    CustomResults.Problem);
             }
             catch (FormatException)
             {
@@ -87,6 +90,11 @@ internal sealed class Create : IEndpoint
                 return Results.Problem(ex.Message);
             }
         })
-        .WithTags(Tags.Cars);
+        .HasPermission(Permissions.CarsCreate)
+        .WithTags(Tags.Cars)
+        .WithName("CreateCar")
+        .Produces<Guid>(StatusCodes.Status201Created)
+        .ProducesValidationProblem()
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

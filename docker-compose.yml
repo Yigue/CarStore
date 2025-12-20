@@ -11,11 +11,17 @@ services:
       - "8080:8080"
       - "8081:8081"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
       - ASPNETCORE_HTTP_PORTS=8080
       - ASPNETCORE_HTTPS_PORTS=8081
-      - ConnectionStrings__Database=Host=postgres;Port=5432;Database=carstore;Username=postgres;Password=postgres;
-      - Serilog__WriteTo__1__Args__ServerUrl=http://seq:5341
+      - ConnectionStrings__Database=${CONNECTION_STRING:-Host=postgres;Port=5432;Database=carstore;Username=postgres;Password=postgres;}
+      - Jwt__Secret=${JWT_SECRET}
+      - Jwt__Issuer=${JWT_ISSUER:-carstore}
+      - Jwt__Audience=${JWT_AUDIENCE:-carstore-api}
+      - Jwt__ExpirationInMinutes=${JWT_EXPIRATION_IN_MINUTES:-60}
+      - AzureBlobStorage__ConnectionString=${AZURE_BLOB_CONNECTION_STRING:-}
+      - AzureBlobStorage__ContainerName=${AZURE_BLOB_CONTAINER_NAME:-}
+      - Serilog__WriteTo__1__Args__ServerUrl=${SEQ_SERVER_URL:-http://seq:5341}
     depends_on:
       postgres:
         condition: service_healthy
@@ -23,7 +29,7 @@ services:
         condition: service_started
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3

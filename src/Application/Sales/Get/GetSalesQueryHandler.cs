@@ -18,7 +18,7 @@ internal sealed class GetSalesQueryHandler(IApplicationDbContext context)
                 Id = sale.Id,
                 CarId = sale.CarId,
                 ClientId = sale.ClientId,
-                FinalPrice = sale.FinalPrice,
+                FinalPrice = sale.FinalPrice.Amount,
                 PaymentMethod = sale.PaymentMethod.ToString(),
                 Status = sale.Status.ToString(),
                 ContractNumber = sale.ContractNumber,

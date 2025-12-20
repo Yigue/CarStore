@@ -29,6 +29,9 @@ internal sealed class GetPrimaryImages : IEndpoint
 
             return Results.Ok(primaryImages);
         })
-        .WithTags(Tags.Cars);
+        .HasPermission(Permissions.CarsRead)
+        .WithTags(Tags.Cars)
+        .WithName("GetPrimaryCarImages")
+        .Produces(StatusCodes.Status200OK);
     }
 } 

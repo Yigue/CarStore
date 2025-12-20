@@ -30,8 +30,15 @@ internal sealed class Create : IEndpoint
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 
-            return result.Match(Results.Ok, CustomResults.Problem);
+            return result.Match(
+                id => Results.Created($"/clients/{id}", new { id }),
+                CustomResults.Problem);
         })
-        .WithTags(Tags.Clients);
+        .HasPermission(Permissions.ClientsCreate)
+        .WithTags(Tags.Clients)
+        .WithName("CreateClient")
+        .Produces<Guid>(StatusCodes.Status201Created)
+        .ProducesValidationProblem()
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

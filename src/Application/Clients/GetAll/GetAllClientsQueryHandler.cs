@@ -21,7 +21,7 @@ internal sealed class GetAllClientsQueryHandler(IApplicationDbContext context)
                 client.FirstName,
                 client.LastName,
                 client.DNI,
-                client.Email,
+                client.Email.Value,
                 client.Phone,
                 client.Address,
                 client.Status,

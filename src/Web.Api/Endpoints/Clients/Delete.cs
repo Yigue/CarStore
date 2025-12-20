@@ -15,13 +15,15 @@ internal sealed class Delete : IEndpoint
 
             Result result = await sender.Send(command, cancellationToken);
 
-            if (result.IsFailure)
-            {
-                return Results.BadRequest(result.Error);
-            }
-
-            return Results.NoContent();
+            return result.Match(
+                () => Results.NoContent(),
+                CustomResults.Problem);
         })
-        .WithTags("Clients");
+        .HasPermission(Permissions.ClientsDelete)
+        .WithTags(Tags.Clients)
+        .WithName("DeleteClient")
+        .Produces(StatusCodes.Status204NoContent)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

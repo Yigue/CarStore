@@ -18,8 +18,16 @@ internal sealed class Login : IEndpoint
 
             Result<string> result = await sender.Send(command, cancellationToken);
 
-            return result.Match(Results.Ok, CustomResults.Problem);
+            return result.Match(
+                token => Results.Ok(new { token }),
+                CustomResults.Problem);
         })
-        .WithTags(Tags.Users);
+        .WithTags(Tags.Users)
+        .WithName("LoginUser")
+        .AllowAnonymous()
+        .Produces<string>(StatusCodes.Status200OK)
+        .ProducesValidationProblem()
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

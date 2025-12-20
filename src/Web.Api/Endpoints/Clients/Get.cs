@@ -15,13 +15,14 @@ internal sealed class Get : IEndpoint
 
             Result<IReadOnlyList<ClientResponse>> result = await sender.Send(query, cancellationToken);
 
-            if (result.IsFailure)
-            {
-                return Results.BadRequest(result.Error);
-            }
-
-            return Results.Ok(result.Value);
+            return result.Match(
+                clients => Results.Ok(clients),
+                CustomResults.Problem);
         })
-        .WithTags("Clients");
+        .HasPermission(Permissions.ClientsRead)
+        .WithTags(Tags.Clients)
+        .WithName("GetAllClients")
+        .Produces<IReadOnlyList<ClientResponse>>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

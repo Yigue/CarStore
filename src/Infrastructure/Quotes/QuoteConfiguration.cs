@@ -1,4 +1,5 @@
 using Domain.Quotes;
+using Infrastructure.Persistence.Configurations.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -11,7 +12,8 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.HasKey(q => q.Id);
 
         builder.Property(q => q.ProposedPrice)
-            .HasColumnType("decimal(18,2)")
+            .HasConversion(new MoneyValueConverter())
+            .HasColumnName("proposed_price")
             .IsRequired();
 
         builder.Property(q => q.Status)

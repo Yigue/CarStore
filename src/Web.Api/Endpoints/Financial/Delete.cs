@@ -15,13 +15,15 @@ internal sealed class Delete : IEndpoint
 
             Result result = await sender.Send(command, cancellationToken);
 
-            if (result.IsFailure)
-            {
-                return Results.NotFound(result.Error);
-            }
-
-            return Results.NoContent();
+            return result.Match(
+                () => Results.NoContent(),
+                CustomResults.Problem);
         })
-        .WithTags("Financial");
+        .HasPermission(Permissions.FinancialDelete)
+        .WithTags(Tags.Financial)
+        .WithName("DeleteFinancial")
+        .Produces(StatusCodes.Status204NoContent)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

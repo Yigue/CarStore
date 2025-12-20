@@ -1,4 +1,5 @@
 using Domain.Sales;
+using Infrastructure.Persistence.Configurations.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -11,7 +12,8 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.HasKey(s => s.Id);
 
         builder.Property(s => s.FinalPrice)
-            .HasColumnType("decimal(18,2)")
+            .HasConversion(new MoneyValueConverter())
+            .HasColumnName("final_price")
             .IsRequired();
 
         builder.Property(s => s.Status)

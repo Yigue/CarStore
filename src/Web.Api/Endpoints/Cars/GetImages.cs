@@ -39,7 +39,11 @@ internal sealed class GetImages : IEndpoint
 
             return Results.Ok(images);
         })
-        .WithTags(Tags.Cars);
+        .HasPermission(Permissions.CarsRead)
+        .WithTags(Tags.Cars)
+        .WithName("GetCarImages")
+        .Produces(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status404NotFound);
 
         // Endpoint para obtener todas las imágenes (no asociadas a un coche específico)
         app.MapGet("cars/images", async (
@@ -64,6 +68,9 @@ internal sealed class GetImages : IEndpoint
 
             return Results.Ok(images);
         })
-        .WithTags(Tags.Cars);
+        .HasPermission(Permissions.CarsRead)
+        .WithTags(Tags.Cars)
+        .WithName("GetAllCarImages")
+        .Produces(StatusCodes.Status200OK);
     }
 } 

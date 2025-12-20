@@ -4,6 +4,7 @@ using Domain.Clients;
 using Domain.Sales;
 using Domain.Financial.Attributes;
 using Domain.Financial.Events;
+using Domain.Shared.ValueObjects;
 
 namespace Domain.Financial;
 
@@ -11,7 +12,7 @@ public sealed class FinancialTransaction : Entity
 {
     // Propiedades principales
     public TransactionType Type { get; private set; }
-    public decimal Amount { get; private set; }
+    public Money Amount { get; private set; }
     public string Description { get; private set; }
     public PaymentMethod PaymentMethod { get; private set; }
     public string? ReferenceNumber { get; private set; }
@@ -36,6 +37,40 @@ public sealed class FinancialTransaction : Entity
     public FinancialTransaction(
         TransactionType type,
         decimal amount,
+        string description,
+        PaymentMethod paymentMethod,
+        TransactionCategory category,
+        Car? car = null,
+        Client? client = null,
+        Sale? sale = null)
+    {
+        Type = type;
+        Amount = new Money(amount);
+        Description = description;
+        PaymentMethod = paymentMethod;
+        Category = category;
+        CategoryId = category.Id;
+        Car = car;
+        if (car != null)
+        {
+            CarId = car.Id;
+        }
+        Client = client;
+        if (client != null)
+        {
+            ClientId = client.Id;
+        }
+        Sale = sale;
+        if (sale != null)
+        {
+            SaleId = sale.Id;
+        }
+        TransactionDate = DateTime.UtcNow;
+    }
+    
+    public FinancialTransaction(
+        TransactionType type,
+        Money amount,
         string description,
         PaymentMethod paymentMethod,
         TransactionCategory category,
@@ -71,6 +106,30 @@ public sealed class FinancialTransaction : Entity
     public void Update(
         TransactionType type,
         decimal amount,
+        string description,
+        PaymentMethod paymentMethod,
+        string? referenceNumber,
+        DateTime transactionDate,
+        Guid categoryId,
+        Guid? carId,
+        Guid? clientId,
+        Guid? saleId)
+    {
+        Type = type;
+        Amount = new Money(amount);
+        Description = description;
+        PaymentMethod = paymentMethod;
+        ReferenceNumber = referenceNumber;
+        TransactionDate = transactionDate;
+        CategoryId = categoryId;
+        CarId = carId;
+        ClientId = clientId;
+        SaleId = saleId;
+    }
+    
+    public void Update(
+        TransactionType type,
+        Money amount,
         string description,
         PaymentMethod paymentMethod,
         string? referenceNumber,

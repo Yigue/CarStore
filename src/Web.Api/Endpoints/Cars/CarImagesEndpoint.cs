@@ -9,7 +9,7 @@ namespace Web.Api.Endpoints.Cars;
 
 [ApiController]
 [Route("cars/{carId:guid}/images")]
-// [Authorize]
+[Authorize] // Requiere autenticación
 [Tags("Car Images")]
 public class CarImagesEndpoint : ControllerBase
 {
@@ -22,8 +22,11 @@ public class CarImagesEndpoint : ControllerBase
 
     [HttpPost]
     [DisableRequestSizeLimit]
+    [Authorize(Policy = "cars:update")] // Requiere permiso específico
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UploadImage(
         [FromRoute] Guid carId,
         [FromForm] IFormFile file,
@@ -58,8 +61,11 @@ public class CarImagesEndpoint : ControllerBase
     }
 
     [HttpDelete("{imageId:guid}")]
+    [Authorize(Policy = "cars:update")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteImage(
         [FromRoute] Guid carId,
         [FromRoute] Guid imageId)
@@ -76,8 +82,11 @@ public class CarImagesEndpoint : ControllerBase
     }
 
     [HttpPut("{imageId:guid}/make-primary")]
+    [Authorize(Policy = "cars:update")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> MakePrimary(
         [FromRoute] Guid carId,
         [FromRoute] Guid imageId)

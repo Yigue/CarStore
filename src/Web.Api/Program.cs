@@ -23,19 +23,21 @@ builder.Services
 builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 
 // Configurar CORS para permitir solicitudes desde la aplicación React
-// builder.Services.AddCors(options =>
-// {
-//     options.AddPolicy("CorsPolicy", policy =>
-//     {
-//         policy.AllowAnyOrigin() // En producción, restrinja esto a su dominio React
-//               .AllowAnyMethod()
-//               .AllowAnyHeader();
-//     });
-// });
+builder.Services.AddCors(options =>
+{
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+        ?? new[] { "http://localhost:3000", "http://localhost:5173" };
+    
+    options.AddPolicy("CorsPolicy", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
 
 WebApplication app = builder.Build();
-
-app.MapEndpoints();
 
 if (app.Environment.IsDevelopment())
 {
@@ -43,7 +45,10 @@ if (app.Environment.IsDevelopment())
     app.ApplyMigrations();
 }
 
-// Habilitar CORS
+// Configurar middleware en el orden correcto
+app.UseRouting();
+
+// CORS debe ir después de UseRouting pero antes de UseAuthentication
 app.UseCors("CorsPolicy");
 
 // Configurar archivos estáticos
@@ -62,12 +67,6 @@ app.UseStaticFiles(new StaticFileOptions
     FileProvider = new PhysicalFileProvider(uploadPath),
     RequestPath = "/uploads"
 });
-   
-
-app.MapHealthChecks("health", new HealthCheckOptions
-{
-    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-});
 
 app.UseRequestContextLogging();
 
@@ -78,6 +77,14 @@ app.UseExceptionHandler();
 app.UseAuthentication();
 
 app.UseAuthorization();
+
+// Mapear endpoints después de configurar middleware
+app.MapEndpoints();
+
+app.MapHealthChecks("health", new HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
 
 // REMARK: If you want to use Controllers, you'll need this.
 app.MapControllers();

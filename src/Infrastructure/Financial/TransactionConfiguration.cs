@@ -1,4 +1,5 @@
 using Domain.Financial;
+using Infrastructure.Persistence.Configurations.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -11,7 +12,8 @@ public class TransactionConfiguration : IEntityTypeConfiguration<FinancialTransa
         builder.HasKey(t => t.Id);
 
         builder.Property(t => t.Amount)
-            .HasColumnType("decimal(18,2)")
+            .HasConversion(new MoneyValueConverter())
+            .HasColumnName("amount")
             .IsRequired();
 
         builder.Property(t => t.Type)

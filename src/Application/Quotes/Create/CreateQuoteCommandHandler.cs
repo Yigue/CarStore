@@ -9,11 +9,18 @@ using SharedKernel;
 namespace Application.Quotes.Create;
 
 internal sealed class CreateQuoteCommandHandler(
-    IApplicationDbContext context)
+    IApplicationDbContext context,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<CreateQuoteCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateQuoteCommand command, CancellationToken cancellationToken)
     {
+        // Validate ValidUntil is in the future
+        if (command.ValidUntil <= dateTimeProvider.UtcNow)
+        {
+            return Result.Failure<Guid>(QuoteErrors.InvalidValidUntil());
+        }
+        
         Car? car = await context.Cars
             .SingleOrDefaultAsync(c => c.Id == command.CarId, cancellationToken);
 

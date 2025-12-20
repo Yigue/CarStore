@@ -85,6 +85,11 @@ internal sealed class GetImageWithSas : IEndpoint
                 return Results.Problem($"Error al generar URL con SAS: {ex.Message}");
             }
         })
-        .WithTags(Tags.Cars);
+        .HasPermission(Permissions.CarsRead)
+        .WithTags(Tags.Cars)
+        .WithName("GetCarImageWithSas")
+        .Produces(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

@@ -17,5 +17,9 @@ public static class SalesErrors
     public static Error NotAllAtributes(Guid saleId) => Error.NotFound(
         "Sales.NotAllAttributes",
         $"The sale with the Id = '{saleId}' was not found");
+    
+    public static Error InvalidPrice() => Error.Problem(
+        "Sales.InvalidPrice",
+        "FinalPrice must be greater than 0");
 }
 

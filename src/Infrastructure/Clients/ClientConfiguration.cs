@@ -1,4 +1,5 @@
 using Domain.Clients;
+using Infrastructure.Persistence.Configurations.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -26,6 +27,7 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
             .IsUnique();
 
         builder.Property(c => c.Email)
+            .HasConversion(new EmailValueConverter())
             .HasMaxLength(200)
             .IsRequired();
 

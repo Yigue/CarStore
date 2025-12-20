@@ -22,18 +22,26 @@ internal sealed class CreateSaleCommandHandler(
         Car? car = await context.Cars.FindAsync(new object[] { command.CarId }, cancellationToken);
         if (car == null)
         {
-            return Result.Failure<Guid>(SalesErrors.NotFound(command.CarId));
+            return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
         }
+        
+        // Validate car is available (only check ServiceCar, as CarStatus is about condition, not availability)
         if (car.ServiceCar != statusServiceCar.Disponible)
         {
-            return Result.Failure<Guid>(SalesErrors.AlreadySold(command.CarId));
+            return Result.Failure<Guid>(CarErrors.AlreadySold(command.CarId));
         }
 
         // Verify if client exists
         Client? client = await context.Clients.FindAsync(new object[] { command.ClientId }, cancellationToken);
         if (client == null)
         {
-            return Result.Failure<Guid>(SalesErrors.NotFound(command.ClientId));
+            return Result.Failure<Guid>(ClientErrors.NotFound(command.ClientId));
+        }
+        
+        // Validate client is active
+        if (client.Status != ClientStatus.Active)
+        {
+            return Result.Failure<Guid>(ClientErrors.Inactive(client.Id));
         }
 
         var sale = new Sale(
@@ -45,13 +53,18 @@ internal sealed class CreateSaleCommandHandler(
             command.Comments
             );
 
-        // Update car status
-        car.ServiceCar = statusServiceCar.Vendido;
+        // Update car status using domain method
+        car.MarkAsSold();
 
         context.Sales.Add(sale);
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return sale.Id;
+        // Complete the sale to trigger financial transaction
+        sale.Complete();
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(sale.Id);
     }
 }

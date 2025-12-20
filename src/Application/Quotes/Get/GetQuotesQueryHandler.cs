@@ -12,13 +12,16 @@ internal sealed class GetQuotesQueryHandler(IApplicationDbContext context)
     {
         List<QuoteResponse> quotes = await context.Quotes
             .Include(q => q.Car)
+                .ThenInclude(c => c.Marca)
+            .Include(q => q.Car)
+                .ThenInclude(c => c.Modelo)
             .Include(q => q.Client)
             .Select(quote => new QuoteResponse
             {
                 Id = quote.Id,
                 CarId = quote.CarId,
                 ClientId = quote.ClientId,
-                ProposedPrice = quote.ProposedPrice,
+                ProposedPrice = quote.ProposedPrice.Amount,
                 Status = quote.Status.ToString(),
                 ValidUntil = quote.ValidUntil,
                 Comments = quote.Comments,

@@ -16,7 +16,7 @@ internal sealed class GetAllFinancialsQueryHandler(IApplicationDbContext context
             .Select(transaction => new FinancialResponses(
                 transaction.Id,
                 transaction.Type,
-                transaction.Amount,
+                transaction.Amount.Amount,
                 transaction.Description,
                 transaction.PaymentMethod,
                 transaction.ReferenceNumber,

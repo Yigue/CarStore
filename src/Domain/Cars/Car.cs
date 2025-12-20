@@ -1,5 +1,6 @@
 using Domain.Cars.Atribbutes;
 using Domain.Cars.Events;
+using Domain.Shared.ValueObjects;
 using SharedKernel;
 
 namespace Domain.Cars;
@@ -20,19 +21,20 @@ public sealed class Car : Entity
     public int Cilindrada { get; set; }
     public int Kilometraje { get; set; }
     public int Año { get; set; }
-    public string Patente { get; set; }
+    public LicensePlate Patente { get; private set; }
     public string Descripcion { get; set; }
     public ICollection<CarImage> Images { get; set; } = new List<CarImage>();
 
-    public DateTime CreatedAt { get; set; }
-    public decimal Price { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public DateTime CreatedAt { get; private set; }
+    public Money Price { get; private set; }
+    public DateTime UpdatedAt { get; private set; }
 
 
     private Car()
     {
-
+        Images = new List<CarImage>();
     }
+    
     public Car(
         Marca marca,
         Modelo modelo,
@@ -65,15 +67,44 @@ public sealed class Car : Entity
         Cilindrada = cilindrada;
         Kilometraje = kilometraje;
         Año = año;
-        Patente = patente;
+        Patente = new LicensePlate(patente);
         Descripcion = descripcion;
-        Price = price;
+        Price = new Money(price);
 
         CreatedAt = date;
         UpdatedAt = date;
 
         Raise(new NewCarDomainEvent(Id));
     }
-
-
+    
+    public void MarkAsSold()
+    {
+        if (ServiceCar == statusServiceCar.Vendido)
+            return;
+        
+        ServiceCar = statusServiceCar.Vendido;
+        UpdatedAt = DateTime.UtcNow;
+        Raise(new CarSoldDomainEvent(Id));
+    }
+    
+    public void MarkAsAvailable()
+    {
+        if (ServiceCar == statusServiceCar.Disponible)
+            return;
+        
+        ServiceCar = statusServiceCar.Disponible;
+        UpdatedAt = DateTime.UtcNow;
+    }
+    
+    public void UpdatePrice(decimal newPrice)
+    {
+        Price = new Money(newPrice);
+        UpdatedAt = DateTime.UtcNow;
+    }
+    
+    public void UpdatePrice(Money newPrice)
+    {
+        Price = newPrice;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

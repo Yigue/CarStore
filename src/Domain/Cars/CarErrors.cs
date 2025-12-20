@@ -21,5 +21,9 @@ public static class CarErrors
     public static Error ImageNotFound(Guid imageId) => Error.NotFound(
         "Cars.ImageNotFound",
         $"The car image with the Id = '{imageId}' was not found");
+    
+    public static Error PatenteAlreadyExists(string patente) => Error.Conflict(
+        "Cars.PatenteAlreadyExists",
+        $"A car with license plate '{patente}' already exists");
 }
 

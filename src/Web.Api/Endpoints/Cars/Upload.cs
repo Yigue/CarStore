@@ -62,7 +62,12 @@ internal sealed class Upload : IEndpoint
                 return Results.Problem(ex.Message);
             }
         })
-        .WithTags(Tags.Cars);
+        .HasPermission(Permissions.CarsUpdate)
+        .WithTags(Tags.Cars)
+        .WithName("UploadCarImage")
+        .Produces<Guid>(StatusCodes.Status200OK)
+        .ProducesValidationProblem()
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
 
     }
 }

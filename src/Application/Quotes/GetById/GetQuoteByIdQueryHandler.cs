@@ -14,6 +14,9 @@ internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
     {
         Quote? quote = await context.Quotes
             .Include(q => q.Car)
+                .ThenInclude(c => c.Marca)
+            .Include(q => q.Car)
+                .ThenInclude(c => c.Modelo)
             .Include(q => q.Client)
             .FirstOrDefaultAsync(q => q.Id == query.QuoteId, cancellationToken);
 
@@ -27,7 +30,7 @@ internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
             Id = quote.Id,
             CarId = quote.CarId,
             ClientId = quote.ClientId,
-            ProposedPrice = quote.ProposedPrice,
+            ProposedPrice = quote.ProposedPrice.Amount,
             Status = quote.Status.ToString(),
             ValidUntil = quote.ValidUntil,
             Comments = quote.Comments,

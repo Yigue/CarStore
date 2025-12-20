@@ -22,8 +22,16 @@ internal sealed class Register : IEndpoint
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 
-            return result.Match(Results.Ok, CustomResults.Problem);
+            return result.Match(
+                id => Results.Created($"/users/{id}", new { id }),
+                CustomResults.Problem);
         })
-        .WithTags(Tags.Users);
+        .WithTags(Tags.Users)
+        .WithName("RegisterUser")
+        .AllowAnonymous()
+        .Produces<Guid>(StatusCodes.Status201Created)
+        .ProducesValidationProblem()
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }
