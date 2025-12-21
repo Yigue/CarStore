@@ -57,9 +57,9 @@ public class CarTests
         car.Cilindrada.Should().Be(cilindrada);
         car.Kilometraje.Should().Be(kilometraje);
         car.Año.Should().Be(anio);
-        car.Patente.Should().Be(patente);
+        car.Patente.Value.Should().Be(patente);
         car.Descripcion.Should().Be(descripcion);
-        car.Price.Should().Be(price);
+        car.Price.Amount.Should().Be(price);
         car.CreatedAt.Should().Be(now);
         car.UpdatedAt.Should().Be(now);
         car.DomainEvents.Should().BeEmpty();

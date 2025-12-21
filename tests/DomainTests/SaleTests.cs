@@ -22,7 +22,7 @@ public class SaleTests
 
         sale.CarId.Should().Be(carId);
         sale.ClientId.Should().Be(clientId);
-        sale.FinalPrice.Should().Be(finalPrice);
+        sale.FinalPrice.Amount.Should().Be(finalPrice);
         sale.PaymentMethod.Should().Be(paymentMethod);
         sale.ContractNumber.Should().Be(contractNumber);
         sale.Comments.Should().Be(comments);

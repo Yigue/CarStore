@@ -22,7 +22,7 @@ public class ClientTests
         client.FirstName.Should().Be(firstName);
         client.LastName.Should().Be(lastName);
         client.DNI.Should().Be(dni);
-        client.Email.Should().Be(email);
+        client.Email.Value.Should().Be(email);
         client.Phone.Should().Be(phone);
         client.Address.Should().Be(address);
         client.Status.Should().Be(ClientStatus.Active);
