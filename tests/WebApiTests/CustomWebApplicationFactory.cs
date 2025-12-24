@@ -1,5 +1,7 @@
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Infrastructure.Database;
+using Infrastructure.Database.SeedData;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +34,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             using var scope = sp.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             db.Database.EnsureCreated();
+            
+            // Seed datos iniciales
+            var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+            DatabaseSeeder.SeedAsync(db, passwordHasher).GetAwaiter().GetResult();
         });
     }
 }

@@ -1,6 +1,7 @@
 using Domain.Financial.Attributes;
 using Domain.Sales;
 using Domain.Sales.Events;
+using Domain.Shared.ValueObjects;
 
 namespace DomainEventsTests;
 
@@ -12,6 +13,7 @@ public class SaleEventsTests
         var carId = Guid.NewGuid();
         var clientId = Guid.NewGuid();
         const decimal price = 5000m;
+        var money = new Money(price);
 
         var sale = new Sale(
             carId,
@@ -23,6 +25,6 @@ public class SaleEventsTests
 
         sale.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<SaleCreatedDomainEvent>()
-            .Which.Should().BeEquivalentTo(new SaleCreatedDomainEvent(sale.Id, carId, clientId, price));
+            .Which.Should().BeEquivalentTo(new SaleCreatedDomainEvent(sale.Id, carId, clientId, money));
     }
 }

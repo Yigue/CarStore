@@ -4,6 +4,7 @@ using Application.Abstractions.Messaging;
 using Domain.Cars;
 using Domain.Cars.Atribbutes;
 using Domain.Shared.ValueObjects;
+using Infrastructure.Caching;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -11,7 +12,9 @@ namespace Application.Cars.Update;
 
 internal sealed class UpdateCarCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    CachedBrandService cachedBrandService,
+    CachedModelService cachedModelService)
     : ICommandHandler<UpdateCarCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(UpdateCarCommand command, CancellationToken cancellationToken)
@@ -23,16 +26,17 @@ internal sealed class UpdateCarCommandHandler(
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.Id));
         }
-        Marca marca = await context.Marca
-           .SingleOrDefaultAsync(m => m.Id == command.Marca, cancellationToken);
+        
+        // Usar servicio de caché para obtener marca
+        Marca? marca = await cachedBrandService.GetByIdAsync(command.Marca, cancellationToken);
 
         if (marca is null)
         {
             return Result.Failure<Guid>(CarErrors.AtributesInvalid());
         }
 
-        Modelo modelo = await context.Modelo
-            .SingleOrDefaultAsync(m => m.Id == command.Modelo, cancellationToken);
+        // Usar servicio de caché para obtener modelo
+        Modelo? modelo = await cachedModelService.GetByIdAsync(command.Modelo, cancellationToken);
 
         if (modelo is null)
         {

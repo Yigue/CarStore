@@ -2,6 +2,7 @@ using Domain.Sales;
 using Domain.Sales.Attributes;
 using Domain.Sales.Events;
 using Domain.Financial.Attributes;
+using Domain.Shared.ValueObjects;
 using SharedKernel;
 
 public class SaleTests
@@ -28,7 +29,7 @@ public class SaleTests
         sale.Comments.Should().Be(comments);
         sale.Status.Should().Be(SaleStatus.Pending);
         sale.SaleDate.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
-        sale.DomainEvents.Should().BeEmpty();
+        sale.DomainEvents.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -63,17 +64,22 @@ public class SaleTests
         var saleId = Guid.NewGuid();
         var carId = Guid.NewGuid();
         var clientId = Guid.NewGuid();
-        var finalPrice = _faker.Random.Decimal(1000, 10000);
+        var finalPriceDecimal = _faker.Random.Decimal(1000, 10000);
+        var finalPrice = new Money(finalPriceDecimal);
+        var paymentMethod = PaymentMethod.Cash;
         var reason = _faker.Lorem.Sentence();
 
         var created = new SaleCreatedDomainEvent(saleId, carId, clientId, finalPrice);
         created.SaleId.Should().Be(saleId);
         created.CarId.Should().Be(carId);
         created.ClientId.Should().Be(clientId);
-        created.FinalPrice.Should().Be(finalPrice);
+        created.FinalPrice.Amount.Should().Be(finalPriceDecimal);
 
-        var completed = new SaleCompletedDomainEvent(saleId);
+        var completed = new SaleCompletedDomainEvent(saleId, carId, clientId, finalPrice, paymentMethod);
         completed.SaleId.Should().Be(saleId);
+        completed.CarId.Should().Be(carId);
+        completed.ClientId.Should().Be(clientId);
+        completed.FinalPrice.Amount.Should().Be(finalPriceDecimal);
 
         var cancelled = new SaleCancelledDomainEvent(saleId, reason);
         cancelled.SaleId.Should().Be(saleId);

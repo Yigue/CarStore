@@ -15,6 +15,7 @@ services:
       - ASPNETCORE_HTTP_PORTS=8080
       - ASPNETCORE_HTTPS_PORTS=8081
       - ConnectionStrings__Database=${CONNECTION_STRING:-Host=postgres;Port=5432;Database=carstore;Username=postgres;Password=postgres;}
+      - ConnectionStrings__Redis=${REDIS_CONNECTION_STRING:-redis:6379}
       - Jwt__Secret=${JWT_SECRET}
       - Jwt__Issuer=${JWT_ISSUER:-carstore}
       - Jwt__Audience=${JWT_AUDIENCE:-carstore-api}
@@ -24,6 +25,8 @@ services:
       - Serilog__WriteTo__1__Args__ServerUrl=${SEQ_SERVER_URL:-http://seq:5341}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       seq:
         condition: service_started

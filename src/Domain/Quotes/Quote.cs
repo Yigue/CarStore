@@ -43,7 +43,7 @@ public sealed class Quote : Entity
         CreatedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
 
-        Raise(new QuoteCreatedDomainEvent(Id, CarId, ClientId, ProposedPrice.Amount));
+        Raise(new QuoteCreatedDomainEvent(Id, CarId, ClientId, ProposedPrice));
     }
 
     public void Update(

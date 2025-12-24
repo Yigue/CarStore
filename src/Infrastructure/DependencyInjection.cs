@@ -5,6 +5,7 @@ using Application.Abstractions.Storage;
 using Application.Services;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
+using Infrastructure.Caching;
 using Infrastructure.Database;
 using Infrastructure.Storage;
 using Infrastructure.Time;
@@ -12,9 +13,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using StackExchange.Redis;
 using SharedKernel;
 
 namespace Infrastructure;
@@ -27,6 +30,7 @@ public static class DependencyInjection
         services
             .AddServices()
             .AddDatabase(configuration)
+            .AddCaching(configuration)
             .AddHealthChecks(configuration)
             .AddAuthenticationInternal(configuration)
             .AddAuthorizationInternal();
@@ -83,11 +87,49 @@ public static class DependencyInjection
         return services;
     }
 
+    private static IServiceCollection AddCaching(this IServiceCollection services, IConfiguration configuration)
+    {
+        var redisConnectionString = configuration.GetConnectionString("Redis");
+        
+        if (!string.IsNullOrEmpty(redisConnectionString))
+        {
+            // Configurar Redis como caché distribuido
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redisConnectionString;
+                options.InstanceName = "CarStore:";
+            });
+
+            // Registrar servicio de caché
+            services.AddSingleton<ICacheService, RedisCacheService>();
+        }
+        else
+        {
+            // Si no hay Redis configurado, usar caché en memoria como fallback
+            services.AddDistributedMemoryCache();
+            services.AddSingleton<ICacheService, RedisCacheService>();
+        }
+
+        // Registrar servicios de caché para datos frecuentes
+        services.AddScoped<CachedBrandService>();
+        services.AddScoped<CachedModelService>();
+        services.AddScoped<CachedCategoryService>();
+
+        return services;
+    }
+
     private static IServiceCollection AddHealthChecks(this IServiceCollection services, IConfiguration configuration)
     {
-        services
+        var healthChecksBuilder = services
             .AddHealthChecks()
             .AddNpgSql(configuration.GetConnectionString("Database")!);
+
+        // Agregar health check de Redis si está configurado
+        var redisConnectionString = configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrEmpty(redisConnectionString))
+        {
+            healthChecksBuilder.AddRedis(redisConnectionString, name: "redis");
+        }
 
         return services;
     }

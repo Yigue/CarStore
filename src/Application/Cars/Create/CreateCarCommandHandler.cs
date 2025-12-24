@@ -5,6 +5,7 @@ using Domain.Cars;
 using Domain.Cars.Atribbutes;
 using Domain.Cars.Events;
 using Domain.Users;
+using Infrastructure.Caching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SharedKernel;
@@ -13,7 +14,9 @@ namespace Application.Cars.Create;
 
 internal sealed class CreateCarCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider
+    IDateTimeProvider dateTimeProvider,
+    CachedBrandService cachedBrandService,
+    CachedModelService cachedModelService
     )
     : ICommandHandler<CreateCarCommand, Guid>
 {
@@ -29,16 +32,16 @@ internal sealed class CreateCarCommandHandler(
             return Result.Failure<Guid>(CarErrors.PatenteAlreadyExists(command.Patente));
         }
 
-        Marca marca = await context.Marca
-            .SingleOrDefaultAsync(m => m.Id == command.Marca, cancellationToken);
+        // Usar servicio de caché para obtener marca
+        Marca? marca = await cachedBrandService.GetByIdAsync(command.Marca, cancellationToken);
 
         if (marca is null)
         {
             return Result.Failure<Guid>(CarErrors.AtributesInvalid());
         }
  
-        Modelo modelo = await context.Modelo
-            .SingleOrDefaultAsync(m => m.Id == command.Modelo, cancellationToken);  
+        // Usar servicio de caché para obtener modelo
+        Modelo? modelo = await cachedModelService.GetByIdAsync(command.Modelo, cancellationToken);  
 
         if (modelo is null)
         {

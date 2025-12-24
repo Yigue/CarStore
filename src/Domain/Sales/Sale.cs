@@ -46,7 +46,7 @@ public sealed class Sale : Entity
         Status = SaleStatus.Pending;
         SaleDate = DateTime.UtcNow;
 
-        Raise(new SaleCreatedDomainEvent(Id, CarId, ClientId, FinalPrice.Amount));
+        Raise(new SaleCreatedDomainEvent(Id, CarId, ClientId, FinalPrice));
     }
 
     public void Complete()
@@ -55,7 +55,7 @@ public sealed class Sale : Entity
             throw new DomainException("Only pending sales can be completed");
         
         Status = SaleStatus.Completed;
-        Raise(new SaleCompletedDomainEvent(Id, CarId, ClientId, FinalPrice.Amount, PaymentMethod));
+        Raise(new SaleCompletedDomainEvent(Id, CarId, ClientId, FinalPrice, PaymentMethod));
     }
 
     public void Cancel(string reason)

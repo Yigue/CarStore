@@ -2,6 +2,7 @@ using Application.Abstractions.Data;
 using Domain.Financial;
 using Domain.Financial.Attributes;
 using Domain.Sales.Events;
+using Infrastructure.Caching;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -10,14 +11,14 @@ namespace Application.Sales.Create;
 
 internal sealed class SaleCompletedDomainEventHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    CachedCategoryService cachedCategoryService)
     : INotificationHandler<SaleCompletedDomainEvent>
 {
     public async Task Handle(SaleCompletedDomainEvent notification, CancellationToken cancellationToken)
     {
-        // Buscar categoría "Venta de Auto" (o crear si no existe)
-        var category = await context.TransactionCategories
-            .FirstOrDefaultAsync(c => c.Name == "Venta de Auto", cancellationToken);
+        // Buscar categoría "Venta de Auto" usando caché (o crear si no existe)
+        var category = await cachedCategoryService.GetByNameAsync("Venta de Auto", cancellationToken);
         
         if (category == null)
         {
@@ -28,6 +29,9 @@ internal sealed class SaleCompletedDomainEventHandler(
                 TransactionType.Income);
             context.TransactionCategories.Add(category);
             await context.SaveChangesAsync(cancellationToken);
+            
+            // Invalidar caché de categorías para incluir la nueva
+            await cachedCategoryService.InvalidateCacheAsync(cancellationToken);
         }
         
         // Buscar la venta para obtener referencias

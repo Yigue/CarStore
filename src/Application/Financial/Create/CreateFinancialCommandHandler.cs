@@ -6,13 +6,15 @@ using Domain.Clients;
 using Domain.Financial;
 using Domain.Financial.Attributes;
 using Domain.Sales;
+using Infrastructure.Caching;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Financial.Create;
 
 internal sealed class CreateFinancialCommandHandler(
-    IApplicationDbContext context)
+    IApplicationDbContext context,
+    CachedCategoryService cachedCategoryService)
     : ICommandHandler<CreateFinancialCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateFinancialCommand command, CancellationToken cancellationToken)
@@ -51,13 +53,14 @@ internal sealed class CreateFinancialCommandHandler(
                 return Result.Failure<Guid>(FinancialErrors.AttributesInvalid());
             }
         }
-         TransactionCategory category = await context.TransactionCategories
-                .SingleOrDefaultAsync(c => c.Id == command.CategoryId, cancellationToken);
+        
+        // Usar servicio de caché para obtener categoría
+        TransactionCategory? category = await cachedCategoryService.GetByIdAsync(command.CategoryId, cancellationToken);
 
-            if (category is null)
-            {
-                return Result.Failure<Guid>(FinancialErrors.AttributesInvalid());
-            }
+        if (category is null)
+        {
+            return Result.Failure<Guid>(FinancialErrors.AttributesInvalid());
+        }
 
         var financial = new FinancialTransaction(
             command.Type,
