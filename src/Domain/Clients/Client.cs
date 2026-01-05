@@ -33,9 +33,13 @@ public sealed class Client : Entity
         string address)
     {
         if (string.IsNullOrWhiteSpace(firstName))
+        {
             throw new DomainException("FirstName cannot be empty");
+        }
         if (string.IsNullOrWhiteSpace(lastName))
+        {
             throw new DomainException("LastName cannot be empty");
+        }
         
         FirstName = firstName;
         LastName = lastName;
@@ -59,9 +63,13 @@ public sealed class Client : Entity
         string address)
     {
         if (string.IsNullOrWhiteSpace(firstName))
+        {
             throw new DomainException("FirstName cannot be empty");
+        }
         if (string.IsNullOrWhiteSpace(lastName))
+        {
             throw new DomainException("LastName cannot be empty");
+        }
         
         FirstName = firstName;
         LastName = lastName;
@@ -74,7 +82,9 @@ public sealed class Client : Entity
     public void Deactivate()
     {
         if (Status == ClientStatus.Inactive)
+        {
             return;
+        }
         
         Status = ClientStatus.Inactive;
         Raise(new ClientDeactivatedDomainEvent(Id));
@@ -83,7 +93,9 @@ public sealed class Client : Entity
     public void Activate()
     {
         if (Status == ClientStatus.Active)
+        {
             return;
+        }
         
         Status = ClientStatus.Active;
     }

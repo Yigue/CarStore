@@ -80,7 +80,9 @@ public sealed class Car : Entity
     public void MarkAsSold()
     {
         if (ServiceCar == statusServiceCar.Vendido)
+        {
             return;
+        }
         
         ServiceCar = statusServiceCar.Vendido;
         UpdatedAt = DateTime.UtcNow;
@@ -90,7 +92,9 @@ public sealed class Car : Entity
     public void MarkAsAvailable()
     {
         if (ServiceCar == statusServiceCar.Disponible)
+        {
             return;
+        }
         
         ServiceCar = statusServiceCar.Disponible;
         UpdatedAt = DateTime.UtcNow;
@@ -105,6 +109,44 @@ public sealed class Car : Entity
     public void UpdatePrice(Money newPrice)
     {
         Price = newPrice;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateDetails(
+        Marca marca,
+        Modelo modelo,
+        Color color,
+        TypeCar carType,
+        StatusCar carStatus,
+        statusServiceCar serviceCar,
+        int cantidadPuertas,
+        int cantidadAsientos,
+        int cilindrada,
+        int kilometraje,
+        int año,
+        string patente,
+        string descripcion)
+    {
+        Marca = marca;
+        MarcaId = marca.Id;
+        Modelo = modelo;
+        ModeloId = modelo.Id;
+        Color = color;
+        CarType = carType;
+        CarStatus = carStatus;
+        ServiceCar = serviceCar;
+        CantidadPuertas = cantidadPuertas;
+        CantidadAsientos = cantidadAsientos;
+        Cilindrada = cilindrada;
+        Kilometraje = kilometraje;
+        Año = año;
+
+        if (Patente.Value != patente)
+        {
+            Patente = new LicensePlate(patente);
+        }
+
+        Descripcion = descripcion;
         UpdatedAt = DateTime.UtcNow;
     }
 }

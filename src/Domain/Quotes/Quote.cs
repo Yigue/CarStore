@@ -30,7 +30,9 @@ public sealed class Quote : Entity
         string comments)
     {
         if (validUntil <= DateTime.UtcNow)
+        {
             throw new DomainException("ValidUntil must be in the future");
+        }
         
         Car = car;
         CarId = car.Id;
@@ -52,10 +54,14 @@ public sealed class Quote : Entity
         string comments)
     {
         if (Status != QuoteStatus.Pending)
+        {
             throw new DomainException("Only pending quotes can be updated");
+        }
         
         if (validUntil <= DateTime.UtcNow)
+        {
             throw new DomainException("ValidUntil must be in the future");
+        }
         
         ProposedPrice = new Money(proposedPrice);
         ValidUntil = validUntil;
@@ -69,10 +75,14 @@ public sealed class Quote : Entity
         string comments)
     {
         if (Status != QuoteStatus.Pending)
+        {
             throw new DomainException("Only pending quotes can be updated");
+        }
         
         if (validUntil <= DateTime.UtcNow)
+        {
             throw new DomainException("ValidUntil must be in the future");
+        }
         
         ProposedPrice = proposedPrice;
         ValidUntil = validUntil;
@@ -83,10 +93,14 @@ public sealed class Quote : Entity
     public void Accept()
     {
         if (Status != QuoteStatus.Pending)
+        {
             throw new DomainException("Only pending quotes can be accepted");
+        }
         
         if (ValidUntil < DateTime.UtcNow)
+        {
             throw new DomainException("Cannot accept an expired quote");
+        }
         
         Status = QuoteStatus.Accepted;
         UpdatedAt = DateTime.UtcNow;
@@ -96,7 +110,9 @@ public sealed class Quote : Entity
     public void Reject(string reason)
     {
         if (Status != QuoteStatus.Pending)
+        {
             throw new DomainException("Only pending quotes can be rejected");
+        }
         
         Status = QuoteStatus.Rejected;
         UpdatedAt = DateTime.UtcNow;
