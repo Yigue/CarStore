@@ -52,7 +52,9 @@ public sealed class Sale : Entity
     public void Complete()
     {
         if (Status != SaleStatus.Pending)
+        {
             throw new DomainException("Only pending sales can be completed");
+        }
         
         Status = SaleStatus.Completed;
         Raise(new SaleCompletedDomainEvent(Id, CarId, ClientId, FinalPrice, PaymentMethod));
@@ -61,10 +63,14 @@ public sealed class Sale : Entity
     public void Cancel(string reason)
     {
         if (Status != SaleStatus.Pending)
+        {
             throw new DomainException("Only pending sales can be cancelled");
+        }
         
         if (string.IsNullOrWhiteSpace(reason))
+        {
             throw new DomainException("Cancellation reason is required");
+        }
         
         Status = SaleStatus.Cancelled;
         Raise(new SaleCancelledDomainEvent(Id, reason));
@@ -77,7 +83,9 @@ public sealed class Sale : Entity
         string comments)
     {
         if (Status != SaleStatus.Pending)
+        {
             throw new DomainException("Only pending sales can be updated");
+        }
         
         FinalPrice = new Money(finalPrice);
         PaymentMethod = paymentMethod;
@@ -92,7 +100,9 @@ public sealed class Sale : Entity
         string comments)
     {
         if (Status != SaleStatus.Pending)
+        {
             throw new DomainException("Only pending sales can be updated");
+        }
         
         FinalPrice = finalPrice;
         PaymentMethod = paymentMethod;
