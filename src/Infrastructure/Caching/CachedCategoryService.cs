@@ -1,6 +1,6 @@
+using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Domain.Financial.Attributes;
-using Infrastructure.Caching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -9,7 +9,7 @@ namespace Infrastructure.Caching;
 /// <summary>
 /// Servicio para obtener categorías de transacciones con caché
 /// </summary>
-internal sealed class CachedCategoryService
+internal sealed class CachedCategoryService : ICachedCategoryService
 {
     private readonly IApplicationDbContext _context;
     private readonly ICacheService _cacheService;

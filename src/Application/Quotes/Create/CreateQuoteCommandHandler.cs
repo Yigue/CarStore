@@ -42,7 +42,8 @@ internal sealed class CreateQuoteCommandHandler(
             client,
             command.ProposedPrice,
             command.ValidUntil,
-            command.Comments);
+            command.Comments,
+            dateTimeProvider.UtcNow);
 
         context.Quotes.Add(quote);
 

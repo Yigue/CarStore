@@ -42,7 +42,8 @@ public sealed class FinancialTransaction : Entity
         TransactionCategory category,
         Car? car = null,
         Client? client = null,
-        Sale? sale = null)
+        Sale? sale = null,
+        DateTime transactionDate = default)
     {
         Type = type;
         Amount = new Money(amount);
@@ -65,7 +66,7 @@ public sealed class FinancialTransaction : Entity
         {
             SaleId = sale.Id;
         }
-        TransactionDate = DateTime.UtcNow;
+        TransactionDate = transactionDate == default ? DateTime.UtcNow : transactionDate;
     }
     
     public FinancialTransaction(
@@ -76,7 +77,8 @@ public sealed class FinancialTransaction : Entity
         TransactionCategory category,
         Car? car = null,
         Client? client = null,
-        Sale? sale = null)
+        Sale? sale = null,
+        DateTime transactionDate = default)
     {
         Type = type;
         Amount = amount;
@@ -99,7 +101,7 @@ public sealed class FinancialTransaction : Entity
         {
             SaleId = sale.Id;
         }
-        TransactionDate = DateTime.UtcNow;
+        TransactionDate = transactionDate == default ? DateTime.UtcNow : transactionDate;
     }
 
     // Métodos para actualizar propiedades

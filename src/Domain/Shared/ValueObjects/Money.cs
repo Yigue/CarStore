@@ -9,6 +9,7 @@ public sealed record Money
 
     private Money() { } // Para EF Core
 
+#pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
     public Money(decimal amount, string currency = "USD")
     {
         if (amount < 0)

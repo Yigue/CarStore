@@ -1,6 +1,7 @@
 using Application.Abstractions.Behaviors;
 using FluentValidation;
 using FluentValidation.Results;
+using MediatR;
 using Moq;
 using SharedKernel;
 using FluentAssertions;

@@ -6,7 +6,7 @@ using Domain.Clients;
 using Domain.Financial;
 using Domain.Financial.Attributes;
 using Domain.Sales;
-using Infrastructure.Caching;
+using Application.Abstractions.Caching;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -14,7 +14,7 @@ namespace Application.Financial.Create;
 
 internal sealed class CreateFinancialCommandHandler(
     IApplicationDbContext context,
-    CachedCategoryService cachedCategoryService)
+    ICachedCategoryService cachedCategoryService)
     : ICommandHandler<CreateFinancialCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateFinancialCommand command, CancellationToken cancellationToken)

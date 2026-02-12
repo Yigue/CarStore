@@ -19,4 +19,8 @@ public static class UserErrors
     public static readonly Error EmailNotUnique = Error.Conflict(
         "Users.EmailNotUnique",
         "The provided email is not unique");
+
+    public static readonly Error InvalidPassword = Error.Problem(
+        "Users.InvalidPassword",
+        "The password provided is incorrect");
 }

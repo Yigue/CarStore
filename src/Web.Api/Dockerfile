@@ -39,7 +39,7 @@ RUN dotnet build "./Web.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build --no-r
 # Publish the application
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Web.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false --no-build
+RUN dotnet publish "./Web.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 # Create final runtime image
 FROM base AS final

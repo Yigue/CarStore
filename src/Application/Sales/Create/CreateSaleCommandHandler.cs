@@ -4,6 +4,7 @@ using Domain.Cars;
 using Domain.Cars.Atribbutes;
 using Domain.Cars.Events;
 using Domain.Clients;
+using Domain.Clients.Attributes;
 using Domain.Quotes;
 using Domain.Sales;
 using Domain.Sales.Events;
@@ -13,7 +14,8 @@ using SharedKernel;
 namespace Application.Sales.Create;
 
 internal sealed class CreateSaleCommandHandler(
-    IApplicationDbContext context)
+    IApplicationDbContext context,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<CreateSaleCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateSaleCommand command, CancellationToken cancellationToken)
@@ -30,7 +32,7 @@ internal sealed class CreateSaleCommandHandler(
         {
             return Result.Failure<Guid>(CarErrors.AlreadySold(command.CarId));
         }
-
+ 
         // Verify if client exists
         Client? client = await context.Clients.FindAsync(new object[] { command.ClientId }, cancellationToken);
         if (client == null)
@@ -43,18 +45,19 @@ internal sealed class CreateSaleCommandHandler(
         {
             return Result.Failure<Guid>(ClientErrors.Inactive(client.Id));
         }
-
+ 
         var sale = new Sale(
             command.CarId,
             command.ClientId,
             command.FinalPrice,
             command.PaymentMethod,
             command.ContractNumber,
-            command.Comments
+            command.Comments,
+            dateTimeProvider.UtcNow
             );
-
+ 
         // Update car status using domain method
-        car.MarkAsSold();
+        car.MarkAsSold(dateTimeProvider.UtcNow);
 
         context.Sales.Add(sale);
 

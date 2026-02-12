@@ -4,7 +4,7 @@ using Application.Abstractions.Messaging;
 using Domain.Cars;
 using Domain.Cars.Atribbutes;
 using Domain.Shared.ValueObjects;
-using Infrastructure.Caching;
+using Application.Abstractions.Caching;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -13,8 +13,8 @@ namespace Application.Cars.Update;
 internal sealed class UpdateCarCommandHandler(
     IApplicationDbContext context,
     IDateTimeProvider dateTimeProvider,
-    CachedBrandService cachedBrandService,
-    CachedModelService cachedModelService)
+    ICachedBrandService cachedBrandService,
+    ICachedModelService cachedModelService)
     : ICommandHandler<UpdateCarCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(UpdateCarCommand command, CancellationToken cancellationToken)
@@ -45,34 +45,37 @@ internal sealed class UpdateCarCommandHandler(
 
 
         // Update properties that need to be public for EF Core
-        car.Marca = marca;
-        car.Modelo = modelo;
-        car.Color = command.Color;
-        car.CarType = command.CarType;
-        car.CarStatus = command.CarStatus;
-        car.ServiceCar = command.ServiceCar;
-        car.CantidadPuertas = command.CantidadPuertas;
-        car.CantidadAsientos = command.CantidadAsientos;
-        car.Cilindrada = command.Cilindrada;
-        car.Kilometraje = command.Kilometraje;
-        car.Año = command.Año;
-        car.Patente = new LicensePlate(command.Patente);
-        car.Descripcion = command.Descripcion;
+        // Update properties that need to be public for EF Core
+        car.UpdateDetails(
+            marca,
+            modelo,
+            command.Color,
+            command.CarType,
+            command.CarStatus,
+            command.ServiceCar,
+            command.CantidadPuertas,
+            command.CantidadAsientos,
+            command.Cilindrada,
+            command.Kilometraje,
+            command.Año,
+            command.Patente,
+            command.Descripcion,
+            dateTimeProvider.UtcNow);
         
         // Use domain method for price update
         if (car.Price.Amount != command.Price)
         {
-            car.UpdatePrice(command.Price);
+            car.UpdatePrice(command.Price, dateTimeProvider.UtcNow);
         }
         
         // Handle service status changes using domain methods
         if (command.ServiceCar == statusServiceCar.Vendido && car.ServiceCar != statusServiceCar.Vendido)
         {
-            car.MarkAsSold();
+            car.MarkAsSold(dateTimeProvider.UtcNow);
         }
         else if (command.ServiceCar == statusServiceCar.Disponible && car.ServiceCar != statusServiceCar.Disponible)
         {
-            car.MarkAsAvailable();
+            car.MarkAsAvailable(dateTimeProvider.UtcNow);
         }
 
         await context.SaveChangesAsync(cancellationToken);

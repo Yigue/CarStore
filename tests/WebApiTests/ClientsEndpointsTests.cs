@@ -55,7 +55,7 @@ public class ClientsEndpointsTests
         await using var factory = new CustomWebApplicationFactory();
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var entity = new Client("Jane", "Smith", "222", "jane@example.com", "456", "Road");
+        var entity = new Client("Jane", "Smith", "222", "jane@example.com", "456", "Road", DateTime.UtcNow);
         context.Clients.Add(entity);
         await context.SaveChangesAsync();
 

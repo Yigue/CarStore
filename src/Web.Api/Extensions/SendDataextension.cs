@@ -2,6 +2,7 @@
 #pragma warning disable IDE0007
 
 using Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
 using Domain.Cars;
 using Domain.Clients;
 using Domain.Quotes;
@@ -65,6 +66,7 @@ public static class SeedDataExtensions
 
         var carFaker = new Faker<Car>()
             .CustomInstantiator(f => new Car(
+                Guid.Parse("11111111-1111-1111-1111-111111111111"), // Usar ID fijo de desarrollo
                 f.PickRandom(marcas),
                 f.PickRandom(modelos),
                 f.PickRandom<Color>(),
@@ -76,7 +78,7 @@ public static class SeedDataExtensions
                 f.Random.Int(1000, 3000),
                 f.Random.Int(0, 100000),
                 f.Random.Int(2015, 2024),
-                f.Random.Replace("???-####"),
+                f.Random.Replace("??###??"),
                 f.Lorem.Sentence(),
                 f.Random.Decimal(15000, 50000),
                 DateTime.Now.ToUniversalTime()
@@ -94,12 +96,14 @@ public static class SeedDataExtensions
         {
             var clientFaker = new Faker<Client>()
                 .CustomInstantiator(f => new Client(
+                    Guid.Parse("11111111-1111-1111-1111-111111111111"), // DealerId fijo
                     f.Name.FirstName(),
                     f.Name.LastName(),
                     f.Random.Replace("#######"),
                     f.Internet.Email(),
                     f.Phone.PhoneNumber(),
-                    f.Address.FullAddress()
+                    f.Address.FullAddress(),
+                    f.Date.Past(2).ToUniversalTime()
                 ));
 
             var clients = clientFaker.Generate(5);
@@ -112,8 +116,8 @@ public static class SeedDataExtensions
     {
         if (!context.Set<Quote>().Any())
         {
-            var cars = context.Set<Car>().ToList();
-            var clients = context.Set<Client>().ToList();
+            var cars = context.Set<Car>().IgnoreQueryFilters().ToList();
+            var clients = context.Set<Client>().IgnoreQueryFilters().ToList();
             
             if (cars.Count == 0 || clients.Count == 0)
             {
@@ -143,18 +147,19 @@ public static class SeedDataExtensions
         return new Quote(
             car,
             client,
-            f.Random.Decimal(car.Price * 0.9m, car.Price * 1.1m),
+            f.Random.Decimal((car.Price * 0.9m).Amount, (car.Price * 1.1m).Amount),
             f.Date.Future().ToUniversalTime(), // Ensure UTC
-            f.Lorem.Sentence()
+            f.Lorem.Sentence(),
+            f.Date.Recent().ToUniversalTime()
         );
     }
 
-   private static void SeedSales(ApplicationDbContext context)
+    private static void SeedSales(ApplicationDbContext context)
     {
         if (!context.Set<Sale>().Any())
         {
-            var cars = context.Set<Car>().ToList();
-            var clients = context.Set<Client>().ToList();
+            var cars = context.Set<Car>().IgnoreQueryFilters().ToList();
+            var clients = context.Set<Client>().IgnoreQueryFilters().ToList();
 
             // Validar que hay datos
             if (cars.Count == 0 || clients.Count == 0)
@@ -168,10 +173,11 @@ public static class SeedDataExtensions
                 .CustomInstantiator(f => new Sale(
                     f.PickRandom(cars).Id, // Usar PickRandom de Bogus
                     f.PickRandom(clients).Id,
-                    f.PickRandom(cars).Price, // Obtener precio del Car seleccionado
+                    f.PickRandom(cars).Price.Amount, // Obtener precio del Car seleccionado
                     PaymentMethod.Cash,
                     f.Random.Replace("#######"),
-                    f.Lorem.Sentence()
+                    f.Lorem.Sentence(),
+                    f.Date.Recent().ToUniversalTime()
                 ));
 
             var sales = saleFaker.Generate(5);
@@ -198,10 +204,10 @@ public static class SeedDataExtensions
 
     if (!context.Set<FinancialTransaction>().Any())
     {
-        var categories = context.Set<TransactionCategory>().ToList();
-        var sales = context.Set<Sale>().ToList();
-        var car = context.Set<Car>().ToList();
-        var client = context.Set<Client>().ToList();
+        var categories = context.Set<TransactionCategory>().IgnoreQueryFilters().ToList();
+        var sales = context.Set<Sale>().IgnoreQueryFilters().ToList();
+        var car = context.Set<Car>().IgnoreQueryFilters().ToList();
+        var client = context.Set<Client>().IgnoreQueryFilters().ToList();
 
         if (categories.Count == 0 || sales.Count == 0)
         {

@@ -7,6 +7,9 @@ using Serilog;
 using Web.Api;
 using Web.Api.Extensions;
 using Microsoft.Extensions.FileProviders;
+using Asp.Versioning;
+using Asp.Versioning.Builder;
+using Asp.Versioning.ApiExplorer;
 using System.IO;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -26,7 +29,7 @@ builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 builder.Services.AddCors(options =>
 {
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
-        ?? new[] { "http://localhost:3000", "http://localhost:5173" };
+        ?? ["http://localhost:3000", "http://localhost:5173"];
     
     options.AddPolicy("CorsPolicy", policy =>
     {
@@ -41,9 +44,23 @@ WebApplication app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwaggerWithUi();
-    app.ApplyMigrations();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        IReadOnlyList<ApiVersionDescription> descriptions = app.DescribeApiVersions();
+
+        foreach (ApiVersionDescription description in descriptions)
+        {
+            options.SwaggerEndpoint(
+                $"/swagger/{description.GroupName}/swagger.json",
+                description.GroupName.ToUpperInvariant());
+        }
+    });
+
+    app.SeedTestData();
 }
+
+app.ApplyMigrations();
 
 // Configurar middleware en el orden correcto
 app.UseRouting();
@@ -79,7 +96,16 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Mapear endpoints después de configurar middleware
-app.MapEndpoints();
+ApiVersionSet apiVersionSet = app.NewApiVersionSet()
+    .HasApiVersion(new ApiVersion(1))
+    .ReportApiVersions()
+    .Build();
+
+RouteGroupBuilder versionedGroup = app
+    .MapGroup("api/v{version:apiVersion}")
+    .WithApiVersionSet(apiVersionSet);
+
+versionedGroup.MapEndpoints();
 
 app.MapHealthChecks("health", new HealthCheckOptions
 {

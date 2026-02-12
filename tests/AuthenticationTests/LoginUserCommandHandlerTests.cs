@@ -23,7 +23,7 @@ public class LoginUserCommandHandlerTests
     public async Task Handle_ReturnsFailure_WhenPasswordIsInvalid()
     {
         await using var context = CreateContext();
-        var user = new User { Email = "user@test.com", PasswordHash = "hash" };
+        var user = new User("user@test.com", "John", "Doe", "hash");
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -44,7 +44,7 @@ public class LoginUserCommandHandlerTests
     public async Task Handle_ReturnsToken_WhenCredentialsValid()
     {
         await using var context = CreateContext();
-        var user = new User { Email = "user@test.com", PasswordHash = "hash" };
+        var user = new User("user@test.com", "John", "Doe", "hash");
         context.Users.Add(user);
         await context.SaveChangesAsync();
 

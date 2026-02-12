@@ -60,6 +60,11 @@
       "key": "categoryId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "imageId",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -103,8 +108,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/users/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "login"
+              ]
             },
             "description": "Login con el usuario admin seedeado. El token se guarda automáticamente."
           },
@@ -144,8 +154,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/users/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", "register"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "register"
+              ]
             },
             "description": "Registrar un nuevo usuario"
           },
@@ -180,8 +195,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/users/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "login"
+              ]
             },
             "description": "Login con el usuario recién creado"
           },
@@ -212,8 +232,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/users/{{createdUserId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", "{{createdUserId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{createdUserId}}"
+              ]
             },
             "description": "Obtener información de un usuario por ID"
           },
@@ -248,8 +273,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/users/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "login"
+              ]
             },
             "description": "Test de login fallido con credenciales incorrectas"
           },
@@ -299,8 +329,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/clients",
-              "host": ["{{baseUrl}}"],
-              "path": ["clients"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "clients"
+              ]
             },
             "description": "Crear un nuevo cliente"
           },
@@ -336,8 +370,12 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/clients",
-              "host": ["{{baseUrl}}"],
-              "path": ["clients"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "clients"
+              ]
             },
             "description": "Obtener lista de todos los clientes"
           },
@@ -368,8 +406,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/clients/{{createdClientId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["clients", "{{createdClientId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "clients",
+                "{{createdClientId}}"
+              ]
             },
             "description": "Obtener cliente por ID"
           },
@@ -408,8 +451,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/clients/{{createdClientId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["clients", "{{createdClientId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "clients",
+                "{{createdClientId}}"
+              ]
             },
             "description": "Actualizar datos del cliente. Status: 0=Active, 1=Inactive"
           },
@@ -448,8 +496,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/clients",
-              "host": ["{{baseUrl}}"],
-              "path": ["clients"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "clients"
+              ]
             },
             "description": "Crear otro cliente para pruebas de ventas"
           },
@@ -480,8 +532,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/clients/{{createdClientId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["clients", "{{createdClientId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "clients",
+                "{{createdClientId}}"
+              ]
             },
             "description": "Eliminar cliente por ID"
           },
@@ -524,8 +581,12 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/cars",
-              "host": ["{{baseUrl}}"],
-              "path": ["cars"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars"
+              ]
             },
             "description": "Obtener todos los autos para ver los IDs de marcas y modelos seedeados"
           },
@@ -587,8 +648,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/cars",
-              "host": ["{{baseUrl}}"],
-              "path": ["cars"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars"
+              ]
             },
             "description": "Crear un nuevo auto.\n\nEnums:\n- color: 0=White, 1=Black, 2=Gray, 3=Silver, 4=Red, 5=Blue, 6=Green, 7=Yellow, 8=Brown\n- carType: 0=Sedan, 1=Coupe, 2=Hatchback, 3=SUV, 4=Pickup, 5=Minivan\n- carStatus: 0=New, 1=Used, 2=Certified\n- serviceCar: 0=Service, 1=EnVenta, 2=Vendido, 3=Disponible, 4=NoDisponible\n\n⚠️ IMPORTANTE: Debes reemplazar marcaId y modeloId con GUIDs válidos de la BD."
           },
@@ -624,8 +689,12 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/cars",
-              "host": ["{{baseUrl}}"],
-              "path": ["cars"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars"
+              ]
             },
             "description": "Obtener lista de todos los autos"
           },
@@ -656,8 +725,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/cars/{{createdCarId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["cars", "{{createdCarId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars",
+                "{{createdCarId}}"
+              ]
             },
             "description": "Obtener auto por ID"
           },
@@ -696,8 +770,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/cars/{{createdCarId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["cars", "{{createdCarId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars",
+                "{{createdCarId}}"
+              ]
             },
             "description": "Actualizar datos del auto"
           },
@@ -723,8 +802,14 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/cars/search?minPrice=10000&maxPrice=50000&status=3",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "cars", "search"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cars",
+                "search"
+              ],
               "query": [
                 {
                   "key": "minPrice",
@@ -770,8 +855,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/cars/{{createdCarId}}/images",
-              "host": ["{{baseUrl}}"],
-              "path": ["cars", "{{createdCarId}}", "images"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars",
+                "{{createdCarId}}",
+                "images"
+              ]
             },
             "description": "Obtener imágenes de un auto específico"
           },
@@ -802,8 +893,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/cars/images",
-              "host": ["{{baseUrl}}"],
-              "path": ["cars", "images"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars",
+                "images"
+              ]
             },
             "description": "Obtener todas las imágenes de autos"
           },
@@ -854,15 +950,148 @@
             },
             "url": {
               "raw": "{{baseUrl}}/cars/{{createdCarId}}/images",
-              "host": ["{{baseUrl}}"],
-              "path": ["cars", "{{createdCarId}}", "images"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars",
+                "{{createdCarId}}",
+                "images"
+              ]
             },
             "description": "Subir imagen para un auto. Selecciona un archivo de imagen en el campo 'file'."
           },
           "response": []
         },
         {
-          "name": "3.9 Delete Car",
+          "name": "3.9 Get Primary Images",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code es 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response es un array', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cars/primary-images",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars",
+                "primary-images"
+              ]
+            },
+            "description": "Obtener lista de imágenes principales de todos los autos. Útil para mostrar miniaturas en listados."
+          },
+          "response": []
+        },
+        {
+          "name": "3.10 Get Image With SAS Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code es 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response tiene URL', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.url).to.not.be.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cars/{{imageId}}/url",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars",
+                "{{imageId}}",
+                "url"
+              ]
+            },
+            "description": "Regenerar URL con SAS token para una imagen específica. Útil cuando el token SAS expira (Azure Blob Storage)."
+          },
+          "response": []
+        },
+        {
+          "name": "3.11 Regenerate All Image URLs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code es 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response tiene mensaje', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.not.be.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cars/regenerate-image-urls",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars",
+                "regenerate-image-urls"
+              ]
+            },
+            "description": "Regenerar todas las URLs de imágenes con nuevos tokens SAS. Ejecutar si los tokens han expirado (Azure Blob Storage). ⚠️ Operación costosa, usar con moderación."
+          },
+          "response": []
+        },
+        {
+          "name": "3.12 Delete Car",
           "event": [
             {
               "listen": "test",
@@ -886,8 +1115,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/cars/{{createdCarId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["cars", "{{createdCarId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars",
+                "{{createdCarId}}"
+              ]
             },
             "description": "Eliminar auto por ID"
           },
@@ -937,8 +1171,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/sales",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales"
+              ]
             },
             "description": "Crear una nueva venta.\n\nPaymentMethod: 0=Cash, 1=Credit, 2=Debit, 3=Transfer\n\n⚠️ IMPORTANTE: Necesitas IDs válidos de Car y Client."
           },
@@ -974,8 +1212,12 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/sales",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales"
+              ]
             },
             "description": "Obtener lista de todas las ventas"
           },
@@ -1006,8 +1248,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/sales/{{createdSaleId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", "{{createdSaleId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "{{createdSaleId}}"
+              ]
             },
             "description": "Obtener venta por ID"
           },
@@ -1046,8 +1293,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/sales/{{createdSaleId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", "{{createdSaleId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "{{createdSaleId}}"
+              ]
             },
             "description": "Actualizar venta. Status: 0=Pending, 1=Completed, 2=Cancelled. PaymentMethod: 0=Cash, 1=Credit, 2=Debit, 3=Transfer"
           },
@@ -1086,8 +1338,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/sales/{{createdSaleId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["sales", "{{createdSaleId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "{{createdSaleId}}"
+              ]
             },
             "description": "Marcar venta como completada (status=1)"
           },
@@ -1137,8 +1394,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/quotes",
-              "host": ["{{baseUrl}}"],
-              "path": ["quotes"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quotes"
+              ]
             },
             "description": "Crear una nueva cotización.\n\n⚠️ IMPORTANTE: Necesitas IDs válidos de Car y Client."
           },
@@ -1174,8 +1435,12 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/quotes",
-              "host": ["{{baseUrl}}"],
-              "path": ["quotes"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quotes"
+              ]
             },
             "description": "Obtener lista de todas las cotizaciones"
           },
@@ -1206,8 +1471,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/quotes/{{createdQuoteId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["quotes", "{{createdQuoteId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quotes",
+                "{{createdQuoteId}}"
+              ]
             },
             "description": "Obtener cotización por ID"
           },
@@ -1238,8 +1508,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/quotes/expired",
-              "host": ["{{baseUrl}}"],
-              "path": ["quotes", "expired"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quotes",
+                "expired"
+              ]
             },
             "description": "Obtener cotizaciones expiradas"
           },
@@ -1278,8 +1553,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/quotes/{{createdQuoteId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["quotes", "{{createdQuoteId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quotes",
+                "{{createdQuoteId}}"
+              ]
             },
             "description": "Actualizar cotización"
           },
@@ -1310,8 +1590,14 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/quotes/{{createdQuoteId}}/accept",
-              "host": ["{{baseUrl}}"],
-              "path": ["quotes", "{{createdQuoteId}}", "accept"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quotes",
+                "{{createdQuoteId}}",
+                "accept"
+              ]
             },
             "description": "Aceptar cotización"
           },
@@ -1350,8 +1636,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/quotes/{{createdQuoteId}}/reject",
-              "host": ["{{baseUrl}}"],
-              "path": ["quotes", "{{createdQuoteId}}", "reject"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quotes",
+                "{{createdQuoteId}}",
+                "reject"
+              ]
             },
             "description": "Rechazar cotización con razón"
           },
@@ -1382,8 +1674,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/quotes/{{createdQuoteId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["quotes", "{{createdQuoteId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "quotes",
+                "{{createdQuoteId}}"
+              ]
             },
             "description": "Eliminar cotización por ID"
           },
@@ -1433,8 +1730,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/financial",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial"
+              ]
             },
             "description": "Crear una nueva transacción financiera.\n\nTransactionType: 0=Income, 1=Expense\nPaymentMethod: 0=Cash, 1=Credit, 2=Debit, 3=Transfer\n\n⚠️ IMPORTANTE: Necesitas un ID de categoría válido."
           },
@@ -1473,8 +1774,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/financial",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial"
+              ]
             },
             "description": "Crear transacción de ingreso por venta (con todas las relaciones)"
           },
@@ -1513,8 +1818,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/financial",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial"
+              ]
             },
             "description": "Crear transacción de gasto (type=1 Expense)"
           },
@@ -1550,8 +1859,12 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/financial",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial"
+              ]
             },
             "description": "Obtener lista de todas las transacciones financieras"
           },
@@ -1590,8 +1903,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/financial/{{createdFinancialId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "{{createdFinancialId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "{{createdFinancialId}}"
+              ]
             },
             "description": "Actualizar transacción financiera"
           },
@@ -1622,8 +1940,13 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/financial/{{createdFinancialId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "{{createdFinancialId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "{{createdFinancialId}}"
+              ]
             },
             "description": "Eliminar transacción financiera por ID"
           },
@@ -1631,6 +1954,195 @@
         }
       ],
       "description": "Endpoints para gestión de transacciones financieras"
+    },
+    {
+      "name": "⚙️ Master Data",
+      "item": [
+        {
+          "name": "Get Marcas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/marcas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "marcas"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Modelos By Marca",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/modelos/marca/{{marcaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelos",
+                "marca",
+                "{{marcaId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Transaction Categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.length > 0) {",
+                  "    pm.collectionVariables.set('categoryId', jsonData[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Transaction Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('createdCategoryId', jsonData);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"New Category\",\n    \"description\": \"Created via Postman\",\n    \"type\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/financial/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Transaction Category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Updated Category\",\n    \"description\": \"Updated via Postman\",\n    \"type\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/financial/categories/{{createdCategoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "categories",
+                "{{createdCategoryId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Transaction Category",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/categories/{{createdCategoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "categories",
+                "{{createdCategoryId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     },
     {
       "name": "🔧 7. Setup Helpers",
@@ -1672,8 +2184,12 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/cars",
-              "host": ["{{baseUrl}}"],
-              "path": ["cars"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cars"
+              ]
             },
             "description": "Obtener autos para extraer IDs de marcas y modelos seedeados.\n\nRevisa la respuesta en la consola para encontrar los IDs."
           },
@@ -1699,8 +2215,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
             },
             "description": "Verificar que la API está corriendo"
           },
@@ -1711,4 +2231,3 @@
     }
   ]
 }
-

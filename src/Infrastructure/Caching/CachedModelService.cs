@@ -1,6 +1,6 @@
+using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Domain.Cars.Atribbutes;
-using Infrastructure.Caching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -9,7 +9,7 @@ namespace Infrastructure.Caching;
 /// <summary>
 /// Servicio para obtener modelos con caché
 /// </summary>
-internal sealed class CachedModelService
+internal sealed class CachedModelService : ICachedModelService
 {
     private readonly IApplicationDbContext _context;
     private readonly ICacheService _cacheService;

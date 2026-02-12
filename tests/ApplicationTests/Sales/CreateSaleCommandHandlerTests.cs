@@ -29,14 +29,15 @@ public class CreateSaleCommandHandlerTests
         var marca = new Marca("Ford");
         var modelo = new Modelo("Fiesta", marca.Id);
         var car = new Car(marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New, statusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "XYZ789", "desc", 10000m, DateTime.UtcNow);
-        var client = new Client("Alice", "Johnson", "789", "alice@test.com", "111", "Addr1");
+        var client = new Client("Alice", "Johnson", "789", "alice@test.com", "111", "Addr1", DateTime.UtcNow);
         context.Marca.Add(marca);
         context.Modelo.Add(modelo);
         context.Cars.Add(car);
         context.Clients.Add(client);
         await context.SaveChangesAsync();
 
-        var handler = new CreateSaleCommandHandler(context);
+        var dateProvider = new FakeDateTimeProvider();
+        var handler = new CreateSaleCommandHandler(context, dateProvider);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN123", "ok");
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -50,18 +51,19 @@ public class CreateSaleCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_Car_NotFound()
     {
         using var context = CreateContext();
-        var client = new Client("Bob", "Brown", "123", "bob@test.com", "111", "Addr");
+        var client = new Client("Bob", "Brown", "123", "bob@test.com", "111", "Addr", DateTime.UtcNow);
         context.Clients.Add(client);
         await context.SaveChangesAsync();
 
-        var handler = new CreateSaleCommandHandler(context);
+        var dateProvider = new FakeDateTimeProvider();
+        var handler = new CreateSaleCommandHandler(context, dateProvider);
         var carId = Guid.NewGuid();
         var command = new CreateSaleCommand(carId, client.Id, 1000m, PaymentMethod.Cash, "C", "comment");
 
         var result = await handler.Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Should().Be(SalesErrors.NotFound(carId));
+        result.Error.Should().Be(CarErrors.NotFound(carId));
         context.Sales.Should().BeEmpty();
     }
 }

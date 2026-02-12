@@ -7,23 +7,25 @@ using SharedKernel;
 namespace Application.Quotes.Update;
 
 internal sealed class UpdateQuoteCommandHandler(
-    IApplicationDbContext context)
+    IApplicationDbContext context,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<UpdateQuoteCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(UpdateQuoteCommand command, CancellationToken cancellationToken)
     {
         Quote? quote = await context.Quotes
             .FirstOrDefaultAsync(q => q.Id == command.Id, cancellationToken);
-
+ 
         if (quote is null)
         {
             return Result.Failure<Guid>(QuoteErrors.NotFound(command.Id));
         }
-
+ 
         quote.Update(
             command.ProposedPrice,
             command.ValidUntil,
-            command.Comments);
+            command.Comments,
+            dateTimeProvider.UtcNow);
 
         await context.SaveChangesAsync(cancellationToken);
 

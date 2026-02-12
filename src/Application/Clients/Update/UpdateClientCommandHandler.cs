@@ -2,6 +2,7 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Clients;
+using Domain.Clients.Attributes;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -27,7 +28,8 @@ internal sealed class UpdateClientCommandHandler(
             command.LastName,
             command.Email,
             command.Phone,
-            command.Address);
+            command.Address,
+            dateTimeProvider.UtcNow);
         
         // Handle status change using domain methods
         if (command.Status == ClientStatus.Active && client.Status == ClientStatus.Inactive)

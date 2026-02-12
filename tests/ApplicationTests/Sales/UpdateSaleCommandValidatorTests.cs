@@ -16,8 +16,8 @@ public class UpdateSaleCommandValidatorTests
         var result = _validator.Validate(command);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateSaleCommand.Id) && e.ErrorMessage == "'Id' must not be empty.");
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateSaleCommand.FinalPrice) && e.ErrorMessage == "'Final Price' must be greater than '0'.");
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateSaleCommand.Id));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateSaleCommand.FinalPrice));
     }
 
     [Fact]

@@ -3,7 +3,7 @@ using MediatR;
 
 namespace Application.Users.Register;
 
-internal sealed class UserRegisteredDomainEventHandler(IUserNotificationService notificationService)
+public sealed class UserRegisteredDomainEventHandler(IUserNotificationService notificationService)
     : INotificationHandler<UserRegisteredDomainEvent>
 {
     public Task Handle(UserRegisteredDomainEvent notification, CancellationToken cancellationToken)

@@ -16,6 +16,7 @@ internal sealed class LoginUserCommandHandler(
     {
         User? user = await context.Users
             .AsNoTracking()
+            .IgnoreQueryFilters()
             .SingleOrDefaultAsync(u => u.Email == command.Email, cancellationToken);
 
         if (user is null)
@@ -27,7 +28,7 @@ internal sealed class LoginUserCommandHandler(
 
         if (!verified)
         {
-            return Result.Failure<string>(UserErrors.NotFoundByEmail);
+            return Result.Failure<string>(UserErrors.InvalidPassword);
         }
 
         string token = tokenProvider.Create(user);

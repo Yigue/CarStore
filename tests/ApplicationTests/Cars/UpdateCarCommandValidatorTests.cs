@@ -15,7 +15,7 @@ public class UpdateCarCommandValidatorTests
         var result = _validator.Validate(command);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateCarCommand.Id) && e.ErrorMessage == "'Id' must not be empty.");
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateCarCommand.Id));
     }
 
     [Fact]

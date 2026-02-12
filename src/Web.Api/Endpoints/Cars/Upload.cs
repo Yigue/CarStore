@@ -25,42 +25,31 @@ internal sealed class Upload : IEndpoint
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            try
+            if (request.file == null || request.file.Length == 0)
             {
-                // Validar que se haya enviado un archivo
-                if (request.file == null || request.file.Length == 0)
-                {
-                    return Results.BadRequest("No file uploaded.");
-                }
-
-                // Leer el archivo en un MemoryStream
-                using var memoryStream = new MemoryStream();
-                await request.file.CopyToAsync(memoryStream, cancellationToken);
-
-                // Crear el comando para subir la imagen
-                var command = new UploadImageCarCommand
-                {
-                    CarId = Guid.Parse(request.carId), // Convierte el carId a GUID
-                    ImageData = memoryStream.ToArray(), // Bytes del archivo
-                    FileName = request.file.FileName, // Nombre del archivo
-                    IsPrimary = request.isPrimary, // ¿Es la imagen principal?
-                    Order = request.order // Orden de la imagen
-                };
-
-                // Enviar el comando al manejador
-                Result<Guid> result = await sender.Send(command, cancellationToken);
-
-                // Devolver la respuesta
-                return result.Match(Results.Ok, CustomResults.Problem);
+                return Results.BadRequest("No file uploaded.");
             }
-            catch (FormatException)
+
+            // Leer el archivo en un MemoryStream
+            using var memoryStream = new MemoryStream();
+            await request.file.CopyToAsync(memoryStream, cancellationToken);
+
+            // Crear el comando para subir la imagen
+            // Guid.Parse will throw format exception if invalid, handled by GlobalExceptionHandler
+            var command = new UploadImageCarCommand
             {
-                return Results.BadRequest("GUID inválido para el coche.");
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem(ex.Message);
-            }
+                CarId = Guid.Parse(request.carId), 
+                ImageData = memoryStream.ToArray(), 
+                FileName = request.file.FileName, 
+                IsPrimary = request.isPrimary, 
+                Order = request.order 
+            };
+
+            // Enviar el comando al manejador
+            Result<Guid> result = await sender.Send(command, cancellationToken);
+
+            // Devolver la respuesta
+            return result.Match(Results.Ok, CustomResults.Problem);
         })
         .HasPermission(Permissions.CarsUpdate)
         .WithTags(Tags.Cars)

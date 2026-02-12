@@ -20,20 +20,17 @@ public static class EndpointExtensions
         return services;
     }
 
-    public static IApplicationBuilder MapEndpoints(
-        this WebApplication app,
-        RouteGroupBuilder? routeGroupBuilder = null)
+    public static IEndpointRouteBuilder MapEndpoints(
+        this IEndpointRouteBuilder builder)
     {
-        IEnumerable<IEndpoint> endpoints = app.Services.GetRequiredService<IEnumerable<IEndpoint>>();
-
-        IEndpointRouteBuilder builder = routeGroupBuilder is null ? app : routeGroupBuilder;
+        IEnumerable<IEndpoint> endpoints = builder.ServiceProvider.GetRequiredService<IEnumerable<IEndpoint>>();
 
         foreach (IEndpoint endpoint in endpoints)
         {
             endpoint.MapEndpoint(builder);
         }
 
-        return app;
+        return builder;
     }
 
     public static RouteHandlerBuilder HasPermission(this RouteHandlerBuilder app, string permission)

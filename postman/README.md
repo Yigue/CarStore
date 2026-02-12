@@ -27,10 +27,12 @@ La colección viene con estas variables pre-configuradas:
 | `marcaId` | (vacío) | ID de marca para crear autos |
 | `modeloId` | (vacío) | ID de modelo para crear autos |
 | `categoryId` | (vacío) | ID de categoría para transacciones |
+| `imageId` | (vacío) | ID de imagen para regenerar URL SAS |
 
 ### Cambiar URL Base
 
 Si tu API corre en otro puerto o host:
+
 1. Click en la colección `CarStore API`
 2. Ve a la pestaña `Variables`
 3. Cambia el valor de `baseUrl`
@@ -38,17 +40,21 @@ Si tu API corre en otro puerto o host:
 ## 🚀 Orden de Ejecución Recomendado
 
 ### Paso 1: Login
+
 Ejecuta primero `1.1 Login - Admin Seedeado` para obtener el token de autenticación.
 
 El token se guarda automáticamente en la variable `authToken`.
 
 ### Paso 2: Obtener IDs Seedeados
+
 Ejecuta `3.0 Get All Cars (para obtener IDs seedeados)` para ver los datos disponibles.
 
 Copia los IDs de marca y modelo a las variables de la colección.
 
 ### Paso 3: Ejecutar Tests
+
 Sigue el orden de las carpetas:
+
 1. Users (Autenticación)
 2. Clients (Clientes)
 3. Cars (Vehículos)
@@ -70,18 +76,21 @@ Sigue el orden de las carpetas:
 La base de datos viene con:
 
 ### Marcas (4)
+
 - Toyota
 - Ford
 - Chevrolet
 - Volkswagen
 
 ### Modelos (16 - 4 por marca)
+
 - Toyota: Corolla, Camry, Hilux, RAV4
 - Ford: Focus, Fiesta, Ranger, Mustang
 - Chevrolet: Cruze, Onix, S10, Camaro
 - Volkswagen: Golf, Polo, Amarok, Vento
 
 ### Categorías de Transacciones (7)
+
 - Venta de Auto (Income)
 - Compra de Auto (Expense)
 - Reparación/Mantenimiento (Expense)
@@ -93,6 +102,7 @@ La base de datos viene con:
 ## 📋 Referencia de Enums
 
 ### Color (int)
+
 ```
 0 = White
 1 = Black
@@ -106,6 +116,7 @@ La base de datos viene con:
 ```
 
 ### TypeCar (int)
+
 ```
 0 = Sedan
 1 = Coupe
@@ -116,6 +127,7 @@ La base de datos viene con:
 ```
 
 ### StatusCar (int)
+
 ```
 0 = New
 1 = Used
@@ -123,6 +135,7 @@ La base de datos viene con:
 ```
 
 ### statusServiceCar (int)
+
 ```
 0 = Service
 1 = EnVenta
@@ -132,6 +145,7 @@ La base de datos viene con:
 ```
 
 ### SaleStatus (int)
+
 ```
 0 = Pending
 1 = Completed
@@ -139,12 +153,14 @@ La base de datos viene con:
 ```
 
 ### ClientStatus (int)
+
 ```
 0 = Active
 1 = Inactive
 ```
 
 ### QuoteStatus (int)
+
 ```
 0 = Pending
 1 = Accepted
@@ -153,6 +169,7 @@ La base de datos viene con:
 ```
 
 ### PaymentMethod (int)
+
 ```
 0 = Cash
 1 = Credit
@@ -161,6 +178,7 @@ La base de datos viene con:
 ```
 
 ### TransactionType (int)
+
 ```
 0 = Income
 1 = Expense
@@ -169,6 +187,7 @@ La base de datos viene con:
 ## 🧪 Tests Automatizados
 
 Cada request incluye tests automatizados que:
+
 - Verifican el status code esperado
 - Guardan IDs de recursos creados en variables
 - Validan el tipo de respuesta
@@ -176,18 +195,22 @@ Cada request incluye tests automatizados que:
 ## 🔧 Troubleshooting
 
 ### Error 401 Unauthorized
+
 - Ejecuta primero el login para obtener el token
 - Verifica que el token se guardó en `authToken`
 
 ### Error 404 Not Found
+
 - Verifica que los IDs en la URL son correctos
 - Ejecuta primero los requests de creación
 
 ### Error 400 Bad Request
+
 - Verifica que los IDs de marca/modelo/categoría son válidos
 - Revisa el formato de los enums (deben ser números)
 
 ### Error de conexión
+
 - Verifica que Docker está corriendo
 - Ejecuta `docker-compose up -d`
 - Verifica con el Health Check
@@ -221,7 +244,10 @@ CarStore API - Colección Completa
 │   ├── 3.6 Get Car Images
 │   ├── 3.7 Get All Car Images
 │   ├── 3.8 Upload Car Image
-│   └── 3.9 Delete Car
+│   ├── 3.9 Get Primary Images (NUEVO)
+│   ├── 3.10 Get Image With SAS Token (NUEVO)
+│   ├── 3.11 Regenerate All Image URLs (NUEVO)
+│   └── 3.12 Delete Car
 │
 ├── 💰 4. Sales (Ventas)
 │   ├── 4.1 Create Sale
@@ -256,7 +282,7 @@ CarStore API - Colección Completa
 ## 📞 Soporte
 
 Si encuentras problemas:
+
 1. Revisa que Docker está corriendo correctamente
 2. Verifica los logs: `docker-compose logs web-api`
 3. Revisa la documentación en `DEPLOYMENT.md`
-

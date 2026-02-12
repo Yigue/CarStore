@@ -27,9 +27,10 @@ public sealed class Quote : Entity
         Client client,
         decimal proposedPrice,
         DateTime validUntil,
-        string comments)
+        string comments,
+        DateTime date)
     {
-        if (validUntil <= DateTime.UtcNow)
+        if (validUntil <= date)
             throw new DomainException("ValidUntil must be in the future");
         
         Car = car;
@@ -40,8 +41,8 @@ public sealed class Quote : Entity
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
         Status = QuoteStatus.Pending;
-        CreatedAt = DateTime.UtcNow;
-        UpdatedAt = DateTime.UtcNow;
+        CreatedAt = date;
+        UpdatedAt = date;
 
         Raise(new QuoteCreatedDomainEvent(Id, CarId, ClientId, ProposedPrice));
     }
@@ -49,66 +50,68 @@ public sealed class Quote : Entity
     public void Update(
         decimal proposedPrice,
         DateTime validUntil,
-        string comments)
+        string comments,
+        DateTime updatedAt)
     {
         if (Status != QuoteStatus.Pending)
             throw new DomainException("Only pending quotes can be updated");
         
-        if (validUntil <= DateTime.UtcNow)
+        if (validUntil <= updatedAt)
             throw new DomainException("ValidUntil must be in the future");
         
         ProposedPrice = new Money(proposedPrice);
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = updatedAt;
     }
     
     public void Update(
         Money proposedPrice,
         DateTime validUntil,
-        string comments)
+        string comments,
+        DateTime updatedAt)
     {
         if (Status != QuoteStatus.Pending)
             throw new DomainException("Only pending quotes can be updated");
         
-        if (validUntil <= DateTime.UtcNow)
+        if (validUntil <= updatedAt)
             throw new DomainException("ValidUntil must be in the future");
         
         ProposedPrice = proposedPrice;
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = updatedAt;
     }
     
-    public void Accept()
+    public void Accept(DateTime updatedAt)
     {
         if (Status != QuoteStatus.Pending)
             throw new DomainException("Only pending quotes can be accepted");
         
-        if (ValidUntil < DateTime.UtcNow)
+        if (ValidUntil < updatedAt)
             throw new DomainException("Cannot accept an expired quote");
         
         Status = QuoteStatus.Accepted;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = updatedAt;
         Raise(new QuoteAcceptedDomainEvent(Id));
     }
     
-    public void Reject(string reason)
+    public void Reject(string reason, DateTime updatedAt)
     {
         if (Status != QuoteStatus.Pending)
             throw new DomainException("Only pending quotes can be rejected");
         
         Status = QuoteStatus.Rejected;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = updatedAt;
         Raise(new QuoteRejectedDomainEvent(Id, reason ?? string.Empty));
     }
     
-    public void Expire()
+    public void Expire(DateTime updatedAt)
     {
-        if (Status == QuoteStatus.Pending && ValidUntil < DateTime.UtcNow)
+        if (Status == QuoteStatus.Pending && ValidUntil < updatedAt)
         {
             Status = QuoteStatus.Expired;
-            UpdatedAt = DateTime.UtcNow;
+            UpdatedAt = updatedAt;
         }
     }
 }

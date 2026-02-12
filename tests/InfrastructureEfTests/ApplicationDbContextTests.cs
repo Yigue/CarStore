@@ -6,6 +6,8 @@ public class ApplicationDbContextTests
     private sealed class NoOpPublisher : IPublisher
     {
         public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
+            where TNotification : INotification => Task.CompletedTask;
     }
 
     private static async Task<(ApplicationDbContext Context, SqliteConnection Connection)> CreateContextAsync()
@@ -51,8 +53,8 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var client1 = new Client("John", "Doe", "123", "john@test.com", "555", "Street") { Id = Guid.NewGuid() };
-        var client2 = new Client("Jane", "Smith", "123", "jane@test.com", "555", "Street") { Id = Guid.NewGuid() };
+        var client1 = new Client("John", "Doe", "123", "john@test.com", "555", "Street", DateTime.UtcNow) { Id = Guid.NewGuid() };
+        var client2 = new Client("Jane", "Smith", "123", "jane@test.com", "555", "Street", DateTime.UtcNow) { Id = Guid.NewGuid() };
 
         context.Clients.Add(client1);
         await context.SaveChangesAsync();
@@ -71,15 +73,15 @@ public class ApplicationDbContextTests
         var marca = new Marca("Ford") { Id = Guid.NewGuid() };
         var modelo = new Modelo("Fiesta", marca.Id) { Id = Guid.NewGuid() };
         var car = new Car(marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, statusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "BBB222", "desc", 9000m, DateTime.UtcNow);
-        var client = new Client("John", "Doe", "456", "john@demo.com", "555", "Street") { Id = Guid.NewGuid() };
+        var client = new Client("John", "Doe", "456", "john@demo.com", "555", "Street", DateTime.UtcNow) { Id = Guid.NewGuid() };
         context.AddRange(marca, modelo, car, client);
         await context.SaveChangesAsync();
 
-        var sale = new Sale(car.Id, client.Id, 9000m, PaymentMethod.Cash, "C-1", "ok");
+        var sale = new Sale(car.Id, client.Id, 9000m, PaymentMethod.Cash, "C-1", "ok", DateTime.UtcNow);
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var badSale = new Sale(Guid.NewGuid(), client.Id, 8000m, PaymentMethod.Cash, "C-2", "bad");
+        var badSale = new Sale(Guid.NewGuid(), client.Id, 8000m, PaymentMethod.Cash, "C-2", "bad", DateTime.UtcNow);
         context.Sales.Add(badSale);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
@@ -95,19 +97,18 @@ public class ApplicationDbContextTests
         var marca = new Marca("Ford") { Id = Guid.NewGuid() };
         var modelo = new Modelo("Fiesta", marca.Id) { Id = Guid.NewGuid() };
         var car = new Car(marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, statusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "CCC333", "desc", 8000m, DateTime.UtcNow);
-        var client = new Client("John", "Doe", "789", "john@quotes.com", "555", "Street") { Id = Guid.NewGuid() };
+        var client = new Client("John", "Doe", "789", "john@quotes.com", "555", "Street", DateTime.UtcNow) { Id = Guid.NewGuid() };
         context.AddRange(marca, modelo, car, client);
         await context.SaveChangesAsync();
 
-        var quote = new Quote(car, client, 8000m, DateTime.UtcNow.AddDays(30), "ok");
+        var quote = new Quote(car, client, 8000m, DateTime.UtcNow.AddDays(30), "ok", DateTime.UtcNow);
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
 
-        var badQuote = new Quote(car, client, 7000m, DateTime.UtcNow.AddDays(30), "bad")
-        {
-            Car = null!,
-            CarId = Guid.NewGuid()
-        };
+        // Create a fake car with an ID that doesn't exist in the database to trigger FK violation
+        var fakeCar = new Car(marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, statusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "FAKE123", "fake", 1m, DateTime.UtcNow);
+        // Don't save fakeCar - we want its ID to not exist in DB
+        var badQuote = new Quote(fakeCar, client, 7000m, DateTime.UtcNow.AddDays(30), "bad", DateTime.UtcNow);
         context.Quotes.Add(badQuote);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());

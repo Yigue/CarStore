@@ -6,6 +6,8 @@ using Application.Cars.Create;
 using Domain.Cars;
 using Domain.Cars.Atribbutes;
 using Microsoft.EntityFrameworkCore;
+using Moq;
+using Application.Abstractions.Caching;
 
 namespace Application.UnitTests.Cars;
 
@@ -30,7 +32,15 @@ public class CreateCarCommandHandlerTests
         context.Modelo.Add(modelo);
         await context.SaveChangesAsync();
 
-        var handler = new CreateCarCommandHandler(context, dateProvider);
+        var mockBrandService = new Mock<ICachedBrandService>();
+        mockBrandService.Setup(s => s.GetByIdAsync(marca.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(marca);
+
+        var mockModelService = new Mock<ICachedModelService>();
+        mockModelService.Setup(s => s.GetByIdAsync(modelo.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(modelo);
+
+        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object);
 
         var command = new CreateCarCommand
         {
@@ -61,7 +71,14 @@ public class CreateCarCommandHandlerTests
     {
         using var context = CreateContext();
         var dateProvider = new FakeDateTimeProvider();
-        var handler = new CreateCarCommandHandler(context, dateProvider);
+        
+        var mockBrandService = new Mock<ICachedBrandService>();
+        mockBrandService.Setup(s => s.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Marca?)null); // Brand not found
+
+        var mockModelService = new Mock<ICachedModelService>();
+
+        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object);
 
         var command = new CreateCarCommand
         {

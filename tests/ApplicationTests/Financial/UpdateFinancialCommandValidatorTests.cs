@@ -22,10 +22,11 @@ public class UpdateFinancialCommandValidatorTests
     [Fact]
     public void Validate_ShouldPass_ForValidValues()
     {
-        var command = new UpdateFinancialCommand(Guid.NewGuid(), TransactionType.Income, 100m, "desc", PaymentMethod.Cash, null, DateTime.UtcNow, Guid.NewGuid(), null, null, null);
+        var command = new UpdateFinancialCommand(Guid.NewGuid(), TransactionType.Income, 100m, "desc", PaymentMethod.Cash, null, DateTime.UtcNow.AddMinutes(-5), Guid.NewGuid(), null, null, null);
 
         var result = _validator.Validate(command);
-
+        
+        result.Errors.Should().BeEmpty();
         result.IsValid.Should().BeTrue();
     }
 }

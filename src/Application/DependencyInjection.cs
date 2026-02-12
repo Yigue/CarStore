@@ -18,7 +18,6 @@ public static class DependencyInjection
         });
 
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
-        services.AddScoped<AzureBlobService>();
         return services;
     }
 }

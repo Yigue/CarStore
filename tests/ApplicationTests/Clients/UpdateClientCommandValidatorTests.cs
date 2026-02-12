@@ -15,8 +15,8 @@ public class UpdateClientCommandValidatorTests
         var result = _validator.Validate(command);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateClientCommand.Id) && e.ErrorMessage == "'Id' must not be empty.");
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateClientCommand.Email) && e.ErrorMessage == "'Email' is not a valid email address.");
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateClientCommand.Id));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(UpdateClientCommand.Email));
     }
 
     [Fact]

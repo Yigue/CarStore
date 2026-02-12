@@ -197,7 +197,8 @@ public class FinancialIntegrationTests
             "88990011",
             "andrea.vargas@example.com",
             "+54 11 6666-5555",
-            "Av. Belgrano 1234");
+            "Av. Belgrano 1234",
+            DateTime.UtcNow);
         
         context.Cars.Add(car);
         context.Clients.Add(testClient);
@@ -209,7 +210,8 @@ public class FinancialIntegrationTests
             16000m,
             PaymentMethod.Cash,
             "VTA-2024-004",
-            "Venta de Volkswagen Polo");
+            "Venta de Volkswagen Polo",
+            DateTime.UtcNow);
         
         sale.Complete();
         context.Sales.Add(sale);

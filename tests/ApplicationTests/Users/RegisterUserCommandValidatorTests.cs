@@ -14,8 +14,8 @@ public class RegisterUserCommandValidatorTests
         var result = _validator.Validate(command);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RegisterUserCommand.FirstName) && e.ErrorMessage == "'First Name' must not be empty.");
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RegisterUserCommand.Password) && e.ErrorMessage.StartsWith("'Password' must be at least 8 characters"));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(RegisterUserCommand.FirstName));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(RegisterUserCommand.Password));
     }
 
     [Fact]

@@ -25,13 +25,16 @@ public sealed class Client : Entity
     }
     
     public Client(
+        Guid dealerId,
         string firstName,
         string lastName,
         string dni,
         string email,
         string phone,
-        string address)
+        string address,
+        DateTime date)
     {
+        SetDealer(dealerId);
         if (string.IsNullOrWhiteSpace(firstName))
             throw new DomainException("FirstName cannot be empty");
         if (string.IsNullOrWhiteSpace(lastName))
@@ -45,8 +48,8 @@ public sealed class Client : Entity
         Address = address;
         Status = ClientStatus.Active;
         Sales = new List<Sale>();
-        CreatedAt = DateTime.UtcNow;
-        UpdateAt = DateTime.UtcNow;
+        CreatedAt = date;
+        UpdateAt = date;
         
         Raise(new ClientCreatedDomainEvent(Id, $"{FirstName} {LastName}"));
     }
@@ -56,7 +59,8 @@ public sealed class Client : Entity
         string lastName,
         string email,
         string phone,
-        string address)
+        string address,
+        DateTime updatedAt)
     {
         if (string.IsNullOrWhiteSpace(firstName))
             throw new DomainException("FirstName cannot be empty");
@@ -68,7 +72,7 @@ public sealed class Client : Entity
         Email = new Email(email);
         Phone = phone;
         Address = address;
-        UpdateAt = DateTime.UtcNow;
+        UpdateAt = updatedAt;
     }
     
     public void Deactivate()

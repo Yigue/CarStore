@@ -56,7 +56,8 @@ public class SalesIntegrationTests
             "33445566",
             "roberto.silva@example.com",
             "+54 11 2222-1111",
-            "Av. Rivadavia 1234");
+            "Av. Rivadavia 1234",
+            DateTime.UtcNow);
         
         context.Cars.Add(car);
         context.Clients.Add(testClient);
@@ -131,7 +132,8 @@ public class SalesIntegrationTests
             "77889900",
             "patricia.lopez@example.com",
             "+54 11 1111-2222",
-            "Av. 9 de Julio 5678");
+            "Av. 9 de Julio 5678",
+            DateTime.UtcNow);
         
         context.Cars.Add(car);
         context.Clients.Add(testClient);
@@ -143,7 +145,8 @@ public class SalesIntegrationTests
             19000m,
             PaymentMethod.CreditCard,
             "VTA-2024-002",
-            "Venta de Ford Focus");
+            "Venta de Ford Focus",
+            DateTime.UtcNow);
         
         sale.Complete();
         context.Sales.Add(sale);
@@ -195,7 +198,8 @@ public class SalesIntegrationTests
             "11223344",
             "fernando.garcia@example.com",
             "+54 11 9999-8888",
-            "Av. San Martín 2345");
+            "Av. San Martín 2345",
+            DateTime.UtcNow);
         
         context.Cars.Add(car);
         context.Clients.Add(testClient);
@@ -207,7 +211,8 @@ public class SalesIntegrationTests
             28000m,
             PaymentMethod.BankTransfer,
             "VTA-2024-003",
-            "Venta de Chevrolet Malibu");
+            "Venta de Chevrolet Malibu",
+            DateTime.UtcNow);
         
         sale.Complete();
         context.Sales.Add(sale);
@@ -216,7 +221,7 @@ public class SalesIntegrationTests
         var response = await client.GetAsync($"/sales/{sale.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var result = await response.Content.ReadFromJsonAsync<Application.Sales.GetById.SaleResponse>();
+                var result = await response.Content.ReadFromJsonAsync<Application.Sales.Get.SaleResponse>();
         result.Should().NotBeNull();
         result!.Id.Should().Be(sale.Id);
         result.FinalPrice.Should().Be(28000m);

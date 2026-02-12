@@ -9,6 +9,8 @@ using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
+using Domain.Shared;
+
 namespace Application.Abstractions.Data;
 
 public interface IApplicationDbContext
@@ -22,6 +24,8 @@ public interface IApplicationDbContext
     DbSet<FinancialTransaction> Transactions { get; }
     DbSet<TransactionCategory> TransactionCategories { get; }
     DbSet<User> Users { get; }
+    DbSet<UserPermission> UserPermissions { get; }
+    DbSet<OutboxMessage> OutboxMessages { get; }
     DbSet<CarImage> CarImages { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

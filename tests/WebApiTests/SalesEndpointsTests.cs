@@ -19,7 +19,7 @@ public class SalesEndpointsTests
         var marca = new Marca("VW") { Id = Guid.NewGuid() };
         var modelo = new Modelo("Golf", marca.Id) { Id = Guid.NewGuid(), Marca = marca };
         var car = new Car(marca, modelo, Color.Gray, TypeCar.Sedan, StatusCar.New, statusServiceCar.Disponible, 4,5,1600,0,2021,"AAA111","desc",20000m, DateTime.UtcNow);
-        var clientEntity = new Client("Alice", "Green", "333", "alice@example.com", "789", "Ave");
+        var clientEntity = new Client("Alice", "Green", "333", "alice@example.com", "789", "Ave", DateTime.UtcNow);
         context.AddRange(marca, modelo, car, clientEntity);
         await context.SaveChangesAsync();
 
@@ -54,7 +54,7 @@ public class SalesEndpointsTests
         await using var factory = new CustomWebApplicationFactory();
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var clientEntity = new Client("Bob", "Brown", "444", "bob@example.com", "555", "Street");
+        var clientEntity = new Client("Bob", "Brown", "444", "bob@example.com", "555", "Street", DateTime.UtcNow);
         context.Clients.Add(clientEntity);
         await context.SaveChangesAsync();
 

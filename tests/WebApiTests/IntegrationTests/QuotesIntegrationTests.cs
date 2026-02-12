@@ -54,7 +54,8 @@ public class QuotesIntegrationTests
             "55667788",
             "sofia.martinez@example.com",
             "+54 11 7777-6666",
-            "Av. del Libertador 3456");
+            "Av. del Libertador 3456",
+            DateTime.UtcNow);
         
         context.Cars.Add(car);
         context.Clients.Add(testClient);
@@ -106,7 +107,7 @@ public class QuotesIntegrationTests
             ford,
             mustang,
             Color.Red,
-            TypeCar.Sports,
+            TypeCar.Coupe,
             StatusCar.New,
             statusServiceCar.Disponible,
             2,
@@ -125,7 +126,8 @@ public class QuotesIntegrationTests
             "22334455",
             "diego.ramirez@example.com",
             "+54 11 5555-4444",
-            "Av. Las Heras 4567");
+            "Av. Las Heras 4567",
+            DateTime.UtcNow);
         
         context.Cars.Add(car);
         context.Clients.Add(testClient);
@@ -136,7 +138,8 @@ public class QuotesIntegrationTests
             testClient,
             44000m,
             DateTime.UtcNow.AddDays(15),
-            "Cotización para Ford Mustang");
+            "Cotización para Ford Mustang",
+            DateTime.UtcNow);
         
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
@@ -187,7 +190,8 @@ public class QuotesIntegrationTests
             "66778899",
             "laura.torres@example.com",
             "+54 11 3333-4444",
-            "Av. Callao 6789");
+            "Av. Callao 6789",
+            DateTime.UtcNow);
         
         context.Cars.Add(car);
         context.Clients.Add(testClient);
@@ -198,7 +202,8 @@ public class QuotesIntegrationTests
             testClient,
             29000m,
             DateTime.UtcNow.AddDays(20),
-            "Cotización para Volkswagen Tiguan");
+            "Cotización para Volkswagen Tiguan",
+            DateTime.UtcNow);
         
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
@@ -206,7 +211,7 @@ public class QuotesIntegrationTests
         var response = await client.GetAsync($"/quotes/{quote.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var result = await response.Content.ReadFromJsonAsync<Application.Quotes.GetById.QuoteResponse>();
+                var result = await response.Content.ReadFromJsonAsync<Application.Quotes.Get.QuoteResponse>();
         result.Should().NotBeNull();
         result!.Id.Should().Be(quote.Id);
         result.ProposedPrice.Should().Be(29000m);
@@ -252,7 +257,8 @@ public class QuotesIntegrationTests
             "44556677",
             "miguel.sanchez@example.com",
             "+54 11 8888-7777",
-            "Av. Pueyrredón 8901");
+            "Av. Pueyrredón 8901",
+            DateTime.UtcNow);
         
         context.Cars.Add(car);
         context.Clients.Add(testClient);
@@ -263,7 +269,8 @@ public class QuotesIntegrationTests
             testClient,
             31000m,
             DateTime.UtcNow.AddDays(25),
-            "Cotización para Chevrolet Equinox");
+            "Cotización para Chevrolet Equinox",
+            DateTime.UtcNow);
         
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();

@@ -7,7 +7,8 @@ using SharedKernel;
 namespace Application.Quotes.Reject;
 
 internal sealed class RejectQuoteCommandHandler(
-    IApplicationDbContext context)
+    IApplicationDbContext context,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<RejectQuoteCommand>
 {
     public async Task<Result> Handle(RejectQuoteCommand command, CancellationToken cancellationToken)
@@ -18,7 +19,7 @@ internal sealed class RejectQuoteCommandHandler(
         if (quote is null)
             return Result.Failure(QuoteErrors.NotFound(command.QuoteId));
         
-        quote.Reject(command.Reason);
+        quote.Reject(command.Reason, dateTimeProvider.UtcNow);
         
         await context.SaveChangesAsync(cancellationToken);
         

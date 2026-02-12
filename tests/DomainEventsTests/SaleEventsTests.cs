@@ -21,7 +21,8 @@ public class SaleEventsTests
             price,
             PaymentMethod.Cash,
             "C123",
-            "none");
+            "none",
+            DateTime.UtcNow);
 
         sale.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<SaleCreatedDomainEvent>()

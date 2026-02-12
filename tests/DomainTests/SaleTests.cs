@@ -19,7 +19,8 @@ public class SaleTests
         var contractNumber = _faker.Random.ReplaceNumbers("########");
         var comments = _faker.Lorem.Sentence();
 
-        var sale = new Sale(carId, clientId, finalPrice, paymentMethod, contractNumber, comments);
+        var saleDate = DateTime.UtcNow;
+        var sale = new Sale(carId, clientId, finalPrice, paymentMethod, contractNumber, comments, saleDate);
 
         sale.CarId.Should().Be(carId);
         sale.ClientId.Should().Be(clientId);
@@ -28,7 +29,7 @@ public class SaleTests
         sale.ContractNumber.Should().Be(contractNumber);
         sale.Comments.Should().Be(comments);
         sale.Status.Should().Be(SaleStatus.Pending);
-        sale.SaleDate.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        sale.SaleDate.Should().Be(saleDate);
         sale.DomainEvents.Should().NotBeEmpty();
     }
 

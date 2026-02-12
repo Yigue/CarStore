@@ -34,7 +34,8 @@ public sealed class Sale : Entity
         decimal finalPrice,
         PaymentMethod paymentMethod,
         string contractNumber,
-        string comments)
+        string comments,
+        DateTime saleDate)
     {
         Id = Guid.NewGuid();
         CarId = carId;
@@ -44,7 +45,7 @@ public sealed class Sale : Entity
         ContractNumber = contractNumber;
         Comments = comments;
         Status = SaleStatus.Pending;
-        SaleDate = DateTime.UtcNow;
+        SaleDate = saleDate;
 
         Raise(new SaleCreatedDomainEvent(Id, CarId, ClientId, FinalPrice));
     }

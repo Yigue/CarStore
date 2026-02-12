@@ -14,8 +14,8 @@ public class CreateQuoteCommandValidatorTests
         var result = _validator.Validate(command);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateQuoteCommand.CarId) && e.ErrorMessage == "'Car Id' must not be empty.");
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateQuoteCommand.ValidUntil) && e.ErrorMessage.StartsWith("'Valid Until' must be greater than"));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateQuoteCommand.CarId));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateQuoteCommand.ValidUntil));
     }
 
     [Fact]

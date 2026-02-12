@@ -1,4 +1,5 @@
 ﻿using Web.Api.Infrastructure;
+using Asp.Versioning;
 
 namespace Web.Api;
 
@@ -11,6 +12,16 @@ public static class DependencyInjection
 
         // REMARK: If you want to use Controllers, you'll need this.
         services.AddControllers();
+
+        services.AddApiVersioning(options =>
+        {
+            options.DefaultApiVersion = new ApiVersion(1);
+            options.ApiVersionReader = new UrlSegmentApiVersionReader();
+        }).AddApiExplorer(options =>
+        {
+            options.GroupNameFormat = "'v'V";
+            options.SubstituteApiVersionInUrl = true;
+        });
 
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();

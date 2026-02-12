@@ -12,7 +12,7 @@ public class MoneyValueConverter : ValueConverter<Money, decimal>
 {
     public MoneyValueConverter() : base(
         money => money.Amount,
-        amount => new Money(amount))
+        amount => new Money(amount, "USD"))
     {
     }
 }

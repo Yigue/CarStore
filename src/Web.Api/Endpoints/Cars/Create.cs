@@ -5,7 +5,6 @@ using MediatR;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
-using Web.Api.Endpoints.Cars;
 
 namespace Web.Api.Endpoints.Cars;
 
@@ -33,62 +32,29 @@ internal sealed class Create : IEndpoint
     {
         app.MapPost("cars", async (Request request, ISender sender, CancellationToken cancellationToken) =>
         {
-            // Validar enums
-            if(!Enum.IsDefined(typeof(Color), request.Color))
+            var command = new CreateCarCommand
             {
+                Marca = Guid.Parse(request.Marca), // Will throw FormatException if invalid, handled by GlobalExceptionHandler or mapped
+                Modelo = Guid.Parse(request.Modelo),
+                Color = (Color)request.Color,
+                CarType = (TypeCar)request.CarType,
+                CarStatus = (StatusCar)request.CarStatus,
+                ServiceCar = (statusServiceCar)request.ServiceCar,
+                CantidadPuertas = request.CantidadPuertas,
+                CantidadAsientos = request.CantidadAsientos,
+                Cilindrada = request.Cilindrada,
+                Kilometraje = request.Kilometraje,
+                Año = request.Año,
+                Patente = request.Patente,
+                Descripcion = request.Descripcion,
+                Price = request.Precio
+            };
 
-                return Results.BadRequest("Color inválido");
-            }
-            if(!Enum.IsDefined(typeof(TypeCar), request.CarType))
-            {
+            Result<Guid> result = await sender.Send(command, cancellationToken);
 
-                return Results.BadRequest("Tipo de carro inválido");
-            }
-            if(!Enum.IsDefined(typeof(StatusCar), request.CarStatus))
-            {
-
-                return Results.BadRequest("Estado de carro inválido");
-            }
-            if (!Enum.IsDefined(typeof(statusServiceCar), request.ServiceCar))
-            {
-
-                return Results.BadRequest("Estado de servicio inválido");
-            }
-
-            try 
-            {
-                var command = new CreateCarCommand
-                {
-                    Marca = new Guid(request.Marca),
-                    Modelo = new Guid(request.Modelo),
-                    Color = (Color)request.Color,
-                    CarType = (TypeCar)request.CarType,
-                    CarStatus = (StatusCar)request.CarStatus,
-                    ServiceCar = (statusServiceCar)request.ServiceCar,
-                    CantidadPuertas = request.CantidadPuertas,
-                    CantidadAsientos = request.CantidadAsientos,
-                    Cilindrada = request.Cilindrada,
-                    Kilometraje = request.Kilometraje,
-                    Año = request.Año,
-                    Patente = request.Patente,
-                    Descripcion = request.Descripcion,
-                    Price = request.Precio
-                };
-
-                Result<Guid> result = await sender.Send(command, cancellationToken);
-
-                return result.Match(
-                    id => Results.Created($"/cars/{id}", new { id }),
-                    CustomResults.Problem);
-            }
-            catch (FormatException)
-            {
-                return Results.BadRequest("GUID inválido para Marca o Modelo");
-            }
-            catch (Exception ex)
-            {
-                return Results.Problem(ex.Message);
-            }
+            return result.Match(
+                id => Results.Created($"/cars/{id}", new { id }),
+                CustomResults.Problem);
         })
         .HasPermission(Permissions.CarsCreate)
         .WithTags(Tags.Cars)

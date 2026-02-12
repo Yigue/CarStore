@@ -11,7 +11,7 @@ internal sealed class CreateCarCommandValidator : AbstractValidator<CreateCarCom
         RuleFor(x => x.Color).NotEmpty().WithMessage("El campo color es requerido y debe ser una opcion valida");
         RuleFor(x => x.CarType).IsInEnum().WithMessage("El campo tipo de Car Type es requerido y debe ser una opcion valida");
         RuleFor(x => x.CarStatus).IsInEnum().WithMessage("El campo estado de Car Status es requerido y debe ser una opcion valida");
-        RuleFor(x => x.ServiceCar).NotEmpty().WithMessage("El campo tipo de servicio es requerido y debe ser una opcion valida");
+        RuleFor(x => x.ServiceCar).IsInEnum().WithMessage("El campo tipo de servicio es requerido y debe ser una opcion valida");
         RuleFor(x => x.CantidadPuertas).GreaterThanOrEqualTo(1).WithMessage("El campo cantidad de puertas debe ser mayor o igual a 1");
         RuleFor(x => x.CantidadAsientos).GreaterThanOrEqualTo(1).WithMessage("El campo cantidad de asientos debe ser mayor o igual a 1");
         RuleFor(x => x.Cilindrada).GreaterThanOrEqualTo(1).WithMessage("El campo cilindrada debe ser mayor o igual a 1");

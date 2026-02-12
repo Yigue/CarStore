@@ -22,7 +22,7 @@ internal sealed class AcceptQuoteCommandHandler(
         if (quote.ValidUntil < dateTimeProvider.UtcNow)
             return Result.Failure(QuoteErrors.Expired(command.QuoteId));
         
-        quote.Accept();
+        quote.Accept(dateTimeProvider.UtcNow);
         
         await context.SaveChangesAsync(cancellationToken);
         

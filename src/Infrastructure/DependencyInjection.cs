@@ -1,14 +1,19 @@
 using System.Text;
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Storage;
+using Application.Abstractions.Tenancy;
 using Application.Services;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
 using Infrastructure.Caching;
 using Infrastructure.Database;
 using Infrastructure.Storage;
+using Infrastructure.Tenancy;
 using Infrastructure.Time;
+using Infrastructure.Users;
+using Application.Users.Register;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +24,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
 using SharedKernel;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+using Quartz;
+using Infrastructure.BackgroundJobs;
 
 namespace Infrastructure;
 
@@ -28,12 +38,24 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration) =>
         services
+            .AddTenancy()
             .AddServices()
             .AddDatabase(configuration)
             .AddCaching(configuration)
             .AddHealthChecks(configuration)
             .AddAuthenticationInternal(configuration)
-            .AddAuthorizationInternal();
+            .AddAuthorizationInternal()
+            .ConfigureOpenTelemetry()
+            .AddBackgroundJobs();
+
+    private static IServiceCollection AddTenancy(this IServiceCollection services)
+    {
+        // Multi-tenancy service
+        // TODO: In production, replace with implementation that reads from JWT claims
+        services.AddScoped<ICurrentTenantService, CurrentTenantService>();
+        
+        return services;
+    }
 
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
@@ -64,6 +86,8 @@ public static class DependencyInjection
                 return new LocalFileStorageService(configuration);
             }
         });
+
+        services.AddScoped<IUserNotificationService, UserNotificationService>();
         
         return services;
     }
@@ -111,9 +135,9 @@ public static class DependencyInjection
         }
 
         // Registrar servicios de caché para datos frecuentes
-        services.AddScoped<CachedBrandService>();
-        services.AddScoped<CachedModelService>();
-        services.AddScoped<CachedCategoryService>();
+        services.AddScoped<ICachedBrandService, CachedBrandService>();
+        services.AddScoped<ICachedModelService, CachedModelService>();
+        services.AddScoped<ICachedCategoryService, CachedCategoryService>();
 
         return services;
     }
@@ -168,6 +192,43 @@ public static class DependencyInjection
         services.AddTransient<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
         services.AddTransient<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
+
+        return services;
+    }
+
+    private static IServiceCollection ConfigureOpenTelemetry(this IServiceCollection services)
+    {
+        services.AddOpenTelemetry()
+            .WithLogging(logging => logging.AddOtlpExporter())
+            .WithMetrics(metrics => metrics
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation()
+                .AddOtlpExporter())
+            .WithTracing(tracing => tracing
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddEntityFrameworkCoreInstrumentation()
+                .AddOtlpExporter());
+
+        return services;
+    }
+    private static IServiceCollection AddBackgroundJobs(this IServiceCollection services)
+    {
+        services.AddQuartz(configure =>
+        {
+            var jobKey = new JobKey(nameof(ProcessOutboxMessagesJob));
+
+            configure
+                .AddJob<ProcessOutboxMessagesJob>(opts => opts.WithIdentity(jobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(jobKey)
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInSeconds(10)
+                                .RepeatForever()));
+        });
+
+        services.AddQuartzHostedService();
 
         return services;
     }

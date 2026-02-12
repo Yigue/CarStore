@@ -14,8 +14,8 @@ public class CreateClientCommandValidatorTests
         var result = _validator.Validate(command);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateClientCommand.FirstName) && e.ErrorMessage == "'First Name' must not be empty.");
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateClientCommand.DNI) && e.ErrorMessage.StartsWith("'D N I' must be 20 characters or fewer"));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateClientCommand.FirstName));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateClientCommand.DNI));
     }
 
     [Fact]

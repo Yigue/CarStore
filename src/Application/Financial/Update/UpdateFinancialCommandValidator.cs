@@ -14,7 +14,6 @@ public sealed class UpdateFinancialCommandValidator : AbstractValidator<UpdateFi
             .NotEmpty().WithMessage("El ID es requerido");
 
         RuleFor(x => x.Type)
-            .NotEmpty().WithMessage("El tipo de transacción es requerido")
             .IsInEnum().WithMessage("El tipo de transacción debe ser un valor válido");
 
         RuleFor(x => x.Amount)
@@ -26,16 +25,16 @@ public sealed class UpdateFinancialCommandValidator : AbstractValidator<UpdateFi
             .MaximumLength(255).WithMessage("La descripción no puede exceder los 255 caracteres");
 
         RuleFor(x => x.PaymentMethod)
-            .NotEmpty().WithMessage("El método de pago es requerido")
             .IsInEnum().WithMessage("El método de pago debe ser un valor válido");
 
         RuleFor(x => x.ReferenceNumber)
             .MaximumLength(50).WithMessage("El número de referencia no puede exceder los 50 caracteres");
 
+        RuleFor(x => x.CategoryId)
+            .NotEmpty().WithMessage("La categoría es requerida");
+
         RuleFor(x => x.TransactionDate)
             .NotEmpty().WithMessage("La fecha de transacción es requerida")
             .LessThanOrEqualTo(DateTime.UtcNow).WithMessage("La fecha de transacción no puede ser futura");
-
-        
     }
 }

@@ -2,7 +2,7 @@ using Application.Abstractions.Data;
 using Domain.Financial;
 using Domain.Financial.Attributes;
 using Domain.Sales.Events;
-using Infrastructure.Caching;
+using Application.Abstractions.Caching;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -12,7 +12,7 @@ namespace Application.Sales.Create;
 internal sealed class SaleCompletedDomainEventHandler(
     IApplicationDbContext context,
     IDateTimeProvider dateTimeProvider,
-    CachedCategoryService cachedCategoryService)
+    ICachedCategoryService cachedCategoryService)
     : INotificationHandler<SaleCompletedDomainEvent>
 {
     public async Task Handle(SaleCompletedDomainEvent notification, CancellationToken cancellationToken)
@@ -54,7 +54,8 @@ internal sealed class SaleCompletedDomainEventHandler(
             category,
             car: sale.Car,
             client: sale.Client,
-            sale: sale);
+            sale: sale,
+            transactionDate: dateTimeProvider.UtcNow);
         
         context.Transactions.Add(transaction);
         await context.SaveChangesAsync(cancellationToken);

@@ -22,7 +22,7 @@ public class TokenProviderTests
         }).Build();
 
         var provider = new TokenProvider(configuration);
-        var user = new User { Id = Guid.NewGuid(), Email = "test@example.com" };
+                var user = new User("test@example.com", "Test", "User", "hash");
 
         string token = provider.Create(user);
 
@@ -30,7 +30,7 @@ public class TokenProviderTests
         var jwt = handler.ReadJsonWebToken(token);
 
         jwt.Subject.Should().Be(user.Id.ToString());
-        jwt.Claims.First(c => c.Type == JwtRegisteredClaimNames.Email).Value.Should().Be(user.Email);
+        jwt.Claims.First(c => c.Type == Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Email).Value.Should().Be(user.Email);
         jwt.Issuer.Should().Be("issuer");
         jwt.Audiences.Should().Contain("audience");
         jwt.ValidTo.Should().BeCloseTo(DateTime.UtcNow.AddMinutes(60), TimeSpan.FromMinutes(1));
@@ -47,7 +47,7 @@ public class TokenProviderTests
         }).Build();
 
         var provider = new TokenProvider(configuration);
-        var user = new User { Id = Guid.NewGuid(), Email = "test@example.com" };
+                var user = new User("test@example.com", "Test", "User", "hash");
 
         Action act = () => provider.Create(user);
 

@@ -1,4 +1,5 @@
 using Application.Abstractions.Behaviors;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SharedKernel;

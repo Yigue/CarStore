@@ -16,8 +16,8 @@ public class ClientTests
         var email = _faker.Internet.Email();
         var phone = _faker.Phone.PhoneNumber();
         var address = _faker.Address.FullAddress();
-
-        var client = new Client(firstName, lastName, dni, email, phone, address);
+        var date = DateTime.UtcNow;
+        var client = new Client(firstName, lastName, dni, email, phone, address, date);
 
         client.FirstName.Should().Be(firstName);
         client.LastName.Should().Be(lastName);
@@ -27,7 +27,7 @@ public class ClientTests
         client.Address.Should().Be(address);
         client.Status.Should().Be(ClientStatus.Active);
         client.Sales.Should().BeEmpty();
-        client.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        client.CreatedAt.Should().Be(date);
         client.DomainEvents.Should().ContainSingle();
 
         var domainEvent = client.DomainEvents.Single().Should().BeOfType<ClientCreatedDomainEvent>().Subject;

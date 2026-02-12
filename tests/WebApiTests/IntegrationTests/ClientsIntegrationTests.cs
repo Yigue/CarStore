@@ -65,7 +65,8 @@ public class ClientsIntegrationTests
             "87654321",
             "maria.gonzalez@example.com",
             "+54 11 9876-5432",
-            "Av. Santa Fe 5678");
+            "Av. Santa Fe 5678",
+            DateTime.UtcNow);
         
         var client2 = new Domain.Clients.Client(
             "Carlos",
@@ -73,7 +74,8 @@ public class ClientsIntegrationTests
             "11223344",
             "carlos.rodriguez@example.com",
             "+54 11 5555-1234",
-            "Av. Libertador 9012");
+            "Av. Libertador 9012",
+            DateTime.UtcNow);
         
         context.Clients.AddRange(client1, client2);
         await context.SaveChangesAsync();
@@ -105,7 +107,8 @@ public class ClientsIntegrationTests
             "55667788",
             "ana.martinez@example.com",
             "+54 11 4444-5678",
-            "Av. Córdoba 3456");
+            "Av. Córdoba 3456",
+            DateTime.UtcNow);
         
         context.Clients.Add(testClient);
         await context.SaveChangesAsync();
@@ -113,7 +116,7 @@ public class ClientsIntegrationTests
         var response = await client.GetAsync($"/clients/{testClient.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var result = await response.Content.ReadFromJsonAsync<Application.Clients.GetById.ClientResponse>();
+        var result = await response.Content.ReadFromJsonAsync<Application.Clients.GetAll.ClientResponse>();
         result.Should().NotBeNull();
         result!.Id.Should().Be(testClient.Id);
         result.FirstName.Should().Be("Ana");
@@ -138,7 +141,8 @@ public class ClientsIntegrationTests
             "99887766",
             "luis.fernandez@example.com",
             "+54 11 3333-2222",
-            "Av. Cabildo 7890");
+            "Av. Cabildo 7890",
+            DateTime.UtcNow);
         
         context.Clients.Add(testClient);
         await context.SaveChangesAsync();

@@ -9,4 +9,6 @@ public static class Tags
     public const string Cars = "cars";
     public const string Clients = "clients";
     public const string Financial = "financial";
+    public const string Marcas = "marcas";
+    public const string Modelos = "modelos";
 }

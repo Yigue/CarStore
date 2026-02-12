@@ -23,60 +23,30 @@ internal sealed class PermissionProvider
 
     public async Task<HashSet<string>> GetForUserIdAsync(Guid userId)
     {
-        // Intentar obtener permisos del caché
+        // 1. Intentar obtener permisos del caché
         var cacheKey = CacheKeys.UserPermissions(userId);
         var cachedPermissions = await _cacheService.GetAsync<HashSet<string>>(cacheKey);
         
-        if (cachedPermissions != null)
+        if (cachedPermissions is not null)
         {
             _logger.LogDebug("Permissions retrieved from cache for user {UserId}", userId);
             return cachedPermissions;
         }
 
-        // Verificar si el usuario existe
-        var userExists = await _context.Users
-            .AnyAsync(u => u.Id == userId);
+        // 2. Si no está en caché, buscar en base de datos
+        // Tip: Usamos AsNoTracking para mejor rendimiento en lecturas
+        var permissions = await _context.UserPermissions
+            .Where(x => x.UserId == userId)
+            .Select(x => x.Permission)
+            .ToArrayAsync();
+            
+        var permissionsSet = permissions.ToHashSet();
 
-        if (!userExists)
-        {
-            return [];
-        }
-
-        // Por ahora, todos los usuarios autenticados tienen todos los permisos
-        // En el futuro, esto debería consultar una tabla de permisos/roles
-        // TODO: Implementar sistema de roles y permisos en base de datos
-        // TODO: Agregar tabla UserRoles y RolePermissions
+        // 3. Guardar en caché (incluso si está vacío, para evitar golpear la BD repetidamente)
+        await _cacheService.SetAsync(cacheKey, permissionsSet, CacheTTL.Permissions);
         
-        var allPermissions = new HashSet<string>
-        {
-            // Permisos de usuarios
-            "users:access",
-            // Permisos de autos
-            "cars:read",
-            "cars:write",
-            "cars:delete",
-            // Permisos de clientes
-            "clients:read",
-            "clients:write",
-            "clients:delete",
-            // Permisos de ventas
-            "sales:read",
-            "sales:write",
-            "sales:delete",
-            // Permisos de cotizaciones
-            "quotes:read",
-            "quotes:write",
-            "quotes:delete",
-            // Permisos financieros
-            "financial:read",
-            "financial:write",
-            "financial:delete"
-        };
+        _logger.LogDebug("Permissions loaded from DB and cached for user {UserId}. Count: {Count}", userId, permissionsSet.Count);
 
-        // Guardar en caché
-        await _cacheService.SetAsync(cacheKey, allPermissions, CacheTTL.Permissions);
-        _logger.LogDebug("Permissions cached for user {UserId} with TTL {TTL}", userId, CacheTTL.Permissions);
-
-        return allPermissions;
+        return permissionsSet;
     }
 }

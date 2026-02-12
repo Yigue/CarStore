@@ -7,6 +7,7 @@ using Domain.Financial.Attributes;
 using Domain.Quotes;
 using Domain.Sales;
 using Domain.Users;
+using Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.UnitTests;
@@ -26,5 +27,19 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<FinancialTransaction> Transactions => Set<FinancialTransaction>();
     public DbSet<TransactionCategory> TransactionCategories => Set<TransactionCategory>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<CarImage> CarImages => Set<CarImage>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Client>().OwnsOne(c => c.Email);
+        modelBuilder.Entity<Car>().OwnsOne(c => c.Patente);
+        modelBuilder.Entity<Car>().OwnsOne(c => c.Price);
+        modelBuilder.Entity<Sale>().OwnsOne(s => s.FinalPrice);
+        modelBuilder.Entity<Quote>().OwnsOne(q => q.ProposedPrice);
+        modelBuilder.Entity<FinancialTransaction>().OwnsOne(t => t.Amount);
+        
+        base.OnModelCreating(modelBuilder);
+    }
 }

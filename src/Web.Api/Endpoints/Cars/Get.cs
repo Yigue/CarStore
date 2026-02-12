@@ -2,6 +2,7 @@
 using Application.Cars.GetAll;
 using MediatR;
 using SharedKernel;
+using Web.Api.Extensions;
 using Web.Api.Infrastructure;
 
 namespace Web.Api.Endpoints.Cars;

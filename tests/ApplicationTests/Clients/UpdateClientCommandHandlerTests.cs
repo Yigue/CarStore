@@ -23,7 +23,7 @@ public class UpdateClientCommandHandlerTests
     {
         using var context = CreateContext();
         var dateProvider = new FakeDateTimeProvider { UtcNow = new DateTime(2024, 1, 1) };
-        var client = new Client("John", "Doe", "123", "john@test.com", "555", "Street 1");
+        var client = new Client("John", "Doe", "123", "john@test.com", "555", "Street 1", dateProvider.UtcNow);
         context.Clients.Add(client);
         await context.SaveChangesAsync();
 
