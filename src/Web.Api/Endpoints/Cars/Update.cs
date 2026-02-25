@@ -11,8 +11,8 @@ internal sealed class Update : IEndpoint
 {
     public sealed class Request
     {
-        public string Marca { get; set; }
-        public string Modelo { get; set; }
+        public Guid Marca { get; set; }
+        public Guid Modelo { get; set; }
         public int Color { get; set; }
         public int CarType { get; set; }
         public int CarStatus { get; set; }
@@ -33,8 +33,8 @@ internal sealed class Update : IEndpoint
         {
             var command = new UpdateCarCommand(
                 id,
-                new Guid(request.Marca),
-                new Guid(request.Modelo),
+                request.Marca,
+                request.Modelo,
                 (Color)request.Color,
                 (TypeCar)request.CarType,
                 (StatusCar)request.CarStatus,

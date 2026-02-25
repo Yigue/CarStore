@@ -12,8 +12,8 @@ internal sealed class Create : IEndpoint
 {
     public sealed class Request
     {
-        public string Marca { get; set; }
-        public string Modelo { get; set; }
+        public Guid Marca { get; set; }
+        public Guid Modelo { get; set; }
         public int Color { get; set; }
         public int CarType { get; set; }
         public int CarStatus { get; set; }
@@ -34,8 +34,8 @@ internal sealed class Create : IEndpoint
         {
             var command = new CreateCarCommand
             {
-                Marca = Guid.Parse(request.Marca), // Will throw FormatException if invalid, handled by GlobalExceptionHandler or mapped
-                Modelo = Guid.Parse(request.Modelo),
+                Marca = request.Marca,
+                Modelo = request.Modelo,
                 Color = (Color)request.Color,
                 CarType = (TypeCar)request.CarType,
                 CarStatus = (StatusCar)request.CarStatus,
