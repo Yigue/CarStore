@@ -27,6 +27,7 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
             .IsRequired();
 
         builder.Property(c => c.Anio)
+            .HasColumnName("año")
             .IsRequired();
 
         builder.HasOne(c => c.Marca)
