@@ -4,7 +4,7 @@ global using Microsoft.EntityFrameworkCore;
 global using Microsoft.Data.Sqlite;
 global using Infrastructure.Database;
 global using Domain.Cars;
-global using Domain.Cars.Atribbutes;
+global using Domain.Cars.Attributes;
 global using Domain.Clients;
 global using Domain.Financial;
 global using Domain.Financial.Attributes;

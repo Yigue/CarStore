@@ -19,8 +19,9 @@ public class SaleTests
         var contractNumber = _faker.Random.ReplaceNumbers("########");
         var comments = _faker.Lorem.Sentence();
 
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var saleDate = DateTime.UtcNow;
-        var sale = new Sale(carId, clientId, finalPrice, paymentMethod, contractNumber, comments, saleDate);
+        var sale = new Sale(dealerId, carId, clientId, finalPrice, paymentMethod, contractNumber, comments, saleDate);
 
         sale.CarId.Should().Be(carId);
         sale.ClientId.Should().Be(clientId);

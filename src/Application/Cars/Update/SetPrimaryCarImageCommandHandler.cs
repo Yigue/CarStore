@@ -35,7 +35,7 @@ internal sealed class SetPrimaryCarImageCommandHandler : ICommandHandler<SetPrim
         // Establecer todas las imágenes como no primarias
         foreach (CarImage img in car.Images)
         {
-            img.IsPrimary = img.Id == command.ImageId;
+            img.SetAsPrimary(img.Id == command.ImageId);
         }
 
         await _context.SaveChangesAsync(cancellationToken);

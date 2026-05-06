@@ -1,6 +1,6 @@
 
 
-namespace Domain.Cars.Atribbutes;
+namespace Domain.Cars.Attributes;
 
 public enum Color{
 

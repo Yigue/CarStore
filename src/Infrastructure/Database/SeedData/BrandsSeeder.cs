@@ -1,75 +1,73 @@
 using Application.Abstractions.Data;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Domain.Cars;
 
 namespace Infrastructure.Database.SeedData;
 
 /// <summary>
-/// Seeder para Marcas y Modelos de vehículos.
+/// Seeder para Marcas y Modelos de vehÃ­culos.
 /// </summary>
 internal static class BrandsSeeder
 {
-    /// <summary>
-    /// Seedea las marcas y modelos principales según el roadmap.
-    /// </summary>
     public static async Task SeedAsync(
         IApplicationDbContext context,
         CancellationToken cancellationToken = default)
     {
-        // Verificar si ya hay marcas
-        if (await context.Marca.AnyAsync(cancellationToken))
+        // Chequeo sincronico e idempotente para evitar problemas en tests
+        if (context.Marca.IgnoreQueryFilters().Any())
         {
             return;
         }
 
         var marcas = new List<Marca>
         {
-            new("Toyota"),
-            new("Ford"),
-            new("Chevrolet"),
-            new("Volkswagen")
+            new Marca("Toyota"),
+            new Marca("Ford"),
+            new Marca("Chevrolet"),
+            new Marca("Volkswagen"),
+            new Marca("Honda"),
+            new Marca("Fiat"),
+            new Marca("Renault"),
+            new Marca("Peugeot")
         };
 
         context.Marca.AddRange(marcas);
         await context.SaveChangesAsync(cancellationToken);
 
-        // Crear modelos para cada marca
-        var modelos = new List<Modelo>();
-
-        // Toyota
         var toyota = marcas.First(m => m.Nombre == "Toyota");
-        modelos.AddRange(new[]
-        {
+        var ford = marcas.First(m => m.Nombre == "Ford");
+        var chevrolet = marcas.First(m => m.Nombre == "Chevrolet");
+        var volkswagen = marcas.First(m => m.Nombre == "Volkswagen");
+
+        var modelos = new List<Modelo>();
+        modelos.AddRange(new[] {
             new Modelo("Corolla", toyota.Id),
-            new Modelo("Camry", toyota.Id),
+            new Modelo("Hilux", toyota.Id),
             new Modelo("RAV4", toyota.Id),
-            new Modelo("Hilux", toyota.Id)
+            new Modelo("Yaris", toyota.Id)
         });
 
-        // Ford
-        var ford = marcas.First(m => m.Nombre == "Ford");
-        modelos.AddRange(new[]
-        {
+        modelos.AddRange(new[] {
             new Modelo("Fiesta", ford.Id),
             new Modelo("Focus", ford.Id),
-            new Modelo("Mustang", ford.Id),
-            new Modelo("Ranger", ford.Id)
+            new Modelo("Ranger", ford.Id),
+            new Modelo("Mustang", ford.Id)
         });
 
-        // Chevrolet
-        var chevrolet = marcas.First(m => m.Nombre == "Chevrolet");
-        modelos.AddRange(new[]
-        {
+        modelos.AddRange(new[] {
+            new Modelo("Onix", chevrolet.Id),
             new Modelo("Cruze", chevrolet.Id),
-            new Modelo("Malibu", chevrolet.Id),
-            new Modelo("Equinox", chevrolet.Id),
-            new Modelo("Silverado", chevrolet.Id)
+            new Modelo("Tracker", chevrolet.Id),
+            new Modelo("S10", chevrolet.Id),
+            new Modelo("Malibu", chevrolet.Id)
         });
 
-        // Volkswagen
-        var volkswagen = marcas.First(m => m.Nombre == "Volkswagen");
-        modelos.AddRange(new[]
-        {
+        modelos.AddRange(new[] {
             new Modelo("Gol", volkswagen.Id),
             new Modelo("Polo", volkswagen.Id),
             new Modelo("Tiguan", volkswagen.Id),
@@ -80,4 +78,3 @@ internal static class BrandsSeeder
         await context.SaveChangesAsync(cancellationToken);
     }
 }
-

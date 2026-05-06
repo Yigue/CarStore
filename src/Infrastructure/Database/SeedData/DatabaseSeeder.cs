@@ -1,9 +1,11 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Financial.Attributes;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Database.SeedData;
 
@@ -19,6 +21,8 @@ public static class DatabaseSeeder
     public static async Task SeedAsync(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
+        IConfiguration configuration,
+        ILogger logger,
         CancellationToken cancellationToken = default)
     {
         // Verificar si ya hay datos seedeados
@@ -30,7 +34,8 @@ public static class DatabaseSeeder
         // Ejecutar seeders en orden
         await BrandsSeeder.SeedAsync(context, cancellationToken);
         await TransactionCategoriesSeeder.SeedAsync(context, cancellationToken);
-        await UsersSeeder.SeedAsync(context, passwordHasher, cancellationToken);
+        await UsersSeeder.SeedAsync(context, passwordHasher, configuration, logger, cancellationToken);
+        await DevDataSeeder.SeedAsync(context, cancellationToken);
 
         // Guardar todos los cambios
         await context.SaveChangesAsync(cancellationToken);

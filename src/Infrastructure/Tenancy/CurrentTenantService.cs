@@ -1,30 +1,44 @@
 using Application.Abstractions.Tenancy;
+using Microsoft.AspNetCore.Http;
 
 namespace Infrastructure.Tenancy;
 
 /// <summary>
-/// Development implementation of ICurrentTenantService.
-/// Returns a hardcoded DealerId for development.
-/// 
-/// In production, this will read from JWT claims:
-/// - Parse the "dealer_id" claim from the authenticated user
-/// - Validate that the dealer exists and is active
+/// Production implementation of ICurrentTenantService.
+/// Extracts the DealerId from the authenticated user's JWT "dealer_id" claim.
 /// </summary>
 public class CurrentTenantService : ICurrentTenantService
 {
-    // TODO: Replace with actual tenant resolution from JWT claims
-    // Example: Read from HttpContext.User.Claims.FirstOrDefault(c => c.Type == "dealer_id")
-    
-    /// <summary>
-    /// Default development DealerId.
-    /// All data created during development will belong to this dealer.
-    /// </summary>
-    private static readonly Guid DefaultDevelopmentDealerId = 
-        Guid.Parse("11111111-1111-1111-1111-111111111111");
-    
-    public Guid DealerId => DefaultDevelopmentDealerId;
-    
-    public bool HasTenant => true;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public CurrentTenantService(IHttpContextAccessor httpContextAccessor)
+    {
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    public Guid DealerId
+    {
+        get
+        {
+            var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("dealer_id");
+
+            if (claim is null || !Guid.TryParse(claim.Value, out var dealerId))
+            {
+                return Guid.Empty;
+            }
+
+            return dealerId;
+        }
+    }
+
+    public bool HasTenant
+    {
+        get
+        {
+            var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("dealer_id");
+            return claim is not null && Guid.TryParse(claim.Value, out _);
+        }
+    }
 }
 
 /// <summary>

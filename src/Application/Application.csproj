@@ -18,14 +18,13 @@
 
 
   <ItemGroup>
-	<InternalsVisibleTo Include="Application.UnitTests" />
-        <InternalsVisibleTo Include="BehaviorTests" />
+    <InternalsVisibleTo Include="Application.UnitTests" />
+    <InternalsVisibleTo Include="ApplicationTests" />
+    <InternalsVisibleTo Include="AuthenticationTests" />
+    <InternalsVisibleTo Include="BehaviorTests" />
+    <InternalsVisibleTo Include="WebApiTests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" /> <!-- Necesario para Moq -->
   </ItemGroup>
-
-    <ItemGroup>
-      <InternalsVisibleTo Include="Application.UnitTests" />
-      <InternalsVisibleTo Include="AuthenticationTests" />
-    </ItemGroup>
 
 
 </Project>

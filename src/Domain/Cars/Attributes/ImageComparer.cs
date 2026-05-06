@@ -1,4 +1,4 @@
-namespace Domain.Cars.Atribbutes;
+namespace Domain.Cars.Attributes;
 public class ImagenesComparer : IEqualityComparer<string>
 {
     public bool Equals(string? x, string? y)

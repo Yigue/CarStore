@@ -1,7 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Tenancy;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Clients;
 using Domain.Financial;
 using Domain.Financial.Attributes;
@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SharedKernel;
 using Newtonsoft.Json;
 using Domain.Shared;
+using Infrastructure.Persistence.Configurations.ValueObjects;
 
 namespace Infrastructure.Database;
 
@@ -50,6 +51,17 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
         modelBuilder.HasDefaultSchema(Schemas.Default);
+
+        // Ignorar DealerId en entidades compartidas (catálogo)
+        modelBuilder.Entity<Marca>().Ignore(x => x.DealerId);
+        modelBuilder.Entity<Modelo>().Ignore(x => x.DealerId);
+        modelBuilder.Entity<TransactionCategory>().Ignore(x => x.DealerId);
+        modelBuilder.Entity<CarImage>().Ignore(x => x.DealerId);
+
+        // Configurar Email Value Object converter for User
+        modelBuilder.Entity<User>()
+            .Property(u => u.Email)
+            .HasConversion(new EmailValueConverter());
         
         // Multi-tenancy: Global Query Filters
         // Automatically filter all queries by DealerId
@@ -77,7 +89,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.ConfigureWarnings(warnings =>
-            warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning));
+            warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)
+                    .Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
     }
 
     // Implement interface methods
@@ -101,7 +114,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
                     domainEvent,
                     new JsonSerializerSettings
                     {
-                        TypeNameHandling = TypeNameHandling.All
+                        TypeNameHandling = TypeNameHandling.None
                     })
             })
             .ToList();

@@ -3,7 +3,7 @@ using Application.Abstractions.Tenancy;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Cars.Events;
 using Domain.Users;
 using Application.Abstractions.Caching;
@@ -64,7 +64,7 @@ internal sealed class CreateCarCommandHandler(
             command.CantidadAsientos,
             command.Cilindrada,
             command.Kilometraje,
-            command.Año,
+            command.Anio,
             command.Patente,
             command.Descripcion,
             command.Price,

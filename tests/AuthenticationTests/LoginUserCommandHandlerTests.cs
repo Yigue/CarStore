@@ -1,4 +1,5 @@
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Tenancy;
 using Application.Users.Login;
 using Domain.Users;
 using Infrastructure.Database;
@@ -16,14 +17,15 @@ public class LoginUserCommandHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        return new ApplicationDbContext(options, Mock.Of<IPublisher>());
+        var tenantService = Mock.Of<ICurrentTenantService>();
+        return new ApplicationDbContext(options, Mock.Of<IPublisher>(), tenantService);
     }
 
     [Fact]
     public async Task Handle_ReturnsFailure_WhenPasswordIsInvalid()
     {
         await using var context = CreateContext();
-        var user = new User("user@test.com", "John", "Doe", "hash");
+        var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "user@test.com", "John", "Doe", "hash");
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -44,7 +46,7 @@ public class LoginUserCommandHandlerTests
     public async Task Handle_ReturnsToken_WhenCredentialsValid()
     {
         await using var context = CreateContext();
-        var user = new User("user@test.com", "John", "Doe", "hash");
+        var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "user@test.com", "John", "Doe", "hash");
         context.Users.Add(user);
         await context.SaveChangesAsync();
 

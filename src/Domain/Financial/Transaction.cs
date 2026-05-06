@@ -35,6 +35,7 @@ public sealed class FinancialTransaction : Entity
 
     // Constructor con todos los parámetros
     public FinancialTransaction(
+        Guid dealerId,
         TransactionType type,
         decimal amount,
         string description,
@@ -45,6 +46,7 @@ public sealed class FinancialTransaction : Entity
         Sale? sale = null,
         DateTime transactionDate = default)
     {
+        SetDealer(dealerId);
         Type = type;
         Amount = new Money(amount);
         Description = description;
@@ -70,6 +72,7 @@ public sealed class FinancialTransaction : Entity
     }
     
     public FinancialTransaction(
+        Guid dealerId,
         TransactionType type,
         Money amount,
         string description,
@@ -80,6 +83,7 @@ public sealed class FinancialTransaction : Entity
         Sale? sale = null,
         DateTime transactionDate = default)
     {
+        SetDealer(dealerId);
         Type = type;
         Amount = amount;
         Description = description;

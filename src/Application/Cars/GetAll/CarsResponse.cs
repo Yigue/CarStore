@@ -1,4 +1,4 @@
-﻿using Domain.Cars.Atribbutes;
+﻿using Domain.Cars.Attributes;
 using Domain.Cars;
 using System.Diagnostics.CodeAnalysis;
 
@@ -11,12 +11,12 @@ public sealed record CarsResponses(
     Color Color,
     TypeCar Type,
     StatusCar Status,
-    statusServiceCar ServiceStatus,
+    StatusServiceCar ServiceStatus,
     int Puertas,
     int Asientos,
     int Cilindrada,
-    decimal Kilometraje,
-    int Año,
+    int Kilometraje,
+    int Anio,
     string Patente,
     string Description,
     decimal Precio,

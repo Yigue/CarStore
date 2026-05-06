@@ -1,4 +1,4 @@
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

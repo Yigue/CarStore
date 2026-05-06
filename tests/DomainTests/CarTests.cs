@@ -1,5 +1,5 @@
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Cars.Events;
 using SharedKernel;
 
@@ -10,23 +10,25 @@ public class CarTests
     [Fact]
     public void Constructor_ShouldInitializeProperties()
     {
-        var marca = new Marca(_faker.Vehicle.Manufacturer()) { Id = Guid.NewGuid() };
-        var modelo = new Modelo(_faker.Vehicle.Model(), marca.Id) { Id = Guid.NewGuid(), Marca = marca };
+        var marca = new Marca(_faker.Vehicle.Manufacturer());
+        var modelo = new Modelo(_faker.Vehicle.Model(), marca.Id) { Marca = marca };
         var color = _faker.PickRandom<Color>();
         var typeCar = _faker.PickRandom<TypeCar>();
         var statusCar = _faker.PickRandom<StatusCar>();
-        var serviceCar = _faker.PickRandom<statusServiceCar>();
+        var serviceCar = _faker.PickRandom<StatusServiceCar>();
         var puertas = _faker.Random.Int(2, 5);
         var asientos = _faker.Random.Int(2, 7);
         var cilindrada = _faker.Random.Int(1000, 5000);
         var kilometraje = _faker.Random.Int(0, 200000);
         var anio = _faker.Date.Past(20, DateTime.UtcNow).Year;
-        var patente = _faker.Random.AlphaNumeric(6);
+        var patente = "ABC123"; // Patente con formato vÃ¡lido (3 letras, 3 nÃºmeros)
         var descripcion = _faker.Lorem.Sentence();
         var price = _faker.Random.Decimal(1000, 100000);
         var now = DateTime.UtcNow;
 
+        var dealerId = Guid.NewGuid();
         var car = new Car(
+            dealerId,
             marca,
             modelo,
             color,
@@ -56,13 +58,13 @@ public class CarTests
         car.CantidadAsientos.Should().Be(asientos);
         car.Cilindrada.Should().Be(cilindrada);
         car.Kilometraje.Should().Be(kilometraje);
-        car.Año.Should().Be(anio);
+        car.Anio.Should().Be(anio);
         car.Patente.Value.Should().Be(patente);
         car.Descripcion.Should().Be(descripcion);
         car.Price.Amount.Should().Be(price);
         car.CreatedAt.Should().Be(now);
         car.UpdatedAt.Should().Be(now);
-        car.DomainEvents.Should().BeEmpty();
+        car.DomainEvents.Should().ContainSingle(e => e is NewCarDomainEvent);
     }
 
     [Fact]

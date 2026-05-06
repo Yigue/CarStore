@@ -9,7 +9,7 @@ using Domain.Quotes;
 using Domain.Sales;
 using Bogus;
 using System.Security.Cryptography;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Financial.Attributes;
 using System.Transactions;
 using Domain.Financial;
@@ -33,7 +33,7 @@ public static class SeedDataExtensions
 
     private static void SeedCars(ApplicationDbContext context)
     {
-        if (!context.Set<Car>().Any())
+        if (!context.Set<Car>().IgnoreQueryFilters().Any())
         {
              var marcas = new List<Marca>{
             new Marca("Toyota"),
@@ -72,7 +72,7 @@ public static class SeedDataExtensions
                 f.PickRandom<Color>(),
                 TypeCar.Sedan,
                 StatusCar.New,
-                statusServiceCar.EnVenta,
+                StatusServiceCar.EnVenta,
                 f.Random.Int(2, 5),
                 f.Random.Int(4, 7),
                 f.Random.Int(1000, 3000),
@@ -92,7 +92,7 @@ public static class SeedDataExtensions
 
     private static void SeedClients(ApplicationDbContext context)
     {
-        if (!context.Set<Client>().Any())
+        if (!context.Set<Client>().IgnoreQueryFilters().Any())
         {
             var clientFaker = new Faker<Client>()
                 .CustomInstantiator(f => new Client(
@@ -114,7 +114,7 @@ public static class SeedDataExtensions
 
     private static void SeedQuotes(ApplicationDbContext context)
     {
-        if (!context.Set<Quote>().Any())
+        if (!context.Set<Quote>().IgnoreQueryFilters().Any())
         {
             var cars = context.Set<Car>().IgnoreQueryFilters().ToList();
             var clients = context.Set<Client>().IgnoreQueryFilters().ToList();
@@ -145,6 +145,7 @@ public static class SeedDataExtensions
         var car = cars[RandomNumber(rng, cars.Count)];
         var client = clients[RandomNumber(rng, clients.Count)];
         return new Quote(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"), // DealerId fijo de desarrollo
             car,
             client,
             f.Random.Decimal((car.Price * 0.9m).Amount, (car.Price * 1.1m).Amount),
@@ -156,7 +157,7 @@ public static class SeedDataExtensions
 
     private static void SeedSales(ApplicationDbContext context)
     {
-        if (!context.Set<Sale>().Any())
+        if (!context.Set<Sale>().IgnoreQueryFilters().Any())
         {
             var cars = context.Set<Car>().IgnoreQueryFilters().ToList();
             var clients = context.Set<Client>().IgnoreQueryFilters().ToList();
@@ -171,6 +172,7 @@ public static class SeedDataExtensions
 
             var saleFaker = new Faker<Sale>()
                 .CustomInstantiator(f => new Sale(
+                    Guid.Parse("11111111-1111-1111-1111-111111111111"), // DealerId fijo de desarrollo
                     f.PickRandom(cars).Id, // Usar PickRandom de Bogus
                     f.PickRandom(clients).Id,
                     f.PickRandom(cars).Price.Amount, // Obtener precio del Car seleccionado
@@ -188,7 +190,7 @@ public static class SeedDataExtensions
 
  private static void SeedTransactions(ApplicationDbContext context)
 {
-    if (!context.Set<TransactionCategory>().Any())
+    if (!context.Set<TransactionCategory>().IgnoreQueryFilters().Any())
     {
         var categories = new List<TransactionCategory>
         {
@@ -202,7 +204,7 @@ public static class SeedDataExtensions
         context.SaveChanges();
     }
 
-    if (!context.Set<FinancialTransaction>().Any())
+    if (!context.Set<FinancialTransaction>().IgnoreQueryFilters().Any())
     {
         var categories = context.Set<TransactionCategory>().IgnoreQueryFilters().ToList();
         var sales = context.Set<Sale>().IgnoreQueryFilters().ToList();
@@ -216,6 +218,7 @@ public static class SeedDataExtensions
 
         var transactionFaker = new Faker<FinancialTransaction>()
             .CustomInstantiator(f => new FinancialTransaction(
+                Guid.Parse("11111111-1111-1111-1111-111111111111"), // DealerId fijo de desarrollo
                 f.PickRandom<TransactionType>(),
                 f.Random.Decimal(10, 1000),
                 f.Lorem.Sentence(),

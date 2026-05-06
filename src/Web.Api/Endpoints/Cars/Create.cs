@@ -1,6 +1,6 @@
 using Application.Cars.Create;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using MediatR;
 using SharedKernel;
 using Web.Api.Extensions;
@@ -22,33 +22,31 @@ internal sealed class Create : IEndpoint
         public int CantidadAsientos { get; set; }
         public int Cilindrada { get; set; }
         public int Kilometraje { get; set; }
-        public int Año { get; set; }
+        public int Anio { get; set; }
         public string Patente { get; set; }
         public string Descripcion { get; set; }
         public decimal Precio { get; set; }
-    }
+        }
 
-    public void MapEndpoint(IEndpointRouteBuilder app)
-    {
+        public void MapEndpoint(IEndpointRouteBuilder app)
+        {
         app.MapPost("cars", async (Request request, ISender sender, CancellationToken cancellationToken) =>
         {
-            var command = new CreateCarCommand
-            {
-                Marca = request.Marca,
-                Modelo = request.Modelo,
-                Color = (Color)request.Color,
-                CarType = (TypeCar)request.CarType,
-                CarStatus = (StatusCar)request.CarStatus,
-                ServiceCar = (statusServiceCar)request.ServiceCar,
-                CantidadPuertas = request.CantidadPuertas,
-                CantidadAsientos = request.CantidadAsientos,
-                Cilindrada = request.Cilindrada,
-                Kilometraje = request.Kilometraje,
-                Año = request.Año,
-                Patente = request.Patente,
-                Descripcion = request.Descripcion,
-                Price = request.Precio
-            };
+            var command = new CreateCarCommand(
+                request.Marca,
+                request.Modelo,
+                (Color)request.Color,
+                (TypeCar)request.CarType,
+                (StatusCar)request.CarStatus,
+                (StatusServiceCar)request.ServiceCar,
+                request.CantidadPuertas,
+                request.CantidadAsientos,
+                request.Cilindrada,
+                request.Kilometraje,
+                request.Anio,
+                request.Patente,
+                request.Descripcion,
+                request.Precio);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

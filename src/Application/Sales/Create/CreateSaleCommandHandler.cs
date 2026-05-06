@@ -1,7 +1,8 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Cars.Events;
 using Domain.Clients;
 using Domain.Clients.Attributes;
@@ -15,20 +16,22 @@ namespace Application.Sales.Create;
 
 internal sealed class CreateSaleCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ICurrentTenantService tenantService)
     : ICommandHandler<CreateSaleCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateSaleCommand command, CancellationToken cancellationToken)
     {
         // Verify if car exists and is available
-        Car? car = await context.Cars.FindAsync(new object[] { command.CarId }, cancellationToken);
+        Car? car = await context.Cars
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.Id == command.CarId, cancellationToken);      
         if (car == null)
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
-        }
-        
+        }        
         // Validate car is available (only check ServiceCar, as CarStatus is about condition, not availability)
-        if (car.ServiceCar != statusServiceCar.Disponible)
+        if (car.ServiceCar != StatusServiceCar.Disponible)
         {
             return Result.Failure<Guid>(CarErrors.AlreadySold(command.CarId));
         }
@@ -47,6 +50,7 @@ internal sealed class CreateSaleCommandHandler(
         }
  
         var sale = new Sale(
+            tenantService.DealerId,
             command.CarId,
             command.ClientId,
             command.FinalPrice,
@@ -61,11 +65,10 @@ internal sealed class CreateSaleCommandHandler(
 
         context.Sales.Add(sale);
 
-        await context.SaveChangesAsync(cancellationToken);
-
         // Complete the sale to trigger financial transaction
         sale.Complete();
 
+        // Single SaveChangesAsync: persists sale, car status, and all domain events in one transaction
         await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(sale.Id);

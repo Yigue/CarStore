@@ -1,6 +1,6 @@
 using SharedKernel;
 
-namespace Domain.Cars.Atribbutes;
+namespace Domain.Cars.Attributes;
 
 public class Modelo : Entity
 {

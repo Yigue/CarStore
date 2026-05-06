@@ -73,6 +73,12 @@ public class LocalFileStorageService : IBlobStorageService
         return Task.FromResult(exists);
     }
 
+    public string GenerateSasUrl(string containerName, string blobName)
+    {
+        // Para almacenamiento local, simplemente devolvemos la URL relativa
+        return $"{_baseUrl}/{containerName}/{blobName}";
+    }
+
     public Uri GenerateSasUri(Azure.Storage.Blobs.BlobClient blobClient)
     {
         // Para almacenamiento local, simplemente devolvemos la URI original

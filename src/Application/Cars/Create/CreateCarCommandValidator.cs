@@ -17,7 +17,7 @@ internal sealed class CreateCarCommandValidator : AbstractValidator<CreateCarCom
         RuleFor(x => x.Cilindrada).GreaterThanOrEqualTo(1).WithMessage("El campo cilindrada debe ser mayor o igual a 1");
         RuleFor(x => x.Kilometraje).GreaterThanOrEqualTo(1).WithMessage("El campo kilometraje debe ser mayor o igual a 1");
         RuleFor(x => x.Patente).NotEmpty().MaximumLength(10).WithMessage("El campo patente es requerido y debe tener un maximo de 10 caracteres");
-        RuleFor(x => x.Año).NotEmpty().GreaterThan(0).LessThanOrEqualTo(DateTime.Now.Year).WithMessage("El año debe ser válido y no puede ser mayor al año actual");
+        RuleFor(x => x.Anio).NotEmpty().GreaterThan(0).LessThanOrEqualTo(DateTime.Now.Year).WithMessage("El anio debe ser valido y no puede ser mayor al anio actual");
         RuleFor(x => x.Descripcion).NotEmpty().MaximumLength(255).WithMessage("El campo descripcion es requerido y debe tener un maximo de 255 caracteres");
         RuleFor(x => x.Price).NotEmpty().GreaterThan(0).WithMessage("El campo precio es requerido y debe ser mayor a 0");
     }

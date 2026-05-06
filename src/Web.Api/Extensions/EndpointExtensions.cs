@@ -15,6 +15,11 @@ public static class EndpointExtensions
             .Select(type => ServiceDescriptor.Transient(typeof(IEndpoint), type))
             .ToArray();
 
+        foreach (var descriptor in serviceDescriptors)
+        {
+            Console.WriteLine($"[DEBUG] Registering endpoint: {descriptor.ImplementationType?.Name}");
+        }
+
         services.TryAddEnumerable(serviceDescriptors);
 
         return services;
@@ -25,10 +30,14 @@ public static class EndpointExtensions
     {
         IEnumerable<IEndpoint> endpoints = builder.ServiceProvider.GetRequiredService<IEnumerable<IEndpoint>>();
 
+        int count = 0;
         foreach (IEndpoint endpoint in endpoints)
         {
             endpoint.MapEndpoint(builder);
+            count++;
         }
+
+        Console.WriteLine($"[DEBUG] Mapped {count} endpoints");
 
         return builder;
     }

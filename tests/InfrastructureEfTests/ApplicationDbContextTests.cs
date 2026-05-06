@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using Application.Abstractions.Tenancy;
 
 public class ApplicationDbContextTests
 {
@@ -10,17 +11,31 @@ public class ApplicationDbContextTests
             where TNotification : INotification => Task.CompletedTask;
     }
 
+    private sealed class NoOpTenantService : ICurrentTenantService
+    {
+        public Guid DealerId => Guid.Parse("11111111-1111-1111-1111-111111111111");
+        public bool HasTenant => false;
+    }
+
     private static async Task<(ApplicationDbContext Context, SqliteConnection Connection)> CreateContextAsync()
     {
         var connection = new SqliteConnection("Filename=:memory:");
         await connection.OpenAsync();
 
+        using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = "PRAGMA foreign_keys = ON;";
+            cmd.ExecuteNonQuery();
+        }
+
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(connection)
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
-        var context = new ApplicationDbContext(options, new NoOpPublisher());
-        await context.Database.MigrateAsync();
+        var tenantService = new NoOpTenantService();
+        var context = new ApplicationDbContext(options, new NoOpPublisher(), tenantService);
+        await context.Database.EnsureCreatedAsync();
         return (context, connection);
     }
 
@@ -31,16 +46,17 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var marca = new Marca("Ford") { Id = Guid.NewGuid() };
-        var modelo = new Modelo("Fiesta", marca.Id) { Id = Guid.NewGuid() };
+        var dealerId = Guid.NewGuid();
+        var marca = new Marca("Ford");
+        var modelo = new Modelo("Fiesta", marca.Id);
         context.AddRange(marca, modelo);
         await context.SaveChangesAsync();
 
-        var car1 = new Car(marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, statusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "AAA111", "desc", 10000m, DateTime.UtcNow);
+        var car1 = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "AAA111", "desc", 10000m, DateTime.UtcNow);
         context.Cars.Add(car1);
         await context.SaveChangesAsync();
 
-        var car2 = new Car(marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, statusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "AAA111", "desc", 10000m, DateTime.UtcNow);
+        var car2 = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "AAA111", "desc", 10000m, DateTime.UtcNow);
         context.Cars.Add(car2);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
@@ -53,8 +69,9 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var client1 = new Client("John", "Doe", "123", "john@test.com", "555", "Street", DateTime.UtcNow) { Id = Guid.NewGuid() };
-        var client2 = new Client("Jane", "Smith", "123", "jane@test.com", "555", "Street", DateTime.UtcNow) { Id = Guid.NewGuid() };
+        var dealerId = Guid.NewGuid();
+        var client1 = new Client(dealerId, "John", "Doe", "123", "john@test.com", "555", "Street", DateTime.UtcNow);
+        var client2 = new Client(dealerId, "Jane", "Smith", "123", "jane@test.com", "555", "Street", DateTime.UtcNow);
 
         context.Clients.Add(client1);
         await context.SaveChangesAsync();
@@ -70,18 +87,19 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var marca = new Marca("Ford") { Id = Guid.NewGuid() };
-        var modelo = new Modelo("Fiesta", marca.Id) { Id = Guid.NewGuid() };
-        var car = new Car(marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, statusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "BBB222", "desc", 9000m, DateTime.UtcNow);
-        var client = new Client("John", "Doe", "456", "john@demo.com", "555", "Street", DateTime.UtcNow) { Id = Guid.NewGuid() };
+        var dealerId = Guid.NewGuid();
+        var marca = new Marca("Ford");
+        var modelo = new Modelo("Fiesta", marca.Id);
+        var car = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "BBB222", "desc", 9000m, DateTime.UtcNow);
+        var client = new Client(dealerId, "John", "Doe", "456", "john@demo.com", "555", "Street", DateTime.UtcNow);
         context.AddRange(marca, modelo, car, client);
         await context.SaveChangesAsync();
 
-        var sale = new Sale(car.Id, client.Id, 9000m, PaymentMethod.Cash, "C-1", "ok", DateTime.UtcNow);
+        var sale = new Sale(Guid.Parse("11111111-1111-1111-1111-111111111111"), car.Id, client.Id, 9000m, PaymentMethod.Cash, "C-1", "ok", DateTime.UtcNow);
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var badSale = new Sale(Guid.NewGuid(), client.Id, 8000m, PaymentMethod.Cash, "C-2", "bad", DateTime.UtcNow);
+        var badSale = new Sale(Guid.Parse("11111111-1111-1111-1111-111111111111"), Guid.NewGuid(), client.Id, 8000m, PaymentMethod.Cash, "C-2", "bad", DateTime.UtcNow);
         context.Sales.Add(badSale);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
@@ -94,21 +112,22 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var marca = new Marca("Ford") { Id = Guid.NewGuid() };
-        var modelo = new Modelo("Fiesta", marca.Id) { Id = Guid.NewGuid() };
-        var car = new Car(marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, statusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "CCC333", "desc", 8000m, DateTime.UtcNow);
-        var client = new Client("John", "Doe", "789", "john@quotes.com", "555", "Street", DateTime.UtcNow) { Id = Guid.NewGuid() };
+        var dealerId = Guid.NewGuid();
+        var marca = new Marca("Ford");
+        var modelo = new Modelo("Fiesta", marca.Id);
+        var car = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "CCC333", "desc", 8000m, DateTime.UtcNow);
+        var client = new Client(dealerId, "John", "Doe", "789", "john@quotes.com", "555", "Street", DateTime.UtcNow);
         context.AddRange(marca, modelo, car, client);
         await context.SaveChangesAsync();
 
-        var quote = new Quote(car, client, 8000m, DateTime.UtcNow.AddDays(30), "ok", DateTime.UtcNow);
+        var quote = new Quote(Guid.Parse("11111111-1111-1111-1111-111111111111"), car, client, 8000m, DateTime.UtcNow.AddDays(30), "ok", DateTime.UtcNow);
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
 
         // Create a fake car with an ID that doesn't exist in the database to trigger FK violation
-        var fakeCar = new Car(marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, statusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "FAKE123", "fake", 1m, DateTime.UtcNow);
+        var fakeCar = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "FAKE123", "fake", 1m, DateTime.UtcNow);
         // Don't save fakeCar - we want its ID to not exist in DB
-        var badQuote = new Quote(fakeCar, client, 7000m, DateTime.UtcNow.AddDays(30), "bad", DateTime.UtcNow);
+        var badQuote = new Quote(Guid.Parse("11111111-1111-1111-1111-111111111111"), fakeCar, client, 7000m, DateTime.UtcNow.AddDays(30), "bad", DateTime.UtcNow);
         context.Quotes.Add(badQuote);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
@@ -121,11 +140,11 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var category = new TransactionCategory("Venta", "desc", TransactionType.Income) { Id = Guid.NewGuid() };
+        var category = new TransactionCategory("Venta", "desc", TransactionType.Income);
         context.Add(category);
         await context.SaveChangesAsync();
 
-        var transaction = new FinancialTransaction(TransactionType.Income, 100m, "desc", PaymentMethod.Cash, category);
+        var transaction = new FinancialTransaction(Guid.Parse("11111111-1111-1111-1111-111111111111"), TransactionType.Income, 100m, "desc", PaymentMethod.Cash, category);
         context.Transactions.Add(transaction);
         await context.SaveChangesAsync();
 

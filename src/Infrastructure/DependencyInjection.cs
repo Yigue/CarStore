@@ -4,7 +4,7 @@ using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
-using Application.Services;
+using Application.Users.Register;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
 using Infrastructure.Caching;
@@ -50,10 +50,10 @@ public static class DependencyInjection
 
     private static IServiceCollection AddTenancy(this IServiceCollection services)
     {
-        // Multi-tenancy service
-        // TODO: In production, replace with implementation that reads from JWT claims
+        // Multi-tenancy service: reads DealerId from JWT "dealer_id" claim via IHttpContextAccessor
+        // IHttpContextAccessor is registered in AddAuthenticationInternal()
         services.AddScoped<ICurrentTenantService, CurrentTenantService>();
-        
+
         return services;
     }
 
@@ -94,6 +94,15 @@ public static class DependencyInjection
 
     private static IServiceCollection AddDatabase(this IServiceCollection services, IConfiguration configuration)
     {
+        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase") || 
+                          Environment.GetEnvironmentVariable("UseInMemoryDatabase") == "true";
+
+        if (useInMemory)
+        {
+            // No registramos nada aqui para permitir que el proyecto de tests inyecte su propio provider
+            return services;
+        }
+
         string? connectionString = configuration.GetConnectionString("Database") ?? throw new ArgumentNullException(nameof(configuration));
 
         services.AddDbContext<ApplicationDbContext>(
@@ -144,15 +153,21 @@ public static class DependencyInjection
 
     private static IServiceCollection AddHealthChecks(this IServiceCollection services, IConfiguration configuration)
     {
-        var healthChecksBuilder = services
-            .AddHealthChecks()
-            .AddNpgSql(configuration.GetConnectionString("Database")!);
+        var healthChecksBuilder = services.AddHealthChecks();
 
-        // Agregar health check de Redis si está configurado
-        var redisConnectionString = configuration.GetConnectionString("Redis");
-        if (!string.IsNullOrEmpty(redisConnectionString))
+        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase") || 
+                          Environment.GetEnvironmentVariable("UseInMemoryDatabase") == "true";
+
+        if (!useInMemory)
         {
-            healthChecksBuilder.AddRedis(redisConnectionString, name: "redis");
+            healthChecksBuilder.AddNpgSql(configuration.GetConnectionString("Database")!);
+
+            // Agregar health check de Redis si estÃ¡ configurado
+            var redisConnectionString = configuration.GetConnectionString("Redis");
+            if (!string.IsNullOrEmpty(redisConnectionString))
+            {
+                healthChecksBuilder.AddRedis(redisConnectionString, name: "redis");
+            }
         }
 
         return services;
@@ -169,10 +184,11 @@ public static class DependencyInjection
                 o.TokenValidationParameters = new TokenValidationParameters
                 {
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Secret"]!)),
-                    ValidIssuer = configuration["Jwt:Issuer"],
-                    ValidAudience = configuration["Jwt:Audience"],
+                    ValidIssuer = configuration["Jwt:Issuer"] ?? "carstore",
+                    ValidAudience = configuration["Jwt:Audience"] ?? "carstore-api",
                     ClockSkew = TimeSpan.Zero
                 };
+
             });
 
         services.AddHttpContextAccessor();
@@ -217,14 +233,24 @@ public static class DependencyInjection
     {
         services.AddQuartz(configure =>
         {
-            var jobKey = new JobKey(nameof(ProcessOutboxMessagesJob));
-
+            // Job 1: Process Outbox Messages
+            var outboxJobKey = new JobKey(nameof(ProcessOutboxMessagesJob));
             configure
-                .AddJob<ProcessOutboxMessagesJob>(opts => opts.WithIdentity(jobKey))
+                .AddJob<ProcessOutboxMessagesJob>(opts => opts.WithIdentity(outboxJobKey))
                 .AddTrigger(trigger =>
-                    trigger.ForJob(jobKey)
+                    trigger.ForJob(outboxJobKey)
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(10)
+                                .RepeatForever()));
+
+            // Job 2: Mark Expired Quotes
+            var expiredQuotesJobKey = new JobKey(nameof(MarkExpiredQuotesJob));
+            configure
+                .AddJob<MarkExpiredQuotesJob>(opts => opts.WithIdentity(expiredQuotesJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(expiredQuotesJobKey)
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInMinutes(5) // Check every 5 minutes
                                 .RepeatForever()));
         });
 

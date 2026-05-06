@@ -47,6 +47,7 @@ internal sealed class SaleCompletedDomainEventHandler(
         }
         
         var transaction = new FinancialTransaction(
+            sale.DealerId,
             TransactionType.Income,
             notification.FinalPrice,
             $"Venta de auto - Contrato: {sale.ContractNumber}",

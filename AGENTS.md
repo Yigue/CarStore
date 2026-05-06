@@ -128,6 +128,15 @@ Use `carstore-backend` skill for detailed patterns on:
 - EF Core configurations
 - Minimal API endpoints
 
+### Auto-invoke Skills
+
+When performing these actions, ALWAYS invoke the corresponding skill FIRST:
+
+| Action | Skill |
+|--------|-------|
+| Generic DRF patterns | `django-drf` |
+| Writing Python tests with pytest | `pytest` |
+
 ---
 
 ## See Also

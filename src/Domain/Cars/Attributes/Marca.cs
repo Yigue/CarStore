@@ -1,5 +1,5 @@
 using SharedKernel;
-namespace Domain.Cars.Atribbutes;
+namespace Domain.Cars.Attributes;
 
 // Domain/Cars/Attributes/Marca.cs
 public class Marca : Entity

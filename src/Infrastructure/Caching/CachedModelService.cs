@@ -1,6 +1,6 @@
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

@@ -5,9 +5,14 @@ namespace Domain.Shared.ValueObjects;
 
 public sealed record LicensePlate
 {
-    // Regex para patentes argentinas (formato: ABC123 o AB123CD)
+    // Regex para patentes argentinas:
+    // - Autos Antiguos (1995): AAA123 (3 letras, 3 números)
+    // - Autos Mercosur (2016): AA123BB (2 letras, 3 números, 2 letras)
+    // - Motos Antiguas: 123ABC (3 números, 3 letras)
+    // - Motos Mercosur: A123BCD (1 letra, 3 números, 3 letras)
+    // - Otros/Especiales: ABC1234 (3 letras, 4 números)
     private static readonly Regex LicensePlateRegex = new(
-        @"^[A-Z]{2,3}\d{3}[A-Z]{0,2}$",
+        @"^([A-Z]{3}\d{3,4}|[A-Z]{2}\d{3}[A-Z]{2}|[A-Z]\d{3}[A-Z]{3}|\d{3}[A-Z]{3})$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public string Value { get; init; }

@@ -33,12 +33,21 @@ internal sealed class PermissionProvider
             return cachedPermissions;
         }
 
-        // 2. Si no está en caché, buscar en base de datos
+        // 2. Si no estÃ¡ en cachÃ©, buscar en base de datos
         // Tip: Usamos AsNoTracking para mejor rendimiento en lecturas
-        var permissions = await _context.UserPermissions
+        var query = _context.UserPermissions
             .Where(x => x.UserId == userId)
-            .Select(x => x.Permission)
-            .ToArrayAsync();
+            .Select(x => x.Permission);
+
+        string[] permissions;
+        if (query is IAsyncEnumerable<string>)
+        {
+            permissions = await query.ToArrayAsync();
+        }
+        else
+        {
+            permissions = query.ToArray();
+        }
             
         var permissionsSet = permissions.ToHashSet();
 

@@ -12,12 +12,10 @@ internal static class TransactionCategoriesSeeder
     /// <summary>
     /// Seedea las categorías de transacciones según el roadmap.
     /// </summary>
-    public static async Task SeedAsync(
-        IApplicationDbContext context,
-        CancellationToken cancellationToken = default)
+    public static async Task SeedAsync(IApplicationDbContext context, CancellationToken cancellationToken = default)
     {
-        // Verificar si ya hay categorías
-        if (await context.TransactionCategories.AnyAsync(cancellationToken))
+        // Verificar si ya hay categorÃ­as
+        if (context.TransactionCategories.IgnoreQueryFilters().Any())
         {
             return;
         }

@@ -1,5 +1,5 @@
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Infrastructure.Persistence.Configurations.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -26,7 +26,7 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
         builder.Property(c => c.Kilometraje)
             .IsRequired();
 
-        builder.Property(c => c.Año)
+        builder.Property(c => c.Anio)
             .IsRequired();
 
         builder.HasOne(c => c.Marca)

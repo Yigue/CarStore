@@ -25,9 +25,11 @@ internal sealed class Login : IEndpoint
         .WithTags(Tags.Users)
         .WithName("LoginUser")
         .AllowAnonymous()
+        .RequireRateLimiting("login")
         .Produces<string>(StatusCodes.Status200OK)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status429TooManyRequests)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

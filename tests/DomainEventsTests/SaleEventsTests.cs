@@ -15,7 +15,9 @@ public class SaleEventsTests
         const decimal price = 5000m;
         var money = new Money(price);
 
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var sale = new Sale(
+            dealerId,
             carId,
             clientId,
             price,

@@ -10,7 +10,7 @@ public class UserEventsTests
     [Fact]
     public void Register_user_raises_UserRegisteredDomainEvent()
     {
-        var user = new User("user@test.com", "John", "Doe", "hash");
+        var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "user@test.com", "John", "Doe", "hash");
 
         user.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<UserRegisteredDomainEvent>()
@@ -27,7 +27,7 @@ public class UserEventsTests
         var provider = services.BuildServiceProvider();
         var mediator = provider.GetRequiredService<IMediator>();
 
-        var user = new User("user@test.com", "John", "Doe", "hash");
+        var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "user@test.com", "John", "Doe", "hash");
         foreach (var domainEvent in user.DomainEvents)
         {
             await mediator.Publish(domainEvent);

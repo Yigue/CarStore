@@ -1,6 +1,6 @@
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -90,10 +90,9 @@ internal sealed class CachedBrandService : ICachedBrandService
 
     public async Task InvalidateCacheAsync(CancellationToken cancellationToken = default)
     {
-        // Invalidar todas las claves de marcas
-        // Nota: En una implementación completa, se usaría RemoveByPatternAsync
         _logger.LogInformation("Invalidating brands cache");
-        await Task.CompletedTask;
+        await _cacheService.RemoveAsync(CacheKeys.AllBrands(), cancellationToken);
+        _logger.LogWarning("Individual brand cache keys (by id/name) are not invalidated. Consider implementing RemoveByPatternAsync for '{Pattern}'", CacheKeys.BrandsPattern());
     }
 }
 

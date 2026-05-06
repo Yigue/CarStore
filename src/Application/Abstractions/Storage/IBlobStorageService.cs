@@ -10,5 +10,7 @@ public interface IBlobStorageService
     Task<byte[]> DownloadAsync(string containerName, string blobName, CancellationToken cancellationToken = default);
     Task DeleteAsync(string containerName, string blobName, CancellationToken cancellationToken = default);
     Task<bool> ExistsAsync(string containerName, string blobName, CancellationToken cancellationToken = default);
+    string GenerateSasUrl(string containerName, string blobName);
     Uri GenerateSasUri(Azure.Storage.Blobs.BlobClient blobClient);
-} 
+    } 
+ 

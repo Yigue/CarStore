@@ -1,7 +1,7 @@
 using Application.Sales.Get;
 using Application.Sales.GetById;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Clients;
 using Domain.Financial.Attributes;
 using Domain.Sales;
@@ -28,29 +28,31 @@ public class SalesIntegrationTests
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
+
         // Crear carro y cliente usando datos seedeados
-        var volkswagen = await context.Marca.FirstAsync(m => m.Nombre == "Volkswagen");
-        var gol = await context.Modelo.FirstAsync(m => m.Nombre == "Gol" && m.MarcaId == volkswagen.Id);
-        
+        var volkswagen = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Volkswagen");
+        var gol = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Gol" && m.MarcaId == volkswagen.Id); 
+
+        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var car = new Car(
+            dealerId,
             volkswagen,
             gol,
             Color.White,
             TypeCar.Hatchback,
             StatusCar.New,
-            statusServiceCar.Disponible,
+            StatusServiceCar.Disponible,
             4,
             5,
             1600,
             0,
             2024,
-            "VW1234",
+            "ABC123",
             "Volkswagen Gol nuevo",
             22000m,
-            DateTime.UtcNow);
-        
+            DateTime.UtcNow);        
         var testClient = new Client(
+            dealerId,
             "Roberto",
             "Silva",
             "33445566",
@@ -73,17 +75,18 @@ public class SalesIntegrationTests
             Comments = "Venta de Volkswagen Gol"
         };
 
-        var response = await client.PostAsJsonAsync("/sales", request);
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
-        var saleId = await response.Content.ReadFromJsonAsync<Guid>();
+        var response = await client.PostAsJsonAsync("/api/v1/sales", request);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var saleId = result!.id;
         saleId.Should().NotBe(Guid.Empty);
 
         var createdSale = await context.Sales
+            .IgnoreQueryFilters()
             .Include(s => s.Car)
             .Include(s => s.Client)
-            .FirstAsync(s => s.Id == saleId);
-        
+            .FirstAsync(s => s.Id == saleId);        
         createdSale.CarId.Should().Be(car.Id);
         createdSale.ClientId.Should().Be(testClient.Id);
         createdSale.FinalPrice.Amount.Should().Be(22000m);
@@ -91,8 +94,8 @@ public class SalesIntegrationTests
         createdSale.Status.Should().Be(SaleStatus.Completed);
         
         // Verificar que el carro se marcó como vendido
-        var updatedCar = await context.Cars.FindAsync(car.Id);
-        updatedCar!.ServiceCar.Should().Be(statusServiceCar.Vendido);
+        var updatedCar = await context.Cars.IgnoreQueryFilters().FirstAsync(c => c.Id == car.Id);
+        updatedCar!.ServiceCar.Should().Be(StatusServiceCar.Vendido);
     }
 
     [Fact]
@@ -105,28 +108,30 @@ public class SalesIntegrationTests
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
-        var ford = await context.Marca.FirstAsync(m => m.Nombre == "Ford");
-        var focus = await context.Modelo.FirstAsync(m => m.Nombre == "Focus" && m.MarcaId == ford.Id);
-        
+
+        var ford = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Ford");
+        var focus = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Focus" && m.MarcaId == ford.Id);   
+
+        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var car = new Car(
+            dealerId,
             ford,
             focus,
             Color.Blue,
             TypeCar.Sedan,
             StatusCar.Used,
-            statusServiceCar.Disponible,
+            StatusServiceCar.Disponible,
             4,
             5,
             2000,
             30000,
             2021,
-            "FO4567",
+            "ABC123",
             "Ford Focus usado",
             19000m,
-            DateTime.UtcNow);
-        
+            DateTime.UtcNow);        
         var testClient = new Client(
+            dealerId,
             "Patricia",
             "López",
             "77889900",
@@ -140,6 +145,7 @@ public class SalesIntegrationTests
         await context.SaveChangesAsync();
 
         var sale = new Domain.Sales.Sale(
+            Guid.Parse("00000000-0000-0000-0000-000000000001"),
             car.Id,
             testClient.Id,
             19000m,
@@ -152,7 +158,7 @@ public class SalesIntegrationTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var response = await client.GetAsync("/sales");
+        var response = await client.GetAsync("/api/v1/sales");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var sales = await response.Content.ReadFromJsonAsync<List<Application.Sales.Get.SaleResponse>>();
@@ -172,27 +178,30 @@ public class SalesIntegrationTests
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
-        var chevrolet = await context.Marca.FirstAsync(m => m.Nombre == "Chevrolet");
-        var malibu = await context.Modelo.FirstAsync(m => m.Nombre == "Malibu" && m.MarcaId == chevrolet.Id);
+        var chevrolet = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Chevrolet");
+        var malibu = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Malibu" && m.MarcaId == chevrolet.Id);
         
+        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var car = new Car(
+            dealerId,
             chevrolet,
             malibu,
             Color.Silver,
             TypeCar.Sedan,
             StatusCar.New,
-            statusServiceCar.Disponible,
+            StatusServiceCar.Disponible,
             4,
             5,
             2500,
             0,
             2024,
-            "CH8901",
+            "ABC123",
             "Chevrolet Malibu nuevo",
             28000m,
             DateTime.UtcNow);
         
         var testClient = new Client(
+            dealerId,
             "Fernando",
             "García",
             "11223344",
@@ -206,6 +215,7 @@ public class SalesIntegrationTests
         await context.SaveChangesAsync();
 
         var sale = new Domain.Sales.Sale(
+            Guid.Parse("00000000-0000-0000-0000-000000000001"),
             car.Id,
             testClient.Id,
             28000m,
@@ -218,7 +228,7 @@ public class SalesIntegrationTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var response = await client.GetAsync($"/sales/{sale.Id}");
+        var response = await client.GetAsync($"/api/v1/sales/{sale.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
                 var result = await response.Content.ReadFromJsonAsync<Application.Sales.Get.SaleResponse>();
@@ -229,5 +239,7 @@ public class SalesIntegrationTests
         result.CarBrand.Should().Be("Chevrolet");
         result.CarModel.Should().Be("Malibu");
     }
+
+    private sealed record CreateResponse(Guid id);
 }
 

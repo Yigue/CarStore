@@ -1,6 +1,6 @@
 using Application.Abstractions.Messaging;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 
 namespace Application.Cars.Update;
 
@@ -11,7 +11,7 @@ public sealed record UpdateCarCommand(
     Color Color,
     TypeCar CarType,
     StatusCar CarStatus,
-    statusServiceCar ServiceCar,
+    StatusServiceCar ServiceCar,
     int CantidadPuertas,
     int CantidadAsientos,
     int Cilindrada,

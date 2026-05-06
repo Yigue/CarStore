@@ -17,7 +17,7 @@ public sealed class GetByMarca : IEndpoint
 
     private static async Task<IResult> Handler(Guid marcaId, ISender sender, CancellationToken cancellationToken)
     {
-        Result<List<Domain.Cars.Atribbutes.Modelo>> result = await sender.Send(new GetModelosByMarcaQuery(marcaId), cancellationToken);
+        Result<List<Domain.Cars.Attributes.Modelo>> result = await sender.Send(new GetModelosByMarcaQuery(marcaId), cancellationToken);
 
         return result.Match(Results.Ok, CustomResults.Problem);
     }

@@ -2,7 +2,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Shared.ValueObjects;
 using Application.Abstractions.Caching;
 using Microsoft.EntityFrameworkCore;
@@ -69,11 +69,11 @@ internal sealed class UpdateCarCommandHandler(
         }
         
         // Handle service status changes using domain methods
-        if (command.ServiceCar == statusServiceCar.Vendido && car.ServiceCar != statusServiceCar.Vendido)
+        if (command.ServiceCar == StatusServiceCar.Vendido && car.ServiceCar != StatusServiceCar.Vendido)
         {
             car.MarkAsSold(dateTimeProvider.UtcNow);
         }
-        else if (command.ServiceCar == statusServiceCar.Disponible && car.ServiceCar != statusServiceCar.Disponible)
+        else if (command.ServiceCar == StatusServiceCar.Disponible && car.ServiceCar != StatusServiceCar.Disponible)
         {
             car.MarkAsAvailable(dateTimeProvider.UtcNow);
         }

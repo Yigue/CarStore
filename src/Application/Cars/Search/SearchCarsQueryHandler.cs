@@ -1,7 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 using System.Globalization;
@@ -46,12 +46,12 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
 
         if (query.YearFrom.HasValue)
         {
-            carsQuery = carsQuery.Where(c => c.Año >= query.YearFrom);
+            carsQuery = carsQuery.Where(c => c.Anio >= query.YearFrom);
         }
 
         if (query.YearTo.HasValue)
         {
-            carsQuery = carsQuery.Where(c => c.Año <= query.YearTo);
+            carsQuery = carsQuery.Where(c => c.Anio <= query.YearTo);
         }
 
         if (query.PriceFrom.HasValue)
@@ -96,8 +96,8 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
                 ? carsQuery.OrderByDescending(c => c.Price.Amount)
                 : carsQuery.OrderBy(c => c.Price.Amount),
             "YEAR" => query.SortDescending 
-                ? carsQuery.OrderByDescending(c => c.Año)
-                : carsQuery.OrderBy(c => c.Año),
+                ? carsQuery.OrderByDescending(c => c.Anio)
+                : carsQuery.OrderBy(c => c.Anio),
             "CREATED" => query.SortDescending 
                 ? carsQuery.OrderByDescending(c => c.CreatedAt)
                 : carsQuery.OrderBy(c => c.CreatedAt),
@@ -116,7 +116,7 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
             Id = c.Id,
             Marca = c.Marca.Nombre,
             Modelo = c.Modelo.Nombre,
-            Año = c.Año,
+            Anio = c.Anio,
             Precio = c.Price.Amount,
             Descripcion = c.Descripcion,
             ImagenPrincipal = GetPrimaryImageUrl(c),

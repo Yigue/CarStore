@@ -1,5 +1,5 @@
 using Application.Abstractions.Messaging;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using SharedKernel;
 
 namespace Application.Modelos.GetByMarca;

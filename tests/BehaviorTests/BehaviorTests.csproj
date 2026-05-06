@@ -24,4 +24,8 @@
     <ProjectReference Include="..\..\src\Application\Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
 </Project>

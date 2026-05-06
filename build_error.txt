@@ -1,0 +1,24 @@
+  Determinando los proyectos que se van a restaurar...
+  Todos los proyectos están actualizados para la restauración.
+  SharedKernel -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\SharedKernel\bin\Debug\net9.0\SharedKernel.dll
+  Domain -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Domain\bin\Debug\net9.0\Domain.dll
+  Application -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Application\bin\Debug\net9.0\Application.dll
+  DomainTests -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\tests\DomainTests\bin\Debug\net9.0\DomainTests.dll
+  DomainEventsTests -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\tests\DomainEventsTests\bin\Debug\net9.0\DomainEventsTests.dll
+  ApplicationTests -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\tests\ApplicationTests\bin\Debug\net9.0\Application.UnitTests.dll
+  BehaviorTests -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\tests\BehaviorTests\bin\Debug\net9.0\BehaviorTests.dll
+  Infrastructure -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Infrastructure\bin\Debug\net9.0\Infrastructure.dll
+  AuthenticationTests -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\tests\AuthenticationTests\bin\Debug\net9.0\AuthenticationTests.dll
+  InfrastructureEfTests -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\tests\InfrastructureEfTests\bin\Debug\net9.0\InfrastructureEfTests.dll
+  InfrastructureTests -> D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\tests\InfrastructureTests\bin\Debug\net9.0\InfrastructureTests.dll
+D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Web.Api\Program.cs(158,37): error CS1061: "DbSet<User>" no contiene una definición para "IgnoreQueryFilters" ni un método de extensión accesible "IgnoreQueryFilters" que acepte un primer argumento del tipo "DbSet<User>" (¿falta alguna directiva using o una referencia de ensamblado?) [D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Web.Api\Web.Api.csproj]
+D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Web.Api\Program.cs(162,1): warning CA1849: WebApplication.Run(string?) bloquea sincrónicamente.'Await 'WebApplication.RunAsync(string?) en su lugar. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1849) [D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Web.Api\Web.Api.csproj]
+
+ERROR al compilar.
+
+D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Web.Api\Program.cs(162,1): warning CA1849: WebApplication.Run(string?) bloquea sincrónicamente.'Await 'WebApplication.RunAsync(string?) en su lugar. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1849) [D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Web.Api\Web.Api.csproj]
+D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Web.Api\Program.cs(158,37): error CS1061: "DbSet<User>" no contiene una definición para "IgnoreQueryFilters" ni un método de extensión accesible "IgnoreQueryFilters" que acepte un primer argumento del tipo "DbSet<User>" (¿falta alguna directiva using o una referencia de ensamblado?) [D:\2026\Proyectos\SASS Consecionaria de autos\CarStore-BackEnd\src\Web.Api\Web.Api.csproj]
+    1 Advertencia(s)
+    1 Errores
+
+Tiempo transcurrido 00:00:23.08

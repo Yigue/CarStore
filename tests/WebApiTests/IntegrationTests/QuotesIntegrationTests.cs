@@ -1,7 +1,7 @@
 using Application.Quotes.Get;
 using Application.Quotes.GetById;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Clients;
 using Domain.Quotes;
 using Domain.Quotes.Attributes;
@@ -27,28 +27,30 @@ public class QuotesIntegrationTests
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
-        var toyota = await context.Marca.FirstAsync(m => m.Nombre == "Toyota");
-        var rav4 = await context.Modelo.FirstAsync(m => m.Nombre == "RAV4" && m.MarcaId == toyota.Id);
-        
+
+        var toyota = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Toyota");
+        var rav4 = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "RAV4" && m.MarcaId == toyota.Id);   
+
+        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var car = new Car(
+            dealerId,
             toyota,
             rav4,
             Color.Green,
             TypeCar.SUV,
             StatusCar.New,
-            statusServiceCar.Disponible,
+            StatusServiceCar.Disponible,
             5,
             5,
             2500,
             0,
             2024,
-            "TO5678",
+            "ABC123",
             "Toyota RAV4 nuevo",
             35000m,
-            DateTime.UtcNow);
-        
+            DateTime.UtcNow);        
         var testClient = new Client(
+            dealerId,
             "Sofía",
             "Martínez",
             "55667788",
@@ -71,17 +73,18 @@ public class QuotesIntegrationTests
             Comments = "Cotización para Toyota RAV4"
         };
 
-        var response = await client.PostAsJsonAsync("/quotes", request);
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
-        var quoteId = await response.Content.ReadFromJsonAsync<Guid>();
+        var response = await client.PostAsJsonAsync("/api/v1/quotes", request);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var quoteId = result!.id;
         quoteId.Should().NotBe(Guid.Empty);
 
         var createdQuote = await context.Quotes
+            .IgnoreQueryFilters()
             .Include(q => q.Car)
             .Include(q => q.Client)
-            .FirstAsync(q => q.Id == quoteId);
-        
+            .FirstAsync(q => q.Id == quoteId);        
         createdQuote.CarId.Should().Be(car.Id);
         createdQuote.ClientId.Should().Be(testClient.Id);
         createdQuote.ProposedPrice.Amount.Should().Be(34000m);
@@ -99,28 +102,30 @@ public class QuotesIntegrationTests
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
-        var ford = await context.Marca.FirstAsync(m => m.Nombre == "Ford");
-        var mustang = await context.Modelo.FirstAsync(m => m.Nombre == "Mustang" && m.MarcaId == ford.Id);
-        
+
+        var ford = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Ford");
+        var mustang = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Mustang" && m.MarcaId == ford.Id);
+
+        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var car = new Car(
+            dealerId,
             ford,
             mustang,
             Color.Red,
             TypeCar.Coupe,
             StatusCar.New,
-            statusServiceCar.Disponible,
+            StatusServiceCar.Disponible,
             2,
             4,
             5000,
             0,
             2024,
-            "MU9012",
+            "ABC123",
             "Ford Mustang nuevo",
             45000m,
-            DateTime.UtcNow);
-        
+            DateTime.UtcNow);        
         var testClient = new Client(
+            dealerId,
             "Diego",
             "Ramírez",
             "22334455",
@@ -134,6 +139,7 @@ public class QuotesIntegrationTests
         await context.SaveChangesAsync();
 
         var quote = new Domain.Quotes.Quote(
+            Guid.Parse("00000000-0000-0000-0000-000000000001"),
             car,
             testClient,
             44000m,
@@ -144,7 +150,7 @@ public class QuotesIntegrationTests
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
 
-        var response = await client.GetAsync("/quotes");
+        var response = await client.GetAsync("/api/v1/quotes");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var quotes = await response.Content.ReadFromJsonAsync<List<Application.Quotes.Get.QuoteResponse>>();
@@ -164,27 +170,30 @@ public class QuotesIntegrationTests
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
-        var volkswagen = await context.Marca.FirstAsync(m => m.Nombre == "Volkswagen");
-        var tiguan = await context.Modelo.FirstAsync(m => m.Nombre == "Tiguan" && m.MarcaId == volkswagen.Id);
-        
+        var volkswagen = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Volkswagen");
+        var tiguan = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Tiguan" && m.MarcaId == volkswagen.Id);
+
+        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var car = new Car(
+            dealerId,
             volkswagen,
             tiguan,
             Color.Black,
             TypeCar.SUV,
             StatusCar.Used,
-            statusServiceCar.Disponible,
+            StatusServiceCar.Disponible,
             5,
             7,
             2000,
             25000,
             2022,
-            "TI3456",
+            "ABC123",
             "Volkswagen Tiguan usado",
             30000m,
             DateTime.UtcNow);
         
         var testClient = new Client(
+            dealerId,
             "Laura",
             "Torres",
             "66778899",
@@ -198,6 +207,7 @@ public class QuotesIntegrationTests
         await context.SaveChangesAsync();
 
         var quote = new Domain.Quotes.Quote(
+            Guid.Parse("00000000-0000-0000-0000-000000000001"),
             car,
             testClient,
             29000m,
@@ -208,7 +218,7 @@ public class QuotesIntegrationTests
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
 
-        var response = await client.GetAsync($"/quotes/{quote.Id}");
+        var response = await client.GetAsync($"/api/v1/quotes/{quote.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
                 var result = await response.Content.ReadFromJsonAsync<Application.Quotes.Get.QuoteResponse>();
@@ -231,27 +241,30 @@ public class QuotesIntegrationTests
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
-        var chevrolet = await context.Marca.FirstAsync(m => m.Nombre == "Chevrolet");
-        var equinox = await context.Modelo.FirstAsync(m => m.Nombre == "Equinox" && m.MarcaId == chevrolet.Id);
+        var chevrolet = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Chevrolet");
+        var equinox = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Equinox" && m.MarcaId == chevrolet.Id);
         
+        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var car = new Car(
+            dealerId,
             chevrolet,
             equinox,
             Color.White,
             TypeCar.SUV,
             StatusCar.New,
-            statusServiceCar.Disponible,
+            StatusServiceCar.Disponible,
             5,
             5,
             2400,
             0,
             2024,
-            "EQ7890",
+            "ABC123",
             "Chevrolet Equinox nuevo",
             32000m,
             DateTime.UtcNow);
         
         var testClient = new Client(
+            dealerId,
             "Miguel",
             "Sánchez",
             "44556677",
@@ -265,6 +278,7 @@ public class QuotesIntegrationTests
         await context.SaveChangesAsync();
 
         var quote = new Domain.Quotes.Quote(
+            Guid.Parse("00000000-0000-0000-0000-000000000001"),
             car,
             testClient,
             31000m,
@@ -275,11 +289,13 @@ public class QuotesIntegrationTests
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
 
-        var response = await client.PostAsync($"/quotes/{quote.Id}/accept", null);
+        var response = await client.PostAsync($"/api/v1/quotes/{quote.Id}/accept", null);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var updatedQuote = await context.Quotes.FindAsync(quote.Id);
+        var updatedQuote = await context.Quotes.IgnoreQueryFilters().FirstAsync(q => q.Id == quote.Id);
         updatedQuote!.Status.Should().Be(QuoteStatus.Accepted);
     }
+
+    private sealed record CreateResponse(Guid id);
 }
 

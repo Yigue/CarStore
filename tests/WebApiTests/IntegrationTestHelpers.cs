@@ -1,18 +1,20 @@
 using System.Net.Http.Headers;
-using Application.Abstractions.Data;
-using Infrastructure.Database;
-using Microsoft.Extensions.DependencyInjection;
+using System.Net.Http.Json;
+using System.Threading.Tasks;
+using System;
 
 namespace WebApiTests;
 
 /// <summary>
-/// Helpers para tests de integración
+/// Helpers para tests de integraciÃ³n
 /// </summary>
 public static class IntegrationTestHelpers
 {
-    /// <summary>
-    /// Obtiene un token de autenticación para el usuario admin seedeado
-    /// </summary>
+    public static void SetAuthToken(System.Net.Http.HttpClient client, string token)
+    {
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+    }
+
     public static async Task<string> GetAdminTokenAsync(CustomWebApplicationFactory factory)
     {
         var client = factory.CreateClient();
@@ -22,61 +24,12 @@ public static class IntegrationTestHelpers
             Password = "Admin123!"
         };
 
-        var loginResponse = await client.PostAsJsonAsync("/users/login", loginRequest);
+        var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", loginRequest);
         loginResponse.EnsureSuccessStatusCode();
         
-        var token = await loginResponse.Content.ReadAsStringAsync();
-        return token.Trim('"');
+        var result = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        return result!.Token;
     }
 
-    /// <summary>
-    /// Configura el cliente HTTP con el token de autenticación
-    /// </summary>
-    public static void SetAuthToken(HttpClient client, string token)
-    {
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-    }
-
-    /// <summary>
-    /// Obtiene una marca seedeada por nombre
-    /// </summary>
-    public static async Task<Domain.Cars.Atribbutes.Marca> GetSeededBrandAsync(
-        CustomWebApplicationFactory factory,
-        string brandName)
-    {
-        using var scope = factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
-        return await context.Marca
-            .FirstAsync(m => m.Nombre == brandName);
-    }
-
-    /// <summary>
-    /// Obtiene un modelo seedeado por nombre
-    /// </summary>
-    public static async Task<Domain.Cars.Atribbutes.Modelo> GetSeededModelAsync(
-        CustomWebApplicationFactory factory,
-        string modelName)
-    {
-        using var scope = factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
-        return await context.Modelo
-            .FirstAsync(m => m.Nombre == modelName);
-    }
-
-    /// <summary>
-    /// Obtiene una categoría de transacción seedeada por nombre
-    /// </summary>
-    public static async Task<Domain.Financial.Attributes.TransactionCategory> GetSeededCategoryAsync(
-        CustomWebApplicationFactory factory,
-        string categoryName)
-    {
-        using var scope = factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
-        return await context.TransactionCategories
-            .FirstAsync(c => c.Name == categoryName);
-    }
+    private sealed record LoginResponse(string Token);
 }
-

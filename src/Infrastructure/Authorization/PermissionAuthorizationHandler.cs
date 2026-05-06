@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Authorization;
 
-internal sealed class PermissionAuthorizationHandler(
+public sealed class PermissionAuthorizationHandler(
     IServiceScopeFactory serviceScopeFactory,
     ILogger<PermissionAuthorizationHandler> logger)
     : AuthorizationHandler<PermissionRequirement>

@@ -4,10 +4,11 @@ using System.Threading.Tasks;
 using System.Linq;
 using Application.Cars.Create;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Application.Abstractions.Caching;
+using Application.Abstractions.Tenancy;
 
 namespace Application.UnitTests.Cars;
 
@@ -40,25 +41,26 @@ public class CreateCarCommandHandlerTests
         mockModelService.Setup(s => s.GetByIdAsync(modelo.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(modelo);
 
-        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object);
+        var mockTenantService = new Mock<ICurrentTenantService>();
+        mockTenantService.Setup(t => t.DealerId).Returns(Guid.NewGuid());
 
-        var command = new CreateCarCommand
-        {
-            Marca = marca.Id,
-            Modelo = modelo.Id,
-            Color = Color.Blue,
-            CarType = TypeCar.Sedan,
-            CarStatus = StatusCar.New,
-            ServiceCar = statusServiceCar.Disponible,
-            CantidadPuertas = 4,
-            CantidadAsientos = 5,
-            Cilindrada = 2000,
-            Kilometraje = 0,
-            Año = 2024,
-            Patente = "ABC123",
-            Descripcion = "New car",
-            Price = 20000m
-        };
+        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object);
+
+        var command = new CreateCarCommand(
+            marca.Id,
+            modelo.Id,
+            Color.Blue,
+            TypeCar.Sedan,
+            StatusCar.New,
+            StatusServiceCar.Disponible,
+            4,
+            5,
+            2000,
+            0,
+            2024,
+            "ABC123",
+            "New car",
+            20000m);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -78,25 +80,26 @@ public class CreateCarCommandHandlerTests
 
         var mockModelService = new Mock<ICachedModelService>();
 
-        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object);
+        var mockTenantService = new Mock<ICurrentTenantService>();
+        mockTenantService.Setup(t => t.DealerId).Returns(Guid.NewGuid());
 
-        var command = new CreateCarCommand
-        {
-            Marca = Guid.NewGuid(),
-            Modelo = Guid.NewGuid(),
-            Color = Color.Black,
-            CarType = TypeCar.Sedan,
-            CarStatus = StatusCar.New,
-            ServiceCar = statusServiceCar.Disponible,
-            CantidadPuertas = 4,
-            CantidadAsientos = 5,
-            Cilindrada = 2000,
-            Kilometraje = 0,
-            Año = 2024,
-            Patente = "DEF456",
-            Descripcion = "Invalid car",
-            Price = 15000m
-        };
+        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object);
+
+        var command = new CreateCarCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Color.Black,
+            TypeCar.Sedan,
+            StatusCar.New,
+            StatusServiceCar.Disponible,
+            4,
+            5,
+            2000,
+            0,
+            2024,
+            "DEF456",
+            "Invalid car",
+            15000m);
 
         var result = await handler.Handle(command, CancellationToken.None);
 

@@ -1,5 +1,4 @@
 using Application.Cars.Upload;
-using Application.Services;
 using Domain.Cars;
 using Application.Abstractions.Messaging;
 using SharedKernel;
@@ -37,20 +36,18 @@ internal sealed class UploadImageCarCommandHandler(
             cancellationToken);
         
         // Crear la entidad CarImage
-        var carImage = new CarImage
-        {
-            CarId = command.CarId,
-            ImageUrl = imageUrl,
-            IsPrimary = command.IsPrimary,
-            Order = command.Order
-        };
+        var carImage = new CarImage(
+            command.CarId,
+            imageUrl,
+            command.IsPrimary,
+            command.Order);
 
         // Si esta imagen es marcada como primaria, actualizar las otras
         if (command.IsPrimary)
         {
             foreach (CarImage img in car.Images.Where(i => i.IsPrimary))
             {
-                img.IsPrimary = false;
+                img.SetAsPrimary(false);
             }
         }
 

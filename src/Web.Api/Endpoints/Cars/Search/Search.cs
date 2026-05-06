@@ -10,7 +10,7 @@ internal sealed class Search : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapGet("api/cars/search", async (
+        app.MapGet("cars/search", async (
             [AsParameters] SearchCarsRequest request,
             ISender sender,
             CancellationToken cancellationToken) =>

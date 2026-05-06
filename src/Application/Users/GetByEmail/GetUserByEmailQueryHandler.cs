@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.Authentication;
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Users;
@@ -13,6 +13,7 @@ internal sealed class GetUserByEmailQueryHandler(IApplicationDbContext context, 
     public async Task<Result<UserResponse>> Handle(GetUserByEmailQuery query, CancellationToken cancellationToken)
     {
         UserResponse? user = await context.Users
+            .IgnoreQueryFilters()
             .Where(u => u.Email == query.Email)
             .Select(u => new UserResponse
             {

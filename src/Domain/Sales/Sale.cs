@@ -29,6 +29,7 @@ public sealed class Sale : Entity
     }
 
     public Sale(
+        Guid dealerId,
         Guid carId,
         Guid clientId,
         decimal finalPrice,
@@ -37,6 +38,7 @@ public sealed class Sale : Entity
         string comments,
         DateTime saleDate)
     {
+        SetDealer(dealerId);
         Id = Guid.NewGuid();
         CarId = carId;
         ClientId = clientId;

@@ -1,5 +1,5 @@
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Clients;
 using Domain.Financial;
 using Domain.Financial.Attributes;

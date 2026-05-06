@@ -1,4 +1,3 @@
-using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars;
@@ -8,18 +7,24 @@ using SharedKernel;
 namespace Application.Cars.GetAll;
 
 internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context)
-    : IQueryHandler<GetAllCarsQuery, List<CarsResponses>>
+    : IQueryHandler<GetAllCarsQuery, PaginatedResult<CarsResponses>>
 {
-    public async Task<Result<List<CarsResponses>>> Handle(GetAllCarsQuery query, CancellationToken cancellationToken)
+    public async Task<Result<PaginatedResult<CarsResponses>>> Handle(GetAllCarsQuery query, CancellationToken cancellationToken)
     {
-        // Primero, cargamos los autos con sus imágenes
-        var cars = await context.Cars
+        var carsQuery = context.Cars
+            .AsNoTracking()
             .Include(c => c.Marca)
             .Include(c => c.Modelo)
-            .Include(c => c.Images)
+            .Include(c => c.Images);
+
+        var totalCount = await carsQuery.CountAsync(cancellationToken);
+
+        var cars = await carsQuery
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
             .ToListAsync(cancellationToken);
 
-        // Luego, construimos las respuestas en memoria (esto evita el error de traducción LINQ)
+        // Construimos las respuestas en memoria (esto evita el error de traducción LINQ)
         var responses = cars.Select(car => new CarsResponses(
             car.Id,
             car.Marca.Nombre,
@@ -32,7 +37,7 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context)
             car.CantidadAsientos,
             car.Cilindrada,
             car.Kilometraje,
-            car.Año,
+            car.Anio,
             car.Patente.Value,
             car.Descripcion,
             car.Price.Amount,
@@ -49,7 +54,12 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context)
                 .ToList()
         )).ToList();
 
-        return responses;
+        var paginatedResult = new PaginatedResult<CarsResponses>(
+            responses,
+            totalCount,
+            query.Page,
+            query.PageSize);
+
+        return Result.Success(paginatedResult);
     }
 }
-    

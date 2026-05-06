@@ -18,21 +18,17 @@ namespace Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("public")
-                .HasAnnotation("ProductVersion", "9.0.1")
+                .HasAnnotation("ProductVersion", "9.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Domain.Cars.Atribbutes.Marca", b =>
+            modelBuilder.Entity("Domain.Cars.Attributes.Marca", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<Guid>("DealerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dealer_id");
 
                     b.Property<string>("Nombre")
                         .IsRequired()
@@ -46,16 +42,12 @@ namespace Infrastructure.Migrations
                     b.ToTable("marca", "public");
                 });
 
-            modelBuilder.Entity("Domain.Cars.Atribbutes.Modelo", b =>
+            modelBuilder.Entity("Domain.Cars.Attributes.Modelo", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<Guid>("DealerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dealer_id");
 
                     b.Property<Guid>("MarcaId")
                         .HasColumnType("uuid")
@@ -190,10 +182,6 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("car_id");
 
-                    b.Property<Guid>("DealerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dealer_id");
-
                     b.Property<string>("ImageUrl")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -297,10 +285,6 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<Guid>("DealerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dealer_id");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -619,9 +603,9 @@ namespace Infrastructure.Migrations
                     b.ToTable("UserPermissions", "public");
                 });
 
-            modelBuilder.Entity("Domain.Cars.Atribbutes.Modelo", b =>
+            modelBuilder.Entity("Domain.Cars.Attributes.Modelo", b =>
                 {
-                    b.HasOne("Domain.Cars.Atribbutes.Marca", "Marca")
+                    b.HasOne("Domain.Cars.Attributes.Marca", "Marca")
                         .WithMany("Modelos")
                         .HasForeignKey("MarcaId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -633,14 +617,14 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Cars.Car", b =>
                 {
-                    b.HasOne("Domain.Cars.Atribbutes.Marca", "Marca")
+                    b.HasOne("Domain.Cars.Attributes.Marca", "Marca")
                         .WithMany()
                         .HasForeignKey("MarcaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_cars_marca_marca_id");
 
-                    b.HasOne("Domain.Cars.Atribbutes.Modelo", "Modelo")
+                    b.HasOne("Domain.Cars.Attributes.Modelo", "Modelo")
                         .WithMany()
                         .HasForeignKey("ModeloId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -752,7 +736,7 @@ namespace Infrastructure.Migrations
                         .HasConstraintName("fk_user_permissions_users_user_id");
                 });
 
-            modelBuilder.Entity("Domain.Cars.Atribbutes.Marca", b =>
+            modelBuilder.Entity("Domain.Cars.Attributes.Marca", b =>
                 {
                     b.Navigation("Modelos");
                 });

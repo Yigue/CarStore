@@ -1,23 +1,20 @@
 using Application.Abstractions.Messaging;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 
 namespace Application.Cars.Create;
 
-public sealed class CreateCarCommand : ICommand<Guid>
-{
-    public Guid Marca { get; set; }
-    public Guid Modelo { get; set; }
-    public Color Color { get; set; }
-    public TypeCar CarType { get; set; }
-    public StatusCar CarStatus { get; set; }
-    public statusServiceCar ServiceCar { get; set; }
-    public int CantidadPuertas { get; set; }
-    public int CantidadAsientos { get; set; }
-    public int Cilindrada { get; set; }
-    public int Kilometraje { get; set; }
-    public int Año { get; set; }
-    public string Patente { get; set; }
-    public string Descripcion { get; set; }
-    public decimal Price { get; set; }
-}
- 
+public sealed record CreateCarCommand(
+    Guid Marca,
+    Guid Modelo,
+    Color Color,
+    TypeCar CarType,
+    StatusCar CarStatus,
+    StatusServiceCar ServiceCar,
+    int CantidadPuertas,
+    int CantidadAsientos,
+    int Cilindrada,
+    int Kilometraje,
+    int Anio,
+    string Patente,
+    string Descripcion,
+    decimal Price) : ICommand<Guid>;

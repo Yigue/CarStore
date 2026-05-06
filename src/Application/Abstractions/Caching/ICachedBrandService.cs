@@ -1,4 +1,4 @@
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 
 namespace Application.Abstractions.Caching;
 

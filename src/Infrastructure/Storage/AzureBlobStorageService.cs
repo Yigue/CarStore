@@ -99,6 +99,13 @@ public class AzureBlobStorageService : IBlobStorageService
         return await blobClient.ExistsAsync(cancellationToken);
     }
 
+    public string GenerateSasUrl(string containerName, string blobName)
+    {
+        BlobContainerClient containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+        BlobClient blobClient = containerClient.GetBlobClient(blobName);
+        return GenerateSasUri(blobClient).ToString();
+    }
+
     public Uri GenerateSasUri(BlobClient blobClient)
     {
         try

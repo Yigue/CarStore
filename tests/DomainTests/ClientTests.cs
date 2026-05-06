@@ -16,13 +16,14 @@ public class ClientTests
         var email = _faker.Internet.Email();
         var phone = _faker.Phone.PhoneNumber();
         var address = _faker.Address.FullAddress();
+        var dealerId = Guid.NewGuid();
         var date = DateTime.UtcNow;
-        var client = new Client(firstName, lastName, dni, email, phone, address, date);
+        var client = new Client(dealerId, firstName, lastName, dni, email, phone, address, date);
 
         client.FirstName.Should().Be(firstName);
         client.LastName.Should().Be(lastName);
         client.DNI.Should().Be(dni);
-        client.Email.Value.Should().Be(email);
+        client.Email.Value.Should().Be(email.ToLowerInvariant());
         client.Phone.Should().Be(phone);
         client.Address.Should().Be(address);
         client.Status.Should().Be(ClientStatus.Active);

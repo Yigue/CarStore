@@ -11,11 +11,13 @@ internal sealed class Get : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapGet("cars", async (ISender sender, CancellationToken cancellationToken) =>
+        app.MapGet("cars", async (int? page, int? pageSize, ISender sender, CancellationToken cancellationToken) =>
         {
-            var query = new GetAllCarsQuery();
+            var query = new GetAllCarsQuery(
+                Page: page ?? 1,
+                PageSize: pageSize ?? 20);
 
-            Result<List<CarsResponses>> result = await sender.Send(query, cancellationToken);
+            Result<PaginatedResult<CarsResponses>> result = await sender.Send(query, cancellationToken);
 
             return result.Match(
                 cars => Results.Ok(cars),
@@ -24,7 +26,7 @@ internal sealed class Get : IEndpoint
         .HasPermission(Permissions.CarsRead)
         .WithTags(Tags.Cars)
         .WithName("GetAllCars")
-        .Produces<List<CarsResponses>>(StatusCodes.Status200OK)
+        .Produces<PaginatedResult<CarsResponses>>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

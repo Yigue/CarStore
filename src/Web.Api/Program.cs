@@ -1,8 +1,10 @@
 using System.Reflection;
+using System.Threading.RateLimiting;
 using Application;
 using HealthChecks.UI.Client;
 using Infrastructure;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using Web.Api;
 using Web.Api.Extensions;
@@ -11,6 +13,7 @@ using Asp.Versioning;
 using Asp.Versioning.Builder;
 using Asp.Versioning.ApiExplorer;
 using System.IO;
+using Microsoft.EntityFrameworkCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -18,10 +21,45 @@ builder.Host.UseSerilog((context, loggerConfig) => loggerConfig.ReadFrom.Configu
 
 builder.Services.AddSwaggerGenWithAuth();
 
+// Configuración de autenticación
+if (builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Configuration["Jwt:Secret"] = "SecretKeyForTestingPurposesOnly1234567890";
+    builder.Configuration["Jwt:Issuer"] = "CarStore";
+    builder.Configuration["Jwt:Audience"] = "CarStore";
+}
+
 builder.Services
     .AddApplication()
     .AddPresentation()
     .AddInfrastructure(builder.Configuration);
+
+// Rate limiting for login endpoint
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddFixedWindowLimiter("login", limiterOptions =>
+    {
+        var rateLimitConfig = builder.Configuration.GetSection("RateLimiting:Login");
+        limiterOptions.PermitLimit = rateLimitConfig.GetValue("PermitLimit", 10);
+        limiterOptions.Window = TimeSpan.FromSeconds(rateLimitConfig.GetValue("WindowSeconds", 60));
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0;
+    });
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            type = "https://datatracker.ietf.org/doc/html/rfc6585#section-4",
+            title = "Too Many Requests",
+            status = 429,
+            detail = "Too many login attempts. Please try again later."
+        }, cancellationToken);
+    };
+});
 
 builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 
@@ -29,7 +67,7 @@ builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 builder.Services.AddCors(options =>
 {
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
-        ?? ["http://localhost:3000", "http://localhost:5173"];
+        ?? ["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"];
     
     options.AddPolicy("CorsPolicy", policy =>
     {
@@ -44,6 +82,7 @@ WebApplication app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
+    app.ApplyMigrations();
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
@@ -59,8 +98,6 @@ if (app.Environment.IsDevelopment())
 
     app.SeedTestData();
 }
-
-app.ApplyMigrations();
 
 // Configurar middleware en el orden correcto
 app.UseRouting();
@@ -91,11 +128,15 @@ app.UseSerilogRequestLogging();
 
 app.UseExceptionHandler();
 
+app.UseRateLimiter();
+
 app.UseAuthentication();
 
 app.UseAuthorization();
 
-// Mapear endpoints después de configurar middleware
+// Mapear endpoints despuÃ©s de configurar middleware
+app.MapGet("/debug-test", () => "OK");
+
 ApiVersionSet apiVersionSet = app.NewApiVersionSet()
     .HasApiVersion(new ApiVersion(1))
     .ReportApiVersions()
@@ -106,11 +147,12 @@ RouteGroupBuilder versionedGroup = app
     .WithApiVersionSet(apiVersionSet);
 
 versionedGroup.MapEndpoints();
-
 app.MapHealthChecks("health", new HealthCheckOptions
 {
     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
 });
+
+app.Run();
 
 // REMARK: If you want to use Controllers, you'll need this.
 app.MapControllers();

@@ -1,5 +1,6 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
 using Domain.Cars;
 using Domain.Clients;
 using Domain.Quotes;
@@ -10,7 +11,8 @@ namespace Application.Quotes.Create;
 
 internal sealed class CreateQuoteCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ICurrentTenantService tenantService)
     : ICommandHandler<CreateQuoteCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateQuoteCommand command, CancellationToken cancellationToken)
@@ -38,6 +40,7 @@ internal sealed class CreateQuoteCommandHandler(
         }
 
         var quote = new Quote(
+            tenantService.DealerId,
             car,
             client,
             command.ProposedPrice,

@@ -23,6 +23,7 @@ public sealed class Quote : Entity
     private Quote() { }
 
     public Quote(
+        Guid dealerId,
         Car car,
         Client client,
         decimal proposedPrice,
@@ -30,9 +31,11 @@ public sealed class Quote : Entity
         string comments,
         DateTime date)
     {
+        SetDealer(dealerId);
+
         if (validUntil <= date)
             throw new DomainException("ValidUntil must be in the future");
-        
+
         Car = car;
         CarId = car.Id;
         Client = client;

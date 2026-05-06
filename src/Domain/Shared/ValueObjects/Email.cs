@@ -18,10 +18,12 @@ public sealed record Email
         if (string.IsNullOrWhiteSpace(value))
             throw new DomainException("Email cannot be empty");
         
-        if (!EmailRegex.IsMatch(value))
+        var normalized = value.Trim().ToLowerInvariant();
+        
+        if (!EmailRegex.IsMatch(normalized))
             throw new DomainException("Invalid email format");
         
-        Value = value.Trim().ToLowerInvariant();
+        Value = normalized;
     }
 
     public static implicit operator string(Email email) => email.Value;

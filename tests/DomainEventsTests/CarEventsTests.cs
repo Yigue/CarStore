@@ -1,5 +1,5 @@
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using Domain.Cars.Events;
 
 namespace DomainEventsTests;
@@ -9,16 +9,18 @@ public class CarEventsTests
     [Fact]
     public void New_car_raises_NewCarDomainEvent()
     {
-        var marca = new Marca("Toyota") { Id = Guid.NewGuid() };
-        var modelo = new Modelo("Corolla", marca.Id) { Id = Guid.NewGuid(), Marca = marca };
+        var dealerId = Guid.NewGuid();
+        var marca = new Marca("Toyota");
+        var modelo = new Modelo("Corolla", marca.Id) { Marca = marca };
 
         var car = new Car(
+            dealerId,
             marca,
             modelo,
             Color.Black,
             TypeCar.Sedan,
             StatusCar.New,
-            statusServiceCar.Disponible,
+            StatusServiceCar.Disponible,
             4,
             5,
             1600,

@@ -1,6 +1,6 @@
 using Application.Cars.Update;
 using Domain.Cars;
-using Domain.Cars.Atribbutes;
+using Domain.Cars.Attributes;
 using MediatR;
 using SharedKernel;
 using Web.Api.Infrastructure;
@@ -38,7 +38,7 @@ internal sealed class Update : IEndpoint
                 (Color)request.Color,
                 (TypeCar)request.CarType,
                 (StatusCar)request.CarStatus,
-                (statusServiceCar)request.ServiceCar,
+                (StatusServiceCar)request.ServiceCar,
                 request.CantidadPuertas,
                 request.CantidadAsientos,
                 request.Cilindrada,

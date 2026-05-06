@@ -1,5 +1,5 @@
-namespace Domain.Cars.Atribbutes;
-public enum statusServiceCar
+namespace Domain.Cars.Attributes;
+public enum StatusServiceCar
 {
     Service,
     EnVenta,

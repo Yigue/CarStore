@@ -80,7 +80,7 @@ public class LicensePlateTests
     [Fact]
     public void Constructor_WithInvalidFormat_ShouldThrowDomainException()
     {
-        var action = () => new LicensePlate("123ABC");
+        var action = () => new LicensePlate("12A3B"); // Formato que no coincide con ninguna regla de la regex
 
         action.Should().Throw<DomainException>()
             .WithMessage("Invalid license plate format");

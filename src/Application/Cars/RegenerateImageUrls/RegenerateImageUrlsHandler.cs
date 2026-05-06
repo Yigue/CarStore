@@ -55,21 +55,9 @@ internal sealed class RegenerateImageUrlsHandler(
                     continue;
                 }
 
-                // Generar nueva URL con SAS - Nota: Esto asume que el servicio tiene acceso a la key
-                // Idealmente el BlobStorageService debería encapsular esto completamente
-                // Por ahora replicamos la lógica existente pero limpia
-                
-                // TODO: Refactor BlobStorageService to expose GenerateSas(container, blob) directly
-                // For now, we manually reconstruct client as in the original endpoint
-                
-                var blobServiceClient = new Azure.Storage.Blobs.BlobServiceClient(
-                    new Uri($"{uri.Scheme}://{uri.Host}"));
-                var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-                var blobClient = containerClient.GetBlobClient(blobName);
+                string newUrl = blobStorage.GenerateSasUrl(containerName, blobName);
 
-                string newUrl = blobStorage.GenerateSasUri(blobClient).ToString();
-
-                image.ImageUrl = newUrl;
+                image.UpdateImageUrl(newUrl);
                 updatedCount++;
             }
             catch (Exception ex)
