@@ -154,11 +154,6 @@ app.MapHealthChecks("health", new HealthCheckOptions
 
 app.Run();
 
-// REMARK: If you want to use Controllers, you'll need this.
-app.MapControllers();
-
-await app.RunAsync();
-
 // REMARK: Required for functional and integration tests to work.
 namespace Web.Api
 {
