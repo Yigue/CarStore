@@ -1,7 +1,5 @@
-using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
-using Domain.Financial;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -13,6 +11,7 @@ internal sealed class GetAllFinancialsQueryHandler(IApplicationDbContext context
     public async Task<Result<IReadOnlyList<FinancialResponses>>> Handle(GetAllFinancialsQuery query, CancellationToken cancellationToken)
     {
         List<FinancialResponses> transactions = await context.Transactions
+            .AsNoTracking()
             .Select(transaction => new FinancialResponses(
                 transaction.Id,
                 transaction.Type,
@@ -21,10 +20,16 @@ internal sealed class GetAllFinancialsQueryHandler(IApplicationDbContext context
                 transaction.PaymentMethod,
                 transaction.ReferenceNumber,
                 transaction.TransactionDate,
-                transaction.Category,
-                transaction.Car,
-                transaction.Client,
-                transaction.Sale
+                transaction.CategoryId,
+                transaction.Category != null ? transaction.Category.Name : null,
+                transaction.CarId,
+                transaction.Car != null ? transaction.Car.Marca.Nombre + " " + transaction.Car.Modelo.Nombre : null,
+                transaction.ClientId,
+                transaction.Client != null ? transaction.Client.FirstName + " " + transaction.Client.LastName : null,
+                transaction.SaleId,
+                transaction.TransactionDate,
+                transaction.TransactionDate,
+                transaction.DealerId
             ))
             .ToListAsync(cancellationToken);
 

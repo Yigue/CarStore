@@ -1,4 +1,5 @@
 using System.Text;
+using Application.Abstractions;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
@@ -10,6 +11,8 @@ using Infrastructure.Authorization;
 using Infrastructure.Caching;
 using Infrastructure.Database;
 using Infrastructure.Storage;
+using Domain.Services;
+using Infrastructure.Services;
 using Infrastructure.Tenancy;
 using Infrastructure.Time;
 using Infrastructure.Users;
@@ -21,6 +24,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
 using SharedKernel;
@@ -60,15 +64,17 @@ public static class DependencyInjection
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
-        
-        // Registrar servicios de almacenamiento según la configuración
-        services.AddSingleton<IBlobStorageService>(provider =>
+
+        // PHASE-3: Blob storage. Defaults to NoOpBlobStorageService (logs + synthetic
+        // blob names/SAS URLs). Falls back to LocalFileStorageService if explicitly
+        // configured. AzureBlobStorageService stays available for prod wire-up but is
+        // NOT registered by default to avoid an Azure runtime dependency.
+        services.AddScoped<IBlobStorageService>(provider =>
         {
             var configuration = provider.GetRequiredService<IConfiguration>();
-            var azureConnectionString = configuration["AzureBlobStorage:ConnectionString"];
-            
-            // Si la cadena de conexión de Azure existe y no está vacía, usar Azure Blob Storage
-            if (!string.IsNullOrEmpty(azureConnectionString))
+            var azureConnectionString = configuration["AzureBlob:ConnectionString"];
+
+            if (!string.IsNullOrWhiteSpace(azureConnectionString))
             {
                 try
                 {
@@ -76,19 +82,44 @@ public static class DependencyInjection
                 }
                 catch (Exception)
                 {
-                    // Si hay algún error inicializando Azure, usar almacenamiento local
-                    return new LocalFileStorageService(configuration);
+                    // Misconfigured Azure → fall back to NoOp (don't crash dev).
+                    var logger = provider.GetRequiredService<ILogger<NoOpBlobStorageService>>();
+                    return new NoOpBlobStorageService(logger);
                 }
             }
-            else
-            {
-                // Si no hay cadena de conexión configurada, usar almacenamiento local
-                return new LocalFileStorageService(configuration);
-            }
+
+            // Default for Phase 3: stubbed NoOp blob storage.
+            var noOpLogger = provider.GetRequiredService<ILogger<NoOpBlobStorageService>>();
+            return new NoOpBlobStorageService(noOpLogger);
         });
 
         services.AddScoped<IUserNotificationService, UserNotificationService>();
-        
+        services.AddScoped<IRoundRobinLeadAllocator, RoundRobinLeadAllocator>();
+
+        // PHASE-4: Reconditioning costs land here on TaskCompleted. Currently a no-op
+        // (logs only) — swap for a real ledger when finance integration is wired.
+        services.AddScoped<IFinancialLedgerService, NoOpFinancialLedgerService>();
+
+        // PHASE-3: OCR. Defaults to MockOcrService (logs + canned ParsedDocumentDto).
+        // AzureDocumentIntelligenceOcrService is wired only when Endpoint + ApiKey are
+        // present in configuration — avoids any Azure runtime dependency in dev.
+        services.AddScoped<IOcrService>(provider =>
+        {
+            var configuration = provider.GetRequiredService<IConfiguration>();
+            var endpoint = configuration["AzureDocumentIntelligence:Endpoint"];
+            var apiKey = configuration["AzureDocumentIntelligence:ApiKey"];
+
+            if (!string.IsNullOrWhiteSpace(endpoint) && !string.IsNullOrWhiteSpace(apiKey))
+            {
+                return new AzureDocumentIntelligenceOcrService(configuration);
+            }
+
+            var logger = provider.GetRequiredService<ILogger<MockOcrService>>();
+            return new MockOcrService(logger);
+        });
+
+        services.AddSingleton<FinancingCalculationService>();
+
         return services;
     }
 
@@ -183,6 +214,10 @@ public static class DependencyInjection
                 o.RequireHttpsMetadata = false;
                 o.TokenValidationParameters = new TokenValidationParameters
                 {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Secret"]!)),
                     ValidIssuer = configuration["Jwt:Issuer"] ?? "carstore",
                     ValidAudience = configuration["Jwt:Audience"] ?? "carstore-api",
@@ -231,6 +266,13 @@ public static class DependencyInjection
     }
     private static IServiceCollection AddBackgroundJobs(this IServiceCollection services)
     {
+        // Skip background jobs when using in-memory database (integration tests)
+        bool useInMemory = Environment.GetEnvironmentVariable("UseInMemoryDatabase") == "true";
+        if (useInMemory)
+        {
+            return services;
+        }
+
         services.AddQuartz(configure =>
         {
             // Job 1: Process Outbox Messages

@@ -1,6 +1,7 @@
 ﻿using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Cars.GetAll;
 using Application.Cars.GetById;
 using Domain.Cars;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +34,15 @@ internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context)
                 car.Descripcion,
                 car.Price.Amount,
                 car.CreatedAt,
-                car.UpdatedAt
+                car.UpdatedAt,
+                car.Images
+                    .OrderBy(img => img.Order)
+                    .Select(img => new CarImageResponse(
+                        img.Id,
+                        img.ImageUrl,
+                        img.IsPrimary,
+                        img.Order))
+                    .ToList()
             ))
 
             .SingleOrDefaultAsync(cancellationToken);

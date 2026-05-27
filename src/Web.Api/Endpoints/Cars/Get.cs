@@ -23,7 +23,7 @@ internal sealed class Get : IEndpoint
                 cars => Results.Ok(cars),
                 CustomResults.Problem);
         })
-        .HasPermission(Permissions.CarsRead)
+        .AllowAnonymous()
         .WithTags(Tags.Cars)
         .WithName("GetAllCars")
         .Produces<PaginatedResult<CarsResponses>>(StatusCodes.Status200OK)

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,5 +13,7 @@ public interface IBlobStorageService
     Task<bool> ExistsAsync(string containerName, string blobName, CancellationToken cancellationToken = default);
     string GenerateSasUrl(string containerName, string blobName);
     Uri GenerateSasUri(Azure.Storage.Blobs.BlobClient blobClient);
-    } 
+    Task<string> UploadAsync(Stream fileStream, string fileName, string contentType, CancellationToken ct);
+    Task<Uri> GenerateSasUrlAsync(string blobName, TimeSpan ttl, CancellationToken ct);
+}
  

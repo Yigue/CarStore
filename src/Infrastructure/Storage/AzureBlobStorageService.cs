@@ -20,7 +20,7 @@ public class AzureBlobStorageService : IBlobStorageService
 
     public AzureBlobStorageService(IConfiguration configuration)
     {
-        string connectionString = configuration["AzureBlobStorage:ConnectionString"] 
+        string connectionString = configuration["AzureBlob:ConnectionString"] 
             ?? throw new ArgumentNullException(nameof(configuration), "La cadena de conexión de Azure Blob Storage no está configurada");
             
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -156,5 +156,47 @@ public class AzureBlobStorageService : IBlobStorageService
             
             throw new InvalidOperationException($"Error al generar URL con SAS en funcion: {ex.Message}", ex);
         }
+    }
+
+    public async Task<string> UploadAsync(Stream fileStream, string fileName, string contentType, CancellationToken ct)
+    {
+        string containerName = "carstore-legal-docs";
+        BlobContainerClient containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+        await containerClient.CreateIfNotExistsAsync(cancellationToken: ct);
+
+        string blobName = $"{Guid.NewGuid()}_{fileName}";
+        BlobClient blobClient = containerClient.GetBlobClient(blobName);
+
+        var blobUploadOptions = new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders { ContentType = contentType }
+        };
+
+        await blobClient.UploadAsync(fileStream, blobUploadOptions, ct);
+
+        return blobName;
+    }
+
+    public async Task<Uri> GenerateSasUrlAsync(string blobName, TimeSpan ttl, CancellationToken ct)
+    {
+        string containerName = "carstore-legal-docs";
+        BlobContainerClient containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+        BlobClient blobClient = containerClient.GetBlobClient(blobName);
+
+        var sasBuilder = new BlobSasBuilder
+        {
+            BlobContainerName = containerClient.Name,
+            BlobName = blobClient.Name,
+            Resource = "b",
+            StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5),
+            ExpiresOn = DateTimeOffset.UtcNow.Add(ttl)
+        };
+        sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+        var storageSharedKeyCredential = new StorageSharedKeyCredential(_accountName, _accountKey);
+        var sasToken = sasBuilder.ToSasQueryParameters(storageSharedKeyCredential).ToString();
+
+        var uriBuilder = new UriBuilder(blobClient.Uri) { Query = sasToken };
+        return await Task.FromResult(uriBuilder.Uri);
     }
 }

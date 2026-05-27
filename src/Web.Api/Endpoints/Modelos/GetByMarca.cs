@@ -12,7 +12,7 @@ public sealed class GetByMarca : IEndpoint
     {
         app.MapGet("modelos/marca/{marcaId}", Handler)
             .WithTags(Tags.Modelos)
-            .RequireAuthorization();
+            .AllowAnonymous();
     }
 
     private static async Task<IResult> Handler(Guid marcaId, ISender sender, CancellationToken cancellationToken)

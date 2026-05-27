@@ -14,27 +14,26 @@ using Web.Api;
 using System.Collections.Generic;
 using System;
 using Microsoft.Data.Sqlite;
-using System.Data.Common;
 
 namespace WebApiTests;
 
 public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     public string Id { get; } = Guid.NewGuid().ToString();
-    private readonly DbConnection _connection;
+    private readonly SqliteConnection _connection;
 
     public const string AdminDealerId = "00000000-0000-0000-0000-000000000001";
 
     public CustomWebApplicationFactory()
     {
-        // Crear conexiÃ³n compartida para Sqlite in-memory
+        // Crear conexión compartida para Sqlite en memoria
         _connection = new SqliteConnection("Filename=:memory:");
         _connection.Open();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Forzar variables de entorno ANTES de cualquier configuraciÃ³n
+        // Forzar variables de entorno ANTES de cualquier configuración
         Environment.SetEnvironmentVariable("UseInMemoryDatabase", "true");
         Environment.SetEnvironmentVariable("Jwt__Secret", "SecretKeyForTestingPurposesOnly1234567890");
         Environment.SetEnvironmentVariable("Jwt__Issuer", "CarStore");
@@ -71,11 +70,11 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         db.Database.EnsureCreated();
-        
+
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseSeeder");
-        
+
         DatabaseSeeder.SeedAsync(db, passwordHasher, configuration, logger).GetAwaiter().GetResult();
     }
 }

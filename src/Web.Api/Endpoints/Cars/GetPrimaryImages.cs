@@ -29,7 +29,7 @@ internal sealed class GetPrimaryImages : IEndpoint
 
             return Results.Ok(primaryImages);
         })
-        .HasPermission(Permissions.CarsRead)
+        .AllowAnonymous()
         .WithTags(Tags.Cars)
         .WithName("GetPrimaryCarImages")
         .Produces(StatusCodes.Status200OK);

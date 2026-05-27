@@ -1,4 +1,5 @@
-﻿using Domain.Cars.Attributes;
+﻿using Application.Cars.GetAll;
+using Domain.Cars.Attributes;
 
 namespace Application.Cars.GetById;
 
@@ -19,5 +20,6 @@ public sealed record CarGetByIdResponse(
     string Description,
     decimal Precio,
     DateTime CreatedAt,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    List<CarImageResponse> Images
 );

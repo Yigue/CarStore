@@ -1,11 +1,15 @@
 using Application.Abstractions.Tenancy;
+using Application.Abstractions.Data;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace Infrastructure.Tenancy;
 
 /// <summary>
 /// Production implementation of ICurrentTenantService.
 /// Extracts the DealerId from the authenticated user's JWT "dealer_id" claim.
+/// Hardened: Resolves the DealerId from the Host / X-Tenant-Host header for anonymous requests, preventing cross-tenant leakage.
 /// </summary>
 public class CurrentTenantService : ICurrentTenantService
 {
@@ -22,12 +26,44 @@ public class CurrentTenantService : ICurrentTenantService
         {
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("dealer_id");
 
-            if (claim is null || !Guid.TryParse(claim.Value, out var dealerId))
+            if (claim is not null && Guid.TryParse(claim.Value, out var dealerId))
             {
-                return Guid.Empty;
+                return dealerId;
             }
 
-            return dealerId;
+            // Secure fallback for anonymous catalog requests
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext is not null)
+            {
+                string? tenantHost = httpContext.Request.Headers["X-Tenant-Host"].ToString();
+                if (string.IsNullOrWhiteSpace(tenantHost))
+                {
+                    tenantHost = httpContext.Request.Headers["Host"].ToString();
+                }
+
+                if (!string.IsNullOrWhiteSpace(tenantHost))
+                {
+                    // Resolve scoped DB Context on-demand to bypass DI circular reference
+                    var dbContext = httpContext.RequestServices.GetService(typeof(IApplicationDbContext)) as IApplicationDbContext;
+                    if (dbContext is not null)
+                    {
+                        var cleanHost = tenantHost.Split(':')[0].ToLowerInvariant();
+
+                        var settings = dbContext.DealerSettings
+                            .IgnoreQueryFilters()
+                            .FirstOrDefault(s => 
+                                (s.HostName != null && s.HostName.ToLower() == cleanHost) || 
+                                (s.CustomDomain != null && s.CustomDomain.ToLower() == cleanHost));
+
+                        if (settings is not null)
+                        {
+                            return settings.DealerId;
+                        }
+                    }
+                }
+            }
+
+            return Guid.Empty;
         }
     }
 
@@ -36,7 +72,12 @@ public class CurrentTenantService : ICurrentTenantService
         get
         {
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("dealer_id");
-            return claim is not null && Guid.TryParse(claim.Value, out _);
+            if (claim is not null && Guid.TryParse(claim.Value, out _))
+            {
+                return true;
+            }
+
+            return DealerId != Guid.Empty;
         }
     }
 }

@@ -1,27 +1,32 @@
-// using Application.Sales.Delete;
-// using MediatR;
-// using SharedKernel;
-// using Web.Api.Infrastructure;
+using Application.Sales.Delete;
+using MediatR;
+using SharedKernel;
+using Web.Api.Extensions;
+using Web.Api.Infrastructure;
 
-// namespace Web.Api.Endpoints.Sales;
+namespace Web.Api.Endpoints.Sales;
 
-// internal sealed class Delete : IEndpoint
-// {
-//     public void MapEndpoint(IEndpointRouteBuilder app)
-//     {
-//         app.MapDelete("sales/{id}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
-//         {
-//             var command = new DeleteSaleCommand(id);
+internal sealed class Delete : IEndpoint
+{
+    public void MapEndpoint(IEndpointRouteBuilder app)
+    {
+        app.MapDelete("sales/{id}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+        {
+            var command = new DeleteSaleCommand(id);
 
-//             Result result = await sender.Send(command, cancellationToken);
+            Result<Guid> result = await sender.Send(command, cancellationToken);
 
-//             if (result.IsFailure)
-//             {
-//                 return Results.BadRequest(result.Error);
-//             }
-
-//             return Results.NoContent();
-//         })
-//         .WithTags("Sales");
-//     }
-// }
+            return result.Match(
+                _ => Results.NoContent(),
+                CustomResults.Problem);
+        })
+        .HasPermission(Permissions.SalesDelete)
+        .WithTags(Tags.Sales)
+        .WithName("DeleteSale")
+        .Produces(StatusCodes.Status204NoContent)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
+    }
+}

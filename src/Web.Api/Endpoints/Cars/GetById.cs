@@ -20,7 +20,7 @@ internal sealed class GetById : IEndpoint
                 car => Results.Ok(car),
                 CustomResults.Problem);
         })
-        .HasPermission(Permissions.CarsRead)
+        .AllowAnonymous()
         .WithTags(Tags.Cars)
         .WithName("GetCarById")
         .Produces<CarGetByIdResponse>(StatusCodes.Status200OK)

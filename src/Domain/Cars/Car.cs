@@ -29,6 +29,13 @@ public sealed class Car : Entity
     public Money Price { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
+    // PHASE-4: PurchaseCost is nullable — existing Cars in DB have no value until backfilled.
+    // It represents the cost the dealership paid for the unit and is the base for TCO.
+    public Money? PurchaseCost { get; private set; }
+
+    private readonly List<ReconditioningTask> _reconditioningTasks = [];
+    public IReadOnlyList<ReconditioningTask> ReconditioningTasks => _reconditioningTasks.AsReadOnly();
+
 
     private Car()
     {
@@ -142,5 +149,63 @@ public sealed class Car : Entity
     {
         Price = newPrice;
         UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Sets or updates the purchase cost of the vehicle.
+    /// </summary>
+    public void SetPurchaseCost(Money purchaseCost, DateTime updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(purchaseCost);
+        PurchaseCost = purchaseCost;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Adds a new pending reconditioning task to this car and returns it.
+    /// </summary>
+    public ReconditioningTask AddReconditioningTask(string description, Money cost)
+    {
+        var task = ReconditioningTask.Create(DealerId, Id, description, cost);
+        _reconditioningTasks.Add(task);
+        return task;
+    }
+
+    /// <summary>
+    /// Completes the reconditioning task with the given id and bubbles its domain event.
+    /// Throws <see cref="DomainException"/> when no task with that id is part of the aggregate.
+    /// </summary>
+    public void CompleteReconditioningTask(Guid taskId, DateTime completedAtUtc)
+    {
+        ReconditioningTask? task = _reconditioningTasks.FirstOrDefault(t => t.Id == taskId)
+            ?? throw new DomainException(
+                $"ReconditioningTask '{taskId}' was not found on Car '{Id}'");
+
+        task.Complete(completedAtUtc);
+    }
+
+    /// <summary>
+    /// Total Cost of Ownership: <see cref="PurchaseCost"/> + sum of cost of all completed
+    /// reconditioning tasks (currencies must match). When no purchase cost is set we use
+    /// <see cref="Money.Zero"/> defaulted to the currency of completed tasks (or "USD").
+    /// </summary>
+    public Money GetTotalCostOfOwnership()
+    {
+        List<ReconditioningTask> completed = _reconditioningTasks
+            .Where(t => t.Status == ReconditioningStatus.Completed)
+            .ToList();
+
+        string baseCurrency = PurchaseCost?.Currency
+            ?? completed.FirstOrDefault()?.Cost.Currency
+            ?? "USD";
+
+        Money total = PurchaseCost ?? new Money(0, baseCurrency);
+
+        foreach (ReconditioningTask task in completed)
+        {
+            total += task.Cost;
+        }
+
+        return total;
     }
 }

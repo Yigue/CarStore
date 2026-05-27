@@ -39,7 +39,7 @@ internal sealed class GetImages : IEndpoint
 
             return Results.Ok(images);
         })
-        .HasPermission(Permissions.CarsRead)
+        .AllowAnonymous()
         .WithTags(Tags.Cars)
         .WithName("GetCarImages")
         .Produces(StatusCodes.Status200OK)
@@ -68,7 +68,7 @@ internal sealed class GetImages : IEndpoint
 
             return Results.Ok(images);
         })
-        .HasPermission(Permissions.CarsRead)
+        .AllowAnonymous()
         .WithTags(Tags.Cars)
         .WithName("GetAllCarImages")
         .Produces(StatusCodes.Status200OK);

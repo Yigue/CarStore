@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Application;
 using HealthChecks.UI.Client;
 using Infrastructure;
+using Infrastructure.Middleware;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
@@ -129,6 +130,9 @@ app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 
 app.UseRateLimiter();
+
+// Tenant resolution middleware - must run before authentication to populate tenant context
+app.UseTenantResolution();
 
 app.UseAuthentication();
 

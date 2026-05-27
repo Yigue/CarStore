@@ -1,4 +1,6 @@
-﻿namespace Application.Users.GetByEmail;
+﻿using Domain.Users;
+
+namespace Application.Users.GetByEmail;
 
 public sealed record UserResponse
 {
@@ -9,4 +11,6 @@ public sealed record UserResponse
     public string FirstName { get; init; }
 
     public string LastName { get; init; }
+
+    public UserRole Role { get; init; }
 }

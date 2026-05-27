@@ -58,6 +58,26 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
             .HasColumnName("price")
             .IsRequired();
 
+        // PHASE-4: PurchaseCost mapped as owned value object (Amount + Currency columns).
+        // The OWNED REFERENCE is optional (navigation IsRequired(false)) so the whole
+        // pair of columns is nullable in the DB. Existing Cars survive without backfill.
+        builder.OwnsOne(c => c.PurchaseCost, pc =>
+        {
+            pc.Property(p => p.Amount)
+                .HasColumnName("purchase_cost_amount")
+                .HasColumnType("decimal(18,2)");
 
+            pc.Property(p => p.Currency)
+                .HasColumnName("purchase_cost_currency")
+                .HasMaxLength(3);
+        });
+
+        builder.Navigation(c => c.PurchaseCost).IsRequired(false);
+
+        // PHASE-4: Bind EF Core collection navigation to the private backing field so
+        // the aggregate keeps exposing IReadOnlyList<ReconditioningTask>.
+        builder.Metadata
+            .FindNavigation(nameof(Car.ReconditioningTasks))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
     }
 }

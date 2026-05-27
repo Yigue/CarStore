@@ -10,7 +10,13 @@ public sealed class User : Entity
     {
     }
 
-    public User(Guid dealerId, string email, string firstName, string lastName, string passwordHash)
+    public User(
+        Guid dealerId,
+        string email,
+        string firstName,
+        string lastName,
+        string passwordHash,
+        UserRole role = UserRole.Cliente)
     {
         SetDealer(dealerId);
         Id = Guid.NewGuid();
@@ -18,6 +24,7 @@ public sealed class User : Entity
         FirstName = firstName;
         LastName = lastName;
         PasswordHash = passwordHash;
+        Role = role;
 
         Raise(new UserRegisteredDomainEvent(Id));
     }
@@ -26,4 +33,5 @@ public sealed class User : Entity
     public string FirstName { get; private set; }
     public string LastName { get; private set; }
     public string PasswordHash { get; private set; }
+    public UserRole Role { get; private set; }
 }

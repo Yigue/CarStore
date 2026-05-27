@@ -4,6 +4,7 @@
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
     <PackageReference Include="AspNetCore.HealthChecks.Redis" />
     <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Azure.AI.FormRecognizer" />
     <PackageReference Include="EFCore.NamingConventions" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
@@ -23,6 +24,11 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
     <PackageReference Include="Quartz.AspNetCore" />
     <PackageReference Include="StackExchange.Redis" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Required by TenantResolutionMiddleware (HttpContext, RequestDelegate, IApplicationBuilder). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>

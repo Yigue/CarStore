@@ -29,6 +29,36 @@ public static class MigrationExtensions
                 Log.Information("Applying database migrations...");
                 dbContext.Database.Migrate();
                 Log.Information("Database migrations completed successfully");
+
+                // Ajustes idempotentes para columnas agregadas a entidades sin una migración EF dedicada.
+                // El dominio User tiene una propiedad Role mapeada como string, pero ninguna migración la creó.
+                // Hasta que se genere `dotnet ef migrations add AddUserRole`, garantizamos la columna acá.
+                dbContext.Database.ExecuteSqlRaw(@"
+                    ALTER TABLE public.users
+                        ADD COLUMN IF NOT EXISTS role character varying(20) NOT NULL DEFAULT 'Cliente';
+
+                    CREATE TABLE IF NOT EXISTS public.dealer_settings (
+                        id uuid NOT NULL CONSTRAINT PK_dealer_settings PRIMARY KEY,
+                        dealer_id uuid NOT NULL,
+                        dealer_name character varying(200) NOT NULL,
+                        contact_email character varying(200) NOT NULL,
+                        notifications_enabled boolean NOT NULL DEFAULT TRUE,
+                        updated_at timestamp with time zone NOT NULL,
+                        host_name character varying(200) NULL,
+                        custom_domain character varying(200) NULL,
+                        address character varying(500) NULL,
+                        phone_number character varying(50) NULL,
+                        facebook_url character varying(500) NULL,
+                        instagram_url character varying(500) NULL,
+                        twitter_url character varying(500) NULL,
+                        interest_rate_tna numeric(5,2) NULL
+                    );
+                    CREATE UNIQUE INDEX IF NOT EXISTS IX_dealer_settings_dealer_id ON public.dealer_settings (dealer_id);
+
+                    INSERT INTO public.dealer_settings (id, dealer_id, dealer_name, contact_email, notifications_enabled, updated_at, host_name, custom_domain, address, phone_number, facebook_url, instagram_url, twitter_url, interest_rate_tna)
+                    VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Lux Dealership', 'info@luxdealership.com', TRUE, NOW(), 'localhost', 'localhost', 'Av. del Libertador 4500, Palermo, CABA', '+54 11 9999-8888', 'https://facebook.com/luxdealership', 'https://instagram.com/luxdealership', 'https://twitter.com/luxdealership', 65.50)
+                    ON CONFLICT (dealer_id) DO NOTHING;
+                ");
             }
             else
             {
