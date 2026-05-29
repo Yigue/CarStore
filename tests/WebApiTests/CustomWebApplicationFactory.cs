@@ -22,7 +22,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     public string Id { get; } = Guid.NewGuid().ToString();
     private readonly SqliteConnection _connection;
 
-    public const string AdminDealerId = "00000000-0000-0000-0000-000000000001";
+    public const string AdminDealerId = "11111111-1111-1111-1111-111111111111";
 
     public CustomWebApplicationFactory()
     {
@@ -38,6 +38,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("Jwt__Secret", "SecretKeyForTestingPurposesOnly1234567890");
         Environment.SetEnvironmentVariable("Jwt__Issuer", "CarStore");
         Environment.SetEnvironmentVariable("Jwt__Audience", "CarStore");
+        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", "");
 
         builder.UseEnvironment("Testing");
 

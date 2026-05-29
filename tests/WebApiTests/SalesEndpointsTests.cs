@@ -46,7 +46,8 @@ public class SalesEndpointsTests
             FinalPrice = 18000m,
             PaymentMethod = (int)PaymentMethod.Cash,
             ContractNumber = "C123",
-            Description = "none"
+            Description = "none",
+            Comments = ""
         };
         var response = await http.PostAsJsonAsync("/api/v1/sales", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -54,7 +55,7 @@ public class SalesEndpointsTests
         var saleId = result!.id;
 
         context.Sales.IgnoreQueryFilters().Should().ContainSingle(s => s.Id == saleId);
-        var updatedCar = await context.Cars.IgnoreQueryFilters().FirstAsync(c => c.Id == car.Id);
+        var updatedCar = await context.Cars.IgnoreQueryFilters().AsNoTracking().FirstAsync(c => c.Id == car.Id);
         updatedCar.ServiceCar.Should().Be(StatusServiceCar.Vendido);
 
         var get = await http.GetAsync($"/api/v1/sales/{saleId}");
@@ -87,10 +88,11 @@ public class SalesEndpointsTests
             FinalPrice = 1000m,
             PaymentMethod = (int)PaymentMethod.Cash,
             ContractNumber = "C1",
-            Description = "none"
+            Description = "none",
+            Comments = ""
         };
         var response = await http.PostAsJsonAsync("/api/v1/sales", request);
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

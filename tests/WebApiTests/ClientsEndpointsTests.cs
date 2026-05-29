@@ -28,10 +28,10 @@ public class ClientsEndpointsTests
         {
             FirstName = "John",
             LastName = "Doe",
-            Email = "john@example.com",
+            Email = "john.unique@example.com",
             Phone = "123",
             Address = "Street 1",
-            DNI = "111"
+            DNI = "UNIQUE_DNI"
         };
 
         var response = await client.PostAsJsonAsync("/api/v1/clients", request);

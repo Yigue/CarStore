@@ -23,10 +23,10 @@ internal sealed class Create : IEndpoint
             var command = new CreateClientCommand(
                 request.FirstName,
                 request.LastName,
+                request.DNI,
                 request.Email,
                 request.Phone,
-                request.Address,
-                request.DNI);
+                request.Address);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

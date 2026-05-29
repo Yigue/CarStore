@@ -8,8 +8,7 @@ internal sealed class UserPermissionConfiguration : IEntityTypeConfiguration<Use
 {
     public void Configure(EntityTypeBuilder<UserPermission> builder)
     {
-        // No ToTable here to respect snake_case convention in prod 
-        // and default naming in tests, unless convention is applied.
+        builder.ToTable("UserPermissions");
         
         builder.HasKey(x => x.Id);
 
@@ -20,8 +19,17 @@ internal sealed class UserPermissionConfiguration : IEntityTypeConfiguration<Use
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(x => x.GrantedAt)
+            .IsRequired();
+
+        builder.Property(x => x.GrantedBy)
+            .IsRequired(false);
+
         builder.HasOne<User>()
             .WithMany()
             .HasForeignKey(x => x.UserId);
+
+        builder.HasIndex(x => new { x.UserId, x.Permission })
+            .IsUnique();
     }
 }

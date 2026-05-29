@@ -17,8 +17,16 @@ namespace Application.UnitTests;
 
 internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContext
 {
+    private readonly Guid _dealerId;
+
     public TestApplicationDbContext(DbContextOptions<TestApplicationDbContext> options) : base(options)
     {
+        _dealerId = Guid.NewGuid();
+    }
+
+    public TestApplicationDbContext(DbContextOptions<TestApplicationDbContext> options, Guid dealerId) : base(options)
+    {
+        _dealerId = dealerId;
     }
 
     public DbSet<Car> Cars => Set<Car>();

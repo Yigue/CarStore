@@ -34,7 +34,11 @@ internal sealed class GetDealerSettingsQueryHandler(
                 FacebookUrl = s.FacebookUrl,
                 InstagramUrl = s.InstagramUrl,
                 TwitterUrl = s.TwitterUrl,
-                InterestRateTna = s.InterestRateTna
+                InterestRateTna = s.InterestRateTna,
+                LogoUrl = s.LogoUrl,
+                PrimaryColor = s.PrimaryColor,
+                SecondaryColor = s.SecondaryColor,
+                FooterText = s.FooterText
             })
             .SingleOrDefaultAsync(cancellationToken);
 

@@ -13,7 +13,8 @@ internal sealed class GetSaleByIdQueryHandler(IApplicationDbContext context)
     public async Task<Result<SaleResponse>> Handle(GetSaleByIdQuery query, CancellationToken cancellationToken)
     {
         Sale? sale = await context.Sales
-            .Include(s => s.Car)
+            .Include(s => s.Car).ThenInclude(c => c.Marca)
+            .Include(s => s.Car).ThenInclude(c => c.Modelo)
             .Include(s => s.Client)
             .FirstOrDefaultAsync(s => s.Id == query.Id, cancellationToken);
 

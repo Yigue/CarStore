@@ -21,7 +21,7 @@ internal sealed class Update : IEndpoint
         public int CantidadAsientos { get; set; }
         public int Cilindrada { get; set; }
         public int Kilometraje { get; set; }
-        public int Año { get; set; }
+        public int Anio { get; set; }
         public string Patente { get; set; }
         public string Descripcion { get; set; }
         public decimal Precio { get; set; } 
@@ -43,7 +43,7 @@ internal sealed class Update : IEndpoint
                 request.CantidadAsientos,
                 request.Cilindrada,
                 request.Kilometraje,
-                request.Año,
+                request.Anio,
                 request.Patente,
                 request.Descripcion,
                 request.Precio

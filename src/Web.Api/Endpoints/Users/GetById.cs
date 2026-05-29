@@ -20,11 +20,12 @@ internal sealed class GetById : IEndpoint
                 user => Results.Ok(user),
                 CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .HasPermission("CanManageUsers")
         .WithTags(Tags.Users)
         .WithName("GetUserById")
         .Produces<UserResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
     }

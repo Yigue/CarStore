@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Threading.RateLimiting;
+using System.Text.Json.Serialization;
 using Application;
 using HealthChecks.UI.Client;
 using Infrastructure;
@@ -34,6 +35,9 @@ builder.Services
     .AddApplication()
     .AddPresentation()
     .AddInfrastructure(builder.Configuration);
+
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // Rate limiting for login endpoint
 builder.Services.AddRateLimiter(options =>
@@ -81,7 +85,7 @@ builder.Services.AddCors(options =>
 
 WebApplication app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.ApplyMigrations();
     app.UseSwagger();
@@ -131,10 +135,10 @@ app.UseExceptionHandler();
 
 app.UseRateLimiter();
 
-// Tenant resolution middleware - must run before authentication to populate tenant context
-app.UseTenantResolution();
-
 app.UseAuthentication();
+
+// Tenant resolution middleware - now it can see authentication claims
+app.UseTenantResolution();
 
 app.UseAuthorization();
 

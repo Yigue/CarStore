@@ -23,4 +23,12 @@ public static class UserErrors
     public static readonly Error InvalidPassword = Error.Problem(
         "Users.InvalidPassword",
         "The password provided is incorrect");
+
+    public static readonly Error SelfDeleteNotAllowed = Error.Failure(
+        "Users.SelfDeleteNotAllowed",
+        "No puedes eliminar tu propia cuenta");
+
+    public static readonly Error CannotRevokeOwnPermission = Error.Failure(
+        "Users.CannotRevokeOwnPermission",
+        "No puedes revocar tus propios permisos de administrador");
 }

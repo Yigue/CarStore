@@ -16,4 +16,9 @@ public sealed record DealerSettingsResponse
     public string? InstagramUrl { get; init; }
     public string? TwitterUrl { get; init; }
     public decimal? InterestRateTna { get; init; }
+    // Visual settings
+    public string? LogoUrl { get; init; }
+    public string? PrimaryColor { get; init; }
+    public string? SecondaryColor { get; init; }
+    public string? FooterText { get; init; }
 }

@@ -69,6 +69,12 @@ public sealed class DealerSettings : Entity
 
     public decimal? InterestRateTna { get; private set; }
 
+    // Visual settings
+    public string? LogoUrl { get; private set; }
+    public string? PrimaryColor { get; private set; }
+    public string? SecondaryColor { get; private set; }
+    public string? FooterText { get; private set; }
+
     /// <summary>
     /// Puntero round-robin para asignación automática de leads a agentes.
     /// Incrementa atómicamente vía <see cref="IncrementAgentIndex"/>.
@@ -82,6 +88,21 @@ public sealed class DealerSettings : Entity
     {
         LastAssignedAgentIndex += 1;
         return LastAssignedAgentIndex;
+    }
+
+    public void UpdateVisual(string? logoUrl, string? primaryColor, string? secondaryColor, string? footerText)
+    {
+        if (primaryColor != null && !string.IsNullOrWhiteSpace(primaryColor) && !System.Text.RegularExpressions.Regex.IsMatch(primaryColor, @"^#[0-9A-Fa-f]{6}$"))
+            throw new DomainException("PrimaryColor must be a valid hex color (e.g., #FF0000)");
+
+        if (secondaryColor != null && !string.IsNullOrWhiteSpace(secondaryColor) && !System.Text.RegularExpressions.Regex.IsMatch(secondaryColor, @"^#[0-9A-Fa-f]{6}$"))
+            throw new DomainException("SecondaryColor must be a valid hex color (e.g., #00FF00)");
+
+        LogoUrl = logoUrl;
+        PrimaryColor = primaryColor;
+        SecondaryColor = secondaryColor;
+        FooterText = footerText;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public void Update(

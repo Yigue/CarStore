@@ -57,7 +57,7 @@ internal sealed class UpdateCarCommandHandler(
             command.CantidadAsientos,
             command.Cilindrada,
             command.Kilometraje,
-            command.Año,
+            command.Anio,
             command.Patente,
             command.Descripcion,
             dateTimeProvider.UtcNow);

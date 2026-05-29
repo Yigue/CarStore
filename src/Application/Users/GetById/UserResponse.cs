@@ -12,5 +12,13 @@ public sealed record UserResponse
 
     public string LastName { get; init; }
 
+    public string? Phone { get; init; }
+
     public UserRole Role { get; init; }
+
+    public bool IsActive { get; init; }
+
+    public DateTime CreatedAt { get; init; }
+
+    public IEnumerable<string> Permissions { get; init; } = [];
 }

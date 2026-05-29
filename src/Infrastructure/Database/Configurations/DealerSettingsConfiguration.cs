@@ -32,5 +32,22 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
         builder.Property(s => s.LastAssignedAgentIndex)
             .HasDefaultValue(0)
             .IsRequired();
+
+        // Visual settings
+        builder.Property(s => s.LogoUrl)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
+        builder.Property(s => s.PrimaryColor)
+            .HasMaxLength(7)
+            .IsRequired(false);
+
+        builder.Property(s => s.SecondaryColor)
+            .HasMaxLength(7)
+            .IsRequired(false);
+
+        builder.Property(s => s.FooterText)
+            .HasMaxLength(200)
+            .IsRequired(false);
     }
 }

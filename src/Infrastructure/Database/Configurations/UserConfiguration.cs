@@ -34,5 +34,16 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(20)
             .HasDefaultValue(UserRole.Cliente)
             .IsRequired();
+
+        builder.Property(u => u.IsActive)
+            .HasDefaultValue(true)
+            .IsRequired();
+
+        builder.Property(u => u.Phone)
+            .HasMaxLength(20)
+            .IsRequired(false);
+
+        builder.Property(u => u.CreatedAt)
+            .IsRequired();
     }
 }
