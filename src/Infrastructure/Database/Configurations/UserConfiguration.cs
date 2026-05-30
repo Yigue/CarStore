@@ -32,7 +32,6 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Role)
             .HasConversion<string>()
             .HasMaxLength(20)
-            .HasDefaultValue(UserRole.Cliente)
             .IsRequired();
 
         builder.Property(u => u.IsActive)

@@ -25,8 +25,8 @@ internal sealed class UserPermissionConfiguration : IEntityTypeConfiguration<Use
         builder.Property(x => x.GrantedBy)
             .IsRequired(false);
 
-        builder.HasOne<User>()
-            .WithMany()
+        builder.HasOne(x => x.User)
+            .WithMany(u => u.Permissions)
             .HasForeignKey(x => x.UserId);
 
         builder.HasIndex(x => new { x.UserId, x.Permission })
