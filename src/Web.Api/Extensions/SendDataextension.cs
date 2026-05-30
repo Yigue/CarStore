@@ -118,8 +118,8 @@ public static class SeedDataExtensions
                     var image = new CarImage(
                         carId: car.Id,
                         imageUrl: pickedUrls[i],
-                        isPrimary: i == 0,
-                        order: i);
+                        isCover: i == 0,
+                        displayOrder: i);
                     context.Add(image);
                 }
             }

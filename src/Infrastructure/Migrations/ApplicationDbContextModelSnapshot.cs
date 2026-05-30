@@ -246,29 +246,50 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("car_id");
 
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("display_order");
+
                     b.Property<string>("ImageUrl")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("image_url");
 
-                    b.Property<bool>("IsPrimary")
+                    b.Property<bool>("IsCover")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
-                        .HasColumnName("is_primary");
+                        .HasColumnName("is_cover");
 
-                    b.Property<int>("Order")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("order");
+                    b.Property<string>("ObjectKey")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("object_key");
+
+                    b.Property<long?>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
 
                     b.HasKey("Id")
                         .HasName("pk_car_images");
 
                     b.HasIndex("CarId")
                         .HasDatabaseName("ix_car_images_car_id");
+
+                    b.HasIndex("CarId", "DisplayOrder")
+                        .HasDatabaseName("ix_car_images_car_id_display_order");
+
+                    b.HasIndex("CarId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_car_images_car_id_is_cover")
+                        .HasFilter("is_cover = true");
 
                     b.ToTable("car_images", "public");
                 });

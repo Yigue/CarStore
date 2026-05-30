@@ -14,6 +14,8 @@ using Web.Api;
 using System.Collections.Generic;
 using System;
 using Microsoft.Data.Sqlite;
+using Application.Abstractions.Storage;
+using WebApiTests.Fakes;
 
 namespace WebApiTests;
 
@@ -21,6 +23,9 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     public string Id { get; } = Guid.NewGuid().ToString();
     private readonly SqliteConnection _connection;
+
+    /// <summary>In-memory storage double; tests can assert uploads/deletes against it.</summary>
+    public FakeStorageService Storage { get; } = new();
 
     public const string AdminDealerId = "11111111-1111-1111-1111-111111111111";
 
@@ -40,6 +45,15 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("Jwt__Audience", "CarStore");
         Environment.SetEnvironmentVariable("ConnectionStrings__Redis", "");
 
+        // Storage:Minio config so the IOptions<MinioOptions> ValidateOnStart passes in tests.
+        // The real MinioStorageService is replaced below by FakeStorageService, so these
+        // values are never used to reach a real MinIO.
+        Environment.SetEnvironmentVariable("Storage__Minio__InternalEndpoint", "http://minio:9000");
+        Environment.SetEnvironmentVariable("Storage__Minio__PublicEndpoint", "http://localhost:9000");
+        Environment.SetEnvironmentVariable("Storage__Minio__AccessKey", "minioadmin");
+        Environment.SetEnvironmentVariable("Storage__Minio__SecretKey", "minioadmin123");
+        Environment.SetEnvironmentVariable("Storage__Minio__BucketName", "cars");
+
         builder.UseEnvironment("Testing");
 
         builder.ConfigureTestServices(services =>
@@ -54,6 +68,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 options.UseSqlite(_connection));
 
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+
+            // Swap the real MinIO-backed storage for the in-memory fake.
+            services.RemoveAll<IStorageService>();
+            services.AddSingleton<IStorageService>(Storage);
         });
     }
 

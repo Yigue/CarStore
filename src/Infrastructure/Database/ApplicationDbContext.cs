@@ -61,6 +61,14 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
         {
             modelBuilder.HasDefaultSchema(Schemas.Default);
+
+            // REQ-VMS-7: partial UNIQUE index "one cover per car" (Postgres only — the filter
+            // SQL is not portable to SQLite's EnsureCreated()).
+            modelBuilder.Entity<CarImage>()
+                .HasIndex(ci => ci.CarId)
+                .IsUnique()
+                .HasFilter("is_cover = true")
+                .HasDatabaseName("ux_car_images_car_id_is_cover");
         }
 
         // Ignorar DealerId en entidades compartidas (catálogo)

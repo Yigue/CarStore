@@ -24,6 +24,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
@@ -64,6 +65,16 @@ public static class DependencyInjection
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+
+        // PHASE-2 (Inventario-Overhaul): MinIO-backed storage for the Cars aggregate.
+        // ADR-3: single production implementation (no factory, no multi-binding).
+        // Coexists with IBlobStorageService (Documents) per ADR-2.
+        // Fails startup with a clear OptionsValidationException if required keys are missing.
+        services.AddOptions<MinioOptions>()
+            .BindConfiguration(MinioOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddScoped<IStorageService, MinioStorageService>();
 
         // PHASE-3: Blob storage. Defaults to NoOpBlobStorageService (logs + synthetic
         // blob names/SAS URLs). Falls back to LocalFileStorageService if explicitly
