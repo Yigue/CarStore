@@ -51,12 +51,26 @@ public static class MigrationExtensions
                         facebook_url character varying(500) NULL,
                         instagram_url character varying(500) NULL,
                         twitter_url character varying(500) NULL,
-                        interest_rate_tna numeric(5,2) NULL
+                        interest_rate_tna numeric(5,2) NULL,
+                        logo_url character varying(500) NULL,
+                        primary_color character varying(7) NULL,
+                        secondary_color character varying(7) NULL,
+                        footer_text character varying(200) NULL
                     );
                     CREATE UNIQUE INDEX IF NOT EXISTS IX_dealer_settings_dealer_id ON public.dealer_settings (dealer_id);
 
-                    INSERT INTO public.dealer_settings (id, dealer_id, dealer_name, contact_email, notifications_enabled, updated_at, host_name, custom_domain, address, phone_number, facebook_url, instagram_url, twitter_url, interest_rate_tna)
-                    VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Lux Dealership', 'info@luxdealership.com', TRUE, NOW(), 'localhost', 'localhost', 'Av. del Libertador 4500, Palermo, CABA', '+54 11 9999-8888', 'https://facebook.com/luxdealership', 'https://instagram.com/luxdealership', 'https://twitter.com/luxdealership', 65.50)
+                    -- Agregar columnas visuales que pudieran faltar (idempotente)
+                    ALTER TABLE public.dealer_settings
+                        ADD COLUMN IF NOT EXISTS logo_url character varying(500) NULL;
+                    ALTER TABLE public.dealer_settings
+                        ADD COLUMN IF NOT EXISTS primary_color character varying(7) NULL;
+                    ALTER TABLE public.dealer_settings
+                        ADD COLUMN IF NOT EXISTS secondary_color character varying(7) NULL;
+                    ALTER TABLE public.dealer_settings
+                        ADD COLUMN IF NOT EXISTS footer_text character varying(200) NULL;
+
+                    INSERT INTO public.dealer_settings (id, dealer_id, dealer_name, contact_email, notifications_enabled, updated_at, host_name, custom_domain, address, phone_number, facebook_url, instagram_url, twitter_url, interest_rate_tna, logo_url, primary_color, secondary_color, footer_text)
+                    VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Lux Dealership', 'info@luxdealership.com', TRUE, NOW(), 'localhost', 'localhost', 'Av. del Libertador 4500, Palermo, CABA', '+54 11 9999-8888', 'https://facebook.com/luxdealership', 'https://instagram.com/luxdealership', 'https://twitter.com/luxdealership', 65.50, NULL, NULL, NULL, '© 2024 Lux Dealership. Todos los derechos reservados.')
                     ON CONFLICT (dealer_id) DO NOTHING;
                 ");
             }
