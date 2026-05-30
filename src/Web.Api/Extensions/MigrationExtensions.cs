@@ -72,6 +72,18 @@ public static class MigrationExtensions
                     INSERT INTO public.dealer_settings (id, dealer_id, dealer_name, contact_email, notifications_enabled, updated_at, host_name, custom_domain, address, phone_number, facebook_url, instagram_url, twitter_url, interest_rate_tna, logo_url, primary_color, secondary_color, footer_text)
                     VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Lux Dealership', 'info@luxdealership.com', TRUE, NOW(), 'localhost', 'localhost', 'Av. del Libertador 4500, Palermo, CABA', '+54 11 9999-8888', 'https://facebook.com/luxdealership', 'https://instagram.com/luxdealership', 'https://twitter.com/luxdealership', 65.50, NULL, NULL, NULL, '© 2024 Lux Dealership. Todos los derechos reservados.')
                     ON CONFLICT (dealer_id) DO NOTHING;
+
+                    -- Agregar columnas CarImage que faltan (idempotente) — MinIO storage ADR-2
+                    ALTER TABLE public.car_images
+                        ADD COLUMN IF NOT EXISTS object_key character varying(1024) NULL;
+                    ALTER TABLE public.car_images
+                        ADD COLUMN IF NOT EXISTS content_type character varying(100) NULL;
+                    ALTER TABLE public.car_images
+                        ADD COLUMN IF NOT EXISTS size_bytes bigint NULL;
+                    ALTER TABLE public.car_images
+                        ADD COLUMN IF NOT EXISTS is_cover boolean NOT NULL DEFAULT false;
+                    ALTER TABLE public.car_images
+                        ADD COLUMN IF NOT EXISTS display_order integer NOT NULL DEFAULT 0;
                 ");
             }
             else
