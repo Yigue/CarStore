@@ -44,13 +44,12 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context)
             car.CreatedAt,
             car.UpdatedAt,
             car.Images
-                .OrderBy(img => img.Order)
+                .OrderBy(img => img.DisplayOrder)
                 .Select(img => new CarImageResponse(
                     img.Id,
                     img.ImageUrl,
-                    img.IsPrimary,
-                    img.Order
-                ))
+                    img.IsCover,
+                    img.DisplayOrder))
                 .ToList()
         )).ToList();
 

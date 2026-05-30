@@ -36,7 +36,7 @@ public class ClientsEndpointsTests
 
         var response = await client.PostAsJsonAsync("/api/v1/clients", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var id = result!.id;
 
         using var scope = factory.Services.CreateScope();
@@ -86,7 +86,7 @@ public class ClientsEndpointsTests
         
         var response = await httpClient.GetAsync($"/api/v1/clients/{entity.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var result = await response.Content.ReadFromJsonAsync<ClientResponse>();
+        var result = await response.Content.ReadFromJsonAsync<ClientResponse>(IntegrationTestHelpers.JsonOptions);
         result!.Id.Should().Be(entity.Id);
         result.FirstName.Should().Be("Jane");
     }

@@ -41,25 +41,25 @@ public class UsersControllerTests
         };
         var regResponse = await client.PostAsJsonAsync("/api/v1/users/register", register);
         regResponse.StatusCode.Should().Be(HttpStatusCode.Created);
-        var regResult = await regResponse.Content.ReadFromJsonAsync<RegisterResponse>();
+        var regResult = await regResponse.Content.ReadFromJsonAsync<RegisterResponse>(IntegrationTestHelpers.JsonOptions);
 
         // Assign permission manually
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        context.UserPermissions.Add(new Domain.Users.UserPermission(regResult!.id, "users:access"));
+        context.UserPermissions.Add(new Domain.Users.UserPermission(regResult!.id, "CanManageUsers"));
         await context.SaveChangesAsync();
 
         // Login
         var login = new { Email = "listuser@example.com", Password = "Password1!" };
         var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", login);
-        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(IntegrationTestHelpers.JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.token);
 
         // Get users
-        var response = await client.GetAsync("/api/v1/users");
+        var response = await client.GetAsync("/api/v1/users?page=1&pageSize=10");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var result = await response.Content.ReadFromJsonAsync<UserListResponse>();
+        var result = await response.Content.ReadFromJsonAsync<UserListResponse>(IntegrationTestHelpers.JsonOptions);
         result.Should().NotBeNull();
     }
 
@@ -80,25 +80,25 @@ public class UsersControllerTests
         };
         var regResponse = await client.PostAsJsonAsync("/api/v1/users/register", register);
         regResponse.StatusCode.Should().Be(HttpStatusCode.Created);
-        var regResult = await regResponse.Content.ReadFromJsonAsync<RegisterResponse>();
+        var regResult = await regResponse.Content.ReadFromJsonAsync<RegisterResponse>(IntegrationTestHelpers.JsonOptions);
 
         // Assign permission
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        context.UserPermissions.Add(new Domain.Users.UserPermission(regResult!.id, "users:access"));
+        context.UserPermissions.Add(new Domain.Users.UserPermission(regResult!.id, "CanManageUsers"));
         await context.SaveChangesAsync();
 
         // Login
         var login = new { Email = "getbyid@example.com", Password = "Password1!" };
         var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", login);
-        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(IntegrationTestHelpers.JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.token);
 
         // Get user by id
         var response = await client.GetAsync($"/api/v1/users/{regResult.id}");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var result = await response.Content.ReadFromJsonAsync<UserDetailResponse>();
+        var result = await response.Content.ReadFromJsonAsync<UserDetailResponse>(IntegrationTestHelpers.JsonOptions);
         result!.Id.Should().Be(regResult.id);
         result.Email.Should().Be("getbyid@example.com");
     }
@@ -120,19 +120,18 @@ public class UsersControllerTests
         };
         var regResponse = await client.PostAsJsonAsync("/api/v1/users/register", register);
         regResponse.StatusCode.Should().Be(HttpStatusCode.Created);
-        var regResult = await regResponse.Content.ReadFromJsonAsync<RegisterResponse>();
+        var regResult = await regResponse.Content.ReadFromJsonAsync<RegisterResponse>(IntegrationTestHelpers.JsonOptions);
 
         // Assign permissions
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        context.UserPermissions.Add(new Domain.Users.UserPermission(regResult!.id, "users:access"));
-        context.UserPermissions.Add(new Domain.Users.UserPermission(regResult!.id, "users:write"));
+        context.UserPermissions.Add(new Domain.Users.UserPermission(regResult!.id, "CanManageUsers"));
         await context.SaveChangesAsync();
 
         // Login
         var login = new { Email = "updateuser@example.com", Password = "Password1!" };
         var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", login);
-        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(IntegrationTestHelpers.JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.token);
 
         // Update user
@@ -166,7 +165,7 @@ public class UsersControllerTests
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var adminRegResponse = await client.PostAsJsonAsync("/api/v1/users/register", adminRegister);
-        var adminResult = await adminRegResponse.Content.ReadFromJsonAsync<RegisterResponse>();
+        var adminResult = await adminRegResponse.Content.ReadFromJsonAsync<RegisterResponse>(IntegrationTestHelpers.JsonOptions);
 
         // Register a user to delete
         var deleteRegister = new
@@ -178,25 +177,24 @@ public class UsersControllerTests
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var deleteRegResponse = await client.PostAsJsonAsync("/api/v1/users/register", deleteRegister);
-        var deleteResult = await deleteRegResponse.Content.ReadFromJsonAsync<RegisterResponse>();
+        var deleteResult = await deleteRegResponse.Content.ReadFromJsonAsync<RegisterResponse>(IntegrationTestHelpers.JsonOptions);
 
         // Assign permissions to admin
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        context.UserPermissions.Add(new Domain.Users.UserPermission(adminResult!.id, "users:access"));
-        context.UserPermissions.Add(new Domain.Users.UserPermission(adminResult!.id, "users:delete"));
+        context.UserPermissions.Add(new Domain.Users.UserPermission(adminResult!.id, "CanManageUsers"));
         await context.SaveChangesAsync();
 
         // Login as admin
         var login = new { Email = "admin@example.com", Password = "Password1!" };
         var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", login);
-        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(IntegrationTestHelpers.JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.token);
 
         // Delete user
         var response = await client.DeleteAsync($"/api/v1/users/{deleteResult!.id}");
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Fact]
@@ -215,7 +213,7 @@ public class UsersControllerTests
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var adminRegResponse = await client.PostAsJsonAsync("/api/v1/users/register", adminRegister);
-        var adminResult = await adminRegResponse.Content.ReadFromJsonAsync<RegisterResponse>();
+        var adminResult = await adminRegResponse.Content.ReadFromJsonAsync<RegisterResponse>(IntegrationTestHelpers.JsonOptions);
 
         // Register a user to update
         var targetRegister = new
@@ -227,24 +225,23 @@ public class UsersControllerTests
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var targetRegResponse = await client.PostAsJsonAsync("/api/v1/users/register", targetRegister);
-        var targetResult = await targetRegResponse.Content.ReadFromJsonAsync<RegisterResponse>();
+        var targetResult = await targetRegResponse.Content.ReadFromJsonAsync<RegisterResponse>(IntegrationTestHelpers.JsonOptions);
 
         // Assign permissions to admin
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        context.UserPermissions.Add(new Domain.Users.UserPermission(adminResult!.id, "users:access"));
-        context.UserPermissions.Add(new Domain.Users.UserPermission(adminResult!.id, "users:write"));
+        context.UserPermissions.Add(new Domain.Users.UserPermission(adminResult!.id, "CanManageUsers"));
         await context.SaveChangesAsync();
 
         // Login as admin
         var login = new { Email = "assignrole@example.com", Password = "Password1!" };
         var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", login);
-        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(IntegrationTestHelpers.JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.token);
 
         // Assign role
-        var assignRole = new { UserId = targetResult!.id, Role = "Admin" };
-        var response = await client.PostAsJsonAsync("/api/v1/users/assign-role", assignRole);
+        var assignRole = new { Role = "Admin" };
+        var response = await client.PostAsJsonAsync($"/api/v1/users/{targetResult!.id}/role", assignRole);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }

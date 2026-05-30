@@ -38,7 +38,7 @@ public class LoginUserCommandHandlerTests
         var result = await handler.Handle(new LoginUserCommand("user@test.com", "wrong"), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(UserErrors.NotFoundByEmail);
+        result.Error.Should().Be(UserErrors.InvalidPassword);
         tokenProvider.Verify(t => t.Create(It.IsAny<User>()), Times.Never);
     }
 

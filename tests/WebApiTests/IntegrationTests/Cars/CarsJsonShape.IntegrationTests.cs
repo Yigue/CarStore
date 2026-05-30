@@ -27,7 +27,7 @@ public class CarsJsonShapeIntegrationTests
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>(IntegrationTestHelpers.JsonOptions);
         var items = json.GetProperty("items");
         items.GetArrayLength().Should().BeGreaterThan(0);
 

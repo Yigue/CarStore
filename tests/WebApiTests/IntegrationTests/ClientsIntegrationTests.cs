@@ -34,7 +34,7 @@ public class ClientsIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/clients", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var clientId = result!.id;
         clientId.Should().NotBe(Guid.Empty);
 
@@ -93,7 +93,7 @@ public class ClientsIntegrationTests
         var response = await client.GetAsync("/api/v1/clients");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var clients = await response.Content.ReadFromJsonAsync<List<Application.Clients.GetAll.ClientResponse>>();
+        var clients = await response.Content.ReadFromJsonAsync<List<Application.Clients.GetAll.ClientResponse>>(IntegrationTestHelpers.JsonOptions);
         clients.Should().NotBeNull();
         clients!.Count.Should().BeGreaterThanOrEqualTo(2);
         clients.Should().Contain(c => c.Email == "maria.gonzalez@example.com");
@@ -128,7 +128,7 @@ public class ClientsIntegrationTests
         var response = await client.GetAsync($"/api/v1/clients/{testClient.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var result = await response.Content.ReadFromJsonAsync<Application.Clients.GetAll.ClientResponse>();
+        var result = await response.Content.ReadFromJsonAsync<Application.Clients.GetAll.ClientResponse>(IntegrationTestHelpers.JsonOptions);
         result.Should().NotBeNull();
         result!.Id.Should().Be(testClient.Id);
         result.FirstName.Should().Be("Ana");

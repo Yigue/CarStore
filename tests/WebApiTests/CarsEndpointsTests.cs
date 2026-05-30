@@ -62,7 +62,7 @@ public class CarsEndpointsTests
 
         var response = await client.PostAsJsonAsync("/api/v1/cars", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var id = result!.id;
 
         context.Cars.IgnoreQueryFilters().Should().ContainSingle(c => c.Id == id);
@@ -127,7 +127,7 @@ public class CarsEndpointsTests
 
         var response = await client.GetAsync($"/api/v1/cars/{car.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var result = await response.Content.ReadFromJsonAsync<CarGetByIdResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CarGetByIdResponse>(IntegrationTestHelpers.JsonOptions);
         result!.Id.Should().Be(car.Id);
         result.Marca.Should().Be("Ford");
     }

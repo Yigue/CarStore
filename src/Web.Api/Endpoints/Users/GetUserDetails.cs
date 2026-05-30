@@ -1,4 +1,3 @@
-using Application.Users.Queries.GetAllUsers;
 using Application.Users.Queries.GetUserPermissions;
 using Application.Users.Queries.GetRoles;
 using Application.Users.Queries.GetPermissions;
@@ -14,38 +13,6 @@ public sealed class GetUserDetails : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        // GET /api/users - List all users with pagination
-        app.MapGet("users", async (
-            int page,
-            int pageSize,
-            string? search,
-            string? role,
-            bool? isActive,
-            ISender sender,
-            CancellationToken cancellationToken) =>
-        {
-            Domain.Users.UserRole? roleFilter = null;
-            if (!string.IsNullOrWhiteSpace(role) && Enum.TryParse<Domain.Users.UserRole>(role, true, out var parsedRole))
-            {
-                roleFilter = parsedRole;
-            }
-
-            var query = new GetAllUsersQuery(page, pageSize, search, roleFilter, isActive);
-
-            var result = await sender.Send(query, cancellationToken);
-
-            return result.Match(
-                data => Results.Ok(data),
-                CustomResults.Problem);
-        })
-        .HasPermission("CanManageUsers")
-        .WithTags(Tags.Users)
-        .WithName("GetUserDetails")
-        .Produces<PaginatedUsersResponse>()
-        .ProducesProblem(StatusCodes.Status401Unauthorized)
-        .ProducesProblem(StatusCodes.Status403Forbidden)
-        .ProducesProblem(StatusCodes.Status500InternalServerError);
-
         // GET /api/roles - List all roles
         app.MapGet("roles", async (
             ISender sender,

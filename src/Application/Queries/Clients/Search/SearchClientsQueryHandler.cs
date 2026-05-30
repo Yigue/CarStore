@@ -26,7 +26,7 @@ internal sealed class SearchClientsQueryHandler
             .AsNoTracking()
             .Where(c => c.FirstName.ToLower().Contains(searchTerm) ||
                         c.LastName.ToLower().Contains(searchTerm) ||
-                        c.Email.Value.ToLower().Contains(searchTerm))
+                        EF.Property<string>(c, "Email").Contains(query.SearchTerm))
             .Take(50)
             .Select(c => new ClientResponse(
                 c.Id,

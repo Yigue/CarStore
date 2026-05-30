@@ -19,24 +19,37 @@ internal sealed class GetLeadsQueryHandler(
         if (query.Status.HasValue)
             leadsQuery = leadsQuery.Where(l => l.Status == query.Status.Value);
 
-        // Left join to Users to resolve agent name (FirstName + LastName)
-        var results = await (from l in leadsQuery
+        var dbResults = await (from l in leadsQuery
             join u in context.Users.IgnoreQueryFilters() on l.AssignedAgentId equals (Guid?)u.Id into agentJoin
             from agent in agentJoin.DefaultIfEmpty()
-            select new LeadResponse(
+            select new 
+            {
                 l.Id,
                 l.ClientName,
-                l.Email.Value,
+                Email = EF.Property<string>(l, "Email"),
                 l.Phone,
                 l.Status,
-                l.Status.ToString(),
                 l.AssignedAgentId,
-                agent != null ? agent.FirstName + " " + agent.LastName : null,
+                AgentName = agent != null ? agent.FirstName + " " + agent.LastName : null,
                 l.Notes,
-                l.Source.ToString(),
+                l.Source,
                 l.CreatedAt
-            ))
+            })
             .ToListAsync(cancellationToken);
+
+        var results = dbResults.Select(l => new LeadResponse(
+            l.Id,
+            l.ClientName,
+            l.Email,
+            l.Phone,
+            l.Status,
+            l.Status.ToString(),
+            l.AssignedAgentId,
+            l.AgentName,
+            l.Notes,
+            l.Source.ToString(),
+            l.CreatedAt
+        )).ToList();
 
         return Result.Success(results);
     }

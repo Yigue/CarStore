@@ -57,7 +57,7 @@ public class CarImagesFlowTests
     {
         var response = await client.PostAsync($"/api/v1/cars/{carId}/images", ImageContent());
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var dto = await response.Content.ReadFromJsonAsync<UploadedImage>();
+        var dto = await response.Content.ReadFromJsonAsync<UploadedImage>(IntegrationTestHelpers.JsonOptions);
         return dto!;
     }
 
@@ -144,7 +144,7 @@ public class CarImagesFlowTests
     {
         var response = await client.GetAsync($"/api/v1/cars/{carId}/images");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>(IntegrationTestHelpers.JsonOptions);
         var items = json.GetProperty("items");
         var result = new List<UploadedImage>();
         foreach (var item in items.EnumerateArray())

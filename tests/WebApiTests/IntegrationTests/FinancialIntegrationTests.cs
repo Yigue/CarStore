@@ -55,7 +55,7 @@ public class FinancialIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/financial", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var transactionId = result!.id;
         transactionId.Should().NotBe(Guid.Empty);
 
@@ -126,7 +126,7 @@ public class FinancialIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/financial", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var transactionId = result!.id;
 
         var createdTransaction = await context.Transactions
@@ -168,7 +168,7 @@ public class FinancialIntegrationTests
         var response = await client.GetAsync("/api/v1/financial");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var transactions = await response.Content.ReadFromJsonAsync<List<Application.Financial.GetAll.FinancialResponses>>();
+        var transactions = await response.Content.ReadFromJsonAsync<List<Application.Financial.GetAll.FinancialResponses>>(IntegrationTestHelpers.JsonOptions);
         transactions.Should().NotBeNull();
         transactions!.Count.Should().BeGreaterThan(0);
         transactions.Should().Contain(t => t.Id == transaction.Id);
@@ -256,7 +256,7 @@ public class FinancialIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/financial", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var transactionId = result!.id;
 
         var createdTransaction = await context.Transactions

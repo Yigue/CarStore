@@ -53,7 +53,7 @@ public class CarsIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/cars", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var carId = result!.id;
 
         var createdCar = await context.Cars
@@ -78,7 +78,7 @@ public class CarsIntegrationTests
         var response = await client.GetAsync("/api/v1/cars");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var result = await response.Content.ReadFromJsonAsync<SharedKernel.PaginatedResult<CarsResponses>>();
+        var result = await response.Content.ReadFromJsonAsync<SharedKernel.PaginatedResult<CarsResponses>>(IntegrationTestHelpers.JsonOptions);
         result.Should().NotBeNull();
         result!.Items.Count.Should().BeGreaterThan(0);
     }
@@ -105,7 +105,7 @@ public class CarsIntegrationTests
         var response = await client.GetAsync($"/api/v1/cars/{car.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var result = await response.Content.ReadFromJsonAsync<Application.Cars.GetById.CarGetByIdResponse>();
+        var result = await response.Content.ReadFromJsonAsync<Application.Cars.GetById.CarGetByIdResponse>(IntegrationTestHelpers.JsonOptions);
         result!.Id.Should().Be(car.Id);
     }
 

@@ -76,7 +76,7 @@ public class QuotesIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/quotes", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var quoteId = result!.id;
         quoteId.Should().NotBe(Guid.Empty);
 
@@ -154,7 +154,7 @@ public class QuotesIntegrationTests
         var response = await client.GetAsync("/api/v1/quotes");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var quotes = await response.Content.ReadFromJsonAsync<List<Application.Quotes.Get.QuoteResponse>>();
+        var quotes = await response.Content.ReadFromJsonAsync<List<Application.Quotes.Get.QuoteResponse>>(IntegrationTestHelpers.JsonOptions);
         quotes.Should().NotBeNull();
         quotes!.Count.Should().BeGreaterThan(0);
         quotes.Should().Contain(q => q.Id == quote.Id);
@@ -222,7 +222,7 @@ public class QuotesIntegrationTests
         var response = await client.GetAsync($"/api/v1/quotes/{quote.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-                var result = await response.Content.ReadFromJsonAsync<Application.Quotes.Get.QuoteResponse>();
+                var result = await response.Content.ReadFromJsonAsync<Application.Quotes.Get.QuoteResponse>(IntegrationTestHelpers.JsonOptions);
         result.Should().NotBeNull();
         result!.Id.Should().Be(quote.Id);
         result.ProposedPrice.Should().Be(29000m);

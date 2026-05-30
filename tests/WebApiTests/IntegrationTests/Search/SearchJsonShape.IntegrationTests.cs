@@ -27,7 +27,7 @@ public class SearchJsonShapeIntegrationTests
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var jsonArray = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var jsonArray = await response.Content.ReadFromJsonAsync<JsonElement>(IntegrationTestHelpers.JsonOptions);
         jsonArray.ValueKind.Should().Be(JsonValueKind.Array);
         
         if (jsonArray.GetArrayLength() > 0)

@@ -25,7 +25,7 @@ public class UsersEndpointsTests
         };
         var response = await client.PostAsJsonAsync("/api/v1/users/register", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var result = await response.Content.ReadFromJsonAsync<RegisterResponse>();
+        var result = await response.Content.ReadFromJsonAsync<RegisterResponse>(IntegrationTestHelpers.JsonOptions);
         var id = result!.id;
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -62,7 +62,7 @@ public class UsersEndpointsTests
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var regResponse = await client.PostAsJsonAsync("/api/v1/users/register", register);
-        var result = await regResponse.Content.ReadFromJsonAsync<RegisterResponse>();
+        var result = await regResponse.Content.ReadFromJsonAsync<RegisterResponse>(IntegrationTestHelpers.JsonOptions);
         var userId = result!.id;
         var response = await client.GetAsync($"/api/v1/users/{userId}");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -81,23 +81,23 @@ public class UsersEndpointsTests
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var regResponse = await client.PostAsJsonAsync("/api/v1/users/register", register);
-        var regResult = await regResponse.Content.ReadFromJsonAsync<RegisterResponse>();
+        var regResult = await regResponse.Content.ReadFromJsonAsync<RegisterResponse>(IntegrationTestHelpers.JsonOptions);
         var userId = regResult!.id;
 
         // Asignar permiso manualmente para el test
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        context.UserPermissions.Add(new Domain.Users.UserPermission(userId, "users:access"));
+        context.UserPermissions.Add(new Domain.Users.UserPermission(userId, "CanManageUsers"));
         await context.SaveChangesAsync();
 
         var login = new { Email = "auth@example.com", Password = "Password1!" };
         var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", login);
-        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(IntegrationTestHelpers.JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.token);     
 
         var response = await client.GetAsync($"/api/v1/users/{userId}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var result = await response.Content.ReadFromJsonAsync<UserResponse>();
+        var result = await response.Content.ReadFromJsonAsync<UserResponse>(IntegrationTestHelpers.JsonOptions);
         result!.Id.Should().Be(userId);
         result.Email.Should().Be("auth@example.com");
     }

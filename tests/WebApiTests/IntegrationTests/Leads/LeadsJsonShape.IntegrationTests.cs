@@ -17,6 +17,21 @@ public class LeadsJsonShapeIntegrationTests
     {
         // Arrange
         await using var factory = new CustomWebApplicationFactory();
+        
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.Leads.Add(Domain.Leads.Lead.Create(
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                "Test Client",
+                "test@lead.com",
+                "123456",
+                Domain.Leads.LeadSource.Web,
+                DateTime.UtcNow
+            ));
+            await db.SaveChangesAsync();
+        }
+
         var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
         var client = factory.CreateClient();
         IntegrationTestHelpers.SetAuthToken(client, token);
@@ -27,7 +42,7 @@ public class LeadsJsonShapeIntegrationTests
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var jsonArray = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var jsonArray = await response.Content.ReadFromJsonAsync<JsonElement>(IntegrationTestHelpers.JsonOptions);
         jsonArray.ValueKind.Should().Be(JsonValueKind.Array);
         jsonArray.GetArrayLength().Should().BeGreaterThan(0);
 

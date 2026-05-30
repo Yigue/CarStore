@@ -29,6 +29,6 @@ public sealed record CarsResponses(
 public sealed record CarImageResponse(
     Guid Id,
     string ImageUrl,
-    bool IsPrimary,
-    int Order
+    bool IsCover,
+    int DisplayOrder
 );

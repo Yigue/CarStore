@@ -70,8 +70,10 @@ public class CreateUserCommandTests
     public async Task Handle_DuplicateEmail_ReturnsEmailNotUniqueError()
     {
         using var context = CreateContext();
-        var handler = CreateHandler(context);
         var dealerId = Guid.NewGuid();
+        var mockTenantService = new Mock<ICurrentTenantService>();
+        mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
+        var handler = CreateHandler(context, tenantService: mockTenantService.Object);
 
         // Create first user
         var firstUser = new User(dealerId, "duplicate@example.com", "First", "User", "hash1");
@@ -133,18 +135,14 @@ public class CreateUserCommandTests
             null,
             UserRole.Empleado);
 
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        result.IsSuccess.Should().BeTrue();
-
         // Create user in different dealer
         var differentDealerUser = new User(dealerId2, "shared@example.com", "Other", "Dealer", "hash2");
         context.Users.Add(differentDealerUser);
         await context.SaveChangesAsync();
 
-        // Original handler should still succeed for dealer 1
-        var secondResult = await handler.Handle(command, CancellationToken.None);
-        secondResult.IsSuccess.Should().BeTrue();
+        // Handler should succeed for dealer 1 since the email belongs to dealer 2
+        var result = await handler.Handle(command, CancellationToken.None);
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]

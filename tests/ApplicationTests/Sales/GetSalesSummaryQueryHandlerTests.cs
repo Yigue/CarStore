@@ -53,8 +53,13 @@ public class GetSalesSummaryQueryHandlerTests
         await context.SaveChangesAsync();
 
         // Create sales - 2 completed ($20000 + $15000 = $35000), 1 pending ($25000), 1 cancelled ($18000)
-        context.Sales.Add(new Sale(dealerId, car1.Id, client1.Id, 20000m, PaymentMethod.Cash, "S1", "", now));
-        context.Sales.Add(new Sale(dealerId, car2.Id, client1.Id, 15000m, PaymentMethod.CreditCard, "S2", "", now));
+        var sale1 = new Sale(dealerId, car1.Id, client1.Id, 20000m, PaymentMethod.Cash, "S1", "", now);
+        sale1.Complete();
+        context.Sales.Add(sale1);
+        
+        var sale2 = new Sale(dealerId, car2.Id, client1.Id, 15000m, PaymentMethod.CreditCard, "S2", "", now);
+        sale2.Complete();
+        context.Sales.Add(sale2);
         var pendingSale = new Sale(dealerId, car3.Id, client2.Id, 25000m, PaymentMethod.BankTransfer, "S3", "", now);
         // Keep pending - default state
         context.Sales.Add(pendingSale);

@@ -84,7 +84,8 @@ internal static class UsersSeeder
                 "sales:read", "sales:create", "sales:update", "sales:delete",
                 "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
                 "financial:read", "financial:create", "financial:update", "financial:delete",
-                "users:read", "users:create", "users:access"
+                "users:read", "users:create", "users:access", "CanManageUsers", "CanManageRoles",
+                "leads:read", "leads:create", "leads:update", "leads:delete"
             };
 
             foreach (var permission in permissions)

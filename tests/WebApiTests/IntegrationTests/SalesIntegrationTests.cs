@@ -78,7 +78,7 @@ public class SalesIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/sales", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var saleId = result!.id;
         saleId.Should().NotBe(Guid.Empty);
 
@@ -162,7 +162,7 @@ public class SalesIntegrationTests
         var response = await client.GetAsync("/api/v1/sales");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var sales = await response.Content.ReadFromJsonAsync<List<Application.Sales.Get.SaleResponse>>();
+        var sales = await response.Content.ReadFromJsonAsync<List<Application.Sales.Get.SaleResponse>>(IntegrationTestHelpers.JsonOptions);
         sales.Should().NotBeNull();
         sales!.Count.Should().BeGreaterThan(0);
         sales.Should().Contain(s => s.ContractNumber == "VTA-2024-002");
@@ -232,7 +232,7 @@ public class SalesIntegrationTests
         var response = await client.GetAsync($"/api/v1/sales/{sale.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-                var result = await response.Content.ReadFromJsonAsync<Application.Sales.Get.SaleResponse>();
+                var result = await response.Content.ReadFromJsonAsync<Application.Sales.Get.SaleResponse>(IntegrationTestHelpers.JsonOptions);
         result.Should().NotBeNull();
         result!.Id.Should().Be(sale.Id);
         result.FinalPrice.Should().Be(28000m);

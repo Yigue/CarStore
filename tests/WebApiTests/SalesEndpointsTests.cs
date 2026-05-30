@@ -51,7 +51,7 @@ public class SalesEndpointsTests
         };
         var response = await http.PostAsJsonAsync("/api/v1/sales", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var saleId = result!.id;
 
         context.Sales.IgnoreQueryFilters().Should().ContainSingle(s => s.Id == saleId);
@@ -60,7 +60,7 @@ public class SalesEndpointsTests
 
         var get = await http.GetAsync($"/api/v1/sales/{saleId}");
         get.StatusCode.Should().Be(HttpStatusCode.OK);
-        var saleResponse = await get.Content.ReadFromJsonAsync<SaleResponse>();
+        var saleResponse = await get.Content.ReadFromJsonAsync<SaleResponse>(IntegrationTestHelpers.JsonOptions);
         saleResponse!.Id.Should().Be(saleId);
         saleResponse.CarBrand.Should().Be("VW");
     }
