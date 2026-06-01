@@ -15,6 +15,55 @@ namespace Web.Api.Extensions;
 
 public static class MigrationExtensions
 {
+    private static void PreemptMigrationsCollision(DbContext dbContext)
+    {
+        try
+        {
+            var connection = dbContext.Database.GetDbConnection();
+            if (connection.State != System.Data.ConnectionState.Open)
+            {
+                connection.Open();
+            }
+
+            using var cmd = connection.CreateCommand();
+            
+            // Verificamos si la tabla public.clients existe y si tiene la columna city
+            cmd.CommandText = @"
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.columns 
+                    WHERE table_schema = 'public' 
+                      AND table_name = 'clients' 
+                      AND column_name = 'city'
+                );";
+            
+            var columnExists = (bool)(cmd.ExecuteScalar() ?? false);
+
+            if (columnExists)
+            {
+                // Si la columna ya existe, las columnas de la migración ya están en la DB.
+                // Insertamos la migración en __EFMigrationsHistory para que EF Core no intente aplicarla y falle.
+                cmd.CommandText = @"
+                    CREATE TABLE IF NOT EXISTS public.""__EFMigrationsHistory"" (
+                        ""MigrationId"" character varying(150) NOT NULL,
+                        ""ProductVersion"" character varying(32) NOT NULL,
+                        CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
+                    );
+                    
+                    INSERT INTO public.""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+                    VALUES ('20260601000735_AddMissingClientAndCarColumns', '8.0.4')
+                    ON CONFLICT (""MigrationId"") DO NOTHING;
+                ";
+                cmd.ExecuteNonQuery();
+                Log.Information("Se previno la colisión de migración EF para 'AddMissingClientAndCarColumns' registrándola como aplicada.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "No se pudo prevenir la colisión de migración. Continuando normalmente.");
+        }
+    }
+
     public static void ApplyMigrations(this IApplicationBuilder app)
     {
         try
@@ -26,64 +75,35 @@ public static class MigrationExtensions
 
             if (dbContext.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
             {
+                PreemptMigrationsCollision(dbContext);
+
                 Log.Information("Applying database migrations...");
                 dbContext.Database.Migrate();
                 Log.Information("Database migrations completed successfully");
 
                 // Ajustes idempotentes para columnas agregadas a entidades sin una migración EF dedicada.
-                // El dominio User tiene una propiedad Role mapeada como string, pero ninguna migración la creó.
-                // Hasta que se genere `dotnet ef migrations add AddUserRole`, garantizamos la columna acá.
+                // Nota: se recomienda mover estos ajustes a migraciones reales de EF Core.
                 dbContext.Database.ExecuteSqlRaw(@"
                     ALTER TABLE public.users
                         ADD COLUMN IF NOT EXISTS role character varying(20) NOT NULL DEFAULT 'Cliente';
+                ");
 
-                    CREATE TABLE IF NOT EXISTS public.dealer_settings (
-                        id uuid NOT NULL CONSTRAINT PK_dealer_settings PRIMARY KEY,
-                        dealer_id uuid NOT NULL,
-                        dealer_name character varying(200) NOT NULL,
-                        contact_email character varying(200) NOT NULL,
-                        notifications_enabled boolean NOT NULL DEFAULT TRUE,
-                        updated_at timestamp with time zone NOT NULL,
-                        host_name character varying(200) NULL,
-                        custom_domain character varying(200) NULL,
-                        address character varying(500) NULL,
-                        phone_number character varying(50) NULL,
-                        facebook_url character varying(500) NULL,
-                        instagram_url character varying(500) NULL,
-                        twitter_url character varying(500) NULL,
-                        interest_rate_tna numeric(5,2) NULL,
-                        logo_url character varying(500) NULL,
-                        primary_color character varying(7) NULL,
-                        secondary_color character varying(7) NULL,
-                        footer_text character varying(200) NULL
-                    );
-                    CREATE UNIQUE INDEX IF NOT EXISTS IX_dealer_settings_dealer_id ON public.dealer_settings (dealer_id);
+                // Columnas faltantes en clients (ref: AddMissingClientAndCarColumns migration)
+                dbContext.Database.ExecuteSqlRaw(@"
+                    ALTER TABLE public.clients
+                        ADD COLUMN IF NOT EXISTS type character varying(20) NOT NULL DEFAULT 'Individual';
+                    ALTER TABLE public.clients
+                        ADD COLUMN IF NOT EXISTS city character varying(100);
+                    ALTER TABLE public.clients
+                        ADD COLUMN IF NOT EXISTS notes character varying(2000);
+                    ALTER TABLE public.clients
+                        ADD COLUMN IF NOT EXISTS zip_code character varying(20);
+                ");
 
-                    -- Agregar columnas visuales que pudieran faltar (idempotente)
-                    ALTER TABLE public.dealer_settings
-                        ADD COLUMN IF NOT EXISTS logo_url character varying(500) NULL;
-                    ALTER TABLE public.dealer_settings
-                        ADD COLUMN IF NOT EXISTS primary_color character varying(7) NULL;
-                    ALTER TABLE public.dealer_settings
-                        ADD COLUMN IF NOT EXISTS secondary_color character varying(7) NULL;
-                    ALTER TABLE public.dealer_settings
-                        ADD COLUMN IF NOT EXISTS footer_text character varying(200) NULL;
-
-                    INSERT INTO public.dealer_settings (id, dealer_id, dealer_name, contact_email, notifications_enabled, updated_at, host_name, custom_domain, address, phone_number, facebook_url, instagram_url, twitter_url, interest_rate_tna, logo_url, primary_color, secondary_color, footer_text)
-                    VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Lux Dealership', 'info@luxdealership.com', TRUE, NOW(), 'localhost', 'localhost', 'Av. del Libertador 4500, Palermo, CABA', '+54 11 9999-8888', 'https://facebook.com/luxdealership', 'https://instagram.com/luxdealership', 'https://twitter.com/luxdealership', 65.50, NULL, NULL, NULL, '© 2024 Lux Dealership. Todos los derechos reservados.')
-                    ON CONFLICT (dealer_id) DO NOTHING;
-
-                    -- Agregar columnas CarImage que faltan (idempotente) — MinIO storage ADR-2
-                    ALTER TABLE public.car_images
-                        ADD COLUMN IF NOT EXISTS object_key character varying(1024) NULL;
-                    ALTER TABLE public.car_images
-                        ADD COLUMN IF NOT EXISTS content_type character varying(100) NULL;
-                    ALTER TABLE public.car_images
-                        ADD COLUMN IF NOT EXISTS size_bytes bigint NULL;
-                    ALTER TABLE public.car_images
-                        ADD COLUMN IF NOT EXISTS is_cover boolean NOT NULL DEFAULT false;
-                    ALTER TABLE public.car_images
-                        ADD COLUMN IF NOT EXISTS display_order integer NOT NULL DEFAULT 0;
+                // Columnas faltantes en cars (ref: AddMissingClientAndCarColumns migration)
+                dbContext.Database.ExecuteSqlRaw(@"
+                    ALTER TABLE public.cars
+                        ADD COLUMN IF NOT EXISTS is_highlighted boolean NOT NULL DEFAULT false;
                 ");
             }
             else
