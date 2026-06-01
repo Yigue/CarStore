@@ -45,14 +45,14 @@ public static class MigrationExtensions
                 // Insertamos la migración en __EFMigrationsHistory para que EF Core no intente aplicarla y falle.
                 cmd.CommandText = @"
                     CREATE TABLE IF NOT EXISTS public.""__EFMigrationsHistory"" (
-                        ""MigrationId"" character varying(150) NOT NULL,
-                        ""ProductVersion"" character varying(32) NOT NULL,
-                        CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
+                        migration_id character varying(150) NOT NULL,
+                        product_version character varying(32) NOT NULL,
+                        CONSTRAINT pk___ef_migrations_history PRIMARY KEY (migration_id)
                     );
                     
-                    INSERT INTO public.""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+                    INSERT INTO public.""__EFMigrationsHistory"" (migration_id, product_version)
                     VALUES ('20260601000735_AddMissingClientAndCarColumns', '8.0.4')
-                    ON CONFLICT (""MigrationId"") DO NOTHING;
+                    ON CONFLICT (migration_id) DO NOTHING;
                 ";
                 cmd.ExecuteNonQuery();
                 Log.Information("Se previno la colisión de migración EF para 'AddMissingClientAndCarColumns' registrándola como aplicada.");
