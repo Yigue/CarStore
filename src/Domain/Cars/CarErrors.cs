@@ -45,5 +45,15 @@ public static class CarErrors
     public static Error PatenteAlreadyExists(string patente) => Error.Conflict(
         "Cars.PatenteAlreadyExists",
         $"A car with license plate '{patente}' already exists");
+
+    /// <summary>
+    /// REQ-FVIP-2: a <c>car_images</c> row was found with no usable URL — every URL-bearing
+    /// field is null/empty. The read-path falls back to a stable placeholder; this error
+    /// is reserved for the case where a stricter API surface needs to surface the condition
+    /// to the caller (e.g. an admin diagnostics endpoint, not the public catalog).
+    /// </summary>
+    public static readonly Error VehicleImageRowBroken = Error.Problem(
+        "CarImage.RowBroken",
+        "A car_images row has no usable URL field (object_key, image_url all null).");
 }
 
