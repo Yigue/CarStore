@@ -1,8 +1,10 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Storage;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 using System.Globalization;
 
@@ -10,11 +12,20 @@ namespace Application.Cars.Search;
 
 internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, SearchCarsResult>
 {
-    private readonly IApplicationDbContext _context;
+    private static readonly TimeSpan ReadTtl = TimeSpan.FromMinutes(15);
 
-    public SearchCarsQueryHandler(IApplicationDbContext context)
+    private readonly IApplicationDbContext _context;
+    private readonly IStorageService _storage;
+    private readonly ILogger<SearchCarsQueryHandler> _logger;
+
+    public SearchCarsQueryHandler(
+        IApplicationDbContext context,
+        IStorageService storage,
+        ILogger<SearchCarsQueryHandler> logger)
     {
         _context = context;
+        _storage = storage;
+        _logger = logger;
     }
 
     public async Task<Result<SearchCarsResult>> Handle(SearchCarsQuery query, CancellationToken cancellationToken)
@@ -29,8 +40,8 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
         if (!string.IsNullOrWhiteSpace(query.SearchTerm))
         {
             var term = query.SearchTerm;
-            carsQuery = carsQuery.Where(c => 
-                c.Marca.Nombre.Contains(term) || 
+            carsQuery = carsQuery.Where(c =>
+                c.Marca.Nombre.Contains(term) ||
                 c.Modelo.Nombre.Contains(term) ||
                 (c.Descripcion != null && c.Descripcion.Contains(term)));
         }
@@ -137,20 +148,26 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToList();
-            
-        // Mapear a DTOs después de obtener los datos (con seguridad ante nulos)
-        var carDtos = cars.Select(c => new CarDto
+
+        // Mapear a DTOs después de obtener los datos. La lectura del primary image es
+        // async (puede presignar) — procesamos secuencialmente porque la lista está
+        // acotada por pageSize.
+        var carDtos = new List<CarDto>(cars.Count);
+        foreach (var c in cars)
         {
-            Id = c.Id,
-            Marca = c.Marca?.Nombre ?? "N/A",
-            Modelo = c.Modelo?.Nombre ?? "N/A",
-            Anio = c.Anio,
-            Precio = c.Price?.Amount ?? 0,
-            Descripcion = c.Descripcion ?? string.Empty,
-            ImagenPrincipal = GetPrimaryImageUrl(c),
-            CantidadPuertas = c.CantidadPuertas,
-            Kilometraje = c.Kilometraje
-        }).ToList();
+            carDtos.Add(new CarDto
+            {
+                Id = c.Id,
+                Marca = c.Marca?.Nombre ?? "N/A",
+                Modelo = c.Modelo?.Nombre ?? "N/A",
+                Anio = c.Anio,
+                Precio = c.Price?.Amount ?? 0,
+                Descripcion = c.Descripcion ?? string.Empty,
+                ImagenPrincipal = await GetPrimaryImageUrl(c, cancellationToken),
+                CantidadPuertas = c.CantidadPuertas,
+                Kilometraje = c.Kilometraje
+            });
+        }
 
         var totalPages = (int)Math.Ceiling(totalResults / (double)pageSize);
 
@@ -162,10 +179,79 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
             CurrentPage = page
         });
     }
-    
-    private string GetPrimaryImageUrl(Car car)
+
+    /// <summary>
+    /// Resolves the primary image URL for a car. Defensive read-path per REQ-FVIP-2:
+    /// prefers a cover image with a presignable <c>object_key</c>; falls back to the
+    /// legacy direct <c>image_url</c> when no MinIO object exists; returns the stable
+    /// placeholder path with a WARN log when every URL field is null/empty.
+    /// </summary>
+    internal async Task<string> GetPrimaryImageUrl(Car car, CancellationToken cancellationToken)
     {
-        var primaryImage = car.Images?.FirstOrDefault(i => i.IsPrimary);
-        return primaryImage?.ImageUrl;
+        if (car.Images is null || car.Images.Count == 0)
+        {
+            return LogPlaceholder(car.Id, imageId: null);
+        }
+
+        // 1. Prefer a cover image.
+        CarImage? cover = car.Images.FirstOrDefault(i => i.IsCover);
+
+        if (cover is not null)
+        {
+            return await ResolveImageUrl(cover, car.Id, cancellationToken);
+        }
+
+        // 2. No cover at all — try any image with a usable URL, prefer modern.
+        CarImage? modernFallback = car.Images.FirstOrDefault(i => !string.IsNullOrEmpty(i.ObjectKey));
+        if (modernFallback is not null)
+        {
+            return await ResolveImageUrl(modernFallback, car.Id, cancellationToken);
+        }
+
+        CarImage? legacyFallback = car.Images.FirstOrDefault(i => !string.IsNullOrEmpty(i.ImageUrl));
+        if (legacyFallback is not null)
+        {
+            // Legacy dual-mode (ADR-2): return the direct URL as-is. No presign — the
+            // URL is already a public CDN/Azure blob URL, not a MinIO object key.
+            return legacyFallback.ImageUrl!;
+        }
+
+        return LogPlaceholder(car.Id, imageId: null);
     }
-} 
+
+    private async Task<string> ResolveImageUrl(CarImage image, Guid carId, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrEmpty(image.ObjectKey))
+        {
+            // Modern path: presign a fresh URL.
+            try
+            {
+                Uri presigned = await _storage.GetPresignedUrlAsync(image.ObjectKey, ReadTtl, cancellationToken);
+                return presigned.ToString();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "SearchCars: presign failed for car {CarId} image {ImageId} (object_key={ObjectKey}); falling back to placeholder.",
+                    carId, image.Id, image.ObjectKey);
+                return CarImageDefaults.NoImagePlaceholderUrl;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(image.ImageUrl))
+        {
+            return image.ImageUrl!;
+        }
+
+        return LogPlaceholder(carId, image.Id);
+    }
+
+    private string LogPlaceholder(Guid carId, Guid? imageId)
+    {
+        _logger.LogWarning(
+            "SearchCars: car {CarId} has no usable image (imageId={ImageId}); returning stable placeholder {Placeholder}.",
+            carId, imageId, CarImageDefaults.NoImagePlaceholderUrl);
+        return CarImageDefaults.NoImagePlaceholderUrl;
+    }
+}
