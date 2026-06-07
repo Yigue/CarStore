@@ -46,6 +46,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<Lead> Leads => Set<Lead>();
     public DbSet<Domain.Documents.Document> Documents => Set<Domain.Documents.Document>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<BackfillAudit> BackfillAudits => Set<BackfillAudit>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

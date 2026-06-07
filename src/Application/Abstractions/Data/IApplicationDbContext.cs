@@ -35,6 +35,7 @@ public interface IApplicationDbContext
     DbSet<Lead> Leads { get; }
     DbSet<Domain.Documents.Document> Documents { get; }
     DbSet<Appointment> Appointments { get; }
+    DbSet<BackfillAudit> BackfillAudits { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

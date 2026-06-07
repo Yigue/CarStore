@@ -53,6 +53,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Lead> Leads { get; set; }
     public DbSet<Domain.Documents.Document> Documents { get; set; }
     public DbSet<Appointment> Appointments { get; set; }
+    public DbSet<BackfillAudit> BackfillAudits { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -110,6 +111,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<ReconditioningTask>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Appointment>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<BackfillAudit>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         // Note: Marca, Modelo, TransactionCategory, CarImage are shared across tenants (catalog data)
     }
