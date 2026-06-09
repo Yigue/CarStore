@@ -20,7 +20,7 @@ internal sealed class UpdateLeadStatusCommandHandler(
 
         try
         {
-            lead.UpdateStatus(command.NewStatus);
+            lead.UpdateStatus(command.NewStatus, command.Notes, command.LossReason);
         }
         catch (DomainException ex)
         {

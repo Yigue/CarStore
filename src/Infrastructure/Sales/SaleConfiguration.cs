@@ -32,6 +32,10 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(s => s.SaleDate)
             .IsRequired();
 
+        builder.Property(s => s.QuoteId);
+
+        builder.Property(s => s.LeadId);
+
         builder.HasOne(s => s.Car)
             .WithMany()
             .HasForeignKey(s => s.CarId)
@@ -41,5 +45,17 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
             .WithMany(c => c.Sales)
             .HasForeignKey(s => s.ClientId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Domain.Quotes.Quote>()
+            .WithMany()
+            .HasForeignKey(s => s.QuoteId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        builder.HasOne<Domain.Leads.Lead>()
+            .WithMany()
+            .HasForeignKey(s => s.LeadId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }

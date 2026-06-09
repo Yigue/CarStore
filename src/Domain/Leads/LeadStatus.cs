@@ -8,4 +8,5 @@ public enum LeadStatus
     Negociacion = 3,
     Ganado = 4,
     Perdido = 5,
+    Archivado = 6,
 }

@@ -15,6 +15,11 @@ public sealed class Lead : Entity
     public LeadSource Source { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    // CRM Integration fields
+    public Guid? InterestedVehicleId { get; private set; }
+    public Guid? ConvertedClientId { get; private set; }
+    public LeadLossReason? LossReason { get; private set; }
+
     // Required by EF Core
     private Lead()
     {
@@ -26,7 +31,8 @@ public sealed class Lead : Entity
         string email,
         string phone,
         LeadSource source,
-        DateTime createdAt)
+        DateTime createdAt,
+        Guid? interestedVehicleId = null)
     {
         if (string.IsNullOrWhiteSpace(clientName))
             throw new DomainException("ClientName cannot be empty");
@@ -43,6 +49,7 @@ public sealed class Lead : Entity
         lead.Source = source;
         lead.CreatedAt = createdAt;
         lead.AssignedAgentId = null;
+        lead.InterestedVehicleId = interestedVehicleId;
 
         lead.Raise(new LeadCreatedDomainEvent(lead.Id, null));
         return lead;
@@ -57,7 +64,90 @@ public sealed class Lead : Entity
         Raise(new LeadAssignedDomainEvent(Id, agentId));
     }
 
-    public void UpdateStatus(LeadStatus newStatus)
+    /// <summary>
+    /// Updates the lead status enforcing sequential progression rules.
+    /// </summary>
+    /// <param name="newStatus">Target status.</param>
+    /// <param name="notes">Required when transitioning to <see cref="LeadStatus.Contactado"/>.</param>
+    /// <param name="lossReason">Required when transitioning to <see cref="LeadStatus.Perdido"/>.</param>
+    public void UpdateStatus(LeadStatus newStatus, string? notes, LeadLossReason? lossReason = null)
+    {
+        if (Status == LeadStatus.Ganado && newStatus < LeadStatus.Ganado)
+            throw new DomainException("Un lead ganado no puede retroceder de etapa.");
+
+        if (Status == LeadStatus.Archivado)
+            throw new DomainException("A lead that has been archived cannot change status.");
+
+        if (Status == newStatus)
+            return;
+
+        // Forward transitions only (excluding Perdido and Archivado as "end" states)
+        var terminalOrBackward = newStatus != LeadStatus.Perdido
+                                 && newStatus != LeadStatus.Archivado
+                                 && (int)newStatus != (int)Status + 1;
+
+        if (terminalOrBackward)
+            throw new DomainException("Status transitions must be sequential — no stage skipping allowed.");
+
+        // Transition-specific requirements
+        if (newStatus == LeadStatus.Contactado && string.IsNullOrWhiteSpace(notes))
+            throw new DomainException("Moving to Contactado requires notes documenting the first contact.");
+
+        if (newStatus == LeadStatus.Demostracion && InterestedVehicleId is null)
+            throw new DomainException("Moving to Demostracion requires a linked interested vehicle.");
+
+        if (newStatus == LeadStatus.Perdido && lossReason is null)
+            throw new DomainException("Moving to Perdido requires a loss reason to be provided.");
+
+        var oldStatus = Status;
+        Status = newStatus;
+
+        if (notes is not null)
+            Notes = notes;
+
+        if (newStatus == LeadStatus.Perdido && lossReason.HasValue)
+            LossReason = lossReason;
+
+        Raise(new LeadStatusChangedDomainEvent(Id, oldStatus, newStatus));
+    }
+
+    public void UpdateNotes(string? notes)
+    {
+        Notes = notes;
+    }
+
+    public void LinkVehicle(Guid vehicleId)
+    {
+        if (vehicleId == Guid.Empty)
+            throw new DomainException("InterestedVehicleId vehicle cannot be empty.");
+
+        InterestedVehicleId = vehicleId;
+    }
+
+    public void Archive()
+    {
+        if (Status == LeadStatus.Archivado)
+            return;
+
+        var oldStatus = Status;
+        Status = LeadStatus.Archivado;
+        Raise(new LeadStatusChangedDomainEvent(Id, oldStatus, LeadStatus.Archivado));
+    }
+
+    public void MarkConverted(Guid clientId)
+    {
+        if (clientId == Guid.Empty)
+            throw new DomainException("ClientId cannot be empty when marking a lead as converted.");
+
+        ConvertedClientId = clientId;
+    }
+
+    /// <summary>
+    /// System-driven status change (e.g. quote accepted). Bypasses sequential UI enforcement
+    /// but still prevents backward movement from Ganado.
+    /// Only call this from application-layer event handlers, not from user-facing commands.
+    /// </summary>
+    public void ForceStatus(LeadStatus newStatus)
     {
         if (Status == LeadStatus.Ganado && newStatus < LeadStatus.Ganado)
             throw new DomainException("Un lead ganado no puede retroceder de etapa.");
@@ -68,10 +158,5 @@ public sealed class Lead : Entity
         var oldStatus = Status;
         Status = newStatus;
         Raise(new LeadStatusChangedDomainEvent(Id, oldStatus, newStatus));
-    }
-
-    public void UpdateNotes(string? notes)
-    {
-        Notes = notes;
     }
 }

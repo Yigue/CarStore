@@ -15,6 +15,8 @@ public sealed class Sale : Entity
     public Car Car { get; private set; }
     public Guid ClientId { get; private set; }
     public Client Client { get; private set; }
+    public Guid? QuoteId { get; private set; }
+    public Guid? LeadId { get; private set; }
     public Money FinalPrice { get; private set; }
     public SaleStatus Status { get; private set; }
     public PaymentMethod PaymentMethod { get; private set; }

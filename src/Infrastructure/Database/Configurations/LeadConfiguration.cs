@@ -46,6 +46,30 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
 
         builder.Property(l => l.CreatedAt).IsRequired();
 
+        // CRM Integration fields
+        builder.Property(l => l.InterestedVehicleId);
+
+        builder.Property(l => l.ConvertedClientId);
+
+        builder.Property(l => l.LossReason)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+
+        builder.HasOne<Domain.Cars.Car>()
+            .WithMany()
+            .HasForeignKey(l => l.InterestedVehicleId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        builder.HasOne<Domain.Clients.Client>()
+            .WithMany()
+            .HasForeignKey(l => l.ConvertedClientId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        // Exclude Archivado leads from default queries (logical delete)
+        builder.HasQueryFilter(l => l.Status != Domain.Leads.LeadStatus.Archivado);
+
         builder.HasIndex(l => new { l.DealerId, l.Status })
             .HasDatabaseName("ix_leads_dealer_status");
 

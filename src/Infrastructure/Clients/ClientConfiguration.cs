@@ -40,6 +40,19 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.Property(c => c.Status)
             .HasConversion<string>();
 
+        builder.Property(c => c.Type)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(Domain.Clients.Attributes.ClientType.Individual);
+
+        builder.Property(c => c.OriginLeadId);
+
+        builder.HasOne<Domain.Leads.Lead>()
+            .WithMany()
+            .HasForeignKey(c => c.OriginLeadId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
         builder.HasMany(c => c.Sales)
             .WithOne(s => s.Client)
             .HasForeignKey(s => s.ClientId);

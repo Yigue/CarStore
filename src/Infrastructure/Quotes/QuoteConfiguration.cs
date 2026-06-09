@@ -36,6 +36,13 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.HasOne(q => q.Client)
             .WithMany()
             .HasForeignKey(q => q.ClientId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        builder.HasOne(q => q.Lead)
+            .WithMany()
+            .HasForeignKey(q => q.LeadId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }

@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Leads.UpdateStatus;
 
-internal sealed class UpdateLeadStatusFromQuoteHandler(IApplicationDbContext context) 
+internal sealed class UpdateLeadStatusFromQuoteHandler(IApplicationDbContext context)
     : INotificationHandler<QuoteAcceptedDomainEvent>
 {
     public async Task Handle(QuoteAcceptedDomainEvent notification, CancellationToken cancellationToken)
@@ -18,7 +18,9 @@ internal sealed class UpdateLeadStatusFromQuoteHandler(IApplicationDbContext con
 
         if (quote?.Lead is not null && quote.Lead.Status != LeadStatus.Ganado)
         {
-            quote.Lead.UpdateStatus(LeadStatus.Ganado);
+            // System-driven transition: quote acceptance auto-advances the lead to Ganado
+            // regardless of current stage (bypasses sequential UI rules).
+            quote.Lead.ForceStatus(LeadStatus.Ganado);
             await context.SaveChangesAsync(cancellationToken);
         }
     }

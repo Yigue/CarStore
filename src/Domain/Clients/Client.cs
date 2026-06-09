@@ -15,6 +15,8 @@ public sealed class Client : Entity
     public string Phone { get; private set; }
     public string Address { get; private set; }
     public ClientStatus Status { get; private set; }
+    public ClientType Type { get; private set; }
+    public Guid? OriginLeadId { get; private set; }
     public List<Sale> Sales { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdateAt { get; private set; }
@@ -32,14 +34,16 @@ public sealed class Client : Entity
         string email,
         string phone,
         string address,
-        DateTime date)
+        DateTime date,
+        ClientType type = ClientType.Individual,
+        Guid? originLeadId = null)
     {
         SetDealer(dealerId);
         if (string.IsNullOrWhiteSpace(firstName))
             throw new DomainException("FirstName cannot be empty");
         if (string.IsNullOrWhiteSpace(lastName))
             throw new DomainException("LastName cannot be empty");
-        
+
         FirstName = firstName;
         LastName = lastName;
         DNI = dni;
@@ -47,10 +51,12 @@ public sealed class Client : Entity
         Phone = phone;
         Address = address;
         Status = ClientStatus.Active;
+        Type = type;
+        OriginLeadId = originLeadId;
         Sales = new List<Sale>();
         CreatedAt = date;
         UpdateAt = date;
-        
+
         Raise(new ClientCreatedDomainEvent(Id, $"{FirstName} {LastName}"));
     }
     

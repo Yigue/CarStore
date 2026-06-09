@@ -22,7 +22,8 @@ internal sealed class CreateLeadCommandHandler(
             command.Email,
             command.Phone,
             command.Source,
-            dateTimeProvider.UtcNow);
+            dateTimeProvider.UtcNow,
+            command.InterestedVehicleId);
 
         if (command.Notes is not null)
             lead.UpdateNotes(command.Notes);

@@ -8,5 +8,6 @@ public sealed record CreateLeadCommand(
     string Email,
     string Phone,
     LeadSource Source,
-    string? Notes
+    string? Notes,
+    Guid? InterestedVehicleId = null
 ) : ICommand<Guid>;
