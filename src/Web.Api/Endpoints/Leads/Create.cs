@@ -13,7 +13,8 @@ internal sealed class Create : IEndpoint
         string Email,
         string Phone,
         LeadSource Source,
-        string? Notes);
+        string? Notes,
+        Guid? InterestedVehicleId = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -24,7 +25,8 @@ internal sealed class Create : IEndpoint
                 request.Email,
                 request.Phone,
                 request.Source,
-                request.Notes);
+                request.Notes,
+                request.InterestedVehicleId);
 
             Result<Guid> result = await sender.Send(command, ct);
 

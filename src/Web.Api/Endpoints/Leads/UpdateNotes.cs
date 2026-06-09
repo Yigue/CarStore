@@ -1,20 +1,19 @@
-using Application.Leads.UpdateStatus;
-using Domain.Leads;
+using Application.Leads.UpdateNotes;
 using MediatR;
 using SharedKernel;
 using Web.Api.Infrastructure;
 
 namespace Web.Api.Endpoints.Leads;
 
-internal sealed class UpdateStatus : IEndpoint
+internal sealed class UpdateNotes : IEndpoint
 {
-    public sealed record Request(LeadStatus NewStatus, string? Notes = null, LeadLossReason? LossReason = null);
+    public sealed record Request(string? Notes);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPatch("leads/{id:guid}/status", async (Guid id, Request request, ISender sender, CancellationToken ct) =>
+        app.MapPatch("leads/{id:guid}/notes", async (Guid id, Request request, ISender sender, CancellationToken ct) =>
         {
-            var command = new UpdateLeadStatusCommand(id, request.NewStatus, request.Notes, request.LossReason);
+            var command = new UpdateLeadNotesCommand(id, request.Notes);
             Result result = await sender.Send(command, ct);
             return result.Match(
                 () => Results.NoContent(),
@@ -22,9 +21,8 @@ internal sealed class UpdateStatus : IEndpoint
         })
         .HasPermission(Permissions.LeadsUpdate)
         .WithTags(Tags.Leads)
-        .WithName("UpdateLeadStatus")
+        .WithName("UpdateLeadNotes")
         .Produces(StatusCodes.Status204NoContent)
-        .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
     }

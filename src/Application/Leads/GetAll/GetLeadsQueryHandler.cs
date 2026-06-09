@@ -22,7 +22,13 @@ internal sealed class GetLeadsQueryHandler(
         var dbResults = await (from l in leadsQuery
             join u in context.Users.IgnoreQueryFilters() on l.AssignedAgentId equals (Guid?)u.Id into agentJoin
             from agent in agentJoin.DefaultIfEmpty()
-            select new 
+            join c in context.Cars on l.InterestedVehicleId equals (Guid?)c.Id into carJoin
+            from car in carJoin.DefaultIfEmpty()
+            join marca in context.Marca on car.MarcaId equals marca.Id into marcaJoin
+            from m in marcaJoin.DefaultIfEmpty()
+            join modelo in context.Modelo on car.ModeloId equals modelo.Id into modeloJoin
+            from md in modeloJoin.DefaultIfEmpty()
+            select new
             {
                 l.Id,
                 l.ClientName,
@@ -31,6 +37,8 @@ internal sealed class GetLeadsQueryHandler(
                 l.Status,
                 l.AssignedAgentId,
                 AgentName = agent != null ? agent.FirstName + " " + agent.LastName : null,
+                l.InterestedVehicleId,
+                VehicleName = car != null ? m.Nombre + " " + md.Nombre + " " + car.Anio : null,
                 l.Notes,
                 l.Source,
                 l.CreatedAt
@@ -46,6 +54,8 @@ internal sealed class GetLeadsQueryHandler(
             l.Status.ToString(),
             l.AssignedAgentId,
             l.AgentName,
+            l.InterestedVehicleId,
+            l.VehicleName,
             l.Notes,
             l.Source.ToString(),
             l.CreatedAt

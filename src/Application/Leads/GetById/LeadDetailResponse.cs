@@ -1,8 +1,8 @@
 using Domain.Leads;
 
-namespace Application.Leads.GetAll;
+namespace Application.Leads.GetById;
 
-public sealed record LeadResponse(
+public sealed record LeadDetailResponse(
     Guid Id,
     string ClientName,
     string Email,
@@ -13,6 +13,8 @@ public sealed record LeadResponse(
     string? AssignedAgentName,
     Guid? InterestedVehicleId,
     string? InterestedVehicleName,
+    Guid? ConvertedClientId,
+    LeadLossReason? LossReason,
     string? Notes,
     string Source,
     DateTime CreatedAt

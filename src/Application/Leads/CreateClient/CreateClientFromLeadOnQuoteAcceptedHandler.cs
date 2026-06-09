@@ -40,18 +40,27 @@ internal sealed class CreateClientFromLeadOnQuoteAcceptedHandler(
                 var firstName = nameParts[0];
                 var lastName = nameParts.Length > 1 ? nameParts[1] : string.Empty;
 
+                // Use a unique temporary DNI to avoid unique constraint violation.
+                // The client record will need to be completed with real DNI later.
+                var tempDni = $"TEMP_{lead.Id:N}";
+
                 targetClient = new Client(
                     lead.DealerId,
                     firstName,
                     lastName,
-                    string.Empty, // DNI placeholder
+                    tempDni,
                     lead.Email.Value,
                     lead.Phone,
-                    string.Empty, // Address
-                    dateTimeProvider.UtcNow);
+                    string.Empty,
+                    dateTimeProvider.UtcNow,
+                    Domain.Clients.Attributes.ClientType.Individual,
+                    lead.Id);
 
                 context.Clients.Add(targetClient);
             }
+
+            // Link the new client to the lead
+            lead.MarkConverted(targetClient.Id);
 
             // Assign the new client to the quote
             quote.AssignClient(targetClient.Id);
