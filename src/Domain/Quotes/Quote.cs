@@ -1,6 +1,7 @@
 using SharedKernel;
 using Domain.Cars;
 using Domain.Clients;
+using Domain.Leads;
 using Domain.Quotes.Attributes;
 using Domain.Quotes.Events;
 using Domain.Shared.ValueObjects;
@@ -10,7 +11,8 @@ namespace Domain.Quotes;
 public sealed class Quote : Entity
 {
     public Guid CarId { get; private set; }
-    public Guid ClientId { get; private set; }
+    public Guid? ClientId { get; private set; }
+    public Guid? LeadId { get; private set; }
     public Money ProposedPrice { get; private set; }
     public QuoteStatus Status { get; private set; }
     public DateTime ValidUntil { get; private set; }
@@ -18,14 +20,16 @@ public sealed class Quote : Entity
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
     public Car Car { get; private set; }
-    public Client Client { get; private set; }
+    public Client? Client { get; private set; }
+    public Lead? Lead { get; private set; }
 
     private Quote() { }
 
     public Quote(
         Guid dealerId,
         Car car,
-        Client client,
+        Client? client,
+        Lead? lead,
         decimal proposedPrice,
         DateTime validUntil,
         string comments,
@@ -33,13 +37,28 @@ public sealed class Quote : Entity
     {
         SetDealer(dealerId);
 
+        if (client is null && lead is null)
+            throw new DomainException("A quote must have either a Client or a Lead");
+        if (client is not null && lead is not null)
+            throw new DomainException("A quote cannot have both a Client and a Lead");
+
         if (validUntil <= date)
             throw new DomainException("ValidUntil must be in the future");
 
         Car = car;
         CarId = car.Id;
-        Client = client;
-        ClientId = client.Id;
+        
+        if (client is not null)
+        {
+            Client = client;
+            ClientId = client.Id;
+        }
+        else
+        {
+            Lead = lead;
+            LeadId = lead!.Id;
+        }
+        
         ProposedPrice = new Money(proposedPrice);
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
@@ -47,7 +66,7 @@ public sealed class Quote : Entity
         CreatedAt = date;
         UpdatedAt = date;
 
-        Raise(new QuoteCreatedDomainEvent(Id, CarId, ClientId, ProposedPrice));
+        Raise(new QuoteCreatedDomainEvent(Id, CarId, ClientId ?? Guid.Empty, ProposedPrice));
     }
 
     public void Update(
@@ -116,5 +135,10 @@ public sealed class Quote : Entity
             Status = QuoteStatus.Expired;
             UpdatedAt = updatedAt;
         }
+    }
+    
+    public void AssignClient(Guid clientId)
+    {
+        ClientId = clientId;
     }
 }

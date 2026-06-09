@@ -120,14 +120,14 @@ public class ApplicationDbContextTests
         context.AddRange(marca, modelo, car, client);
         await context.SaveChangesAsync();
 
-        var quote = new Quote(Guid.Parse("11111111-1111-1111-1111-111111111111"), car, client, 8000m, DateTime.UtcNow.AddDays(30), "ok", DateTime.UtcNow);
+        var quote = new Quote(Guid.Parse("11111111-1111-1111-1111-111111111111"), car, client, null, 8000m, DateTime.UtcNow.AddDays(30), "ok", DateTime.UtcNow);
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
 
         // Create a fake car with an ID that doesn't exist in the database to trigger FK violation
         var fakeCar = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "ZZZ999", "fake", 1m, DateTime.UtcNow);
         // Don't save fakeCar - we want its ID to not exist in DB
-        var badQuote = new Quote(Guid.Parse("11111111-1111-1111-1111-111111111111"), fakeCar, client, 7000m, DateTime.UtcNow.AddDays(30), "bad", DateTime.UtcNow);
+        var badQuote = new Quote(Guid.Parse("11111111-1111-1111-1111-111111111111"), fakeCar, client, null, 7000m, DateTime.UtcNow.AddDays(30), "bad", DateTime.UtcNow);
         context.Quotes.Add(badQuote);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());

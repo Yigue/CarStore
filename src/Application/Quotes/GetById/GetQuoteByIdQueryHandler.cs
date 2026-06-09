@@ -18,6 +18,7 @@ internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
             .Include(q => q.Car)
                 .ThenInclude(c => c.Modelo)
             .Include(q => q.Client)
+            .Include(q => q.Lead)
             .FirstOrDefaultAsync(q => q.Id == query.QuoteId, cancellationToken);
 
         if (quote is null)
@@ -29,7 +30,7 @@ internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
         {
             Id = quote.Id,
             CarId = quote.CarId,
-            ClientId = quote.ClientId,
+            ClientId = quote.ClientId ?? Guid.Empty,
             ProposedPrice = quote.ProposedPrice.Amount,
             Status = quote.Status.ToString(),
             ValidUntil = quote.ValidUntil,
@@ -38,7 +39,7 @@ internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
             UpdatedAt = quote.UpdatedAt,
             CarBrand = quote.Car.Marca.Nombre,
             CarModel = quote.Car.Modelo.Nombre,
-            ClientName = $"{quote.Client.FirstName} {quote.Client.LastName}"
+            ClientName = quote.Client != null ? $"{quote.Client.FirstName} {quote.Client.LastName}" : (quote.Lead != null ? quote.Lead.ClientName : "Desconocido")
         };
 
         return response;

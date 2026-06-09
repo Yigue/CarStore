@@ -41,6 +41,7 @@ internal sealed class CreateAppointmentCommandHandler(
                 dealerId,
                 command.VehicleId,
                 command.ClientId,
+                command.LeadId,
                 command.AgentId,
                 command.Start,
                 command.End,

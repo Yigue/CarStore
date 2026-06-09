@@ -40,8 +40,11 @@ internal sealed class GetAppointmentsQueryHandler(
                 on (car != null ? car.ModeloId : Guid.Empty) equals modelo.Id into modeloJoin
             from modelo in modeloJoin.DefaultIfEmpty()
             join client in context.Clients.IgnoreQueryFilters().AsNoTracking()
-                on a.ClientId equals client.Id into clientJoin
+                on a.ClientId equals (Guid?)client.Id into clientJoin
             from client in clientJoin.DefaultIfEmpty()
+            join lead in context.Leads.IgnoreQueryFilters().AsNoTracking()
+                on a.LeadId equals (Guid?)lead.Id into leadJoin
+            from lead in leadJoin.DefaultIfEmpty()
             join agent in context.Users.IgnoreQueryFilters().AsNoTracking()
                 on a.AgentId equals agent.Id into agentJoin
             from agent in agentJoin.DefaultIfEmpty()
@@ -57,7 +60,7 @@ internal sealed class GetAppointmentsQueryHandler(
                         + car.Anio).Trim()
                     : null,
                 a.ClientId,
-                client != null ? (client.FirstName + " " + client.LastName) : null,
+                client != null ? (client.FirstName + " " + client.LastName) : (lead != null ? lead.ClientName : null),
                 a.AgentId,
                 agent != null ? (agent.FirstName + " " + agent.LastName) : null,
                 a.StartDateTime,

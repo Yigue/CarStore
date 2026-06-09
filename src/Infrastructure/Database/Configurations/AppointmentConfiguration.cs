@@ -16,7 +16,13 @@ internal sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appoin
 
         builder.Property(a => a.DealerId).IsRequired();
         builder.Property(a => a.VehicleId).IsRequired();
-        builder.Property(a => a.ClientId).IsRequired();
+        
+        builder.Property(a => a.ClientId)
+            .IsRequired(false);
+            
+        builder.Property(a => a.LeadId)
+            .IsRequired(false);
+            
         builder.Property(a => a.AgentId).IsRequired();
 
         builder.Property(a => a.StartDateTime).IsRequired();
@@ -41,6 +47,11 @@ internal sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appoin
         builder.HasOne<Domain.Clients.Client>()
             .WithMany()
             .HasForeignKey(a => a.ClientId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Domain.Leads.Lead>()
+            .WithMany()
+            .HasForeignKey(a => a.LeadId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Domain.Users.User>()

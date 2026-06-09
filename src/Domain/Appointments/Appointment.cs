@@ -13,7 +13,8 @@ namespace Domain.Appointments;
 public sealed class Appointment : Entity
 {
     public Guid VehicleId { get; private set; }
-    public Guid ClientId { get; private set; }
+    public Guid? ClientId { get; private set; }
+    public Guid? LeadId { get; private set; }
     public Guid AgentId { get; private set; }
     public DateTime StartDateTime { get; private set; }
     public DateTime EndDateTime { get; private set; }
@@ -27,7 +28,8 @@ public sealed class Appointment : Entity
     public static Appointment Create(
         Guid dealerId,
         Guid vehicleId,
-        Guid clientId,
+        Guid? clientId,
+        Guid? leadId,
         Guid agentId,
         DateTime start,
         DateTime end,
@@ -37,8 +39,8 @@ public sealed class Appointment : Entity
     {
         if (vehicleId == Guid.Empty)
             throw new DomainException("VehicleId cannot be empty");
-        if (clientId == Guid.Empty)
-            throw new DomainException("ClientId cannot be empty");
+        if (clientId is null && leadId is null)
+            throw new DomainException("Un compromiso debe tener un Cliente o un Lead");
         if (agentId == Guid.Empty)
             throw new DomainException("AgentId cannot be empty");
         if (end <= start)
@@ -49,6 +51,7 @@ public sealed class Appointment : Entity
         appointment.Id = Guid.NewGuid();
         appointment.VehicleId = vehicleId;
         appointment.ClientId = clientId;
+        appointment.LeadId = leadId;
         appointment.AgentId = agentId;
         appointment.StartDateTime = start;
         appointment.EndDateTime = end;

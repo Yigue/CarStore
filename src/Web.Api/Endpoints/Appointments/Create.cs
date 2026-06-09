@@ -10,7 +10,8 @@ internal sealed class Create : IEndpoint
 {
     public sealed record Request(
         Guid VehicleId,
-        Guid ClientId,
+        Guid? ClientId,
+        Guid? LeadId,
         Guid AgentId,
         DateTime Start,
         DateTime End,
@@ -24,6 +25,7 @@ internal sealed class Create : IEndpoint
             var command = new CreateAppointmentCommand(
                 request.VehicleId,
                 request.ClientId,
+                request.LeadId,
                 request.AgentId,
                 request.Start,
                 request.End,

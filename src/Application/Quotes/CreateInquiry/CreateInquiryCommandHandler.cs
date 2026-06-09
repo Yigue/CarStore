@@ -88,6 +88,7 @@ internal sealed class CreateInquiryCommandHandler(
             dealerId,
             car,
             client,
+            null,
             car.Price.Amount,
             dateTimeProvider.UtcNow.AddDays(30),
             command.Comments,

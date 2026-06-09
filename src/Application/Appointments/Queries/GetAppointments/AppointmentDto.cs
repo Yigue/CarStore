@@ -6,7 +6,7 @@ public sealed record AppointmentDto(
     Guid Id,
     Guid VehicleId,
     string? VehicleName,
-    Guid ClientId,
+    Guid? ClientId,
     string? ClientName,
     Guid AgentId,
     string? AgentName,

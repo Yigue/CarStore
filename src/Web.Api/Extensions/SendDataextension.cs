@@ -185,6 +185,7 @@ public static class SeedDataExtensions
             Guid.Parse("11111111-1111-1111-1111-111111111111"), // DealerId fijo de desarrollo
             car,
             client,
+            null, // Lead
             f.Random.Decimal((car.Price * 0.9m).Amount, (car.Price * 1.1m).Amount),
             f.Date.Future().ToUniversalTime(), // Ensure UTC
             f.Lorem.Sentence(),

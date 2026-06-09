@@ -10,7 +10,8 @@ namespace Application.Appointments.Commands.CreateAppointment;
 /// </summary>
 public sealed record CreateAppointmentCommand(
     Guid VehicleId,
-    Guid ClientId,
+    Guid? ClientId,
+    Guid? LeadId,
     Guid AgentId,
     DateTime Start,
     DateTime End,

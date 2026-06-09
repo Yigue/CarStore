@@ -90,12 +90,12 @@ internal static class DevDataSeeder
             var cars = await context.Cars.ToListAsync(cancellationToken);
             var clients = await context.Clients.ToListAsync(cancellationToken);
 
-            var quote1 = new Quote(DefaultDealerId, cars[3], clients[0], 21500, DateTime.UtcNow.AddDays(15), "Cotización aceptada", DateTime.UtcNow.AddDays(-2));
+            var quote1 = new Quote(DefaultDealerId, cars[3], clients[0], null, 21500, DateTime.UtcNow.AddDays(15), "Cotización aceptada", DateTime.UtcNow.AddDays(-2));
             quote1.Accept(DateTime.UtcNow.AddDays(-1));
 
-            var quote2 = new Quote(DefaultDealerId, cars[4], clients[1], 63000, DateTime.UtcNow.AddDays(7), "Cotización pendiente", DateTime.UtcNow.AddDays(-1));
+            var quote2 = new Quote(DefaultDealerId, cars[4], clients[1], null, 63000, DateTime.UtcNow.AddDays(7), "Cotización pendiente", DateTime.UtcNow.AddDays(-1));
 
-            var quote3 = new Quote(DefaultDealerId, cars[0], clients[2], 24000, DateTime.UtcNow.AddDays(10), "Cotización rechazada", DateTime.UtcNow.AddDays(-5));
+            var quote3 = new Quote(DefaultDealerId, cars[0], clients[2], null, 24000, DateTime.UtcNow.AddDays(10), "Cotización rechazada", DateTime.UtcNow.AddDays(-5));
             quote3.Reject("El precio es muy elevado", DateTime.UtcNow.AddDays(-4));
 
             context.Quotes.AddRange(new[] { quote1, quote2, quote3 });

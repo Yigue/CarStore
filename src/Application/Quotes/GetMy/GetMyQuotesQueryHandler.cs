@@ -31,12 +31,13 @@ internal sealed class GetMyQuotesQueryHandler(
             .Include(q => q.Car)
                 .ThenInclude(c => c.Modelo)
             .Include(q => q.Client)
-            .Where(q => q.Client.Email.Value == user.Email.Value)
+            .Include(q => q.Lead)
+            .Where(q => q.Client != null && q.Client.Email.Value == user.Email.Value)
             .Select(quote => new QuoteResponse
             {
                 Id = quote.Id,
                 CarId = quote.CarId,
-                ClientId = quote.ClientId,
+                ClientId = quote.ClientId ?? Guid.Empty,
                 ProposedPrice = quote.ProposedPrice.Amount,
                 Status = quote.Status.ToString(),
                 ValidUntil = quote.ValidUntil,
@@ -45,7 +46,7 @@ internal sealed class GetMyQuotesQueryHandler(
                 UpdatedAt = quote.UpdatedAt,
                 CarBrand = quote.Car.Marca.Nombre,
                 CarModel = quote.Car.Modelo.Nombre,
-                ClientName = $"{quote.Client.FirstName} {quote.Client.LastName}"
+                ClientName = quote.Client != null ? $"{quote.Client.FirstName} {quote.Client.LastName}" : (quote.Lead != null ? quote.Lead.ClientName : "Desconocido")
             })
             .ToListAsync(cancellationToken);
 

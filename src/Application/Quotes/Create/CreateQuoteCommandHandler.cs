@@ -43,6 +43,7 @@ internal sealed class CreateQuoteCommandHandler(
             tenantService.DealerId,
             car,
             client,
+            null,
             command.ProposedPrice,
             command.ValidUntil,
             command.Comments,
