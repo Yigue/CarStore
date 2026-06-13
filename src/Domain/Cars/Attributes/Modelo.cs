@@ -11,6 +11,7 @@ public class Modelo : Entity
     
       public Modelo(string nombre, Guid marcaId)
     {
+        Id = Guid.NewGuid();
         Nombre = nombre;
         MarcaId = marcaId;
         

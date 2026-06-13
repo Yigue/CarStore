@@ -32,12 +32,12 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
 
         builder.HasOne(c => c.Marca)
             .WithMany()
-            .HasForeignKey("MarcaId")
+            .HasForeignKey(c => c.MarcaId)
             .IsRequired();
 
         builder.HasOne(c => c.Modelo)
             .WithMany()
-            .HasForeignKey("ModeloId")
+            .HasForeignKey(c => c.ModeloId)
             .IsRequired();
 
         builder.Property(c => c.CarType)

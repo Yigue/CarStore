@@ -8,6 +8,7 @@ public class Marca : Entity
     public ICollection<Modelo> Modelos { get; private set; }
     public Marca(string nombre)
     {
+        Id = Guid.NewGuid();
         Nombre = nombre;
         Modelos = new List<Modelo>();
     }
