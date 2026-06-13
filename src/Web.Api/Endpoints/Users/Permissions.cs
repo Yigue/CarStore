@@ -13,4 +13,5 @@ internal static class Permissions
     internal const string CanManageFinance = "CanManageFinance";
     internal const string CanManageLeads = "CanManageLeads";
     internal const string CanViewReports = "CanViewReports";
+    internal const string CanManageSettings = "CanManageSettings";
 }

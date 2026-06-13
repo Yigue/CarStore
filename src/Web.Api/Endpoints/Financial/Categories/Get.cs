@@ -12,7 +12,7 @@ public sealed class Get : IEndpoint
     {
         app.MapGet("financial/categories", Handler)
             .WithTags(Tags.Financial)
-            .RequireAuthorization();
+            .HasPermission("financial:read");
     }
 
     private static async Task<IResult> Handler(ISender sender, CancellationToken cancellationToken)

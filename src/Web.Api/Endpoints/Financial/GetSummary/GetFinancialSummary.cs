@@ -21,7 +21,7 @@ public sealed class GetFinancialSummary : IEndpoint
                 data => Results.Ok(data),
                 CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .HasPermission("financial:read")
         .WithTags(Tags.Financial)
         .WithName("GetFinancialSummary")
         .Produces<FinancialSummaryResponse>()

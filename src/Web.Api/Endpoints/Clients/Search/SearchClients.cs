@@ -25,7 +25,7 @@ public sealed class SearchClients : IEndpoint
                 data => Results.Ok(data),
                 CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .HasPermission("clients:read")
         .WithTags(Tags.Clients)
         .WithName("SearchClients")
         .Produces<IEnumerable<ClientResponse>>()

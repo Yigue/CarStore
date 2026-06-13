@@ -85,6 +85,7 @@ internal static class UsersSeeder
                 "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
                 "financial:read", "financial:create", "financial:update", "financial:delete",
                 "users:read", "users:create", "users:access", "CanManageUsers", "CanManageRoles",
+                "CanManageSettings",
                 "leads:read", "leads:create", "leads:update", "leads:delete",
                 "admin:backfill"
             };
@@ -92,6 +93,58 @@ internal static class UsersSeeder
             foreach (var permission in permissions)
             {
                 context.UserPermissions.Add(new UserPermission(admin.Id, permission));
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        await SeedEmpleadoAsync(context, passwordHasher, configuration, dealerId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Seeds a default Empleado (staff) user with a read-focused permission set so that
+    /// non-admin roles are functional out of the box (spec: rbac).
+    /// </summary>
+    private static async Task SeedEmpleadoAsync(
+        IApplicationDbContext context,
+        IPasswordHasher passwordHasher,
+        IConfiguration configuration,
+        Guid dealerId,
+        CancellationToken cancellationToken)
+    {
+        const string empleadoEmail = "empleado@carstore.com";
+        string empleadoPassword = configuration["EMPLEADO_SEED_PASSWORD"] ?? "Empleado123!";
+
+        var empleado = context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefault(u => u.Email == empleadoEmail);
+
+        if (empleado is null)
+        {
+            var passwordHash = passwordHasher.Hash(empleadoPassword);
+            empleado = new User(dealerId, empleadoEmail, "Empleado", "Demo", passwordHash);
+            context.Users.Add(empleado);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        if (!context.UserPermissions
+            .IgnoreQueryFilters()
+            .Any(p => p.UserId == empleado.Id))
+        {
+            var empleadoPermissions = new List<string>
+            {
+                "cars:read",
+                "clients:read",
+                "sales:read",
+                "quotes:read",
+                "quotes:create",
+                "leads:read",
+                "appointments:read"
+            };
+
+            foreach (var permission in empleadoPermissions)
+            {
+                context.UserPermissions.Add(new UserPermission(empleado.Id, permission));
             }
 
             await context.SaveChangesAsync(cancellationToken);

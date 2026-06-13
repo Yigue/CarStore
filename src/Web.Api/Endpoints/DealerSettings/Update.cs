@@ -2,6 +2,7 @@ using Application.DealerSettings;
 using Application.DealerSettings.Update;
 using MediatR;
 using SharedKernel;
+using Web.Api.Extensions;
 using Web.Api.Infrastructure;
 
 namespace Web.Api.Endpoints.DealerSettings;
@@ -45,12 +46,13 @@ internal sealed class Update : IEndpoint
 
             return result.Match(Results.Ok, CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .HasPermission("CanManageSettings")
         .WithTags(Tags.DealerSettings)
         .WithName("UpdateDealerSettings")
         .Produces<DealerSettingsResponse>(StatusCodes.Status200OK)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

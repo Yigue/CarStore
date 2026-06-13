@@ -21,7 +21,7 @@ public sealed class GetTodaySales : IEndpoint
                 data => Results.Ok(data),
                 CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .HasPermission("sales:read")
         .WithTags(Tags.Sales)
         .WithName("GetTodaySales")
         .Produces<TodaySalesResponse>()

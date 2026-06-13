@@ -25,7 +25,7 @@ public sealed class GetRecentClients : IEndpoint
                 data => Results.Ok(data),
                 CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .HasPermission("clients:read")
         .WithTags(Tags.Clients)
         .WithName("GetRecentClients")
         .Produces<IEnumerable<ClientResponse>>()

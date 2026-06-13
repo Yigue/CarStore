@@ -24,9 +24,12 @@ public sealed class GetUserDetails : IEndpoint
                 data => Results.Ok(data.Roles),
                 CustomResults.Problem);
         })
+        .HasPermission(Permissions.CanManageRoles)
         .WithTags(Tags.Users)
         .WithName("GetRoles")
         .Produces<RoleResponse>()
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         // GET /api/permissions - List all permissions
@@ -40,9 +43,12 @@ public sealed class GetUserDetails : IEndpoint
                 data => Results.Ok(data.Permissions),
                 CustomResults.Problem);
         })
+        .HasPermission(Permissions.CanManageRoles)
         .WithTags(Tags.Users)
         .WithName("GetPermissions")
         .Produces<PermissionResponse>()
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         // GET /api/users/{userId}/permissions - Get user permissions
