@@ -230,7 +230,7 @@ public class UsersControllerTests
         // Assign permissions to admin
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        context.UserPermissions.Add(new Domain.Users.UserPermission(adminResult!.id, "CanManageUsers"));
+        context.UserPermissions.Add(new Domain.Users.UserPermission(adminResult!.id, "CanManageRoles"));
         await context.SaveChangesAsync();
 
         // Login as admin

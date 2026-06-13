@@ -151,7 +151,7 @@ public class AdminBackfillEndpointTests
             StatusCar.New,
             StatusServiceCar.Disponible,
             4, 5, 2000, 0, 2024,
-            "BACKF1",
+            "BCK001",
             "Legacy car for backfill test",
             15000m,
             new DateTime(2026, 6, 7, 12, 0, 0, DateTimeKind.Utc));

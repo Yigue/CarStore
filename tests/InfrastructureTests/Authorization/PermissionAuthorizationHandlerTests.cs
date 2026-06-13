@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using System.Collections.Generic;
 using System.Linq;
@@ -53,8 +54,7 @@ public class PermissionAuthorizationHandlerTests : IDisposable
         var mockCache = new Mock<ICacheService>();
         services.AddSingleton(mockCache.Object);
         
-        var mockProviderLogger = new Mock<ILogger<PermissionProvider>>();
-        services.AddSingleton(mockProviderLogger.Object);
+        services.AddSingleton<ILogger<PermissionProvider>>(NullLogger<PermissionProvider>.Instance);
         
         services.AddSingleton<IApplicationDbContext>(_context);
         services.AddScoped<PermissionProvider>();

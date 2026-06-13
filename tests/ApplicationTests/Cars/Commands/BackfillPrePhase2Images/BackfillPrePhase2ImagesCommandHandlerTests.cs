@@ -56,7 +56,7 @@ public class BackfillPrePhase2ImagesCommandHandlerTests
             StatusCar.New,
             StatusServiceCar.Disponible,
             4, 5, 2000, 0, 2024,
-            "LEGACY1",
+            "LEG001",
             "Legacy car with no cover",
             15000m,
             new DateTime(2024, 1, 1));

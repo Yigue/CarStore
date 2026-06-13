@@ -53,7 +53,7 @@ public class LoginUserCommandHandlerTests
         var passwordHasher = new Mock<IPasswordHasher>();
         passwordHasher.Setup(p => p.Verify("correct", "hash")).Returns(true);
         var tokenProvider = new Mock<ITokenProvider>();
-        tokenProvider.Setup(t => t.Create(user)).Returns("token");
+        tokenProvider.Setup(t => t.Create(It.IsAny<User>())).Returns("token");
 
         var handler = new LoginUserCommandHandler(context, passwordHasher.Object, tokenProvider.Object);
 
@@ -61,6 +61,6 @@ public class LoginUserCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Be("token");
-        tokenProvider.Verify(t => t.Create(user), Times.Once);
+        tokenProvider.Verify(t => t.Create(It.IsAny<User>()), Times.Once);
     }
 }

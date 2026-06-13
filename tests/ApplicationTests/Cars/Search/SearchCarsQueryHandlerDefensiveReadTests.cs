@@ -31,7 +31,7 @@ public class SearchCarsQueryHandlerDefensiveReadTests
             StatusCar.New,
             StatusServiceCar.Disponible,
             4, 5, 2000, 0, 2024,
-            "DEFREAD",
+            "DEF123",
             "Defensive read test car",
             15000m,
             new DateTime(2026, 6, 7));

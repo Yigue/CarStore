@@ -31,7 +31,7 @@ public static class DealerSettingsSeeder
                 TRUE, 
                 NOW(), 
                 '127.0.0.1', 
-                'localhost', 
+                'lux.localhost', 
                 'Av. del Libertador 4500, Palermo, CABA', 
                 '+54 11 9999-8888', 
                 'https://facebook.com/luxdealership', 
