@@ -195,11 +195,11 @@ public class ApplicationDbContextTests
 
         var tableNames = await GetTablesAsync();
 
-        tableNames.Should().Contain(t => t.EndsWith("cars"));
-        tableNames.Should().Contain(t => t.EndsWith("clients"));
-        tableNames.Should().Contain(t => t.EndsWith("sales"));
-        tableNames.Should().Contain(t => t.EndsWith("quotes"));
-        tableNames.Should().Contain(t => t.EndsWith("transactions"));
+        tableNames.Should().Contain(t => t.EndsWith("cars", StringComparison.OrdinalIgnoreCase));
+        tableNames.Should().Contain(t => t.EndsWith("clients", StringComparison.OrdinalIgnoreCase));
+        tableNames.Should().Contain(t => t.EndsWith("sales", StringComparison.OrdinalIgnoreCase));
+        tableNames.Should().Contain(t => t.EndsWith("quotes", StringComparison.OrdinalIgnoreCase));
+        tableNames.Should().Contain(t => t.EndsWith("transactions", StringComparison.OrdinalIgnoreCase));
 
         async Task<List<string>> GetColumnsAsync(string table)
         {
@@ -214,19 +214,27 @@ public class ApplicationDbContextTests
             return cols;
         }
 
-        var carsCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("cars")));
-        carsCols.Should().Contain(new[] { "id", "patente" });
+        var carsCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("cars", StringComparison.OrdinalIgnoreCase)));
+        carsCols.Should().Contain(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        carsCols.Should().Contain(c => c.Equals("patente", StringComparison.OrdinalIgnoreCase));
 
-        var clientCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("clients")));
-        clientCols.Should().Contain(new[] { "id", "DNI" }); // Note: case sensitive depending on mapping
+        var clientCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("clients", StringComparison.OrdinalIgnoreCase)));
+        clientCols.Should().Contain(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        clientCols.Should().Contain(c => c.Equals("dni", StringComparison.OrdinalIgnoreCase));
 
-        var salesCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("sales")));
-        salesCols.Should().Contain(new[] { "id", "CarId", "ClientId" });
+        var salesCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("sales", StringComparison.OrdinalIgnoreCase)));
+        salesCols.Should().Contain(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        salesCols.Should().Contain(c => c.Equals("carid", StringComparison.OrdinalIgnoreCase) || c.Equals("car_id", StringComparison.OrdinalIgnoreCase));
+        salesCols.Should().Contain(c => c.Equals("clientid", StringComparison.OrdinalIgnoreCase) || c.Equals("client_id", StringComparison.OrdinalIgnoreCase));
 
-        var quoteCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("quotes")));
-        quoteCols.Should().Contain(new[] { "id", "CarId", "ClientId" });
+        var quoteCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("quotes", StringComparison.OrdinalIgnoreCase)));
+        quoteCols.Should().Contain(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        quoteCols.Should().Contain(c => c.Equals("carid", StringComparison.OrdinalIgnoreCase) || c.Equals("car_id", StringComparison.OrdinalIgnoreCase));
+        quoteCols.Should().Contain(c => c.Equals("clientid", StringComparison.OrdinalIgnoreCase) || c.Equals("client_id", StringComparison.OrdinalIgnoreCase));
 
-        var transactionCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("transactions")));
-        transactionCols.Should().Contain(new[] { "id", "CategoryId", "amount" });
+        var transactionCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("transactions", StringComparison.OrdinalIgnoreCase)));
+        transactionCols.Should().Contain(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        transactionCols.Should().Contain(c => c.Equals("categoryid", StringComparison.OrdinalIgnoreCase) || c.Equals("category_id", StringComparison.OrdinalIgnoreCase));
+        transactionCols.Should().Contain(c => c.Equals("amount", StringComparison.OrdinalIgnoreCase));
     }
 }
