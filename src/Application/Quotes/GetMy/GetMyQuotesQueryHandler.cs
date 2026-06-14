@@ -32,7 +32,7 @@ internal sealed class GetMyQuotesQueryHandler(
                 .ThenInclude(c => c.Modelo)
             .Include(q => q.Client)
             .Include(q => q.Lead)
-            .Where(q => q.Client != null && q.Client.Email.Value == user.Email.Value)
+            .Where(q => q.Client != null && q.Client.Email == user.Email)
             .Select(quote => new QuoteResponse
             {
                 Id = quote.Id,

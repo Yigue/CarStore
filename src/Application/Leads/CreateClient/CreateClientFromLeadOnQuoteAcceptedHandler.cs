@@ -25,7 +25,7 @@ internal sealed class CreateClientFromLeadOnQuoteAcceptedHandler(
             
             // Check if client with this email already exists
             var existingClient = await context.Clients
-                .FirstOrDefaultAsync(c => c.Email.Value == lead.Email.Value, cancellationToken);
+                .FirstOrDefaultAsync(c => c.Email == lead.Email, cancellationToken);
 
             Client targetClient;
 

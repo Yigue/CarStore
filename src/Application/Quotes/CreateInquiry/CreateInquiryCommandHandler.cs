@@ -43,9 +43,10 @@ internal sealed class CreateInquiryCommandHandler(
         }
 
         // 2. Validar email (lanza DomainException si es inválido — el GlobalExceptionHandler lo mapea a 400).
+        Email inquiryEmail;
         try
         {
-            _ = new Email(command.Email);
+            inquiryEmail = new Email(command.Email);
         }
         catch (DomainException ex)
         {
@@ -53,7 +54,7 @@ internal sealed class CreateInquiryCommandHandler(
         }
 
         var client = await context.Clients
-            .SingleOrDefaultAsync(c => c.Email.Value == command.Email, cancellationToken);
+            .SingleOrDefaultAsync(c => c.Email == inquiryEmail, cancellationToken);
 
         if (client is null)
         {
