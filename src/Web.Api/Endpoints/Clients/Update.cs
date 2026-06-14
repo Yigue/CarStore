@@ -20,7 +20,10 @@ internal sealed class Update : IEndpoint
                 request.Email,
                 request.Phone,
                 request.Address,
-                request.Status);
+                request.Status,
+                request.City,
+                request.ZipCode,
+                request.Notes);
 
             Result result = await sender.Send(command, cancellationToken);
 
@@ -45,4 +48,7 @@ public sealed record UpdateClientRequest(
     string Email,
     string Phone,
     string Address,
-    ClientStatus Status);
+    ClientStatus Status,
+    string? City = null,
+    string? ZipCode = null,
+    string? Notes = null);

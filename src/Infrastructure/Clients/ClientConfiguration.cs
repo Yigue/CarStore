@@ -37,6 +37,18 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.Property(c => c.Address)
             .HasMaxLength(200);
 
+        builder.Property(c => c.City)
+            .HasColumnName("city")
+            .HasMaxLength(100);
+
+        builder.Property(c => c.ZipCode)
+            .HasColumnName("zip_code")
+            .HasMaxLength(20);
+
+        builder.Property(c => c.Notes)
+            .HasColumnName("notes")
+            .HasMaxLength(1000);
+
         builder.Property(c => c.Status)
             .HasConversion<string>();
 
