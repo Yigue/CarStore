@@ -52,7 +52,15 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
         builder.Property(c => c.FuelType)
             .HasConversion<string>();
 
-  
+        builder.Property(c => c.Transmission)
+            .HasConversion<string>()
+            .HasDefaultValue(Transmission.Manual)
+            .IsRequired();
+
+        builder.Property(c => c.Featured)
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.Property(c => c.Price)
             .HasConversion(new MoneyValueConverter())
             .HasColumnName("price")

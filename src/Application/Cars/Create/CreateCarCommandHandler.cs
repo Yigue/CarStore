@@ -68,7 +68,11 @@ internal sealed class CreateCarCommandHandler(
             command.Patente,
             command.Descripcion,
             command.Price,
-            dateTimeProvider.UtcNow
+            dateTimeProvider.UtcNow,
+            command.FuelType,
+            command.Featured,
+            command.Transmission,
+            command.PurchaseCost
             );
 
         context.Cars.Add(car);

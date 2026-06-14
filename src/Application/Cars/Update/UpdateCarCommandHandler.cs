@@ -60,7 +60,11 @@ internal sealed class UpdateCarCommandHandler(
             command.Anio,
             command.Patente,
             command.Descripcion,
-            dateTimeProvider.UtcNow);
+            dateTimeProvider.UtcNow,
+            command.FuelType,
+            command.Featured,
+            command.Transmission,
+            command.PurchaseCost);
         
         // Use domain method for price update
         if (car.Price.Amount != command.Price)

@@ -16,6 +16,8 @@ public sealed class Car : Entity
     public StatusCar CarStatus { get; private set; }
     public StatusServiceCar ServiceCar { get; private set; }
     public FuelType FuelType { get; private set; }
+    public Transmission Transmission { get; private set; }
+    public bool Featured { get; private set; }
     public int CantidadPuertas { get; private set; }
     public int CantidadAsientos { get; private set; }
     public int Cilindrada { get; private set; }
@@ -58,7 +60,11 @@ public sealed class Car : Entity
         string patente,
         string descripcion,
         decimal price,
-        DateTime date
+        DateTime date,
+        FuelType fuelType = FuelType.Gasolina,
+        bool featured = false,
+        Transmission transmission = Transmission.Manual,
+        decimal? purchaseCost = null
         )
     {
         SetDealer(dealerId);
@@ -71,6 +77,9 @@ public sealed class Car : Entity
         CarType = carType;
         CarStatus = carStatus;
         ServiceCar = serviceCar;
+        FuelType = fuelType;
+        Transmission = transmission;
+        Featured = featured;
         CantidadPuertas = cantidadPuertas;
         CantidadAsientos = cantidadAsientos;
         Cilindrada = cilindrada;
@@ -79,6 +88,9 @@ public sealed class Car : Entity
         Patente = new LicensePlate(patente);
         Descripcion = descripcion;
         Price = new Money(price);
+
+        if (purchaseCost.HasValue)
+            PurchaseCost = new Money(purchaseCost.Value);
 
         CreatedAt = date;
         UpdatedAt = date;
@@ -100,7 +112,11 @@ public sealed class Car : Entity
         int anio,
         string patente,
         string descripcion,
-        DateTime updatedAt)
+        DateTime updatedAt,
+        FuelType fuelType = FuelType.Gasolina,
+        bool featured = false,
+        Transmission transmission = Transmission.Manual,
+        decimal? purchaseCost = null)
     {
         Marca = marca;
         MarcaId = marca.Id;
@@ -110,6 +126,9 @@ public sealed class Car : Entity
         CarType = carType;
         CarStatus = carStatus;
         ServiceCar = serviceCar;
+        FuelType = fuelType;
+        Transmission = transmission;
+        Featured = featured;
         CantidadPuertas = cantidadPuertas;
         CantidadAsientos = cantidadAsientos;
         Cilindrada = cilindrada;
@@ -117,6 +136,8 @@ public sealed class Car : Entity
         Anio = anio;
         Patente = new LicensePlate(patente);
         Descripcion = descripcion;
+        if (purchaseCost.HasValue)
+            PurchaseCost = new Money(purchaseCost.Value);
         UpdatedAt = updatedAt;
     }
     
