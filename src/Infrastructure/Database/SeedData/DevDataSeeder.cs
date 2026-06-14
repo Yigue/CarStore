@@ -127,5 +127,24 @@ internal static class DevDataSeeder
             context.Transactions.AddRange(transactions);
             await context.SaveChangesAsync(cancellationToken);
         }
+
+        // 6. Leads
+        if (!await context.Leads.IgnoreQueryFilters().AnyAsync(cancellationToken))
+        {
+            var cars = await context.Cars.ToListAsync(cancellationToken);
+            var toyota = cars.First(c => c.Patente == "AB123CD");
+            var hilux = cars.First(c => c.Patente == "AB456EF");
+
+            var lead1 = Lead.Create(DefaultDealerId, "Roberto Sanchez", "roberto@email.com", "+54 11 9999-8888", LeadSource.Facebook, DateTime.UtcNow.AddDays(-2), toyota.Id);
+            
+            var lead2 = Lead.Create(DefaultDealerId, "Laura Gomez", "laura.g@email.com", "+54 11 7777-6666", LeadSource.WalkIn, DateTime.UtcNow.AddDays(-3), hilux.Id);
+            lead2.UpdateStatus(LeadStatus.Contactado, "Interesada en Hilux para trabajo en campo.");
+
+            var lead3 = Lead.Create(DefaultDealerId, "Diego Maradona", "diego@email.com", "+54 11 1010-1010", LeadSource.Web, DateTime.UtcNow.AddDays(-5));
+            lead3.ForceStatus(LeadStatus.Ganado);
+
+            context.Leads.AddRange(new[] { lead1, lead2, lead3 });
+            await context.SaveChangesAsync(cancellationToken);
+        }
     }
 }
