@@ -82,24 +82,33 @@ internal static class UsersSeeder
         }
 
         // Seeder de permisos para el admin (bypass tenant filter for seeding)
-        if (!context.UserPermissions
-            .IgnoreQueryFilters()
-            .Any(p => p.UserId == admin.Id))
+        var permissions = new List<string>
         {
-            var permissions = new List<string>
-            {
-                "cars:read", "cars:create", "cars:update", "cars:delete",
-                "clients:read", "clients:create", "clients:update", "clients:delete",
-                "sales:read", "sales:create", "sales:update", "sales:delete",
-                "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
-                "financial:read", "financial:create", "financial:update", "financial:delete",
-                "users:read", "users:create", "users:access", "CanManageUsers", "CanManageRoles",
-                "CanManageSettings",
-                "leads:read", "leads:create", "leads:update", "leads:delete",
-                "admin:backfill"
-            };
+            "cars:read", "cars:create", "cars:update", "cars:delete",
+            "clients:read", "clients:create", "clients:update", "clients:delete",
+            "sales:read", "sales:create", "sales:update", "sales:delete",
+            "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
+            "financial:read", "financial:create", "financial:update", "financial:delete",
+            "users:read", "users:create", "users:access", "CanManageUsers", "CanManageRoles",
+            "CanManageSettings",
+            "leads:read", "leads:create", "leads:update", "leads:delete",
+            "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
+            "admin:backfill"
+        };
 
-            foreach (var permission in permissions)
+        // Reconcile: add any permissions the admin is missing. Self-heals when new
+        // permissions are introduced (e.g. appointments) without a fresh re-seed,
+        // since the all-or-nothing guard used to skip existing admins entirely.
+        var existingPermissions = context.UserPermissions
+            .IgnoreQueryFilters()
+            .Where(p => p.UserId == admin.Id)
+            .Select(p => p.Permission)
+            .ToHashSet();
+
+        var missingPermissions = permissions.Where(p => !existingPermissions.Contains(p)).ToList();
+        if (missingPermissions.Count > 0)
+        {
+            foreach (var permission in missingPermissions)
             {
                 context.UserPermissions.Add(new UserPermission(admin.Id, permission));
             }
