@@ -71,12 +71,38 @@ builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 // Configurar CORS para permitir solicitudes desde la aplicación React
 builder.Services.AddCors(options =>
 {
-    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
         ?? ["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"];
-    
+
+    // Multi-tenant: each dealer is served from its own subdomain (e.g. lux.localhost
+    // in dev, lux.carstore.com in prod). An exact-match origin list cannot cover
+    // arbitrary tenant subdomains, so we also allow configured host suffixes.
+    // ".localhost" is always allowed in Development for local tenant testing.
+    var allowedHostSuffixes = builder.Configuration.GetSection("Cors:AllowedHostSuffixes").Get<string[]>()
+        ?? [];
+    if (builder.Environment.IsDevelopment() && !allowedHostSuffixes.Contains(".localhost"))
+    {
+        allowedHostSuffixes = [.. allowedHostSuffixes, ".localhost"];
+    }
+
+    bool IsOriginAllowed(string origin)
+    {
+        if (allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // Note: SetIsOriginAllowed reflects the exact origin back, so this stays
+        // compatible with AllowCredentials (which forbids a wildcard "*").
+        return Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+            && allowedHostSuffixes.Any(suffix =>
+                uri.Host.Equals(suffix.TrimStart('.'), StringComparison.OrdinalIgnoreCase)
+                || uri.Host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+    }
+
     options.AddPolicy("CorsPolicy", policy =>
     {
-        policy.WithOrigins(allowedOrigins)
+        policy.SetIsOriginAllowed(IsOriginAllowed)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
