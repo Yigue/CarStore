@@ -41,8 +41,9 @@ internal sealed class CreateClientFromLeadOnQuoteAcceptedHandler(
                 var lastName = nameParts.Length > 1 ? nameParts[1] : string.Empty;
 
                 // Use a unique temporary DNI to avoid unique constraint violation.
-                // The client record will need to be completed with real DNI later.
-                var tempDni = $"TEMP_{lead.Id:N}";
+                // Must fit the DNI column (varchar 20); the first 16 hex chars of the
+                // lead id keep it unique. The record is completed with the real DNI later.
+                var tempDni = $"TEMP{lead.Id:N}"[..20];
 
                 targetClient = new Client(
                     lead.DealerId,
