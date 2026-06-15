@@ -1,6 +1,7 @@
-﻿using Application.Abstractions.Authentication;
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Storage;
 using Application.Cars.GetAll;
 using Application.Cars.GetById;
 using Domain.Cars;
@@ -9,49 +10,63 @@ using SharedKernel;
 
 namespace Application.Cars.GetById;
 
-internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context)
+internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context, IStorageService storage)
     : IQueryHandler<GetCarByIdQuery, CarGetByIdResponse>
 {
     public async Task<Result<CarGetByIdResponse>> Handle(GetCarByIdQuery query, CancellationToken cancellationToken)
     {
-        CarGetByIdResponse? car = await context.Cars
-            .Where(car => car.Id == query.CarId)
-            .Select(car => new CarGetByIdResponse
-            (
-                car.Id,
-                car.Marca.Nombre,
-                car.Modelo.Nombre,
-                car.Color,
-                car.CarType,
-                car.CarStatus,
-                car.ServiceCar,
-                car.CantidadPuertas,
-                car.CantidadAsientos,
-                car.Cilindrada,
-                car.Kilometraje,
-                car.Anio,
-                car.Patente.Value,
-                car.Descripcion,
-                car.Price.Amount,
-                car.CreatedAt,
-                car.UpdatedAt,
-                car.Images
-                    .OrderBy(img => img.DisplayOrder)
-                    .Select(img => new CarImageResponse(
-                        img.Id,
-                        img.ImageUrl,
-                        img.IsCover,
-                        img.DisplayOrder))
-                    .ToList()
-            ))
-
-            .SingleOrDefaultAsync(cancellationToken);
+        Car? car = await context.Cars
+            .Include(c => c.Marca)
+            .Include(c => c.Modelo)
+            .Include(c => c.Images)
+            .FirstOrDefaultAsync(c => c.Id == query.CarId, cancellationToken);
 
         if (car is null)
         {
             return Result.Failure<CarGetByIdResponse>(CarErrors.NotFound(query.CarId));
         }
 
-        return car;
+        var imageResponses = new List<CarImageResponse>(car.Images.Count);
+        foreach (var img in car.Images.OrderBy(i => i.DisplayOrder))
+        {
+            string url = img.ImageUrl ?? string.Empty;
+            if (img.ObjectKey is not null)
+            {
+                try
+                {
+                    Uri presigned = await storage.GetPresignedUrlAsync(img.ObjectKey, TimeSpan.FromMinutes(15), cancellationToken);
+                    url = presigned.ToString();
+                }
+                catch
+                {
+                    // Fallback
+                }
+            }
+            imageResponses.Add(new CarImageResponse(img.Id, url, img.IsCover, img.DisplayOrder));
+        }
+
+        var response = new CarGetByIdResponse
+        (
+            car.Id,
+            car.Marca.Nombre,
+            car.Modelo.Nombre,
+            car.Color,
+            car.CarType,
+            car.CarStatus,
+            car.ServiceCar,
+            car.CantidadPuertas,
+            car.CantidadAsientos,
+            car.Cilindrada,
+            car.Kilometraje,
+            car.Anio,
+            car.Patente.Value,
+            car.Descripcion,
+            car.Price.Amount,
+            car.CreatedAt,
+            car.UpdatedAt,
+            imageResponses
+        );
+
+        return response;
     }
 }

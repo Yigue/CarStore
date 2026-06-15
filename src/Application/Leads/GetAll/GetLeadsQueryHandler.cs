@@ -39,6 +39,8 @@ internal sealed class GetLeadsQueryHandler(
                 AgentName = agent != null ? agent.FirstName + " " + agent.LastName : null,
                 l.InterestedVehicleId,
                 VehicleName = car != null ? m.Nombre + " " + md.Nombre + " " + car.Anio : null,
+                l.ConvertedClientId,
+                l.LossReason,
                 l.Notes,
                 l.Source,
                 l.CreatedAt
@@ -56,6 +58,8 @@ internal sealed class GetLeadsQueryHandler(
             l.AgentName,
             l.InterestedVehicleId,
             l.VehicleName,
+            l.ConvertedClientId,
+            l.LossReason,
             l.Notes,
             l.Source.ToString(),
             l.CreatedAt

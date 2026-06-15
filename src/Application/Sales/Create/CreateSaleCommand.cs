@@ -9,6 +9,7 @@ public sealed record CreateSaleCommand(
     decimal FinalPrice,
     PaymentMethod PaymentMethod,
     string ContractNumber,
-    string Comments
+    string Comments,
+    Guid? LeadId = null
     ) : ICommand<Guid>;
 

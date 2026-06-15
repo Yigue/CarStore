@@ -1,4 +1,6 @@
-﻿namespace SharedKernel;
+using System.Text.Json.Serialization;
+
+namespace SharedKernel;
 
 /// <summary>
 /// Base class for all domain entities.
@@ -6,12 +8,14 @@
 /// </summary>
 public abstract class Entity
 {
+    [JsonInclude]
     public Guid Id { get; protected set; }
     
     /// <summary>
     /// Multi-tenancy: Every entity belongs to a Dealer (concesionaria).
     /// Required for all queries via EF Core Global Query Filters.
     /// </summary>
+    [JsonInclude]
     public Guid DealerId { get; protected set; }
     
     private readonly List<IDomainEvent> _domainEvents = [];

@@ -13,6 +13,8 @@ public sealed record LeadResponse(
     string? AssignedAgentName,
     Guid? InterestedVehicleId,
     string? InterestedVehicleName,
+    Guid? ConvertedClientId,
+    LeadLossReason? LossReason,
     string? Notes,
     string Source,
     DateTime CreatedAt
