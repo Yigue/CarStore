@@ -1,10 +1,12 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace Infrastructure.Migrations
 {
-    /// <inheritdoc />
+    [DbContext(typeof(Infrastructure.Database.ApplicationDbContext))]
+    [Migration("20260530000000_RefactorCarImagesForObjectStorage")]
     public partial class RefactorCarImagesForObjectStorage : Migration
     {
         /// <inheritdoc />
