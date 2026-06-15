@@ -66,9 +66,18 @@ internal static class UsersSeeder
                 adminEmail,
                 "Admin",
                 "User",
-                passwordHash);
+                passwordHash,
+                UserRole.Admin);
 
             context.Users.Add(admin);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        else if (admin.Role != UserRole.Admin)
+        {
+            // Self-heal: earlier seeds created the admin with the default Cliente
+            // role, which left the frontend (role-gated nav) treating admin as a
+            // client. Correct it idempotently on every startup.
+            admin.UpdateRole(UserRole.Admin);
             await context.SaveChangesAsync(cancellationToken);
         }
 
@@ -122,8 +131,14 @@ internal static class UsersSeeder
         if (empleado is null)
         {
             var passwordHash = passwordHasher.Hash(empleadoPassword);
-            empleado = new User(dealerId, empleadoEmail, "Empleado", "Demo", passwordHash);
+            empleado = new User(dealerId, empleadoEmail, "Empleado", "Demo", passwordHash, UserRole.Empleado);
             context.Users.Add(empleado);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        else if (empleado.Role != UserRole.Empleado)
+        {
+            // Self-heal stale Cliente role (see admin note above).
+            empleado.UpdateRole(UserRole.Empleado);
             await context.SaveChangesAsync(cancellationToken);
         }
 
