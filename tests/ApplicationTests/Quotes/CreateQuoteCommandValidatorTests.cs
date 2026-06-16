@@ -9,7 +9,7 @@ public class CreateQuoteCommandValidatorTests
     [Fact]
     public void Validate_ShouldFail_ForInvalidValues()
     {
-        var command = new CreateQuoteCommand(Guid.Empty, Guid.Empty, 0m, DateTime.UtcNow.AddDays(-1), string.Empty);
+        var command = new CreateQuoteCommand(Guid.Empty, Guid.Empty, Guid.Empty, 0m, DateTime.UtcNow.AddDays(-1), string.Empty);
 
         var result = _validator.Validate(command);
 
@@ -21,7 +21,7 @@ public class CreateQuoteCommandValidatorTests
     [Fact]
     public void Validate_ShouldPass_ForValidValues()
     {
-        var command = new CreateQuoteCommand(Guid.NewGuid(), Guid.NewGuid(), 1000m, DateTime.UtcNow.AddDays(1), "Ok");
+        var command = new CreateQuoteCommand(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1000m, DateTime.UtcNow.AddDays(1), "Ok");
 
         var result = _validator.Validate(command);
 

@@ -1,3 +1,4 @@
+using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars.Attributes;
@@ -6,7 +7,9 @@ using SharedKernel;
 
 namespace Application.Modelos.Create;
 
-internal sealed class CreateModeloCommandHandler(IApplicationDbContext context)
+internal sealed class CreateModeloCommandHandler(
+    IApplicationDbContext context,
+    ICachedModelService modelService)
     : ICommandHandler<CreateModeloCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateModeloCommand command, CancellationToken cancellationToken)
@@ -39,6 +42,9 @@ internal sealed class CreateModeloCommandHandler(IApplicationDbContext context)
         var modelo = new Modelo(nombre, command.MarcaId);
         context.Modelo.Add(modelo);
         await context.SaveChangesAsync(cancellationToken);
+
+        // Invalidate cached models for this brand
+        await modelService.InvalidateBrandCacheAsync(command.MarcaId, cancellationToken);
 
         return Result.Success(modelo.Id);
     }

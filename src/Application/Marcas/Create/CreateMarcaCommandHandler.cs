@@ -1,3 +1,4 @@
+using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars.Attributes;
@@ -6,7 +7,9 @@ using SharedKernel;
 
 namespace Application.Marcas.Create;
 
-internal sealed class CreateMarcaCommandHandler(IApplicationDbContext context)
+internal sealed class CreateMarcaCommandHandler(
+    IApplicationDbContext context,
+    ICachedBrandService brandService)
     : ICommandHandler<CreateMarcaCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateMarcaCommand command, CancellationToken cancellationToken)
@@ -29,6 +32,9 @@ internal sealed class CreateMarcaCommandHandler(IApplicationDbContext context)
         var marca = new Marca(nombre);
         context.Marca.Add(marca);
         await context.SaveChangesAsync(cancellationToken);
+
+        // Invalidate cached brands list
+        await brandService.InvalidateCacheAsync(cancellationToken);
 
         return Result.Success(marca.Id);
     }
