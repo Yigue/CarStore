@@ -1,4 +1,5 @@
 using Application.Abstractions.Messaging;
+using Domain.Quotes.Attributes;
 
 namespace Application.Quotes.Create;
 
@@ -8,5 +9,6 @@ public sealed record CreateQuoteCommand(
     Guid? ClientId,
     Guid? LeadId,
     decimal ProposedPrice,
+    PaymentMethod PaymentMethod,
     DateTime ValidUntil,
     string Comments) : ICommand<Guid>;

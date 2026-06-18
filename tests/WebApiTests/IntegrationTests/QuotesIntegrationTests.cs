@@ -145,6 +145,7 @@ public class QuotesIntegrationTests
             testClient,
             null,
             44000m,
+            Domain.Quotes.Attributes.PaymentMethod.Contado,
             DateTime.UtcNow.AddDays(15),
             "Cotización para Ford Mustang",
             DateTime.UtcNow);
@@ -214,6 +215,7 @@ public class QuotesIntegrationTests
             testClient,
             null,
             29000m,
+            Domain.Quotes.Attributes.PaymentMethod.Financiado,
             DateTime.UtcNow.AddDays(20),
             "Cotización para Volkswagen Tiguan",
             DateTime.UtcNow);
@@ -286,6 +288,7 @@ public class QuotesIntegrationTests
             testClient,
             null,
             31000m,
+            Domain.Quotes.Attributes.PaymentMethod.Permuta,
             DateTime.UtcNow.AddDays(25),
             "Cotización para Chevrolet Cruze",
             DateTime.UtcNow);

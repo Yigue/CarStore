@@ -71,6 +71,7 @@ internal sealed class CreateQuoteCommandHandler(
             client,
             lead,
             command.ProposedPrice,
+            command.PaymentMethod,
             command.ValidUntil,
             command.Comments,
             dateTimeProvider.UtcNow);

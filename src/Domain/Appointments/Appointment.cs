@@ -78,4 +78,17 @@ public sealed class Appointment : Entity
     }
 
     public void UpdateNotes(string? notes) => Notes = notes;
+
+    /// <summary>
+    /// Re-points this appointment to a client (e.g. when its lead is converted into a client).
+    /// Clears the lead reference to keep a single party per appointment.
+    /// </summary>
+    public void AssignClient(Guid clientId)
+    {
+        if (clientId == Guid.Empty)
+            throw new DomainException("ClientId cannot be empty when assigning an appointment to a client");
+
+        ClientId = clientId;
+        LeadId = null;
+    }
 }

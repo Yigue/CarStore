@@ -19,6 +19,12 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.Property(q => q.Status)
             .HasConversion<string>();
 
+        builder.Property(q => q.PaymentMethod)
+            .HasConversion<string>()
+            .HasColumnName("payment_method")
+            .HasMaxLength(50)
+            .IsRequired();
+
         builder.Property(q => q.ValidUntil)
             .IsRequired();
 

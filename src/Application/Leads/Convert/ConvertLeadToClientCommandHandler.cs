@@ -55,8 +55,32 @@ internal sealed class ConvertLeadToClientCommandHandler(
         }
 
         lead.MarkConverted(targetClient.Id);
+
+        // Carry the lead's history over to the client so the relationship is preserved:
+        // every quote/appointment created while it was a lead now belongs to the client.
+        await ReassignLeadArtifactsAsync(context, lead.Id, targetClient.Id, cancellationToken);
+
         await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(targetClient.Id);
+    }
+
+    private static async Task ReassignLeadArtifactsAsync(
+        IApplicationDbContext context,
+        Guid leadId,
+        Guid clientId,
+        CancellationToken cancellationToken)
+    {
+        var quotes = await context.Quotes
+            .Where(q => q.LeadId == leadId && q.ClientId == null)
+            .ToListAsync(cancellationToken);
+        foreach (var quote in quotes)
+            quote.AssignClient(clientId);
+
+        var appointments = await context.Appointments
+            .Where(a => a.LeadId == leadId && a.ClientId == null)
+            .ToListAsync(cancellationToken);
+        foreach (var appointment in appointments)
+            appointment.AssignClient(clientId);
     }
 }

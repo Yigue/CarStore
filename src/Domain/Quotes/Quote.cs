@@ -14,6 +14,7 @@ public sealed class Quote : Entity
     public Guid? ClientId { get; private set; }
     public Guid? LeadId { get; private set; }
     public Money ProposedPrice { get; private set; }
+    public PaymentMethod PaymentMethod { get; private set; }
     public QuoteStatus Status { get; private set; }
     public DateTime ValidUntil { get; private set; }
     public string Comments { get; private set; }
@@ -31,6 +32,7 @@ public sealed class Quote : Entity
         Client? client,
         Lead? lead,
         decimal proposedPrice,
+        PaymentMethod paymentMethod,
         DateTime validUntil,
         string comments,
         DateTime date)
@@ -60,6 +62,7 @@ public sealed class Quote : Entity
         }
         
         ProposedPrice = new Money(proposedPrice);
+        PaymentMethod = paymentMethod;
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
         Status = QuoteStatus.Pending;
@@ -137,8 +140,18 @@ public sealed class Quote : Entity
         }
     }
     
+    /// <summary>
+    /// Re-points this quote to a client (e.g. when its lead is converted). Enforces the
+    /// "exactly one party" invariant by clearing the lead reference so the quote does not
+    /// end up owned by both a lead and a client.
+    /// </summary>
     public void AssignClient(Guid clientId)
     {
+        if (clientId == Guid.Empty)
+            throw new DomainException("ClientId cannot be empty when assigning a quote to a client");
+
         ClientId = clientId;
+        LeadId = null;
+        Lead = null;
     }
 }

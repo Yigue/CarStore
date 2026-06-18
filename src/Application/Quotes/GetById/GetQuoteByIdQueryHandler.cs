@@ -32,6 +32,7 @@ internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
             CarId = quote.CarId,
             ClientId = quote.ClientId ?? Guid.Empty,
             ProposedPrice = quote.ProposedPrice.Amount,
+            PaymentMethod = quote.PaymentMethod.ToString(),
             Status = quote.Status.ToString(),
             ValidUntil = quote.ValidUntil,
             Comments = quote.Comments,

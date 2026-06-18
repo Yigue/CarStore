@@ -91,6 +91,7 @@ internal sealed class CreateInquiryCommandHandler(
             client,
             null,
             car.Price.Amount,
+            Domain.Quotes.Attributes.PaymentMethod.Contado,
             dateTimeProvider.UtcNow.AddDays(30),
             command.Comments,
             dateTimeProvider.UtcNow);

@@ -140,7 +140,7 @@ public class ApplicationDbContextTests
         context.AddRange(marca, modelo, car, client);
         await context.SaveChangesAsync();
 
-        var quote = new Quote(TestDealerId, car, client, null, 8000m, DateTime.UtcNow.AddDays(30), "ok", DateTime.UtcNow);
+        var quote = new Quote(TestDealerId, car, client, null, 8000m, Domain.Quotes.Attributes.PaymentMethod.Contado, DateTime.UtcNow.AddDays(30), "ok", DateTime.UtcNow);
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
 
@@ -149,7 +149,7 @@ public class ApplicationDbContextTests
         var fakeCar = new Car(TestDealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "ZZZ999", "fake", 1m, DateTime.UtcNow);
         context.Entry(fakeCar).State = EntityState.Unchanged;
         
-        var badQuote = new Quote(TestDealerId, fakeCar, client, null, 7000m, DateTime.UtcNow.AddDays(30), "bad", DateTime.UtcNow);
+        var badQuote = new Quote(TestDealerId, fakeCar, client, null, 7000m, Domain.Quotes.Attributes.PaymentMethod.Contado, DateTime.UtcNow.AddDays(30), "bad", DateTime.UtcNow);
         context.Quotes.Add(badQuote);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());

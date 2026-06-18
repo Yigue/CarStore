@@ -6,6 +6,7 @@ public sealed class QuoteResponse
     public Guid CarId { get; init; }
     public Guid ClientId { get; init; }
     public decimal ProposedPrice { get; init; }
+    public string PaymentMethod { get; init; }
     public string Status { get; init; }
     public DateTime ValidUntil { get; init; }
     public string Comments { get; init; }

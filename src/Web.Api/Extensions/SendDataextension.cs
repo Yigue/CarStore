@@ -187,6 +187,7 @@ public static class SeedDataExtensions
             client,
             null, // Lead
             f.Random.Decimal((car.Price * 0.9m).Amount, (car.Price * 1.1m).Amount),
+            f.PickRandom<Domain.Quotes.Attributes.PaymentMethod>(),
             f.Date.Future().ToUniversalTime(), // Ensure UTC
             f.Lorem.Sentence(),
             f.Date.Recent().ToUniversalTime()

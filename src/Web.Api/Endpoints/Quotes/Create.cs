@@ -14,6 +14,7 @@ internal sealed class Create : IEndpoint
         public Guid? ClientId { get; set; }
         public Guid? LeadId { get; set; }
         public decimal ProposedPrice { get; set; }
+        public Domain.Quotes.Attributes.PaymentMethod PaymentMethod { get; set; }
         public DateTime ValidUntil { get; set; }
         public string Comments { get; set; } = string.Empty;
     }
@@ -30,6 +31,7 @@ internal sealed class Create : IEndpoint
                 request.ClientId,
                 request.LeadId,
                 request.ProposedPrice,
+                request.PaymentMethod,
                 request.ValidUntil,
                 request.Comments);
 

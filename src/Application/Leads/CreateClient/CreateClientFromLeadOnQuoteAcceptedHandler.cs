@@ -63,9 +63,22 @@ internal sealed class CreateClientFromLeadOnQuoteAcceptedHandler(
             // Link the new client to the lead
             lead.MarkConverted(targetClient.Id);
 
-            // Assign the new client to the quote
+            // Assign the accepted quote and carry the rest of the lead's history
+            // (other quotes + appointments) over to the new client.
             quote.AssignClient(targetClient.Id);
-            
+
+            var otherQuotes = await context.Quotes
+                .Where(q => q.LeadId == lead.Id && q.ClientId == null && q.Id != quote.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var other in otherQuotes)
+                other.AssignClient(targetClient.Id);
+
+            var appointments = await context.Appointments
+                .Where(a => a.LeadId == lead.Id && a.ClientId == null)
+                .ToListAsync(cancellationToken);
+            foreach (var appointment in appointments)
+                appointment.AssignClient(targetClient.Id);
+
             await context.SaveChangesAsync(cancellationToken);
         }
     }
