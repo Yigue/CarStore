@@ -7,7 +7,9 @@ public sealed class CreateAppointmentCommandValidator : AbstractValidator<Create
     public CreateAppointmentCommandValidator()
     {
         RuleFor(x => x.VehicleId).NotEmpty();
-        RuleFor(x => x.ClientId).NotEmpty();
+        RuleFor(x => x)
+            .Must(x => x.ClientId.HasValue ^ x.LeadId.HasValue)
+            .WithMessage("An appointment must reference exactly one of ClientId or LeadId.");
         RuleFor(x => x.AgentId).NotEmpty();
         RuleFor(x => x.End)
             .GreaterThan(x => x.Start)
