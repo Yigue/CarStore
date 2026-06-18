@@ -41,7 +41,7 @@ public class DeleteCarCascadeTests
 
             // Mirror the blob into the fake store so deletion can be observed.
             using var ms = new System.IO.MemoryStream(new byte[] { 1, 2, 3 });
-            await factory.Storage.UploadFileAsync(ms, key, "image/jpeg", default);
+            await factory.Storage.UploadFileAsync(ms, key, "image/jpeg", null, default);
         }
 
         context.Cars.Add(car);

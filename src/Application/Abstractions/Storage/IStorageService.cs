@@ -29,6 +29,7 @@ public interface IStorageService
         Stream stream,
         string objectKey,
         string contentType,
+        long? size,
         CancellationToken ct);
 
     /// <summary>
@@ -46,6 +47,15 @@ public interface IStorageService
     /// <param name="ttl">Time-to-live of the presigned URL.</param>
     Task<Uri> GetPresignedUrlAsync(
         string objectKey,
+        TimeSpan ttl,
+        CancellationToken ct);
+
+    /// <summary>
+    /// Generates a presigned POST URL and fields for direct client-side upload.
+    /// </summary>
+    Task<(string Url, IReadOnlyDictionary<string, string> Fields)> GeneratePresignedPostAsync(
+        string objectKey,
+        string contentType,
         TimeSpan ttl,
         CancellationToken ct);
 }

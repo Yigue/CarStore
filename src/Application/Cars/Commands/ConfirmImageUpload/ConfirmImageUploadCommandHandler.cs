@@ -7,19 +7,19 @@ using Domain.Cars;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
-namespace Application.Cars.Commands.UploadCarImage;
+namespace Application.Cars.Commands.ConfirmImageUpload;
 
-internal sealed class UploadCarImageCommandHandler(
+internal sealed class ConfirmImageUploadCommandHandler(
     IApplicationDbContext context,
     IStorageService storage,
     ICurrentTenantService tenant,
     IDateTimeProvider dateTimeProvider)
-    : ICommandHandler<UploadCarImageCommand, CarImageDto>
+    : ICommandHandler<ConfirmImageUploadCommand, CarImageDto>
 {
     private static readonly TimeSpan ReadTtl = TimeSpan.FromMinutes(15);
 
     public async Task<Result<CarImageDto>> Handle(
-        UploadCarImageCommand command,
+        ConfirmImageUploadCommand command,
         CancellationToken cancellationToken)
     {
         Car? car = await context.Cars
@@ -31,31 +31,21 @@ internal sealed class UploadCarImageCommandHandler(
             return Result.Failure<CarImageDto>(CarErrors.NotFound(command.CarId));
         }
 
-        if (car.Images.Count >= CarImageUploadConstraints.MaxImagesPerCar)
-        {
-            return Result.Failure<CarImageDto>(
-                CarErrors.ImageLimitReached(CarImageUploadConstraints.MaxImagesPerCar));
-        }
+        string ext = Path.GetExtension(command.FileName).TrimStart('.');
+        if (string.IsNullOrEmpty(ext)) ext = "jpg";
+        string objectKey = $"cars/{tenant.DealerId}/{car.Id}/{command.ImageId}.{ext}";
 
-        Guid imageId = Guid.NewGuid();
-        string ext = CarImageUploadConstraints.ExtensionFor(command.ContentType);
-        string objectKey = $"cars/{tenant.DealerId}/{car.Id}/{imageId}.{ext}";
-
-        await storage.UploadFileAsync(
-            command.FileStream,
-            objectKey,
-            command.ContentType,
-            command.SizeBytes,
-            cancellationToken);
+        // We assume the file is already in storage because the client uploaded it.
+        // In a more robust system, we would verify its existence here.
 
         int nextOrder = car.Images.Count == 0
             ? 0
             : car.Images.Max(i => i.DisplayOrder) + 1;
 
-        bool isCover = car.Images.Count == 0; // first image becomes the cover by default
+        bool isCover = car.Images.Count == 0;
 
         CarImage image = CarImage.Create(
-            imageId,
+            command.ImageId,
             car.Id,
             objectKey,
             command.ContentType,

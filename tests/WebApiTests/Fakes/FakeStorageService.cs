@@ -26,12 +26,24 @@ public sealed class FakeStorageService : IStorageService
 
     public int Count => _objects.Count;
 
-    public async Task<string> UploadFileAsync(Stream stream, string objectKey, string contentType, CancellationToken ct)
+    public async Task<string> UploadFileAsync(Stream stream, string objectKey, string contentType, long? size, CancellationToken ct)
     {
         using var ms = new MemoryStream();
         await stream.CopyToAsync(ms, ct);
         _objects[objectKey] = ms.ToArray();
         return objectKey;
+    }
+
+    public Task<(string Url, IReadOnlyDictionary<string, string> Fields)> GeneratePresignedPostAsync(
+        string objectKey, string contentType, TimeSpan ttl, CancellationToken ct)
+    {
+        var url = $"{Scheme}://{PublicHost}/cars";
+        IReadOnlyDictionary<string, string> fields = new System.Collections.Generic.Dictionary<string, string>
+        {
+            ["key"] = objectKey,
+            ["Content-Type"] = contentType,
+        };
+        return Task.FromResult((url, fields));
     }
 
     public Task DeleteFileAsync(string objectKey, CancellationToken ct)

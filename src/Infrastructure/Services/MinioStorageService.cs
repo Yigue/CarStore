@@ -3,6 +3,7 @@ using Infrastructure.Services.Internal;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Minio;
+using Minio.DataModel;
 using Minio.DataModel.Args;
 using Minio.Exceptions;
 
@@ -46,13 +47,18 @@ internal sealed class MinioStorageService : IStorageService
         Stream stream,
         string objectKey,
         string contentType,
+        long? size,
         CancellationToken ct)
     {
-        // The Minio SDK needs the object length; if the stream can't report it, buffer it.
+        // The Minio SDK needs the object length; if the stream can't report it and size is null, buffer it.
         Stream uploadStream = stream;
         long length;
 
-        if (stream.CanSeek)
+        if (size.HasValue)
+        {
+            length = size.Value;
+        }
+        else if (stream.CanSeek)
         {
             length = stream.Length - stream.Position;
         }
@@ -113,6 +119,26 @@ internal sealed class MinioStorageService : IStorageService
 
         // ADR-4: never let the internal compose host reach the browser.
         return PresignedUrlRewriter.Rewrite(new Uri(presigned, UriKind.Absolute), _publicEndpoint);
+    }
+
+    public async Task<(string Url, IReadOnlyDictionary<string, string> Fields)> GeneratePresignedPostAsync(
+        string objectKey,
+        string contentType,
+        TimeSpan ttl,
+        CancellationToken ct)
+    {
+        var postPolicy = new PostPolicy();
+        postPolicy.SetBucket(_options.BucketName);
+        postPolicy.SetKey(objectKey);
+        postPolicy.SetContentType(contentType);
+        postPolicy.SetExpires(DateTime.UtcNow.Add(ttl));
+
+        (Uri url, IDictionary<string, string> fields) = await _client.PresignedPostPolicyAsync(postPolicy);
+
+        // ADR-4: rewrite host to public endpoint
+        Uri rewrittenUrl = PresignedUrlRewriter.Rewrite(url, _publicEndpoint);
+
+        return (rewrittenUrl.ToString(), new Dictionary<string, string>(fields));
     }
 
     private static bool IsNoSuchKey(MinioException ex) =>

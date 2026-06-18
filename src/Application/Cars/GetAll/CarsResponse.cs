@@ -28,7 +28,7 @@ public sealed record CarsResponses(
 [SuppressMessage("Design", "CA1054:Los parámetros URI deben ser de tipo System.Uri", Justification = "Se usa string para simplificar")]
 public sealed record CarImageResponse(
     Guid Id,
-    string ImageUrl,
+    string Url,
     bool IsCover,
     int DisplayOrder
 );
