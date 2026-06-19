@@ -40,11 +40,13 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 {
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
     o.SerializerOptions.Converters.Add(new Web.Api.Infrastructure.UtcDateTimeJsonConverter());
+    o.SerializerOptions.Converters.Add(new Web.Api.Infrastructure.NullableGuidJsonConverter());
 });
 builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(o =>
 {
     o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     o.JsonSerializerOptions.Converters.Add(new Web.Api.Infrastructure.UtcDateTimeJsonConverter());
+    o.JsonSerializerOptions.Converters.Add(new Web.Api.Infrastructure.NullableGuidJsonConverter());
 });
 
 // Rate limiting for login endpoint
