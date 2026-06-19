@@ -1,0 +1,32 @@
+[
+  {
+    "id": "TC001",
+    "title": "createleadwithvehicleandcontactinfo",
+    "description": "Test creating a new lead with valid contact and vehicle information via POST /api/v1/leads and verify the lead is created successfully."
+  },
+  {
+    "id": "TC002",
+    "title": "updateleadstatuswithvaliddata",
+    "description": "Test updating the status of an existing lead using PATCH /api/v1/leads/{id}/status with valid status data and verify the status is updated correctly."
+  },
+  {
+    "id": "TC003",
+    "title": "linkvehicletolead",
+    "description": "Test linking a vehicle to an existing lead via PATCH /api/v1/leads/{id}/vehicle and verify the vehicle is associated with the lead."
+  },
+  {
+    "id": "TC004",
+    "title": "convertleadtoclient",
+    "description": "Test converting a lead to a client using POST /api/v1/leads/{id}/convert with JSON body {'dni': '12345678', 'address': '123 Main St'} and verify the lead is converted and client record is created."
+  },
+  {
+    "id": "TC005",
+    "title": "createquoteforleadorclient",
+    "description": "Test creating a new quote for a lead or client via POST /api/v1/quotes and verify the quote is created with Pending status."
+  },
+  {
+    "id": "TC006",
+    "title": "acceptquoteandtriggerdomainevents",
+    "description": "Test accepting a quote using POST /api/v1/quotes/{id}/accept and verify the quote status changes to Accepted and related domain events update lead status and create client as expected."
+  }
+]
