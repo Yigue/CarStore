@@ -27,22 +27,26 @@ internal sealed class UpdateCarCommandHandler(
             return Result.Failure<Guid>(CarErrors.NotFound(command.Id));
         }
         
-        // Usar servicio de caché para obtener marca
-        Marca? marca = await cachedBrandService.GetByIdAsync(command.Marca, cancellationToken);
-
-        if (marca is null)
+        // Validate existence via the cache (fast path)...
+        if (await cachedBrandService.GetByIdAsync(command.Marca, cancellationToken) is null)
         {
             return Result.Failure<Guid>(CarErrors.AtributesInvalid());
         }
 
-        // Usar servicio de caché para obtener modelo
-        Modelo? modelo = await cachedModelService.GetByIdAsync(command.Modelo, cancellationToken);
-
-        if (modelo is null)
+        if (await cachedModelService.GetByIdAsync(command.Modelo, cancellationToken) is null)
         {
             return Result.Failure<Guid>(CarErrors.AtributesInvalid());
         }
 
+        // ...but attach the instances tracked by THIS context. The cache round-trips entities
+        // through Redis, so on a hit it returns detached graphs that each carry their own Marca
+        // instance; attaching those duplicates to the tracked car makes EF throw an identity
+        // conflict ("another instance with the same key is already being tracked") on SaveChanges.
+        // Loading from the context (no Include on the model) guarantees a single tracked Marca.
+        Marca marca = await context.Marca
+            .SingleAsync(m => m.Id == command.Marca, cancellationToken);
+        Modelo modelo = await context.Modelo
+            .SingleAsync(m => m.Id == command.Modelo, cancellationToken);
 
         // Update properties that need to be public for EF Core
         // Update properties that need to be public for EF Core
