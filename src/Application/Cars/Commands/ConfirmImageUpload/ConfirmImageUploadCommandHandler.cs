@@ -33,7 +33,7 @@ internal sealed class ConfirmImageUploadCommandHandler(
 
         string ext = Path.GetExtension(command.FileName).TrimStart('.');
         if (string.IsNullOrEmpty(ext)) ext = "jpg";
-        string objectKey = $"cars/{tenant.DealerId}/{car.Id}/{command.ImageId}.{ext}";
+        string objectKey = $"{tenant.DealerId}/{car.Id}/{command.ImageId}.{ext}";
 
         // We assume the file is already in storage because the client uploaded it.
         // In a more robust system, we would verify its existence here.

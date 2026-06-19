@@ -39,7 +39,7 @@ internal sealed class UploadCarImageCommandHandler(
 
         Guid imageId = Guid.NewGuid();
         string ext = CarImageUploadConstraints.ExtensionFor(command.ContentType);
-        string objectKey = $"cars/{tenant.DealerId}/{car.Id}/{imageId}.{ext}";
+        string objectKey = $"{tenant.DealerId}/{car.Id}/{imageId}.{ext}";
 
         await storage.UploadFileAsync(
             command.FileStream,

@@ -135,10 +135,17 @@ internal sealed class MinioStorageService : IStorageService
 
         (Uri url, IDictionary<string, string> fields) = await _client.PresignedPostPolicyAsync(postPolicy);
 
+        // The SDK records a `$Content-Type` policy *condition* but omits the matching form field.
+        // Without it the browser POST violates the policy and MinIO answers 403. Emit it explicitly.
+        var formFields = new Dictionary<string, string>(fields)
+        {
+            ["Content-Type"] = contentType,
+        };
+
         // ADR-4: rewrite host to public endpoint
         Uri rewrittenUrl = PresignedUrlRewriter.Rewrite(url, _publicEndpoint);
 
-        return (rewrittenUrl.ToString(), new Dictionary<string, string>(fields));
+        return (rewrittenUrl.ToString(), formFields);
     }
 
     private static bool IsNoSuchKey(MinioException ex) =>

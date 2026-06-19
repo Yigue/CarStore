@@ -33,7 +33,7 @@ internal sealed class GetImageUploadUrlCommandHandler(
         string ext = Path.GetExtension(command.FileName).TrimStart('.');
         if (string.IsNullOrEmpty(ext)) ext = "jpg";
         
-        string objectKey = $"cars/{tenant.DealerId}/{command.CarId}/{imageId}.{ext}";
+        string objectKey = $"{tenant.DealerId}/{command.CarId}/{imageId}.{ext}";
 
         (string url, IReadOnlyDictionary<string, string> fields) = 
             await storage.GeneratePresignedPostAsync(objectKey, command.ContentType, UploadTtl, cancellationToken);
