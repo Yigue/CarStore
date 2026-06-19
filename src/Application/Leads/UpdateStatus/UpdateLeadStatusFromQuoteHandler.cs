@@ -16,11 +16,24 @@ internal sealed class UpdateLeadStatusFromQuoteHandler(IApplicationDbContext con
             .Include(q => q.Lead)
             .FirstOrDefaultAsync(q => q.Id == notification.QuoteId, cancellationToken);
 
-        if (quote?.Lead is not null && quote.Lead.Status != LeadStatus.Ganado)
+        Lead? leadToUpdate = quote?.Lead;
+
+        if (leadToUpdate is null && quote?.ClientId is not null)
+        {
+            var client = await context.Clients
+                .FirstOrDefaultAsync(c => c.Id == quote.ClientId, cancellationToken);
+            if (client?.OriginLeadId is not null)
+            {
+                leadToUpdate = await context.Leads
+                    .FirstOrDefaultAsync(l => l.Id == client.OriginLeadId.Value, cancellationToken);
+            }
+        }
+
+        if (leadToUpdate is not null && leadToUpdate.Status != LeadStatus.Ganado)
         {
             // System-driven transition: quote acceptance auto-advances the lead to Ganado
             // regardless of current stage (bypasses sequential UI rules).
-            quote.Lead.ForceStatus(LeadStatus.Ganado);
+            leadToUpdate.ForceStatus(LeadStatus.Ganado);
             await context.SaveChangesAsync(cancellationToken);
         }
     }
