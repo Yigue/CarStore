@@ -4,7 +4,8 @@ public sealed class QuoteResponse
 {
     public Guid Id { get; init; }
     public Guid CarId { get; init; }
-    public Guid ClientId { get; init; }
+    public Guid? ClientId { get; init; }
+    public Guid? LeadId { get; init; }
     public decimal ProposedPrice { get; init; }
     public string PaymentMethod { get; init; }
     public string Status { get; init; }

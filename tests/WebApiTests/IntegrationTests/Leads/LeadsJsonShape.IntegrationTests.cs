@@ -17,7 +17,7 @@ public class LeadsJsonShapeIntegrationTests
     {
         // Arrange
         await using var factory = new CustomWebApplicationFactory();
-        
+
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -41,19 +41,84 @@ public class LeadsJsonShapeIntegrationTests
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
+
         var jsonArray = await response.Content.ReadFromJsonAsync<JsonElement>(IntegrationTestHelpers.JsonOptions);
         jsonArray.ValueKind.Should().Be(JsonValueKind.Array);
         jsonArray.GetArrayLength().Should().BeGreaterThan(0);
 
         var firstLead = jsonArray[0];
-        
+
         firstLead.TryGetProperty("status", out var statusValue).Should().BeTrue("Property 'status' should exist in the JSON response");
         statusValue.ValueKind.Should().Be(JsonValueKind.String, "Property 'status' should be a string (enum converted)");
         statusValue.GetString().Should().NotBeNullOrEmpty();
-        
+
         firstLead.TryGetProperty("source", out var sourceValue).Should().BeTrue("Property 'source' should exist in the JSON response");
         sourceValue.ValueKind.Should().Be(JsonValueKind.String, "Property 'source' should be a string (enum converted)");
         sourceValue.GetString().Should().NotBeNullOrEmpty();
+    }
+
+    /// <summary>
+    /// Phase 6 integration test: POST /leads/{id}/convert → 201
+    /// + lead status becomes Ganado
+    /// + client is created with camelCase keys (id, dni, address) and correct persisted values.
+    /// RED before Phases 3 + 4 fixes; GREEN after.
+    /// </summary>
+    [Fact]
+    public async Task ConvertLead_AdvancesLeadToGanado_AndCreatesClientWithCamelCaseShape()
+    {
+        // Arrange
+        await using var factory = new CustomWebApplicationFactory();
+
+        Guid leadId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.Database.EnsureCreated();
+
+            var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
+            var lead = Lead.Create(dealerId, "Convert Test", "convert.test@example.com", "3334445", LeadSource.Web, DateTime.UtcNow);
+            db.Leads.Add(lead);
+            await db.SaveChangesAsync();
+            leadId = lead.Id;
+        }
+
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var httpClient = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(httpClient, token);
+
+        var convertRequest = new { Dni = "12345678", Address = "Av. Rivadavia 1001" };
+
+        // Act: POST /api/v1/leads/{id}/convert
+        var convertResponse = await httpClient.PostAsJsonAsync($"/api/v1/leads/{leadId}/convert", convertRequest);
+
+        // Assert 201
+        convertResponse.StatusCode.Should().Be(HttpStatusCode.Created, "convert must return 201 Created");
+
+        // Extract clientId from response
+        var convertJson = await convertResponse.Content.ReadFromJsonAsync<JsonElement>(IntegrationTestHelpers.JsonOptions);
+        var clientId = convertJson.GetProperty("clientId").GetGuid();
+        clientId.Should().NotBeEmpty("clientId must be a valid Guid");
+
+        // Verify lead status via DB
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var updatedLead = await db.Leads.FindAsync(leadId);
+            updatedLead!.Status.Should().Be(LeadStatus.Ganado, "lead must be Ganado after conversion");
+        }
+
+        // Verify client JSON shape: GET /api/v1/clients/{clientId}
+        var clientResponse = await httpClient.GetAsync($"/api/v1/clients/{clientId}");
+        clientResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Case-SENSITIVE assertion (default JsonSerializerOptions, no PropertyNameCaseInsensitive)
+        var clientJson = await clientResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+        clientJson.TryGetProperty("id", out _).Should().BeTrue("key 'id' (camelCase) must be present");
+        clientJson.TryGetProperty("dni", out var dniProp).Should().BeTrue("key 'dni' (lowercase) must be present");
+        clientJson.TryGetProperty("address", out var addrProp).Should().BeTrue("key 'address' (camelCase) must be present");
+
+        dniProp.GetString().Should().Be("12345678", "persisted DNI must match the convert request");
+        addrProp.GetString().Should().Be("Av. Rivadavia 1001", "persisted address must match the convert request");
     }
 }

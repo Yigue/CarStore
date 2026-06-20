@@ -56,6 +56,9 @@ internal sealed class ConvertLeadToClientCommandHandler(
 
         lead.MarkConverted(targetClient.Id);
 
+        if (lead.Status != LeadStatus.Ganado)
+            lead.ForceStatus(LeadStatus.Ganado);
+
         // Carry the lead's history over to the client so the relationship is preserved:
         // every quote/appointment created while it was a lead now belongs to the client.
         await ReassignLeadArtifactsAsync(context, lead.Id, targetClient.Id, cancellationToken);

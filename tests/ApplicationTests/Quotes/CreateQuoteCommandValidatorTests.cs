@@ -7,6 +7,16 @@ public class CreateQuoteCommandValidatorTests
 {
     private readonly CreateQuoteCommandValidator _validator = new();
 
+    private static CreateQuoteCommand ValidBaseCommand(Guid? clientId, Guid? leadId) =>
+        new CreateQuoteCommand(
+            Guid.NewGuid(),
+            clientId,
+            leadId,
+            1000m,
+            PaymentMethod.Contado,
+            DateTime.UtcNow.AddDays(1),
+            "Ok");
+
     [Fact]
     public void Validate_ShouldFail_ForInvalidValues()
     {
@@ -29,5 +39,47 @@ public class CreateQuoteCommandValidatorTests
         var result = _validator.Validate(command);
 
         result.IsValid.Should().BeTrue();
+    }
+
+    // Phase 5: XOR invariant contract lock (expected GREEN)
+
+    [Fact]
+    public void Validate_ShouldFail_WhenBothClientIdAndLeadIdAreNull()
+    {
+        var command = ValidBaseCommand(clientId: null, leadId: null);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse("a quote must reference exactly one party");
+    }
+
+    [Fact]
+    public void Validate_ShouldFail_WhenBothClientIdAndLeadIdAreProvided()
+    {
+        var command = ValidBaseCommand(clientId: Guid.NewGuid(), leadId: Guid.NewGuid());
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse("a quote cannot reference both a client and a lead");
+    }
+
+    [Fact]
+    public void Validate_ShouldPass_WhenOnlyClientIdIsProvided()
+    {
+        var command = ValidBaseCommand(clientId: Guid.NewGuid(), leadId: null);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeTrue("a client-only quote is valid");
+    }
+
+    [Fact]
+    public void Validate_ShouldPass_WhenOnlyLeadIdIsProvided()
+    {
+        var command = ValidBaseCommand(clientId: null, leadId: Guid.NewGuid());
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeTrue("a lead-only quote is valid");
     }
 }

@@ -30,7 +30,8 @@ internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
         {
             Id = quote.Id,
             CarId = quote.CarId,
-            ClientId = quote.ClientId ?? Guid.Empty,
+            ClientId = quote.ClientId,
+            LeadId = quote.LeadId,
             ProposedPrice = quote.ProposedPrice.Amount,
             PaymentMethod = quote.PaymentMethod.ToString(),
             Status = quote.Status.ToString(),

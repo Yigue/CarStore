@@ -37,4 +37,38 @@ public class ConvertLeadToClientCommandValidatorTests
 
         result.IsValid.Should().BeTrue();
     }
+
+    // Phase 3 RED: Address validation
+
+    [Fact]
+    public void Validate_ShouldFail_WhenAddressIsEmpty()
+    {
+        var command = new ConvertLeadToClientCommand(Guid.NewGuid(), "28345678", string.Empty);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(ConvertLeadToClientCommand.Address));
+    }
+
+    [Fact]
+    public void Validate_ShouldFail_WhenAddressIsWhitespace()
+    {
+        var command = new ConvertLeadToClientCommand(Guid.NewGuid(), "28345678", "   ");
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(ConvertLeadToClientCommand.Address));
+    }
+
+    [Fact]
+    public void Validate_ShouldPass_WhenDniAndAddressAreProvided()
+    {
+        var command = new ConvertLeadToClientCommand(Guid.NewGuid(), "28345678", "Av. Corrientes 1234");
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeTrue();
+    }
 }

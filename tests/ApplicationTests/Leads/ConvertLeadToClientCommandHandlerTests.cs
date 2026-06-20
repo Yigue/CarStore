@@ -75,4 +75,50 @@ public class ConvertLeadToClientCommandHandlerTests
 
         result.IsFailure.Should().BeTrue();
     }
+
+    // Phase 4 RED: ConvertLead → LeadStatus.Ganado
+
+    [Fact]
+    public async Task Handle_ShouldAdvanceLeadToGanado_OnSuccessfulConversion()
+    {
+        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        var lead = Lead.Create(dealerId, "Pedro Ramirez", "pedro@test.com", "5556667", LeadSource.Web, DateTime.UtcNow);
+        context.Leads.Add(lead);
+        await context.SaveChangesAsync();
+
+        var dateProvider = new FakeDateTimeProvider();
+        var handler = new ConvertLeadToClientCommandHandler(context, dateProvider);
+        var command = new ConvertLeadToClientCommand(lead.Id, "29111333", "Av. Siempre Viva 742");
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+
+        var updatedLead = await context.Leads.FindAsync(lead.Id);
+        updatedLead!.Status.Should().Be(LeadStatus.Ganado, "converting a lead must advance its status to Ganado");
+    }
+
+    [Fact]
+    public async Task Handle_ShouldNotThrow_WhenLeadIsAlreadyGanado()
+    {
+        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        var lead = Lead.Create(dealerId, "Maria Sosa", "maria.sosa@test.com", "7778889", LeadSource.Web, DateTime.UtcNow);
+        // Manually advance lead to Ganado via ForceStatus (same as quote-accept path)
+        lead.ForceStatus(LeadStatus.Ganado);
+        context.Leads.Add(lead);
+        await context.SaveChangesAsync();
+
+        var dateProvider = new FakeDateTimeProvider();
+        var handler = new ConvertLeadToClientCommandHandler(context, dateProvider);
+        var command = new ConvertLeadToClientCommand(lead.Id, "33444555", "Calle Falsa 123");
+
+        // Must not throw; idempotent with UpdateLeadStatusFromQuoteHandler
+        var act = async () => await handler.Handle(command, CancellationToken.None);
+        await act.Should().NotThrowAsync();
+
+        var updatedLead = await context.Leads.FindAsync(lead.Id);
+        updatedLead!.Status.Should().Be(LeadStatus.Ganado, "status must remain Ganado");
+    }
 }
