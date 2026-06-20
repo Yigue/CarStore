@@ -13,6 +13,7 @@
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="MailKit" />
     <PackageReference Include="Minio" />
     <PackageReference Include="Moq" />
     <PackageReference Include="Newtonsoft.Json" />
@@ -41,6 +42,7 @@
   <ItemGroup>
         <InternalsVisibleTo Include="ArchitectureTests" />
         <InternalsVisibleTo Include="InfrastructureTests" />
+        <InternalsVisibleTo Include="Application.UnitTests" />
   </ItemGroup>
 
 

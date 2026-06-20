@@ -131,6 +131,30 @@ public static class DependencyInjection
 
         services.AddSingleton<FinancingCalculationService>();
 
+        // Email: optional-service pattern (mirrors IBlobStorageService/IOcrService).
+        // When Email:Smtp:Host is present → SmtpEmailService (real SMTP via MailKit).
+        // When absent → NoOpEmailService (logs only, never throws).
+        // ValidateOnStart is NOT used because an absent section must not crash boot (R6).
+        services.AddOptions<EmailOptions>()
+            .BindConfiguration(EmailOptions.SectionName)
+            .ValidateDataAnnotations();
+
+        services.AddScoped<Application.Abstractions.Messaging.IEmailService>(provider =>
+        {
+            var cfg = provider.GetRequiredService<IConfiguration>();
+            var host = cfg["Email:Smtp:Host"];
+
+            if (!string.IsNullOrWhiteSpace(host))
+            {
+                return new SmtpEmailService(
+                    provider.GetRequiredService<IOptions<EmailOptions>>(),
+                    provider.GetRequiredService<ILogger<SmtpEmailService>>());
+            }
+
+            return new NoOpEmailService(
+                provider.GetRequiredService<ILogger<NoOpEmailService>>());
+        });
+
         return services;
     }
 
