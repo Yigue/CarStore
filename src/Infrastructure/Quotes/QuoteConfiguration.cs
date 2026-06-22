@@ -34,6 +34,14 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.Property(q => q.CreatedAt)
             .IsRequired();
 
+        builder.Property(q => q.IsDeleted)
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(q => q.DeletedAtUtc);
+
+        builder.HasIndex(q => q.IsDeleted);
+
         builder.HasOne(q => q.Car)
             .WithMany()
             .HasForeignKey(q => q.CarId)

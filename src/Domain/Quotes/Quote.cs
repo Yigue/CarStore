@@ -8,7 +8,7 @@ using Domain.Shared.ValueObjects;
 
 namespace Domain.Quotes;
 
-public sealed class Quote : Entity
+public sealed class Quote : Entity, ISoftDeletable
 {
     public Guid CarId { get; private set; }
     public Guid? ClientId { get; private set; }
@@ -23,6 +23,8 @@ public sealed class Quote : Entity
     public Car Car { get; private set; }
     public Client? Client { get; private set; }
     public Lead? Lead { get; private set; }
+    public bool IsDeleted { get; private set; }
+    public DateTime? DeletedAtUtc { get; private set; }
 
     private Quote() { }
 
@@ -153,5 +155,18 @@ public sealed class Quote : Entity
         ClientId = clientId;
         LeadId = null;
         Lead = null;
+    }
+
+    /// <summary>
+    /// Logically deletes the quote. The row is retained and excluded from default queries via
+    /// the EF Core global query filter; this is an idempotent operation.
+    /// </summary>
+    public void Delete(DateTime deletedAtUtc)
+    {
+        if (IsDeleted)
+            return;
+
+        IsDeleted = true;
+        DeletedAtUtc = deletedAtUtc;
     }
 }

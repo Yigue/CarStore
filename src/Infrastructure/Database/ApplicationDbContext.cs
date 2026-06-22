@@ -94,8 +94,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Client>().HasQueryFilter(x => 
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
-        modelBuilder.Entity<Quote>().HasQueryFilter(x => 
-            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Quote>().HasQueryFilter(x =>
+            (!_tenantService.HasTenant || x.DealerId == _tenantService.DealerId) && !x.IsDeleted);
         modelBuilder.Entity<Sale>().HasQueryFilter(x => 
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<FinancialTransaction>().HasQueryFilter(x => 
