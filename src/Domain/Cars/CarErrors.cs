@@ -34,7 +34,10 @@ public static class CarErrors
         "CarImage.BlobDeleteFailed",
         "Failed to delete the image blob from object storage.");
 
-    public static readonly Error CarBlobDeleteFailed = Error.Problem(
+    // Storage-backend failure (not a client error): a blob delete threw, so the cascade
+    // delete was aborted and the DB left untouched. Typed as Failure so it maps to HTTP 500
+    // (CustomResults) — the caller did nothing wrong and the operation may succeed on retry.
+    public static readonly Error CarBlobDeleteFailed = Error.Failure(
         "Car.BlobDeleteFailed",
         "Failed to delete one or more car image blobs from object storage; the delete was rolled back.");
 

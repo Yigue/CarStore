@@ -34,7 +34,7 @@ public class AdminBackfillEndpointTests
         // Arrange
         await using var factory = new CustomWebApplicationFactory();
         factory.SeedDatabase();
-        await SeedCarWithLegacyImage(factory);
+        var legacyImageId = await SeedCarWithLegacyImage(factory);
 
         var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
         var client = factory.CreateClient();
@@ -53,10 +53,12 @@ public class AdminBackfillEndpointTests
         body!.Action.Should().Be("DryRun");
         body.AffectedRowCount.Should().BeGreaterThanOrEqualTo(1);
 
-        // The legacy car_image row MUST still be IsCover=false after the dry-run.
+        // The seeded legacy car_image row MUST still be IsCover=false after the dry-run.
+        // Query by its specific Id (not FirstAsync) so cross-class parallel runs cannot
+        // surface a foreign row and make the assertion non-deterministic.
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<Infrastructure.Database.ApplicationDbContext>();
-        var stillLegacy = await context.CarImages.IgnoreQueryFilters().FirstAsync();
+        var stillLegacy = await context.CarImages.IgnoreQueryFilters().FirstAsync(ci => ci.Id == legacyImageId);
         stillLegacy.IsCover.Should().BeFalse();
     }
 
@@ -66,7 +68,7 @@ public class AdminBackfillEndpointTests
         // Arrange
         await using var factory = new CustomWebApplicationFactory();
         factory.SeedDatabase();
-        await SeedCarWithLegacyImage(factory);
+        var legacyImageId = await SeedCarWithLegacyImage(factory);
 
         var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
         var client = factory.CreateClient();
@@ -84,9 +86,11 @@ public class AdminBackfillEndpointTests
         body.Should().NotBeNull();
         body!.Action.Should().Be("Apply");
 
+        // Query the seeded image by its specific Id so a foreign row from a parallel run
+        // cannot satisfy/break the assertion (FirstAsync ordering is non-deterministic).
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<Infrastructure.Database.ApplicationDbContext>();
-        var image = await context.CarImages.IgnoreQueryFilters().FirstAsync();
+        var image = await context.CarImages.IgnoreQueryFilters().FirstAsync(ci => ci.Id == legacyImageId);
         image.IsCover.Should().BeTrue();
     }
 
@@ -134,7 +138,7 @@ public class AdminBackfillEndpointTests
     /// the backfill is designed to repair. Uses the dealer's admin user id so the
     /// global query filter does not strip the row.
     /// </summary>
-    private static async Task SeedCarWithLegacyImage(CustomWebApplicationFactory factory)
+    private static async Task<Guid> SeedCarWithLegacyImage(CustomWebApplicationFactory factory)
     {
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<Infrastructure.Database.ApplicationDbContext>();
@@ -172,5 +176,7 @@ public class AdminBackfillEndpointTests
             displayOrder: 0);
         context.CarImages.Add(legacyImage);
         await context.SaveChangesAsync();
+
+        return legacyImage.Id;
     }
 }
