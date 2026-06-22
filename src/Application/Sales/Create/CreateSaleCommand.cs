@@ -10,6 +10,7 @@ public sealed record CreateSaleCommand(
     PaymentMethod PaymentMethod,
     string ContractNumber,
     string Comments,
-    Guid? LeadId = null
+    Guid? LeadId = null,
+    Guid? QuoteId = null
     ) : ICommand<Guid>;
 

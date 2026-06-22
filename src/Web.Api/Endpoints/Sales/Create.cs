@@ -17,7 +17,8 @@ internal sealed class Create : IEndpoint
         string Status,
         string ContractNumber,
         string Comments,
-        Guid? LeadId = null);
+        Guid? LeadId = null,
+        Guid? QuoteId = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -30,7 +31,8 @@ internal sealed class Create : IEndpoint
                 request.PaymentMethod,
                 request.ContractNumber,
                 request.Comments,
-                request.LeadId);
+                request.LeadId,
+                request.QuoteId);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

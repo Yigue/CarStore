@@ -58,7 +58,8 @@ internal sealed class CreateSaleCommandHandler(
             command.ContractNumber,
             command.Comments,
             dateTimeProvider.UtcNow,
-            command.LeadId
+            command.LeadId,
+            command.QuoteId
             );
  
         // Update car status using domain method

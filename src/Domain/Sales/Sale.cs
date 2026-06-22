@@ -39,13 +39,15 @@ public sealed class Sale : Entity
         string contractNumber,
         string comments,
         DateTime saleDate,
-        Guid? leadId = null)
+        Guid? leadId = null,
+        Guid? quoteId = null)
     {
         SetDealer(dealerId);
         Id = Guid.NewGuid();
         CarId = carId;
         ClientId = clientId;
         LeadId = leadId;
+        QuoteId = quoteId;
         FinalPrice = new Money(finalPrice);
         PaymentMethod = paymentMethod;
         ContractNumber = contractNumber;
