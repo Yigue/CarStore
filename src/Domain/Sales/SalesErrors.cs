@@ -21,5 +21,9 @@ public static class SalesErrors
     public static Error InvalidPrice() => Error.Problem(
         "Sales.InvalidPrice",
         "FinalPrice must be greater than 0");
+
+    public static Error CannotEditNonPending(Guid saleId) => Error.Conflict(
+        "Sales.CannotEditNonPending",
+        $"The sale with Id = '{saleId}' cannot be edited because it is not in a pending state.");
 }
 
