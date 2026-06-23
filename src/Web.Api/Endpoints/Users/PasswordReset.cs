@@ -19,20 +19,18 @@ internal sealed class PasswordReset : IEndpoint
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("users/password-reset", (
+        app.MapPost("users/password-reset", async (
             [FromBody] Request request,
-            ILoggerFactory loggerFactory) =>
+            MediatR.ISender sender,
+            CancellationToken cancellationToken) =>
         {
-            var logger = loggerFactory.CreateLogger("PasswordReset");
-            logger.LogInformation(
-                "Password reset solicitado para {Email}. STUB: aún no se envía email — pendiente integración SMTP.",
-                request.Email);
+            var command = new Application.Users.Commands.RequestPasswordReset.RequestPasswordResetCommand(request.Email);
+            await sender.Send(command, cancellationToken);
 
             // Respuesta neutral por seguridad: no confirmamos si el email existe.
             return Results.Ok(new
             {
-                message = "Si la cuenta existe, recibirás instrucciones para restablecer tu contraseña.",
-                stub = true
+                message = "Si la cuenta existe, recibirás instrucciones para restablecer tu contraseña."
             });
         })
         .WithTags(Tags.Users)

@@ -83,8 +83,9 @@ public class SaleTests
         completed.ClientId.Should().Be(clientId);
         completed.FinalPrice.Amount.Should().Be(finalPriceDecimal);
 
-        var cancelled = new SaleCancelledDomainEvent(saleId, reason);
+        var cancelled = new SaleCancelledDomainEvent(saleId, carId, reason);
         cancelled.SaleId.Should().Be(saleId);
+        cancelled.CarId.Should().Be(carId);
         cancelled.Reason.Should().Be(reason);
     }
 }

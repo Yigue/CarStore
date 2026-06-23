@@ -35,13 +35,21 @@ internal sealed class UpdateClientCommandHandler(
             notes: command.Notes);
         
         // Handle status change using domain methods
-        if (command.Status == ClientStatus.Active && client.Status == ClientStatus.Inactive)
+        if (command.Status == ClientStatus.Active)
         {
             client.Activate();
         }
-        else if (command.Status == ClientStatus.Inactive && client.Status == ClientStatus.Active)
+        else if (command.Status == ClientStatus.Inactive)
         {
             client.Deactivate();
+        }
+        else if (command.Status == ClientStatus.Prospect)
+        {
+            client.SetProspect();
+        }
+        else if (command.Status == ClientStatus.VIP)
+        {
+            client.SetVIP();
         }
 
         await context.SaveChangesAsync(cancellationToken);

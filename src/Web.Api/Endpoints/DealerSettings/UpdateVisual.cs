@@ -32,7 +32,7 @@ internal sealed class UpdateVisual : IEndpoint
                 _ => Results.Ok(),
                 CustomResults.Problem);
         })
-        .HasPermission("CanManageUsers")
+        .HasPermission("CanManageSettings")
         .WithTags(Tags.DealerSettings)
         .WithName("UpdateDealerVisual")
         .Produces(StatusCodes.Status200OK)

@@ -121,6 +121,27 @@ builder.Services.AddCors(options =>
 
 WebApplication app = builder.Build();
 
+// Fail fast if the JWT signing key is missing or still set to the committed placeholder.
+// The secret MUST be provided at runtime via the Jwt__Secret environment variable,
+// a secrets manager, or dotnet user-secrets — never committed to source control.
+string? jwtSecret = app.Configuration["Jwt:Secret"];
+if (string.IsNullOrWhiteSpace(jwtSecret) ||
+    jwtSecret.Contains("super-duper-secret", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException(
+        "Jwt:Secret is not configured. Provide a strong secret via the Jwt__Secret " +
+        "environment variable, a secrets manager, or dotnet user-secrets. " +
+        "It must not be empty or the committed placeholder value.");
+}
+
+bool isDevOrTesting = app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing");
+if (!isDevOrTesting && jwtSecret.Length < 32)
+{
+    throw new InvalidOperationException(
+        "Jwt:Secret must be at least 32 characters in non-development environments " +
+        "to provide adequate signing strength for HMAC-SHA256.");
+}
+
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.ApplyMigrations();

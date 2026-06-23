@@ -39,6 +39,28 @@ public class UpdateClientCommandHandlerTests
         updated.UpdateAt.Should().Be(dateProvider.UtcNow);
     }
 
+    [Theory]
+    [InlineData(ClientStatus.Prospect)]
+    [InlineData(ClientStatus.VIP)]
+    public async Task Handle_Should_ApplyExtendedStatus(ClientStatus targetStatus)
+    {
+        using var context = CreateContext();
+        var dateProvider = new FakeDateTimeProvider { UtcNow = new DateTime(2024, 1, 1) };
+        var dealerId = Guid.NewGuid();
+        var client = new Client(dealerId, "John", "Doe", "123", "john@test.com", "555", "Street 1", dateProvider.UtcNow);
+        context.Clients.Add(client);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateClientCommandHandler(context, dateProvider);
+        var command = new UpdateClientCommand(client.Id, "John", "Doe", "123", "john@test.com", "555", "Street 1", targetStatus);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var updated = await context.Clients.FindAsync(client.Id);
+        updated!.Status.Should().Be(targetStatus);
+    }
+
     [Fact]
     public async Task Handle_Should_ReturnFailure_WhenClientNotFound()
     {

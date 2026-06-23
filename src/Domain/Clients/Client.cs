@@ -112,4 +112,20 @@ public sealed class Client : Entity
         
         Status = ClientStatus.Active;
     }
+
+    public void SetProspect()
+    {
+        if (Status == ClientStatus.Prospect)
+            return;
+
+        Status = ClientStatus.Prospect;
+    }
+
+    public void SetVIP()
+    {
+        if (Status == ClientStatus.VIP)
+            return;
+
+        Status = ClientStatus.VIP;
+    }
 }

@@ -23,6 +23,7 @@
     <InternalsVisibleTo Include="AuthenticationTests" />
     <InternalsVisibleTo Include="BehaviorTests" />
     <InternalsVisibleTo Include="WebApiTests" />
+    <InternalsVisibleTo Include="InfrastructureEfTests" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" /> <!-- Necesario para Moq -->
   </ItemGroup>
 

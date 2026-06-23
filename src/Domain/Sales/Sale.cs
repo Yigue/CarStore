@@ -76,7 +76,7 @@ public sealed class Sale : Entity
             throw new DomainException("Cancellation reason is required");
         
         Status = SaleStatus.Cancelled;
-        Raise(new SaleCancelledDomainEvent(Id, reason));
+        Raise(new SaleCancelledDomainEvent(Id, CarId, reason));
     }
     
     public void Update(
