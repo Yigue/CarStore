@@ -34,10 +34,10 @@ internal sealed class GetAppointmentsQueryHandler(
                 on a.VehicleId equals car.Id into carJoin
             from car in carJoin.DefaultIfEmpty()
             join marca in context.Marca.AsNoTracking()
-                on (car != null ? car.MarcaId : Guid.Empty) equals marca.Id into marcaJoin
+                on car.MarcaId equals marca.Id into marcaJoin
             from marca in marcaJoin.DefaultIfEmpty()
             join modelo in context.Modelo.AsNoTracking()
-                on (car != null ? car.ModeloId : Guid.Empty) equals modelo.Id into modeloJoin
+                on car.ModeloId equals modelo.Id into modeloJoin
             from modelo in modeloJoin.DefaultIfEmpty()
             join client in context.Clients.IgnoreQueryFilters().AsNoTracking()
                 on a.ClientId equals (Guid?)client.Id into clientJoin
