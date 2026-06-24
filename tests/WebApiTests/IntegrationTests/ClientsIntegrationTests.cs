@@ -23,18 +23,19 @@ public class ClientsIntegrationTests
 
         var request = new
         {
-            FirstName = "Juan",
-            LastName = "Pérez",
-            DNI = "12345678",
-            Email = "juan.perez@example.com",
+            FirstName = "Unique",
+            LastName = "Client",
+            DNI = "UNIQUE123",
+            Email = "unique.client@example.com",
             Phone = "+54 11 1234-5678",
             Address = "Av. Corrientes 1234, Buenos Aires"
         };
 
         var response = await client.PostAsJsonAsync("/api/v1/clients", request);
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
-        var clientId = await response.Content.ReadFromJsonAsync<Guid>();
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
+        var clientId = result!.id;
         clientId.Should().NotBe(Guid.Empty);
 
         using var scope = factory.Services.CreateScope();
@@ -42,11 +43,16 @@ public class ClientsIntegrationTests
 
         var createdClient = await context.Clients
             .IgnoreQueryFilters()
-            .FirstAsync(c => c.Id == clientId);        createdClient.FirstName.Should().Be("Juan");
-        createdClient.LastName.Should().Be("Pérez");
-        createdClient.Email.Value.Should().Be("juan.perez@example.com");
-        createdClient.DNI.Should().Be("12345678");
+            .AsNoTracking()
+            .FirstAsync(c => c.Id == clientId);
+
+        createdClient.FirstName.Should().Be("Unique");
+        createdClient.LastName.Should().Be("Client");
+        createdClient.Email.Value.Should().Be("unique.client@example.com");
+        createdClient.DNI.Should().Be("UNIQUE123");
     }
+
+    private sealed record CreateResponse(Guid id);
 
     [Fact]
     public async Task GetClients_ShouldReturnClients()
@@ -60,7 +66,7 @@ public class ClientsIntegrationTests
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
-        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var client1 = new Domain.Clients.Client(
             dealerId,
             "María",
@@ -87,7 +93,7 @@ public class ClientsIntegrationTests
         var response = await client.GetAsync("/api/v1/clients");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var clients = await response.Content.ReadFromJsonAsync<List<Application.Clients.GetAll.ClientResponse>>();
+        var clients = await response.Content.ReadFromJsonAsync<List<Application.Clients.GetAll.ClientResponse>>(IntegrationTestHelpers.JsonOptions);
         clients.Should().NotBeNull();
         clients!.Count.Should().BeGreaterThanOrEqualTo(2);
         clients.Should().Contain(c => c.Email == "maria.gonzalez@example.com");
@@ -105,7 +111,7 @@ public class ClientsIntegrationTests
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
-        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var testClient = new Domain.Clients.Client(
             dealerId,
             "Ana",
@@ -122,7 +128,7 @@ public class ClientsIntegrationTests
         var response = await client.GetAsync($"/api/v1/clients/{testClient.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var result = await response.Content.ReadFromJsonAsync<Application.Clients.GetAll.ClientResponse>();
+        var result = await response.Content.ReadFromJsonAsync<Application.Clients.GetAll.ClientResponse>(IntegrationTestHelpers.JsonOptions);
         result.Should().NotBeNull();
         result!.Id.Should().Be(testClient.Id);
         result.FirstName.Should().Be("Ana");
@@ -141,7 +147,7 @@ public class ClientsIntegrationTests
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
-        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var testClient = new Domain.Clients.Client(
             dealerId,
             "Luis",
@@ -169,7 +175,7 @@ public class ClientsIntegrationTests
         var response = await client.PutAsJsonAsync($"/api/v1/clients/{testClient.Id}", updateRequest);
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var updatedClient = await context.Clients.IgnoreQueryFilters().FirstAsync(c => c.Id == testClient.Id);
+        var updatedClient = await context.Clients.IgnoreQueryFilters().AsNoTracking().FirstAsync(c => c.Id == testClient.Id);
         updatedClient.Email.Value.Should().Be("luis.fernandez.updated@example.com");
         updatedClient.Phone.Should().Be("+54 11 3333-9999");
     }

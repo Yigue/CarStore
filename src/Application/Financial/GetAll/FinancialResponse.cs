@@ -1,26 +1,23 @@
-using System.Transactions;
-using Domain.Cars;
-using Domain.Cars.Attributes;
-using Domain.Clients;
 using Domain.Financial.Attributes;
-using Domain.Sales;
 
 namespace Application.Financial.GetAll;
 
 public sealed record FinancialResponses(
- Guid Id,
- TransactionType Type,
- decimal Amount,
- string Description,
- PaymentMethod PaymentMethod,
- string? ReferenceNumber,
- DateTime TransactionDate,
- TransactionCategory Category,
- Car? Car,
- Client? Client,
- Sale? Sale
+    Guid Id,
+    TransactionType Type,
+    decimal Amount,
+    string Description,
+    PaymentMethod PaymentMethod,
+    string? ReferenceNumber,
+    DateTime Date,
+    Guid? CategoryId,
+    string? CategoryName,
+    Guid? CarId,
+    string? CarLabel,
+    Guid? ClientId,
+    string? ClientName,
+    Guid? SaleId,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    Guid TenantId
 );
-
-
-
-    

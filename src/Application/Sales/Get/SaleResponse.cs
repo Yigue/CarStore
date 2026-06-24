@@ -5,6 +5,8 @@ public sealed class SaleResponse
     public Guid Id { get; init; }
     public Guid CarId { get; init; }
     public Guid ClientId { get; init; }
+    public Guid? QuoteId { get; init; }
+    public Guid? LeadId { get; init; }
 
     public decimal FinalPrice { get; init; }
     public string PaymentMethod { get; init; }

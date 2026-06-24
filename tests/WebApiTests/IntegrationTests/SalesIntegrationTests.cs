@@ -33,7 +33,7 @@ public class SalesIntegrationTests
         var volkswagen = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Volkswagen");
         var gol = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Gol" && m.MarcaId == volkswagen.Id); 
 
-        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var car = new Car(
             dealerId,
             volkswagen,
@@ -47,7 +47,7 @@ public class SalesIntegrationTests
             1600,
             0,
             2024,
-            "ABC123",
+            "UNQ123",
             "Volkswagen Gol nuevo",
             22000m,
             DateTime.UtcNow);        
@@ -55,8 +55,8 @@ public class SalesIntegrationTests
             dealerId,
             "Roberto",
             "Silva",
-            "33445566",
-            "roberto.silva@example.com",
+            "VTA_UNIQUE_DNI",
+            "roberto.silva.unique@example.com",
             "+54 11 2222-1111",
             "Av. Rivadavia 1234",
             DateTime.UtcNow);
@@ -71,19 +71,20 @@ public class SalesIntegrationTests
             ClientId = testClient.Id.ToString(),
             FinalPrice = 22000m,
             PaymentMethod = (int)PaymentMethod.Cash,
-            ContractNumber = "VTA-2024-001",
-            Comments = "Venta de Volkswagen Gol"
+            ContractNumber = "VTA-123",
+            Comments = ""
         };
 
         var response = await client.PostAsJsonAsync("/api/v1/sales", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var saleId = result!.id;
         saleId.Should().NotBe(Guid.Empty);
 
         var createdSale = await context.Sales
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Include(s => s.Car)
             .Include(s => s.Client)
             .FirstAsync(s => s.Id == saleId);        
@@ -94,7 +95,7 @@ public class SalesIntegrationTests
         createdSale.Status.Should().Be(SaleStatus.Completed);
         
         // Verificar que el carro se marcó como vendido
-        var updatedCar = await context.Cars.IgnoreQueryFilters().FirstAsync(c => c.Id == car.Id);
+        var updatedCar = await context.Cars.IgnoreQueryFilters().AsNoTracking().FirstAsync(c => c.Id == car.Id);
         updatedCar!.ServiceCar.Should().Be(StatusServiceCar.Vendido);
     }
 
@@ -112,7 +113,7 @@ public class SalesIntegrationTests
         var ford = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Ford");
         var focus = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Focus" && m.MarcaId == ford.Id);   
 
-        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var car = new Car(
             dealerId,
             ford,
@@ -126,7 +127,7 @@ public class SalesIntegrationTests
             2000,
             30000,
             2021,
-            "ABC123",
+            "UNQ123",
             "Ford Focus usado",
             19000m,
             DateTime.UtcNow);        
@@ -145,7 +146,7 @@ public class SalesIntegrationTests
         await context.SaveChangesAsync();
 
         var sale = new Domain.Sales.Sale(
-            Guid.Parse("00000000-0000-0000-0000-000000000001"),
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
             car.Id,
             testClient.Id,
             19000m,
@@ -161,7 +162,7 @@ public class SalesIntegrationTests
         var response = await client.GetAsync("/api/v1/sales");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var sales = await response.Content.ReadFromJsonAsync<List<Application.Sales.Get.SaleResponse>>();
+        var sales = await response.Content.ReadFromJsonAsync<List<Application.Sales.Get.SaleResponse>>(IntegrationTestHelpers.JsonOptions);
         sales.Should().NotBeNull();
         sales!.Count.Should().BeGreaterThan(0);
         sales.Should().Contain(s => s.ContractNumber == "VTA-2024-002");
@@ -181,7 +182,7 @@ public class SalesIntegrationTests
         var chevrolet = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Chevrolet");
         var malibu = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Malibu" && m.MarcaId == chevrolet.Id);
         
-        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var car = new Car(
             dealerId,
             chevrolet,
@@ -195,7 +196,7 @@ public class SalesIntegrationTests
             2500,
             0,
             2024,
-            "ABC123",
+            "UNQ123",
             "Chevrolet Malibu nuevo",
             28000m,
             DateTime.UtcNow);
@@ -215,7 +216,7 @@ public class SalesIntegrationTests
         await context.SaveChangesAsync();
 
         var sale = new Domain.Sales.Sale(
-            Guid.Parse("00000000-0000-0000-0000-000000000001"),
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
             car.Id,
             testClient.Id,
             28000m,
@@ -231,7 +232,7 @@ public class SalesIntegrationTests
         var response = await client.GetAsync($"/api/v1/sales/{sale.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-                var result = await response.Content.ReadFromJsonAsync<Application.Sales.Get.SaleResponse>();
+                var result = await response.Content.ReadFromJsonAsync<Application.Sales.Get.SaleResponse>(IntegrationTestHelpers.JsonOptions);
         result.Should().NotBeNull();
         result!.Id.Should().Be(sale.Id);
         result.FinalPrice.Should().Be(28000m);

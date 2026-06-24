@@ -12,6 +12,7 @@ public sealed class TransactionCategory : Entity
 
     public TransactionCategory(string name, string description, TransactionType type)
     {
+        Id = Guid.NewGuid();
         Name = name;
         Description = description;
         Type = type;

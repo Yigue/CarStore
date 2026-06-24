@@ -23,10 +23,16 @@ public class ProcessOutboxMessagesJob(
     /// This eliminates the RCE vector from TypeNameHandling.All.
     /// </summary>
     private static readonly Dictionary<string, Type> DomainEventTypeMap =
-        typeof(IDomainEvent).Assembly
-            .GetTypes()
+        // Concrete domain events live in the Domain assembly, while IDomainEvent
+        // lives in SharedKernel. Scanning only IDomainEvent's assembly left the map
+        // empty, so every outbox message failed with "Unknown event type" and no
+        // domain-event handler ever ran. Scan both assemblies.
+        new[] { typeof(IDomainEvent).Assembly, typeof(Domain.Quotes.Quote).Assembly }
+            .Distinct()
+            .SelectMany(a => a.GetTypes())
             .Where(t => typeof(IDomainEvent).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface)
-            .ToDictionary(t => t.Name, t => t);
+            .GroupBy(t => t.Name)
+            .ToDictionary(g => g.Key, g => g.First());
 
     private static readonly JsonSerializerSettings SafeSerializerSettings = new()
     {

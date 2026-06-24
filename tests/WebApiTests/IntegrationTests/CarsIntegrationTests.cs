@@ -45,7 +45,7 @@ public class CarsIntegrationTests
             Cilindrada = 2000,
             Kilometraje = 0,
             Anio = 2024,
-            Patente = "ABC123",
+            Patente = "UNQ123",
             Descripcion = "Nuevo Toyota Corolla",
             Precio = 25000m
         };
@@ -53,11 +53,12 @@ public class CarsIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/cars", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var carId = result!.id;
 
         var createdCar = await context.Cars
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Include(c => c.Marca)
             .Include(c => c.Modelo)
             .FirstAsync(c => c.Id == carId);
@@ -77,9 +78,9 @@ public class CarsIntegrationTests
         var response = await client.GetAsync("/api/v1/cars");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var cars = await response.Content.ReadFromJsonAsync<List<CarsResponses>>();
-        cars.Should().NotBeNull();
-        cars!.Count.Should().BeGreaterThan(0);
+        var result = await response.Content.ReadFromJsonAsync<SharedKernel.PaginatedResult<CarsResponses>>(IntegrationTestHelpers.JsonOptions);
+        result.Should().NotBeNull();
+        result!.Items.Count.Should().BeGreaterThan(0);
     }
 
     [Fact]
@@ -97,14 +98,14 @@ public class CarsIntegrationTests
         var cruze = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Cruze" && m.MarcaId == chevrolet.Id);
         
         var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
-        var car = new Domain.Cars.Car(dealerId, chevrolet, cruze, Color.Black, TypeCar.Sedan, StatusCar.Used, StatusServiceCar.Disponible, 4, 5, 1800, 50000, 2020, "ABC123", "Desc", 15000m, DateTime.UtcNow);
+        var car = new Domain.Cars.Car(dealerId, chevrolet, cruze, Color.Black, TypeCar.Sedan, StatusCar.Used, StatusServiceCar.Disponible, 4, 5, 1800, 50000, 2020, "UNQ123", "Desc", 15000m, DateTime.UtcNow);
         context.Cars.Add(car);
         await context.SaveChangesAsync();
 
         var response = await client.GetAsync($"/api/v1/cars/{car.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var result = await response.Content.ReadFromJsonAsync<Application.Cars.GetById.CarGetByIdResponse>();
+        var result = await response.Content.ReadFromJsonAsync<Application.Cars.GetById.CarGetByIdResponse>(IntegrationTestHelpers.JsonOptions);
         result!.Id.Should().Be(car.Id);
     }
 
@@ -129,7 +130,7 @@ public class CarsIntegrationTests
             Cilindrada = 2000,
             Kilometraje = 0,
             Anio = 2024,
-            Patente = "ABC123",
+            Patente = "UNQ123",
             Descripcion = "Invalid",
             Precio = 20000m
         };

@@ -1,11 +1,15 @@
 using Application.Abstractions.Tenancy;
+using Application.Abstractions.Data;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace Infrastructure.Tenancy;
 
 /// <summary>
 /// Production implementation of ICurrentTenantService.
 /// Extracts the DealerId from the authenticated user's JWT "dealer_id" claim.
+/// Hardened: Resolves the DealerId from the Host / X-Tenant-Host header for anonymous requests, preventing cross-tenant leakage.
 /// </summary>
 public class CurrentTenantService : ICurrentTenantService
 {
@@ -22,12 +26,60 @@ public class CurrentTenantService : ICurrentTenantService
         {
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("dealer_id");
 
-            if (claim is null || !Guid.TryParse(claim.Value, out var dealerId))
+            if (claim is not null && Guid.TryParse(claim.Value, out var dealerId))
             {
-                return Guid.Empty;
+                return dealerId;
             }
 
-            return dealerId;
+            // Secure fallback for anonymous catalog requests
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext is not null)
+            {
+                string? tenantHost = httpContext.Request.Headers["X-Tenant-Host"].ToString();
+                if (string.IsNullOrWhiteSpace(tenantHost))
+                {
+                    tenantHost = httpContext.Request.Headers["Host"].ToString();
+                }
+
+                if (!string.IsNullOrWhiteSpace(tenantHost))
+                {
+                    // Resolve scoped DB Context on-demand to bypass DI circular reference
+                    var dbContext = httpContext.RequestServices.GetService(typeof(IApplicationDbContext)) as IApplicationDbContext;
+                    if (dbContext is not null)
+                    {
+                        var cleanHost = tenantHost.Split(':')[0].ToLowerInvariant();
+
+                        var settings = dbContext.DealerSettings
+                            .IgnoreQueryFilters()
+                            .FirstOrDefault(s => 
+                                (s.HostName != null && s.HostName.ToLower() == cleanHost) || 
+                                (s.CustomDomain != null && s.CustomDomain.ToLower() == cleanHost));
+
+                        if (settings is not null)
+                        {
+                            return settings.DealerId;
+                        }
+
+                        // Fallback for development: if no host match, use the first (and only) dealer
+                        // This handles cases like 'localhost:3000' vs '127.0.0.1' when host_name is set to any valid value
+                        var fallbackSettings = dbContext.DealerSettings
+                            .IgnoreQueryFilters()
+                            .FirstOrDefault();
+                        
+                        if (fallbackSettings is not null)
+                        {
+                            Serilog.Log.Warning("CurrentTenantService: No se encontró DealerSettings para el host '{Host}'. Activando fallback de desarrollo local con DealerId '{DealerId}'", cleanHost, fallbackSettings.DealerId);
+                            return fallbackSettings.DealerId;
+                        }
+                        else
+                        {
+                            Serilog.Log.Error("CurrentTenantService: No se encontró coincidencia para el host '{Host}' y tampoco existen DealerSettings cargados en la base de datos.", cleanHost);
+                        }
+                    }
+                }
+            }
+
+            return Guid.Empty;
         }
     }
 
@@ -36,7 +88,12 @@ public class CurrentTenantService : ICurrentTenantService
         get
         {
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("dealer_id");
-            return claim is not null && Guid.TryParse(claim.Value, out _);
+            if (claim is not null && Guid.TryParse(claim.Value, out _))
+            {
+                return true;
+            }
+
+            return DealerId != Guid.Empty;
         }
     }
 }

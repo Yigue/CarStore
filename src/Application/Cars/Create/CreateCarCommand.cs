@@ -17,4 +17,8 @@ public sealed record CreateCarCommand(
     int Anio,
     string Patente,
     string Descripcion,
-    decimal Price) : ICommand<Guid>;
+    decimal Price,
+    FuelType FuelType = FuelType.Gasolina,
+    bool Featured = false,
+    Transmission Transmission = Transmission.Manual,
+    decimal? PurchaseCost = null) : ICommand<Guid>;

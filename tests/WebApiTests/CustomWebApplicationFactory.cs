@@ -14,31 +14,45 @@ using Web.Api;
 using System.Collections.Generic;
 using System;
 using Microsoft.Data.Sqlite;
-using System.Data.Common;
+using Application.Abstractions.Storage;
+using WebApiTests.Fakes;
 
 namespace WebApiTests;
 
 public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     public string Id { get; } = Guid.NewGuid().ToString();
-    private readonly DbConnection _connection;
+    private readonly SqliteConnection _connection;
 
-    public const string AdminDealerId = "00000000-0000-0000-0000-000000000001";
+    /// <summary>In-memory storage double; tests can assert uploads/deletes against it.</summary>
+    public FakeStorageService Storage { get; } = new();
+
+    public const string AdminDealerId = "11111111-1111-1111-1111-111111111111";
 
     public CustomWebApplicationFactory()
     {
-        // Crear conexiÃ³n compartida para Sqlite in-memory
+        // Crear conexión compartida para Sqlite en memoria
         _connection = new SqliteConnection("Filename=:memory:");
         _connection.Open();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Forzar variables de entorno ANTES de cualquier configuraciÃ³n
+        // Forzar variables de entorno ANTES de cualquier configuración
         Environment.SetEnvironmentVariable("UseInMemoryDatabase", "true");
         Environment.SetEnvironmentVariable("Jwt__Secret", "SecretKeyForTestingPurposesOnly1234567890");
         Environment.SetEnvironmentVariable("Jwt__Issuer", "CarStore");
         Environment.SetEnvironmentVariable("Jwt__Audience", "CarStore");
+        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", "");
+
+        // Storage:Minio config so the IOptions<MinioOptions> ValidateOnStart passes in tests.
+        // The real MinioStorageService is replaced below by FakeStorageService, so these
+        // values are never used to reach a real MinIO.
+        Environment.SetEnvironmentVariable("Storage__Minio__InternalEndpoint", "http://minio:9000");
+        Environment.SetEnvironmentVariable("Storage__Minio__PublicEndpoint", "http://localhost:9000");
+        Environment.SetEnvironmentVariable("Storage__Minio__AccessKey", "minioadmin");
+        Environment.SetEnvironmentVariable("Storage__Minio__SecretKey", "minioadmin123");
+        Environment.SetEnvironmentVariable("Storage__Minio__BucketName", "cars");
 
         builder.UseEnvironment("Testing");
 
@@ -54,6 +68,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 options.UseSqlite(_connection));
 
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+
+            // Swap the real MinIO-backed storage for the in-memory fake.
+            services.RemoveAll<IStorageService>();
+            services.AddSingleton<IStorageService>(Storage);
         });
     }
 
@@ -71,11 +89,11 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         db.Database.EnsureCreated();
-        
+
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseSeeder");
-        
+
         DatabaseSeeder.SeedAsync(db, passwordHasher, configuration, logger).GetAwaiter().GetResult();
     }
 }

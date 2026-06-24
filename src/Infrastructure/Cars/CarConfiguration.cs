@@ -32,12 +32,12 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
 
         builder.HasOne(c => c.Marca)
             .WithMany()
-            .HasForeignKey("MarcaId")
+            .HasForeignKey(c => c.MarcaId)
             .IsRequired();
 
         builder.HasOne(c => c.Modelo)
             .WithMany()
-            .HasForeignKey("ModeloId")
+            .HasForeignKey(c => c.ModeloId)
             .IsRequired();
 
         builder.Property(c => c.CarType)
@@ -52,12 +52,40 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
         builder.Property(c => c.FuelType)
             .HasConversion<string>();
 
-  
+        builder.Property(c => c.Transmission)
+            .HasConversion<string>()
+            .HasDefaultValue(Transmission.Manual)
+            .IsRequired();
+
+        builder.Property(c => c.Featured)
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.Property(c => c.Price)
             .HasConversion(new MoneyValueConverter())
             .HasColumnName("price")
             .IsRequired();
 
+        // PHASE-4: PurchaseCost mapped as owned value object (Amount + Currency columns).
+        // The OWNED REFERENCE is optional (navigation IsRequired(false)) so the whole
+        // pair of columns is nullable in the DB. Existing Cars survive without backfill.
+        builder.OwnsOne(c => c.PurchaseCost, pc =>
+        {
+            pc.Property(p => p.Amount)
+                .HasColumnName("purchase_cost_amount")
+                .HasColumnType("decimal(18,2)");
 
+            pc.Property(p => p.Currency)
+                .HasColumnName("purchase_cost_currency")
+                .HasMaxLength(3);
+        });
+
+        builder.Navigation(c => c.PurchaseCost).IsRequired(false);
+
+        // PHASE-4: Bind EF Core collection navigation to the private backing field so
+        // the aggregate keeps exposing IReadOnlyList<ReconditioningTask>.
+        builder.Metadata
+            .FindNavigation(nameof(Car.ReconditioningTasks))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
     }
 }

@@ -25,6 +25,13 @@ internal sealed class GetImageWithSas : IEndpoint
                 return Results.NotFound($"Imagen con ID {imageId} no encontrada");
             }
 
+            // MinIO-backed images use ObjectKey + presigned URLs (see /cars/{carId}/images);
+            // this legacy SAS endpoint only handles legacy ImageUrl images.
+            if (string.IsNullOrEmpty(image.ImageUrl))
+            {
+                return Results.NotFound("Esta imagen no tiene una URL legacy; usá GET /cars/{carId}/images.");
+            }
+
             // Para URLs de Azure Blob Storage
             if (image.ImageUrl.Contains("blob.core.windows.net"))
             {

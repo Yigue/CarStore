@@ -1,0 +1,90 @@
+version: "2"
+type: backend
+tech_stack:
+  - C#
+  - .NET 8
+  - ASP.NET Core Minimal API
+  - Entity Framework Core
+  - MediatR
+  - PostgreSQL
+routes:
+  - path: /api/v1/users/login
+    file: src/Web.Api/Endpoints/Users/Login.cs
+    auth_required: false
+    description: Login to get JWT token
+  - path: /api/v1/cars
+    file: src/Web.Api/Endpoints/Cars/Create.cs
+    auth_required: true
+    description: Create a vehicle
+  - path: /api/v1/leads
+    file: src/Web.Api/Endpoints/Leads/GetAll.cs
+    auth_required: true
+    description: Get all leads
+  - path: /api/v1/leads/{id}
+    file: src/Web.Api/Endpoints/Leads/GetById.cs
+    auth_required: true
+    description: Get a lead by ID
+  - path: /api/v1/leads
+    file: src/Web.Api/Endpoints/Leads/Create.cs
+    auth_required: true
+    description: Create a new lead
+  - path: /api/v1/leads/{id}/status
+    file: src/Web.Api/Endpoints/Leads/UpdateStatus.cs
+    auth_required: true
+    description: Update status of a lead
+  - path: /api/v1/leads/{id}/convert
+    file: src/Web.Api/Endpoints/Leads/Convert.cs
+    auth_required: true
+    description: Convert a lead to a client
+  - path: /api/v1/leads/{id}/vehicle
+    file: src/Web.Api/Endpoints/Leads/LinkVehicle.cs
+    auth_required: true
+    description: Link a vehicle to a lead
+  - path: /api/v1/quotes
+    file: src/Web.Api/Endpoints/Quotes/Create.cs
+    auth_required: true
+    description: Create a quote
+  - path: /api/v1/quotes/{id}/accept
+    file: src/Web.Api/Endpoints/Quotes/Accept.cs
+    auth_required: true
+    description: Accept a quote
+features:
+  - name: CRM Lead Management
+    description: Full lifecycle of leads from capture to conversion and status updates
+    files:
+      - src/Web.Api/Endpoints/Leads/Create.cs
+      - src/Web.Api/Endpoints/Leads/UpdateStatus.cs
+      - src/Web.Api/Endpoints/Leads/LinkVehicle.cs
+      - src/Web.Api/Endpoints/Leads/Convert.cs
+    entry_route: /api/v1/leads
+    user_interactions:
+      - Create a new lead with vehicle and contact info
+      - Link interested vehicle to the lead
+      - Update lead status
+      - Convert lead to client
+    api_calls:
+      - method: POST
+        endpoint: /api/v1/leads
+      - method: PATCH
+        endpoint: /api/v1/leads/{id}/status
+      - method: PATCH
+        endpoint: /api/v1/leads/{id}/vehicle
+      - method: POST
+        endpoint: /api/v1/leads/{id}/convert
+    auth_required: true
+  - name: CRM Quotes & Deals
+    description: Creating and accepting quotes to close sales and automatically convert leads
+    files:
+      - src/Web.Api/Endpoints/Quotes/Create.cs
+      - src/Web.Api/Endpoints/Quotes/Accept.cs
+    entry_route: /api/v1/quotes
+    user_interactions:
+      - Create quote for a lead or client
+      - Accept quote which triggers domain event to update lead status and create client
+    api_calls:
+      - method: POST
+        endpoint: /api/v1/quotes
+      - method: POST
+        endpoint: /api/v1/quotes/{id}/accept
+    auth_required: true
+known_limitations: []

@@ -11,8 +11,10 @@ internal sealed class Create : IEndpoint
     public sealed class Request
     {
         public Guid CarId { get; set; }
-        public Guid ClientId { get; set; }
+        public Guid? ClientId { get; set; }
+        public Guid? LeadId { get; set; }
         public decimal ProposedPrice { get; set; }
+        public Domain.Quotes.Attributes.PaymentMethod PaymentMethod { get; set; }
         public DateTime ValidUntil { get; set; }
         public string Comments { get; set; } = string.Empty;
     }
@@ -27,7 +29,9 @@ internal sealed class Create : IEndpoint
             var command = new CreateQuoteCommand(
                 request.CarId,
                 request.ClientId,
+                request.LeadId,
                 request.ProposedPrice,
+                request.PaymentMethod,
                 request.ValidUntil,
                 request.Comments);
 

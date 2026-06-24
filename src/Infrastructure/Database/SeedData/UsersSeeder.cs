@@ -66,30 +66,109 @@ internal static class UsersSeeder
                 adminEmail,
                 "Admin",
                 "User",
-                passwordHash);
+                passwordHash,
+                UserRole.Admin);
 
             context.Users.Add(admin);
             await context.SaveChangesAsync(cancellationToken);
         }
+        else if (admin.Role != UserRole.Admin)
+        {
+            // Self-heal: earlier seeds created the admin with the default Cliente
+            // role, which left the frontend (role-gated nav) treating admin as a
+            // client. Correct it idempotently on every startup.
+            admin.UpdateRole(UserRole.Admin);
+            await context.SaveChangesAsync(cancellationToken);
+        }
 
         // Seeder de permisos para el admin (bypass tenant filter for seeding)
-        if (!context.UserPermissions
-            .IgnoreQueryFilters()
-            .Any(p => p.UserId == admin.Id))
+        var permissions = new List<string>
         {
-            var permissions = new List<string>
-            {
-                "cars:read", "cars:create", "cars:update", "cars:delete",
-                "clients:read", "clients:create", "clients:update", "clients:delete",
-                "sales:read", "sales:create", "sales:update", "sales:delete",
-                "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
-                "financial:read", "financial:create", "financial:update", "financial:delete",
-                "users:read", "users:create", "users:access"
-            };
+            "cars:read", "cars:create", "cars:update", "cars:delete",
+            "clients:read", "clients:create", "clients:update", "clients:delete",
+            "sales:read", "sales:create", "sales:update", "sales:delete",
+            "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
+            "financial:read", "financial:create", "financial:update", "financial:delete",
+            "users:read", "users:create", "users:access", "CanManageUsers", "CanManageRoles",
+            "CanManageSettings",
+            "leads:read", "leads:create", "leads:update", "leads:delete",
+            "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
+            "admin:backfill"
+        };
 
-            foreach (var permission in permissions)
+        // Reconcile: add any permissions the admin is missing. Self-heals when new
+        // permissions are introduced (e.g. appointments) without a fresh re-seed,
+        // since the all-or-nothing guard used to skip existing admins entirely.
+        var existingPermissions = context.UserPermissions
+            .IgnoreQueryFilters()
+            .Where(p => p.UserId == admin.Id)
+            .Select(p => p.Permission)
+            .ToHashSet();
+
+        var missingPermissions = permissions.Where(p => !existingPermissions.Contains(p)).ToList();
+        if (missingPermissions.Count > 0)
+        {
+            foreach (var permission in missingPermissions)
             {
                 context.UserPermissions.Add(new UserPermission(admin.Id, permission));
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        await SeedEmpleadoAsync(context, passwordHasher, configuration, dealerId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Seeds a default Empleado (staff) user with a read-focused permission set so that
+    /// non-admin roles are functional out of the box (spec: rbac).
+    /// </summary>
+    private static async Task SeedEmpleadoAsync(
+        IApplicationDbContext context,
+        IPasswordHasher passwordHasher,
+        IConfiguration configuration,
+        Guid dealerId,
+        CancellationToken cancellationToken)
+    {
+        const string empleadoEmail = "empleado@carstore.com";
+        string empleadoPassword = configuration["EMPLEADO_SEED_PASSWORD"] ?? "Empleado123!";
+
+        var empleado = context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefault(u => u.Email == empleadoEmail);
+
+        if (empleado is null)
+        {
+            var passwordHash = passwordHasher.Hash(empleadoPassword);
+            empleado = new User(dealerId, empleadoEmail, "Empleado", "Demo", passwordHash, UserRole.Empleado);
+            context.Users.Add(empleado);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        else if (empleado.Role != UserRole.Empleado)
+        {
+            // Self-heal stale Cliente role (see admin note above).
+            empleado.UpdateRole(UserRole.Empleado);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        if (!context.UserPermissions
+            .IgnoreQueryFilters()
+            .Any(p => p.UserId == empleado.Id))
+        {
+            var empleadoPermissions = new List<string>
+            {
+                "cars:read",
+                "clients:read",
+                "sales:read",
+                "quotes:read",
+                "quotes:create",
+                "leads:read",
+                "appointments:read"
+            };
+
+            foreach (var permission in empleadoPermissions)
+            {
+                context.UserPermissions.Add(new UserPermission(empleado.Id, permission));
             }
 
             await context.SaveChangesAsync(cancellationToken);

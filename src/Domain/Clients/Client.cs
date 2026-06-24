@@ -14,7 +14,12 @@ public sealed class Client : Entity
     public Email Email { get; private set; }
     public string Phone { get; private set; }
     public string Address { get; private set; }
+    public string? City { get; private set; }
+    public string? ZipCode { get; private set; }
+    public string? Notes { get; private set; }
     public ClientStatus Status { get; private set; }
+    public ClientType Type { get; private set; }
+    public Guid? OriginLeadId { get; private set; }
     public List<Sale> Sales { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdateAt { get; private set; }
@@ -32,25 +37,35 @@ public sealed class Client : Entity
         string email,
         string phone,
         string address,
-        DateTime date)
+        DateTime date,
+        ClientType type = ClientType.Individual,
+        Guid? originLeadId = null,
+        string? city = null,
+        string? zipCode = null,
+        string? notes = null)
     {
         SetDealer(dealerId);
         if (string.IsNullOrWhiteSpace(firstName))
             throw new DomainException("FirstName cannot be empty");
         if (string.IsNullOrWhiteSpace(lastName))
             throw new DomainException("LastName cannot be empty");
-        
+
         FirstName = firstName;
         LastName = lastName;
         DNI = dni;
         Email = new Email(email);
         Phone = phone;
         Address = address;
+        City = city;
+        ZipCode = zipCode;
+        Notes = notes;
         Status = ClientStatus.Active;
+        Type = type;
+        OriginLeadId = originLeadId;
         Sales = new List<Sale>();
         CreatedAt = date;
         UpdateAt = date;
-        
+
         Raise(new ClientCreatedDomainEvent(Id, $"{FirstName} {LastName}"));
     }
     
@@ -60,18 +75,24 @@ public sealed class Client : Entity
         string email,
         string phone,
         string address,
-        DateTime updatedAt)
+        DateTime updatedAt,
+        string? city = null,
+        string? zipCode = null,
+        string? notes = null)
     {
         if (string.IsNullOrWhiteSpace(firstName))
             throw new DomainException("FirstName cannot be empty");
         if (string.IsNullOrWhiteSpace(lastName))
             throw new DomainException("LastName cannot be empty");
-        
+
         FirstName = firstName;
         LastName = lastName;
         Email = new Email(email);
         Phone = phone;
         Address = address;
+        City = city;
+        ZipCode = zipCode;
+        Notes = notes;
         UpdateAt = updatedAt;
     }
     
@@ -90,5 +111,21 @@ public sealed class Client : Entity
             return;
         
         Status = ClientStatus.Active;
+    }
+
+    public void SetProspect()
+    {
+        if (Status == ClientStatus.Prospect)
+            return;
+
+        Status = ClientStatus.Prospect;
+    }
+
+    public void SetVIP()
+    {
+        if (Status == ClientStatus.VIP)
+            return;
+
+        Status = ClientStatus.VIP;
     }
 }

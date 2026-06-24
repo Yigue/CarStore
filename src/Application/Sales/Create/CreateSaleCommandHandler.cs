@@ -30,12 +30,27 @@ internal sealed class CreateSaleCommandHandler(
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
         }        
-        // Validate car is available (only check ServiceCar, as CarStatus is about condition, not availability)
-        if (car.ServiceCar != StatusServiceCar.Disponible)
+        // Validate car is available (only check ServiceCar, as CarStatus is about condition, not availability).
+        // D-1: un vehículo Reservado (tomado por la cotización que se está convirtiendo) también es vendible.
+        if (car.ServiceCar != StatusServiceCar.Disponible && car.ServiceCar != StatusServiceCar.Reservado)
         {
             return Result.Failure<Guid>(CarErrors.AlreadySold(command.CarId));
         }
- 
+
+        // D-5: a quote converts into at most one sale. Guard against a second sale created
+        // from the same quote (idempotency on the quote -> sale conversion). Sales are
+        // tenant-scoped, so the default query filter keeps this within the dealer.
+        if (command.QuoteId is { } quoteId)
+        {
+            bool alreadyConverted = await context.Sales
+                .AnyAsync(s => s.QuoteId == quoteId, cancellationToken);
+
+            if (alreadyConverted)
+            {
+                return Result.Failure<Guid>(SalesErrors.AlreadyConvertedFromQuote(quoteId));
+            }
+        }
+
         // Verify if client exists
         Client? client = await context.Clients.FindAsync(new object[] { command.ClientId }, cancellationToken);
         if (client == null)
@@ -57,7 +72,9 @@ internal sealed class CreateSaleCommandHandler(
             command.PaymentMethod,
             command.ContractNumber,
             command.Comments,
-            dateTimeProvider.UtcNow
+            dateTimeProvider.UtcNow,
+            command.LeadId,
+            command.QuoteId
             );
  
         // Update car status using domain method

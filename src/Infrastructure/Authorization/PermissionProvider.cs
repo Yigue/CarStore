@@ -23,38 +23,33 @@ internal sealed class PermissionProvider
 
     public async Task<HashSet<string>> GetForUserIdAsync(Guid userId)
     {
-        // 1. Intentar obtener permisos del caché
         var cacheKey = CacheKeys.UserPermissions(userId);
         var cachedPermissions = await _cacheService.GetAsync<HashSet<string>>(cacheKey);
-        
+
         if (cachedPermissions is not null)
         {
-            _logger.LogDebug("Permissions retrieved from cache for user {UserId}", userId);
+            _logger.LogDebug("Permissions retrieved from cache for user {UserId}. Count: {Count}", userId, cachedPermissions.Count);
             return cachedPermissions;
         }
 
-        // 2. Si no estÃ¡ en cachÃ©, buscar en base de datos
-        // Tip: Usamos AsNoTracking para mejor rendimiento en lecturas
-        var query = _context.UserPermissions
+        string[] permissions = await _context.UserPermissions
             .Where(x => x.UserId == userId)
-            .Select(x => x.Permission);
+            .Select(x => x.Permission)
+            .ToArrayAsync();
 
-        string[] permissions;
-        if (query is IAsyncEnumerable<string>)
+        var permissionsSet = permissions.ToHashSet();
+
+        // Only cache when there are permissions. Caching an empty set locks the
+        // user out for the full TTL even after the missing rows are added.
+        if (permissionsSet.Count > 0)
         {
-            permissions = await query.ToArrayAsync();
+            await _cacheService.SetAsync(cacheKey, permissionsSet, CacheTTL.Permissions);
+            _logger.LogDebug("Permissions loaded from DB and cached for user {UserId}. Count: {Count}", userId, permissionsSet.Count);
         }
         else
         {
-            permissions = query.ToArray();
+            _logger.LogWarning("No permissions found in DB for user {UserId} — not caching to allow recovery once permissions are seeded.", userId);
         }
-            
-        var permissionsSet = permissions.ToHashSet();
-
-        // 3. Guardar en caché (incluso si está vacío, para evitar golpear la BD repetidamente)
-        await _cacheService.SetAsync(cacheKey, permissionsSet, CacheTTL.Permissions);
-        
-        _logger.LogDebug("Permissions loaded from DB and cached for user {UserId}. Count: {Count}", userId, permissionsSet.Count);
 
         return permissionsSet;
     }

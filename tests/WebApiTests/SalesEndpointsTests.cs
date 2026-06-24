@@ -46,20 +46,21 @@ public class SalesEndpointsTests
             FinalPrice = 18000m,
             PaymentMethod = (int)PaymentMethod.Cash,
             ContractNumber = "C123",
-            Description = "none"
+            Description = "none",
+            Comments = ""
         };
         var response = await http.PostAsJsonAsync("/api/v1/sales", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var saleId = result!.id;
 
         context.Sales.IgnoreQueryFilters().Should().ContainSingle(s => s.Id == saleId);
-        var updatedCar = await context.Cars.IgnoreQueryFilters().FirstAsync(c => c.Id == car.Id);
+        var updatedCar = await context.Cars.IgnoreQueryFilters().AsNoTracking().FirstAsync(c => c.Id == car.Id);
         updatedCar.ServiceCar.Should().Be(StatusServiceCar.Vendido);
 
         var get = await http.GetAsync($"/api/v1/sales/{saleId}");
         get.StatusCode.Should().Be(HttpStatusCode.OK);
-        var saleResponse = await get.Content.ReadFromJsonAsync<SaleResponse>();
+        var saleResponse = await get.Content.ReadFromJsonAsync<SaleResponse>(IntegrationTestHelpers.JsonOptions);
         saleResponse!.Id.Should().Be(saleId);
         saleResponse.CarBrand.Should().Be("VW");
     }
@@ -87,10 +88,11 @@ public class SalesEndpointsTests
             FinalPrice = 1000m,
             PaymentMethod = (int)PaymentMethod.Cash,
             ContractNumber = "C1",
-            Description = "none"
+            Description = "none",
+            Comments = ""
         };
         var response = await http.PostAsJsonAsync("/api/v1/sales", request);
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

@@ -21,10 +21,14 @@ internal sealed class Update : IEndpoint
         public int CantidadAsientos { get; set; }
         public int Cilindrada { get; set; }
         public int Kilometraje { get; set; }
-        public int Año { get; set; }
+        public int Anio { get; set; }
         public string Patente { get; set; }
         public string Descripcion { get; set; }
-        public decimal Precio { get; set; } 
+        public decimal Precio { get; set; }
+        public int FuelType { get; set; }
+        public bool Featured { get; set; }
+        public int Transmission { get; set; }
+        public decimal? PurchaseCost { get; set; }
     }
 
     public void MapEndpoint(IEndpointRouteBuilder app)
@@ -43,10 +47,14 @@ internal sealed class Update : IEndpoint
                 request.CantidadAsientos,
                 request.Cilindrada,
                 request.Kilometraje,
-                request.Año,
+                request.Anio,
                 request.Patente,
                 request.Descripcion,
-                request.Precio
+                request.Precio,
+                (FuelType)request.FuelType,
+                request.Featured,
+                (Transmission)request.Transmission,
+                request.PurchaseCost
             );
 
             Result<Guid> result = await sender.Send(command, cancellationToken);

@@ -14,7 +14,10 @@ internal sealed class Create : IEndpoint
         string Email,
         string Phone,
         string Address,
-        string DNI);
+        string DNI,
+        string? City = null,
+        string? ZipCode = null,
+        string? Notes = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -23,10 +26,13 @@ internal sealed class Create : IEndpoint
             var command = new CreateClientCommand(
                 request.FirstName,
                 request.LastName,
+                request.DNI,
                 request.Email,
                 request.Phone,
                 request.Address,
-                request.DNI);
+                request.City,
+                request.ZipCode,
+                request.Notes);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

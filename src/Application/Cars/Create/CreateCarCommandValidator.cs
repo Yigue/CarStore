@@ -8,14 +8,14 @@ internal sealed class CreateCarCommandValidator : AbstractValidator<CreateCarCom
     {
         RuleFor(x => x.Marca).NotEmpty().WithMessage("El campo marca es requerido y debe ser una opcion valida");
         RuleFor(x => x.Modelo).NotEmpty().WithMessage("El campo modelo es requerido y debe ser una opcion valida");
-        RuleFor(x => x.Color).NotEmpty().WithMessage("El campo color es requerido y debe ser una opcion valida");
+        RuleFor(x => x.Color).IsInEnum().WithMessage("El campo color es requerido y debe ser una opcion valida");
         RuleFor(x => x.CarType).IsInEnum().WithMessage("El campo tipo de Car Type es requerido y debe ser una opcion valida");
         RuleFor(x => x.CarStatus).IsInEnum().WithMessage("El campo estado de Car Status es requerido y debe ser una opcion valida");
         RuleFor(x => x.ServiceCar).IsInEnum().WithMessage("El campo tipo de servicio es requerido y debe ser una opcion valida");
         RuleFor(x => x.CantidadPuertas).GreaterThanOrEqualTo(1).WithMessage("El campo cantidad de puertas debe ser mayor o igual a 1");
         RuleFor(x => x.CantidadAsientos).GreaterThanOrEqualTo(1).WithMessage("El campo cantidad de asientos debe ser mayor o igual a 1");
         RuleFor(x => x.Cilindrada).GreaterThanOrEqualTo(1).WithMessage("El campo cilindrada debe ser mayor o igual a 1");
-        RuleFor(x => x.Kilometraje).GreaterThanOrEqualTo(1).WithMessage("El campo kilometraje debe ser mayor o igual a 1");
+        RuleFor(x => x.Kilometraje).GreaterThanOrEqualTo(0).WithMessage("El campo kilometraje debe ser mayor o igual a 0");
         RuleFor(x => x.Patente).NotEmpty().MaximumLength(10).WithMessage("El campo patente es requerido y debe tener un maximo de 10 caracteres");
         RuleFor(x => x.Anio).NotEmpty().GreaterThan(0).LessThanOrEqualTo(DateTime.Now.Year).WithMessage("El anio debe ser valido y no puede ser mayor al anio actual");
         RuleFor(x => x.Descripcion).NotEmpty().MaximumLength(255).WithMessage("El campo descripcion es requerido y debe tener un maximo de 255 caracteres");

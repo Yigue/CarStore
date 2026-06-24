@@ -15,7 +15,7 @@ public sealed class Update : IEndpoint
     {
         app.MapPut("financial/categories/{id}", Handler)
             .WithTags(Tags.Financial)
-            .RequireAuthorization();
+            .HasPermission("financial:update");
     }
 
     private static async Task<IResult> Handler(Guid id, Request request, ISender sender, CancellationToken cancellationToken)

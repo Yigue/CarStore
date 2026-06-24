@@ -1,8 +1,10 @@
 using System.Reflection;
 using System.Threading.RateLimiting;
+using System.Text.Json.Serialization;
 using Application;
 using HealthChecks.UI.Client;
 using Infrastructure;
+using Infrastructure.Middleware;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
@@ -33,6 +35,19 @@ builder.Services
     .AddApplication()
     .AddPresentation()
     .AddInfrastructure(builder.Configuration);
+
+builder.Services.ConfigureHttpJsonOptions(o =>
+{
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    o.SerializerOptions.Converters.Add(new Web.Api.Infrastructure.UtcDateTimeJsonConverter());
+    o.SerializerOptions.Converters.Add(new Web.Api.Infrastructure.NullableGuidJsonConverter());
+});
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(o =>
+{
+    o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    o.JsonSerializerOptions.Converters.Add(new Web.Api.Infrastructure.UtcDateTimeJsonConverter());
+    o.JsonSerializerOptions.Converters.Add(new Web.Api.Infrastructure.NullableGuidJsonConverter());
+});
 
 // Rate limiting for login endpoint
 builder.Services.AddRateLimiter(options =>
@@ -66,12 +81,38 @@ builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 // Configurar CORS para permitir solicitudes desde la aplicación React
 builder.Services.AddCors(options =>
 {
-    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
         ?? ["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"];
-    
+
+    // Multi-tenant: each dealer is served from its own subdomain (e.g. lux.localhost
+    // in dev, lux.carstore.com in prod). An exact-match origin list cannot cover
+    // arbitrary tenant subdomains, so we also allow configured host suffixes.
+    // ".localhost" is always allowed in Development for local tenant testing.
+    var allowedHostSuffixes = builder.Configuration.GetSection("Cors:AllowedHostSuffixes").Get<string[]>()
+        ?? [];
+    if (builder.Environment.IsDevelopment() && !allowedHostSuffixes.Contains(".localhost"))
+    {
+        allowedHostSuffixes = [.. allowedHostSuffixes, ".localhost"];
+    }
+
+    bool IsOriginAllowed(string origin)
+    {
+        if (allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // Note: SetIsOriginAllowed reflects the exact origin back, so this stays
+        // compatible with AllowCredentials (which forbids a wildcard "*").
+        return Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+            && allowedHostSuffixes.Any(suffix =>
+                uri.Host.Equals(suffix.TrimStart('.'), StringComparison.OrdinalIgnoreCase)
+                || uri.Host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+    }
+
     options.AddPolicy("CorsPolicy", policy =>
     {
-        policy.WithOrigins(allowedOrigins)
+        policy.SetIsOriginAllowed(IsOriginAllowed)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -80,7 +121,28 @@ builder.Services.AddCors(options =>
 
 WebApplication app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Fail fast if the JWT signing key is missing or still set to the committed placeholder.
+// The secret MUST be provided at runtime via the Jwt__Secret environment variable,
+// a secrets manager, or dotnet user-secrets — never committed to source control.
+string? jwtSecret = app.Configuration["Jwt:Secret"];
+if (string.IsNullOrWhiteSpace(jwtSecret) ||
+    jwtSecret.Contains("super-duper-secret", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException(
+        "Jwt:Secret is not configured. Provide a strong secret via the Jwt__Secret " +
+        "environment variable, a secrets manager, or dotnet user-secrets. " +
+        "It must not be empty or the committed placeholder value.");
+}
+
+bool isDevOrTesting = app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing");
+if (!isDevOrTesting && jwtSecret.Length < 32)
+{
+    throw new InvalidOperationException(
+        "Jwt:Secret must be at least 32 characters in non-development environments " +
+        "to provide adequate signing strength for HMAC-SHA256.");
+}
+
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.ApplyMigrations();
     app.UseSwagger();
@@ -131,6 +193,9 @@ app.UseExceptionHandler();
 app.UseRateLimiter();
 
 app.UseAuthentication();
+
+// Tenant resolution middleware - now it can see authentication claims
+app.UseTenantResolution();
 
 app.UseAuthorization();
 

@@ -18,11 +18,16 @@ internal sealed class RejectQuoteCommandHandler(
         
         if (quote is null)
             return Result.Failure(QuoteErrors.NotFound(command.QuoteId));
-        
+
         quote.Reject(command.Reason, dateTimeProvider.UtcNow);
-        
+
+        // D-1: liberar la reserva del vehículo (idempotente si ya no estaba reservado).
+        var car = await context.Cars
+            .SingleOrDefaultAsync(c => c.Id == quote.CarId, cancellationToken);
+        car?.Release(dateTimeProvider.UtcNow);
+
         await context.SaveChangesAsync(cancellationToken);
-        
+
         return Result.Success();
     }
 }

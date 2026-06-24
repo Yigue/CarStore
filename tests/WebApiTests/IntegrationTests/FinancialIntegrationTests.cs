@@ -18,7 +18,7 @@ using System.Collections.Generic;
 namespace WebApiTests.IntegrationTests;
 
 /// <summary>
-/// Tests de integraciÃ³n para endpoints de Financial usando datos seedeados
+/// Tests de integración para endpoints de Financial usando datos seedeados
 /// </summary>
 public class FinancialIntegrationTests
 {
@@ -42,11 +42,11 @@ public class FinancialIntegrationTests
         {
             Type = (int)TransactionType.Income,
             Amount = 25000m,
-            Description = "Venta de vehÃ­culo",
+            Description = "Venta de vehículo",
             PaymentMethod = (int)PaymentMethod.Cash,
             ReferenceNumber = "REF-2024-001",
             TransactionDate = DateTime.UtcNow,
-            CategoryId = category.Id.ToString(),
+            category = category.Id.ToString(),
             CarId = (string?)null,
             ClientId = (string?)null,
             SaleId = (string?)null
@@ -55,12 +55,13 @@ public class FinancialIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/financial", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var transactionId = result!.id;
         transactionId.Should().NotBe(Guid.Empty);
 
         var createdTransaction = await context.Transactions
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Include(t => t.Category)
             .FirstAsync(t => t.Id == transactionId);
 
@@ -81,13 +82,13 @@ public class FinancialIntegrationTests
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var toyota = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Toyota");     
-        var camry = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Camry" && m.MarcaId == toyota.Id);
+        var corolla = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Corolla" && m.MarcaId == toyota.Id);
 
         var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
         var car = new Car(
             dealerId,
             toyota,
-            camry,
+            corolla,
             Color.Blue,
             TypeCar.Sedan,
             StatusCar.New,
@@ -98,13 +99,13 @@ public class FinancialIntegrationTests
             0,
             2024,
             "ABC123",
-            "Toyota Camry nuevo",
+            "Toyota Corolla nuevo",
             30000m,
             DateTime.UtcNow);
 
         var category = await context.TransactionCategories
             .IgnoreQueryFilters()
-            .FirstAsync(c => c.Name == "Servicio TÃ©cnico");
+            .FirstAsync(c => c.Name == "Servicio Técnico");
         context.Cars.Add(car);
         await context.SaveChangesAsync();
 
@@ -112,11 +113,11 @@ public class FinancialIntegrationTests
         {
             Type = (int)TransactionType.Income,
             Amount = 5000m,
-            Description = "Servicio tÃ©cnico de Toyota Camry",
+            Description = "Servicio técnico de Toyota Corolla",
             PaymentMethod = (int)PaymentMethod.CreditCard,
             ReferenceNumber = "SRV-2024-001",
             TransactionDate = DateTime.UtcNow,
-            CategoryId = category.Id.ToString(),
+            category = category.Id.ToString(),
             CarId = car.Id.ToString(),
             ClientId = (string?)null,
             SaleId = (string?)null
@@ -125,7 +126,7 @@ public class FinancialIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/financial", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var transactionId = result!.id;
 
         var createdTransaction = await context.Transactions
@@ -135,7 +136,7 @@ public class FinancialIntegrationTests
             .FirstAsync(t => t.Id == transactionId);
 
         createdTransaction.CarId.Should().Be(car.Id);
-        createdTransaction.Category.Name.Should().Be("Servicio TÃ©cnico");
+        createdTransaction.Category.Name.Should().Be("Servicio Técnico");
     }
 
     [Fact]
@@ -167,7 +168,7 @@ public class FinancialIntegrationTests
         var response = await client.GetAsync("/api/v1/financial");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var transactions = await response.Content.ReadFromJsonAsync<List<Application.Financial.GetAll.FinancialResponses>>();
+        var transactions = await response.Content.ReadFromJsonAsync<List<Application.Financial.GetAll.FinancialResponses>>(IntegrationTestHelpers.JsonOptions);
         transactions.Should().NotBeNull();
         transactions!.Count.Should().BeGreaterThan(0);
         transactions.Should().Contain(t => t.Id == transaction.Id);
@@ -246,7 +247,7 @@ public class FinancialIntegrationTests
             PaymentMethod = (int)PaymentMethod.Cash,
             ReferenceNumber = "VTA-2024-004",
             TransactionDate = DateTime.UtcNow,
-            CategoryId = category.Id.ToString(),
+            category = category.Id.ToString(),
             CarId = car.Id.ToString(),
             ClientId = testClient.Id.ToString(),
             SaleId = sale.Id.ToString()
@@ -255,7 +256,7 @@ public class FinancialIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/financial", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var transactionId = result!.id;
 
         var createdTransaction = await context.Transactions

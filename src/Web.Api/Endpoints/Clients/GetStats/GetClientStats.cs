@@ -21,7 +21,7 @@ public sealed class GetClientStats : IEndpoint
                 data => Results.Ok(data),
                 CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .HasPermission("clients:read")
         .WithTags(Tags.Clients)
         .WithName("GetClientStats")
         .Produces<ClientStatsResponse>()

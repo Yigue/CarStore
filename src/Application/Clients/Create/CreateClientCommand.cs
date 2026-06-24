@@ -8,4 +8,7 @@ public sealed record CreateClientCommand(
     string DNI,
     string Email,
     string Phone,
-    string Address) : ICommand<Guid>;
+    string Address,
+    string? City = null,
+    string? ZipCode = null,
+    string? Notes = null) : ICommand<Guid>;

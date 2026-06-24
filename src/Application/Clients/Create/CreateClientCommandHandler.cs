@@ -23,7 +23,10 @@ internal sealed class CreateClientCommandHandler(
             command.Email,
             command.Phone,
             command.Address,
-            dateTimeProvider.UtcNow);
+            dateTimeProvider.UtcNow,
+            city: command.City,
+            zipCode: command.ZipCode,
+            notes: command.Notes);
 
         context.Clients.Add(client);
 

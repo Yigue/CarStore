@@ -21,7 +21,7 @@ public sealed class GetSalesSummary : IEndpoint
                 data => Results.Ok(data),
                 CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .HasPermission("sales:read")
         .WithTags(Tags.Sales)
         .WithName("GetSalesSummary")
         .Produces<SalesSummaryResponse>()

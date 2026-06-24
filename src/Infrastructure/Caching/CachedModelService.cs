@@ -94,8 +94,15 @@ internal sealed class CachedModelService : ICachedModelService
 
     public async Task InvalidateCacheAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Invalidating models cache");
-        await Task.CompletedTask;
+        _logger.LogInformation("Invalidating all models cache");
+        await _cacheService.RemoveAsync(CacheKeys.AllModels(), cancellationToken);
+    }
+
+    public async Task InvalidateBrandCacheAsync(Guid brandId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Invalidating models cache for brand {BrandId}", brandId);
+        await _cacheService.RemoveAsync(CacheKeys.ModelsByBrand(brandId), cancellationToken);
+        await _cacheService.RemoveAsync(CacheKeys.AllModels(), cancellationToken);
     }
 }
 

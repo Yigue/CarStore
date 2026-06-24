@@ -12,7 +12,7 @@ public sealed class Get : IEndpoint
     {
         app.MapGet("marcas", Handler)
             .WithTags(Tags.Marcas)
-            .RequireAuthorization();
+            .AllowAnonymous();
     }
 
     private static async Task<IResult> Handler(ISender sender, CancellationToken cancellationToken)

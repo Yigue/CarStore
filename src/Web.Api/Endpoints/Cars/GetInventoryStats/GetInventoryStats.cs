@@ -21,7 +21,7 @@ public sealed class GetInventoryStats : IEndpoint
                 data => Results.Ok(data),
                 CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .AllowAnonymous()
         .WithTags(Tags.Cars)
         .WithName("GetInventoryStats")
         .Produces<InventoryStatsResponse>()

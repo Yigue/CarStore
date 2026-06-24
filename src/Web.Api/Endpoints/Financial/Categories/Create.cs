@@ -15,7 +15,7 @@ public sealed class Create : IEndpoint
     {
         app.MapPost("financial/categories", Handler)
             .WithTags(Tags.Financial)
-            .RequireAuthorization();
+            .HasPermission("financial:create");
     }
 
     private static async Task<IResult> Handler(Request request, ISender sender, CancellationToken cancellationToken)

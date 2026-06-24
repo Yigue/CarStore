@@ -1,4 +1,4 @@
-using Application.Queries.Users.GetAll;
+using Application.Users.Queries.GetAllUsers;
 using MediatR;
 using SharedKernel;
 using Web.Api.Extensions;
@@ -12,19 +12,35 @@ public sealed class GetAllUsers : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("users", async (
+            int page,
+            int pageSize,
+            string? search,
+            string? role,
+            bool? isActive,
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            var result = await sender.Send(new GetAllUsersQuery(), cancellationToken);
+            // Parse role if provided
+            Domain.Users.UserRole? roleFilter = null;
+            if (!string.IsNullOrWhiteSpace(role) && Enum.TryParse<Domain.Users.UserRole>(role, true, out var parsedRole))
+            {
+                roleFilter = parsedRole;
+            }
+
+            var query = new GetAllUsersQuery(page, pageSize, search, roleFilter, isActive);
+
+            var result = await sender.Send(query, cancellationToken);
 
             return result.Match(
                 data => Results.Ok(data),
                 CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .HasPermission("CanManageUsers")
         .WithTags(Tags.Users)
         .WithName("GetAllUsers")
-        .Produces<IEnumerable<UserResponse>>()
+        .Produces<PaginatedUsersResponse>()
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }

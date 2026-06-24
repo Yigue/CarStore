@@ -1,0 +1,85 @@
+using Application.Abstractions.Data;
+using Domain.Quotes.Events;
+using Domain.Quotes;
+using Domain.Clients;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using SharedKernel;
+
+namespace Application.Leads.CreateClient;
+
+internal sealed class CreateClientFromLeadOnQuoteAcceptedHandler(
+    IApplicationDbContext context,
+    IDateTimeProvider dateTimeProvider) 
+    : INotificationHandler<QuoteAcceptedDomainEvent>
+{
+    public async Task Handle(QuoteAcceptedDomainEvent notification, CancellationToken cancellationToken)
+    {
+        var quote = await context.Quotes
+            .Include(q => q.Lead)
+            .FirstOrDefaultAsync(q => q.Id == notification.QuoteId, cancellationToken);
+
+        if (quote?.Lead is not null && quote.ClientId is null)
+        {
+            var lead = quote.Lead;
+            
+            // Check if client with this email already exists
+            var existingClient = await context.Clients
+                .FirstOrDefaultAsync(c => c.Email == lead.Email, cancellationToken);
+
+            Client targetClient;
+
+            if (existingClient is not null)
+            {
+                targetClient = existingClient;
+            }
+            else
+            {
+                // Create new client from lead
+                var nameParts = lead.ClientName.Split(' ', 2);
+                var firstName = nameParts[0];
+                var lastName = nameParts.Length > 1 ? nameParts[1] : string.Empty;
+
+                // Use a unique temporary DNI to avoid unique constraint violation.
+                // Must fit the DNI column (varchar 20); the first 16 hex chars of the
+                // lead id keep it unique. The record is completed with the real DNI later.
+                var tempDni = $"TEMP{lead.Id:N}"[..20];
+
+                targetClient = new Client(
+                    lead.DealerId,
+                    firstName,
+                    lastName,
+                    tempDni,
+                    lead.Email.Value,
+                    lead.Phone,
+                    string.Empty,
+                    dateTimeProvider.UtcNow,
+                    Domain.Clients.Attributes.ClientType.Individual,
+                    lead.Id);
+
+                context.Clients.Add(targetClient);
+            }
+
+            // Link the new client to the lead
+            lead.MarkConverted(targetClient.Id);
+
+            // Assign the accepted quote and carry the rest of the lead's history
+            // (other quotes + appointments) over to the new client.
+            quote.AssignClient(targetClient.Id);
+
+            var otherQuotes = await context.Quotes
+                .Where(q => q.LeadId == lead.Id && q.ClientId == null && q.Id != quote.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var other in otherQuotes)
+                other.AssignClient(targetClient.Id);
+
+            var appointments = await context.Appointments
+                .Where(a => a.LeadId == lead.Id && a.ClientId == null)
+                .ToListAsync(cancellationToken);
+            foreach (var appointment in appointments)
+                appointment.AssignClient(targetClient.Id);
+
+            await context.SaveChangesAsync(cancellationToken);
+        }
+    }
+}

@@ -12,7 +12,7 @@ public sealed class Delete : IEndpoint
     {
         app.MapDelete("financial/categories/{id}", Handler)
             .WithTags(Tags.Financial)
-            .RequireAuthorization();
+            .HasPermission("financial:delete");
     }
 
     private static async Task<IResult> Handler(Guid id, ISender sender, CancellationToken cancellationToken)

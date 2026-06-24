@@ -28,7 +28,7 @@ internal sealed class CreateCarCommandHandler(
         var licensePlate = new Domain.Shared.ValueObjects.LicensePlate(command.Patente);
         var existingCar = await context.Cars
             .IgnoreQueryFilters() // Patente única globalmente, no solo por concesionaria
-            .AnyAsync(c => c.Patente.Value == licensePlate.Value, cancellationToken);
+            .AnyAsync(c => c.Patente == licensePlate, cancellationToken);
 
         if (existingCar)
         {
@@ -68,7 +68,11 @@ internal sealed class CreateCarCommandHandler(
             command.Patente,
             command.Descripcion,
             command.Price,
-            dateTimeProvider.UtcNow
+            dateTimeProvider.UtcNow,
+            command.FuelType,
+            command.Featured,
+            command.Transmission,
+            command.PurchaseCost
             );
 
         context.Cars.Add(car);

@@ -1,0 +1,26 @@
+using Application.Modelos.Get;
+using MediatR;
+using SharedKernel;
+using Web.Api.Extensions;
+using Web.Api.Infrastructure;
+
+namespace Web.Api.Endpoints.Modelos;
+
+public sealed class Get : IEndpoint
+{
+    public void MapEndpoint(IEndpointRouteBuilder app)
+    {
+        app.MapGet("modelos", Handler)
+            .WithTags(Tags.Modelos)
+            .AllowAnonymous();
+    }
+
+    private static async Task<IResult> Handler(ISender sender, CancellationToken cancellationToken)
+    {
+        Result<List<Domain.Cars.Attributes.Modelo>> result = await sender.Send(new GetModelosQuery(), cancellationToken);
+
+        return result.Match(
+            modelos => Results.Ok(modelos.Select(m => new { id = m.Id, nombre = m.Nombre, marcaId = m.MarcaId })),
+            CustomResults.Problem);
+    }
+}

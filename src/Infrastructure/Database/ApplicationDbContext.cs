@@ -1,14 +1,17 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Tenancy;
+using Domain.Appointments;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Clients;
 using Domain.Financial;
 using Domain.Financial.Attributes;
+using Domain.Leads;
 using Domain.Quotes;
 using Domain.Sales;
 
 using Domain.Users;
+using DealerSettingsEntity = Domain.DealerSettings.DealerSettings;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
@@ -43,14 +46,32 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<TransactionCategory> TransactionCategories { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<UserPermission> UserPermissions { get; set; }
+    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
     public DbSet<CarImage> CarImages { get; set; }
-
+    public DbSet<ReconditioningTask> ReconditioningTasks { get; set; }
+    public DbSet<DealerSettingsEntity> DealerSettings { get; set; }
+    public DbSet<Lead> Leads { get; set; }
+    public DbSet<Domain.Documents.Document> Documents { get; set; }
+    public DbSet<Appointment> Appointments { get; set; }
+    public DbSet<BackfillAudit> BackfillAudits { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
-        modelBuilder.HasDefaultSchema(Schemas.Default);
+
+        if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
+        {
+            modelBuilder.HasDefaultSchema(Schemas.Default);
+
+            // REQ-VMS-7: partial UNIQUE index "one cover per car" (Postgres only — the filter
+            // SQL is not portable to SQLite's EnsureCreated()).
+            modelBuilder.Entity<CarImage>()
+                .HasIndex(ci => ci.CarId)
+                .IsUnique()
+                .HasFilter("is_cover = true")
+                .HasDatabaseName("ux_car_images_car_id_is_cover");
+        }
 
         // Ignorar DealerId en entidades compartidas (catálogo)
         modelBuilder.Entity<Marca>().Ignore(x => x.DealerId);
@@ -58,11 +79,10 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<TransactionCategory>().Ignore(x => x.DealerId);
         modelBuilder.Entity<CarImage>().Ignore(x => x.DealerId);
 
-        // Configurar Email Value Object converter for User
-        modelBuilder.Entity<User>()
-            .Property(u => u.Email)
-            .HasConversion(new EmailValueConverter());
-        
+        // User configuration (Email + Role + length constraints) vive en
+        // Infrastructure/Database/Configurations/UserConfiguration.cs y se
+        // aplica via ApplyConfigurationsFromAssembly() arriba.
+
         // Multi-tenancy: Global Query Filters
         // Automatically filter all queries by DealerId
         // This ensures data isolation between tenants (concesionarias)
@@ -75,13 +95,25 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Client>().HasQueryFilter(x => 
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
-        modelBuilder.Entity<Quote>().HasQueryFilter(x => 
-            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Quote>().HasQueryFilter(x =>
+            (!_tenantService.HasTenant || x.DealerId == _tenantService.DealerId) && !x.IsDeleted);
         modelBuilder.Entity<Sale>().HasQueryFilter(x => 
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<FinancialTransaction>().HasQueryFilter(x => 
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
-        modelBuilder.Entity<User>().HasQueryFilter(x => 
+        modelBuilder.Entity<User>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<DealerSettingsEntity>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Lead>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Documents.Document>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<ReconditioningTask>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Appointment>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<BackfillAudit>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         // Note: Marca, Modelo, TransactionCategory, CarImage are shared across tenants (catalog data)
     }

@@ -24,7 +24,7 @@ public sealed class GetTopClients : IEndpoint
                 data => Results.Ok(data),
                 CustomResults.Problem);
         })
-        .RequireAuthorization()
+        .HasPermission("clients:read")
         .WithTags(Tags.Clients)
         .WithName("GetTopClients")
         .Produces<IEnumerable<ClientWithRevenueResponse>>()

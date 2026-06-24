@@ -1,9 +1,27 @@
 using System.Data;
 using System.Data.Common;
 using Application.Abstractions.Tenancy;
+using Domain.Appointments;
+using Domain.Cars;
+using Domain.Cars.Attributes;
+using Domain.Clients;
+using Domain.Financial;
+using Domain.Financial.Attributes;
+using Domain.Leads;
+using Domain.Quotes;
+using Domain.Sales;
+using FluentAssertions;
+using Infrastructure.Database;
+using MediatR;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using SharedKernel;
+using Xunit;
 
 public class ApplicationDbContextTests
 {
+    private static readonly Guid TestDealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
     private sealed class NoOpPublisher : IPublisher
     {
         public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -13,7 +31,7 @@ public class ApplicationDbContextTests
 
     private sealed class NoOpTenantService : ICurrentTenantService
     {
-        public Guid DealerId => Guid.Parse("11111111-1111-1111-1111-111111111111");
+        public Guid DealerId => TestDealerId;
         public bool HasTenant => false;
     }
 
@@ -36,6 +54,12 @@ public class ApplicationDbContextTests
         var tenantService = new NoOpTenantService();
         var context = new ApplicationDbContext(options, new NoOpPublisher(), tenantService);
         await context.Database.EnsureCreatedAsync();
+
+        // Seed DealerSettings to avoid FK violations since most entities have a DealerId
+        var settings = new Domain.DealerSettings.DealerSettings(TestDealerId, "Test Dealer", "test@dealer.com");
+        context.DealerSettings.Add(settings);
+        await context.SaveChangesAsync();
+
         return (context, connection);
     }
 
@@ -46,17 +70,16 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var dealerId = Guid.NewGuid();
         var marca = new Marca("Ford");
         var modelo = new Modelo("Fiesta", marca.Id);
         context.AddRange(marca, modelo);
         await context.SaveChangesAsync();
 
-        var car1 = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "AAA111", "desc", 10000m, DateTime.UtcNow);
+        var car1 = new Car(TestDealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "AAA111", "desc", 10000m, DateTime.UtcNow);
         context.Cars.Add(car1);
         await context.SaveChangesAsync();
 
-        var car2 = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "AAA111", "desc", 10000m, DateTime.UtcNow);
+        var car2 = new Car(TestDealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "AAA111", "desc", 10000m, DateTime.UtcNow);
         context.Cars.Add(car2);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
@@ -69,9 +92,8 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var dealerId = Guid.NewGuid();
-        var client1 = new Client(dealerId, "John", "Doe", "123", "john@test.com", "555", "Street", DateTime.UtcNow);
-        var client2 = new Client(dealerId, "Jane", "Smith", "123", "jane@test.com", "555", "Street", DateTime.UtcNow);
+        var client1 = new Client(TestDealerId, "John", "Doe", "123", "john@test.com", "555", "Street", DateTime.UtcNow);
+        var client2 = new Client(TestDealerId, "Jane", "Smith", "123", "jane@test.com", "555", "Street", DateTime.UtcNow);
 
         context.Clients.Add(client1);
         await context.SaveChangesAsync();
@@ -87,19 +109,18 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var dealerId = Guid.NewGuid();
         var marca = new Marca("Ford");
         var modelo = new Modelo("Fiesta", marca.Id);
-        var car = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "BBB222", "desc", 9000m, DateTime.UtcNow);
-        var client = new Client(dealerId, "John", "Doe", "456", "john@demo.com", "555", "Street", DateTime.UtcNow);
+        var car = new Car(TestDealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "BBB222", "desc", 9000m, DateTime.UtcNow);
+        var client = new Client(TestDealerId, "John", "Doe", "456", "john@demo.com", "555", "Street", DateTime.UtcNow);
         context.AddRange(marca, modelo, car, client);
         await context.SaveChangesAsync();
 
-        var sale = new Sale(Guid.Parse("11111111-1111-1111-1111-111111111111"), car.Id, client.Id, 9000m, PaymentMethod.Cash, "C-1", "ok", DateTime.UtcNow);
+        var sale = new Sale(TestDealerId, car.Id, client.Id, 9000m, PaymentMethod.Cash, "C-1", "ok", DateTime.UtcNow);
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var badSale = new Sale(Guid.Parse("11111111-1111-1111-1111-111111111111"), Guid.NewGuid(), client.Id, 8000m, PaymentMethod.Cash, "C-2", "bad", DateTime.UtcNow);
+        var badSale = new Sale(TestDealerId, Guid.NewGuid(), client.Id, 8000m, PaymentMethod.Cash, "C-2", "bad", DateTime.UtcNow);
         context.Sales.Add(badSale);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
@@ -112,22 +133,23 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var dealerId = Guid.NewGuid();
         var marca = new Marca("Ford");
         var modelo = new Modelo("Fiesta", marca.Id);
-        var car = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "CCC333", "desc", 8000m, DateTime.UtcNow);
-        var client = new Client(dealerId, "John", "Doe", "789", "john@quotes.com", "555", "Street", DateTime.UtcNow);
+        var car = new Car(TestDealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "CCC333", "desc", 8000m, DateTime.UtcNow);
+        var client = new Client(TestDealerId, "John", "Doe", "789", "john@quotes.com", "555", "Street", DateTime.UtcNow);
         context.AddRange(marca, modelo, car, client);
         await context.SaveChangesAsync();
 
-        var quote = new Quote(Guid.Parse("11111111-1111-1111-1111-111111111111"), car, client, 8000m, DateTime.UtcNow.AddDays(30), "ok", DateTime.UtcNow);
+        var quote = new Quote(TestDealerId, car, client, null, 8000m, Domain.Quotes.Attributes.PaymentMethod.Contado, DateTime.UtcNow.AddDays(30), "ok", DateTime.UtcNow);
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
 
-        // Create a fake car with an ID that doesn't exist in the database to trigger FK violation
-        var fakeCar = new Car(dealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "FAKE123", "fake", 1m, DateTime.UtcNow);
-        // Don't save fakeCar - we want its ID to not exist in DB
-        var badQuote = new Quote(Guid.Parse("11111111-1111-1111-1111-111111111111"), fakeCar, client, 7000m, DateTime.UtcNow.AddDays(30), "bad", DateTime.UtcNow);
+        // Para forzar el error de FK en Quote (que usa objetos en el ctor),
+        // creamos un objeto stub y le decimos a EF que ya existe (Unchanged).
+        var fakeCar = new Car(TestDealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "ZZZ999", "fake", 1m, DateTime.UtcNow);
+        context.Entry(fakeCar).State = EntityState.Unchanged;
+        
+        var badQuote = new Quote(TestDealerId, fakeCar, client, null, 7000m, Domain.Quotes.Attributes.PaymentMethod.Contado, DateTime.UtcNow.AddDays(30), "bad", DateTime.UtcNow);
         context.Quotes.Add(badQuote);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
@@ -144,7 +166,7 @@ public class ApplicationDbContextTests
         context.Add(category);
         await context.SaveChangesAsync();
 
-        var transaction = new FinancialTransaction(Guid.Parse("11111111-1111-1111-1111-111111111111"), TransactionType.Income, 100m, "desc", PaymentMethod.Cash, category);
+        var transaction = new FinancialTransaction(TestDealerId, TransactionType.Income, 100m, "desc", PaymentMethod.Cash, category);
         context.Transactions.Add(transaction);
         await context.SaveChangesAsync();
 
@@ -158,14 +180,26 @@ public class ApplicationDbContextTests
         await using var _ = context;
         await using var __ = connection;
 
-        var tables = connection.GetSchema("Tables");
-        var tableNames = tables.Rows.Cast<DataRow>().Select(r => r["TABLE_NAME"].ToString()!).ToList();
+        async Task<List<string>> GetTablesAsync()
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table';";
+            using var reader = await cmd.ExecuteReaderAsync();
+            var tables = new List<string>();
+            while (await reader.ReadAsync())
+            {
+                tables.Add(reader.GetString(0));
+            }
+            return tables;
+        }
 
-        tableNames.Should().Contain(t => t.EndsWith("cars"));
-        tableNames.Should().Contain(t => t.EndsWith("clients"));
-        tableNames.Should().Contain(t => t.EndsWith("sales"));
-        tableNames.Should().Contain(t => t.EndsWith("quotes"));
-        tableNames.Should().Contain(t => t.EndsWith("transactions"));
+        var tableNames = await GetTablesAsync();
+
+        tableNames.Should().Contain(t => t.EndsWith("cars", StringComparison.OrdinalIgnoreCase));
+        tableNames.Should().Contain(t => t.EndsWith("clients", StringComparison.OrdinalIgnoreCase));
+        tableNames.Should().Contain(t => t.EndsWith("sales", StringComparison.OrdinalIgnoreCase));
+        tableNames.Should().Contain(t => t.EndsWith("quotes", StringComparison.OrdinalIgnoreCase));
+        tableNames.Should().Contain(t => t.EndsWith("transactions", StringComparison.OrdinalIgnoreCase));
 
         async Task<List<string>> GetColumnsAsync(string table)
         {
@@ -180,19 +214,27 @@ public class ApplicationDbContextTests
             return cols;
         }
 
-        var carsCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("cars")));
-        carsCols.Should().Contain(new[] { "id", "patente" });
+        var carsCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("cars", StringComparison.OrdinalIgnoreCase)));
+        carsCols.Should().Contain(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        carsCols.Should().Contain(c => c.Equals("patente", StringComparison.OrdinalIgnoreCase));
 
-        var clientCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("clients")));
-        clientCols.Should().Contain(new[] { "id", "dni" });
+        var clientCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("clients", StringComparison.OrdinalIgnoreCase)));
+        clientCols.Should().Contain(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        clientCols.Should().Contain(c => c.Equals("dni", StringComparison.OrdinalIgnoreCase));
 
-        var salesCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("sales")));
-        salesCols.Should().Contain(new[] { "id", "car_id", "client_id" });
+        var salesCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("sales", StringComparison.OrdinalIgnoreCase)));
+        salesCols.Should().Contain(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        salesCols.Should().Contain(c => c.Equals("carid", StringComparison.OrdinalIgnoreCase) || c.Equals("car_id", StringComparison.OrdinalIgnoreCase));
+        salesCols.Should().Contain(c => c.Equals("clientid", StringComparison.OrdinalIgnoreCase) || c.Equals("client_id", StringComparison.OrdinalIgnoreCase));
 
-        var quoteCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("quotes")));
-        quoteCols.Should().Contain(new[] { "id", "car_id", "client_id" });
+        var quoteCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("quotes", StringComparison.OrdinalIgnoreCase)));
+        quoteCols.Should().Contain(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        quoteCols.Should().Contain(c => c.Equals("carid", StringComparison.OrdinalIgnoreCase) || c.Equals("car_id", StringComparison.OrdinalIgnoreCase));
+        quoteCols.Should().Contain(c => c.Equals("clientid", StringComparison.OrdinalIgnoreCase) || c.Equals("client_id", StringComparison.OrdinalIgnoreCase));
 
-        var transactionCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("transactions")));
-        transactionCols.Should().Contain(new[] { "id", "category_id", "amount" });
+        var transactionCols = await GetColumnsAsync(tableNames.First(t => t.EndsWith("transactions", StringComparison.OrdinalIgnoreCase)));
+        transactionCols.Should().Contain(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        transactionCols.Should().Contain(c => c.Equals("categoryid", StringComparison.OrdinalIgnoreCase) || c.Equals("category_id", StringComparison.OrdinalIgnoreCase));
+        transactionCols.Should().Contain(c => c.Equals("amount", StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -10,6 +10,12 @@ namespace WebApiTests;
 /// </summary>
 public static class IntegrationTestHelpers
 {
+    public static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
+
     public static void SetAuthToken(System.Net.Http.HttpClient client, string token)
     {
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -24,10 +30,10 @@ public static class IntegrationTestHelpers
             Password = "Admin123!"
         };
 
-        var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", loginRequest);
+        var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", loginRequest, JsonOptions);
         loginResponse.EnsureSuccessStatusCode();
         
-        var result = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var result = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(JsonOptions);
         return result!.Token;
     }
 

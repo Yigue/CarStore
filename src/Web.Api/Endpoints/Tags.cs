@@ -1,4 +1,4 @@
-﻿namespace Web.Api.Endpoints;
+namespace Web.Api.Endpoints;
 
 public static class Tags
 {
@@ -11,4 +11,10 @@ public static class Tags
     public const string Financial = "financial";
     public const string Marcas = "marcas";
     public const string Modelos = "modelos";
+    public const string DealerSettings = "dealer-settings";
+    public const string Leads = "leads";
+    public const string Documents = "documents";
+    public const string Appointments = "appointments";
+    public const string Dashboard = "dashboard";
+    public const string Reports = "reports";
 }

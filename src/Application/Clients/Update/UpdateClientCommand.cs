@@ -11,4 +11,7 @@ public sealed record UpdateClientCommand(
     string Email,
     string Phone,
     string Address,
-    ClientStatus Status) : ICommand<Guid>;
+    ClientStatus Status,
+    string? City = null,
+    string? ZipCode = null,
+    string? Notes = null) : ICommand<Guid>;

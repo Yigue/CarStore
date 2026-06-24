@@ -15,6 +15,8 @@ public sealed class Sale : Entity
     public Car Car { get; private set; }
     public Guid ClientId { get; private set; }
     public Client Client { get; private set; }
+    public Guid? QuoteId { get; private set; }
+    public Guid? LeadId { get; private set; }
     public Money FinalPrice { get; private set; }
     public SaleStatus Status { get; private set; }
     public PaymentMethod PaymentMethod { get; private set; }
@@ -36,12 +38,16 @@ public sealed class Sale : Entity
         PaymentMethod paymentMethod,
         string contractNumber,
         string comments,
-        DateTime saleDate)
+        DateTime saleDate,
+        Guid? leadId = null,
+        Guid? quoteId = null)
     {
         SetDealer(dealerId);
         Id = Guid.NewGuid();
         CarId = carId;
         ClientId = clientId;
+        LeadId = leadId;
+        QuoteId = quoteId;
         FinalPrice = new Money(finalPrice);
         PaymentMethod = paymentMethod;
         ContractNumber = contractNumber;
@@ -70,7 +76,7 @@ public sealed class Sale : Entity
             throw new DomainException("Cancellation reason is required");
         
         Status = SaleStatus.Cancelled;
-        Raise(new SaleCancelledDomainEvent(Id, reason));
+        Raise(new SaleCancelledDomainEvent(Id, CarId, reason));
     }
     
     public void Update(

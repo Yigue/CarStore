@@ -18,6 +18,7 @@
     </PackageReference>
     <PackageReference Include="Moq" />
     <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Testcontainers" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Infrastructure\Infrastructure.csproj" />

@@ -21,7 +21,7 @@ public class AzureBlobStorageServiceTests
         string accountKey = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("dummyaccountkeydummyaccountkey"));
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["AzureBlobStorage:ConnectionString"] = $"DefaultEndpointsProtocol=https;AccountName=testaccount;AccountKey={accountKey};EndpointSuffix=core.windows.net"
+            ["AzureBlob:ConnectionString"] = $"DefaultEndpointsProtocol=https;AccountName=testaccount;AccountKey={accountKey};EndpointSuffix=core.windows.net"
         }).Build();
 
         var service = new AzureBlobStorageService(configuration);

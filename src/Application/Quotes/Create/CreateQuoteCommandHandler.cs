@@ -2,7 +2,9 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
 using Domain.Cars;
+using Domain.Cars.Attributes;
 using Domain.Clients;
+using Domain.Leads;
 using Domain.Quotes;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -31,24 +33,61 @@ internal sealed class CreateQuoteCommandHandler(
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
         }
 
-        Client? client = await context.Clients
-            .SingleOrDefaultAsync(c => c.Id == command.ClientId, cancellationToken);
-
-        if (client is null)
+        // D-1: solo se puede cotizar un vehículo Disponible. Si ya está reservado
+        // (por otra cotización activa) o vendido -> 409.
+        if (car.ServiceCar != StatusServiceCar.Disponible)
         {
-            return Result.Failure<Guid>(ClientErrors.NotFound(command.ClientId));
+            return Result.Failure<Guid>(CarErrors.NotAvailable(command.CarId));
+        }
+
+        // Resolve exactly one party: an existing client, or a lead (which lets the
+        // quote-accepted handlers auto-convert the lead into a client).
+        Client? client = null;
+        Lead? lead = null;
+
+        if (command.ClientId is { } clientId)
+        {
+            client = await context.Clients
+                .SingleOrDefaultAsync(c => c.Id == clientId, cancellationToken);
+
+            if (client is null)
+            {
+                return Result.Failure<Guid>(ClientErrors.NotFound(clientId));
+            }
+        }
+        else if (command.LeadId is { } leadId)
+        {
+            lead = await context.Leads
+                .SingleOrDefaultAsync(l => l.Id == leadId, cancellationToken);
+
+            if (lead is null)
+            {
+                return Result.Failure<Guid>(LeadErrors.NotFound(leadId));
+            }
+        }
+        else
+        {
+            return Result.Failure<Guid>(new Error(
+                "Quotes.MissingParty",
+                "A quote must reference either a client or a lead.",
+                ErrorType.Validation));
         }
 
         var quote = new Quote(
             tenantService.DealerId,
             car,
             client,
+            lead,
             command.ProposedPrice,
+            command.PaymentMethod,
             command.ValidUntil,
             command.Comments,
             dateTimeProvider.UtcNow);
 
         context.Quotes.Add(quote);
+
+        // D-1: reservar el vehículo en la misma transacción que la cotización.
+        car.Reserve(dateTimeProvider.UtcNow);
 
         await context.SaveChangesAsync(cancellationToken);
 

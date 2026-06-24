@@ -15,6 +15,9 @@ internal sealed class RegisterUserCommandHandler(
     ICurrentTenantService tenantService)
     : ICommandHandler<RegisterUserCommand, Guid>
 {
+    // Default DealerId for development/single-tenant scenarios
+    private static readonly Guid DefaultDealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
     public async Task<Result<Guid>> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
     {
         var email = new Email(command.Email);
@@ -24,8 +27,16 @@ internal sealed class RegisterUserCommandHandler(
             return Result.Failure<Guid>(UserErrors.EmailNotUnique);
         }
 
+        var dealerId = command.DealerId ?? tenantService.DealerId;
+
+        // If still empty (unauthenticated registration), use default dealer for development
+        if (dealerId == Guid.Empty)
+        {
+            dealerId = DefaultDealerId;
+        }
+
         var user = new User(
-            command.DealerId ?? tenantService.DealerId,
+            dealerId,
             command.Email,
             command.FirstName,
             command.LastName,

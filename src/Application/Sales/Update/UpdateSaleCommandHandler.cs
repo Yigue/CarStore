@@ -21,27 +21,38 @@ internal sealed class UpdateSaleCommandHandler(
             return Result.Failure<Guid>(SalesErrors.NotFound(command.Id));
         }
 
-        // Update sale properties using domain method
-        if (command.Status == SaleStatus.Pending)
+        // Domain rule: only pending sales can be mutated. Guard here and return a
+        // conflict result instead of letting the domain methods throw (which surfaced as a 500).
+        if (sale.Status != SaleStatus.Pending)
         {
-            sale.Update(
-                command.FinalPrice,
-                command.PaymentMethod,
-                command.ContractNumber,
-                command.Comments);
+            return Result.Failure<Guid>(SalesErrors.CannotEditNonPending(command.Id));
         }
-        else if (command.Status == SaleStatus.Completed && sale.Status == SaleStatus.Pending)
+
+        switch (command.Status)
         {
-            sale.Update(
-                command.FinalPrice,
-                command.PaymentMethod,
-                command.ContractNumber,
-                command.Comments);
-            sale.Complete();
-        }
-        else if (command.Status == SaleStatus.Cancelled && sale.Status == SaleStatus.Pending)
-        {
-            sale.Cancel("Cancelled via update");
+            case SaleStatus.Pending:
+                sale.Update(
+                    command.FinalPrice,
+                    command.PaymentMethod,
+                    command.ContractNumber,
+                    command.Comments);
+                break;
+
+            case SaleStatus.Completed:
+                sale.Update(
+                    command.FinalPrice,
+                    command.PaymentMethod,
+                    command.ContractNumber,
+                    command.Comments);
+                sale.Complete();
+                break;
+
+            case SaleStatus.Cancelled:
+                sale.Cancel("Cancelled via update");
+                break;
+
+            default:
+                return Result.Failure<Guid>(SalesErrors.CannotEditNonPending(command.Id));
         }
 
         await context.SaveChangesAsync(cancellationToken);

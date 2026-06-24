@@ -12,13 +12,15 @@ public sealed class GetByMarca : IEndpoint
     {
         app.MapGet("modelos/marca/{marcaId}", Handler)
             .WithTags(Tags.Modelos)
-            .RequireAuthorization();
+            .AllowAnonymous();
     }
 
     private static async Task<IResult> Handler(Guid marcaId, ISender sender, CancellationToken cancellationToken)
     {
         Result<List<Domain.Cars.Attributes.Modelo>> result = await sender.Send(new GetModelosByMarcaQuery(marcaId), cancellationToken);
 
-        return result.Match(Results.Ok, CustomResults.Problem);
+        return result.Match(
+            modelos => Results.Ok(modelos.Select(m => new { id = m.Id, nombre = m.Nombre, marcaId = m.MarcaId })),
+            CustomResults.Problem);
     }
 }

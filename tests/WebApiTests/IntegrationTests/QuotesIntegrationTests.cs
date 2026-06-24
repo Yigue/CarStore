@@ -31,7 +31,7 @@ public class QuotesIntegrationTests
         var toyota = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Toyota");
         var rav4 = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "RAV4" && m.MarcaId == toyota.Id);   
 
-        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var car = new Car(
             dealerId,
             toyota,
@@ -76,12 +76,13 @@ public class QuotesIntegrationTests
         var response = await client.PostAsJsonAsync("/api/v1/quotes", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var quoteId = result!.id;
         quoteId.Should().NotBe(Guid.Empty);
 
         var createdQuote = await context.Quotes
             .IgnoreQueryFilters()
+            .AsNoTracking()
             .Include(q => q.Car)
             .Include(q => q.Client)
             .FirstAsync(q => q.Id == quoteId);        
@@ -106,7 +107,7 @@ public class QuotesIntegrationTests
         var ford = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Ford");
         var mustang = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Mustang" && m.MarcaId == ford.Id);
 
-        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var car = new Car(
             dealerId,
             ford,
@@ -139,10 +140,12 @@ public class QuotesIntegrationTests
         await context.SaveChangesAsync();
 
         var quote = new Domain.Quotes.Quote(
-            Guid.Parse("00000000-0000-0000-0000-000000000001"),
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
             car,
             testClient,
+            null,
             44000m,
+            Domain.Quotes.Attributes.PaymentMethod.Contado,
             DateTime.UtcNow.AddDays(15),
             "Cotización para Ford Mustang",
             DateTime.UtcNow);
@@ -153,7 +156,7 @@ public class QuotesIntegrationTests
         var response = await client.GetAsync("/api/v1/quotes");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var quotes = await response.Content.ReadFromJsonAsync<List<Application.Quotes.Get.QuoteResponse>>();
+        var quotes = await response.Content.ReadFromJsonAsync<List<Application.Quotes.Get.QuoteResponse>>(IntegrationTestHelpers.JsonOptions);
         quotes.Should().NotBeNull();
         quotes!.Count.Should().BeGreaterThan(0);
         quotes.Should().Contain(q => q.Id == quote.Id);
@@ -173,7 +176,7 @@ public class QuotesIntegrationTests
         var volkswagen = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Volkswagen");
         var tiguan = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Tiguan" && m.MarcaId == volkswagen.Id);
 
-        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var car = new Car(
             dealerId,
             volkswagen,
@@ -207,10 +210,12 @@ public class QuotesIntegrationTests
         await context.SaveChangesAsync();
 
         var quote = new Domain.Quotes.Quote(
-            Guid.Parse("00000000-0000-0000-0000-000000000001"),
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
             car,
             testClient,
+            null,
             29000m,
+            Domain.Quotes.Attributes.PaymentMethod.Financiado,
             DateTime.UtcNow.AddDays(20),
             "Cotización para Volkswagen Tiguan",
             DateTime.UtcNow);
@@ -221,7 +226,7 @@ public class QuotesIntegrationTests
         var response = await client.GetAsync($"/api/v1/quotes/{quote.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-                var result = await response.Content.ReadFromJsonAsync<Application.Quotes.Get.QuoteResponse>();
+                var result = await response.Content.ReadFromJsonAsync<Application.Quotes.Get.QuoteResponse>(IntegrationTestHelpers.JsonOptions);
         result.Should().NotBeNull();
         result!.Id.Should().Be(quote.Id);
         result.ProposedPrice.Should().Be(29000m);
@@ -242,13 +247,13 @@ public class QuotesIntegrationTests
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
         var chevrolet = await context.Marca.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Chevrolet");
-        var equinox = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Equinox" && m.MarcaId == chevrolet.Id);
+        var cruze = await context.Modelo.IgnoreQueryFilters().FirstAsync(m => m.Nombre == "Cruze" && m.MarcaId == chevrolet.Id);
         
-        var dealerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var car = new Car(
             dealerId,
             chevrolet,
-            equinox,
+            cruze,
             Color.White,
             TypeCar.SUV,
             StatusCar.New,
@@ -259,7 +264,7 @@ public class QuotesIntegrationTests
             0,
             2024,
             "ABC123",
-            "Chevrolet Equinox nuevo",
+            "Chevrolet Cruze nuevo",
             32000m,
             DateTime.UtcNow);
         
@@ -278,12 +283,14 @@ public class QuotesIntegrationTests
         await context.SaveChangesAsync();
 
         var quote = new Domain.Quotes.Quote(
-            Guid.Parse("00000000-0000-0000-0000-000000000001"),
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
             car,
             testClient,
+            null,
             31000m,
+            Domain.Quotes.Attributes.PaymentMethod.Permuta,
             DateTime.UtcNow.AddDays(25),
-            "Cotización para Chevrolet Equinox",
+            "Cotización para Chevrolet Cruze",
             DateTime.UtcNow);
         
         context.Quotes.Add(quote);
@@ -292,7 +299,7 @@ public class QuotesIntegrationTests
         var response = await client.PostAsync($"/api/v1/quotes/{quote.Id}/accept", null);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var updatedQuote = await context.Quotes.IgnoreQueryFilters().FirstAsync(q => q.Id == quote.Id);
+        var updatedQuote = await context.Quotes.IgnoreQueryFilters().AsNoTracking().FirstAsync(q => q.Id == quote.Id);
         updatedQuote!.Status.Should().Be(QuoteStatus.Accepted);
     }
 

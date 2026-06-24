@@ -44,8 +44,8 @@ public class CarsEndpointsTests
 
         var request = new
         {
-            Marca = marca.Id.ToString(),
-            Modelo = modelo.Id.ToString(),
+            Marca = marca.Id,
+            Modelo = modelo.Id,
             Color = (int)Color.White,
             CarType = (int)TypeCar.Sedan,
             CarStatus = (int)StatusCar.New,
@@ -55,14 +55,14 @@ public class CarsEndpointsTests
             Cilindrada = 2000,
             Kilometraje = 10000,
             Anio = 2020,
-            Patente = "ABC123",
+            Patente = "TST999",
             Descripcion = "Test",
             Precio = 10000m
         };
 
         var response = await client.PostAsJsonAsync("/api/v1/cars", request);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var result = await response.Content.ReadFromJsonAsync<CreateResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CreateResponse>(IntegrationTestHelpers.JsonOptions);
         var id = result!.id;
 
         context.Cars.IgnoreQueryFilters().Should().ContainSingle(c => c.Id == id);
@@ -86,8 +86,8 @@ public class CarsEndpointsTests
 
         var request = new
         {
-            Marca = marca.Id.ToString(),
-            Modelo = modelo.Id.ToString(),
+            Marca = marca.Id,
+            Modelo = modelo.Id,
             Color = 999,
             CarType = (int)TypeCar.Sedan,
             CarStatus = (int)StatusCar.New,
@@ -97,7 +97,7 @@ public class CarsEndpointsTests
             Cilindrada = 2000,
             Kilometraje = 10000,
             Anio = 2020,
-            Patente = "ABC123",
+            Patente = "TST888",
             Descripcion = "Test",
             Precio = 10000m
         };
@@ -118,7 +118,7 @@ public class CarsEndpointsTests
         var modelo = new Modelo("Fiesta", marca.Id) { Marca = marca };
 
         var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
-        var car = new Car(dealerId, marca, modelo, Color.Blue, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4,5,1600,5000,2019,"ABC123","desc",15000m, DateTime.UtcNow);
+        var car = new Car(dealerId, marca, modelo, Color.Blue, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4,5,1600,5000,2019,"GET777","desc",15000m, DateTime.UtcNow);
         context.AddRange(marca, modelo, car);
         await context.SaveChangesAsync();
 
@@ -127,7 +127,7 @@ public class CarsEndpointsTests
 
         var response = await client.GetAsync($"/api/v1/cars/{car.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var result = await response.Content.ReadFromJsonAsync<CarGetByIdResponse>();
+        var result = await response.Content.ReadFromJsonAsync<CarGetByIdResponse>(IntegrationTestHelpers.JsonOptions);
         result!.Id.Should().Be(car.Id);
         result.Marca.Should().Be("Ford");
     }

@@ -4,6 +4,7 @@ using Domain.Cars.Attributes;
 using Domain.Clients;
 using Domain.Financial;
 using Domain.Financial.Attributes;
+using Domain.Leads;
 using Domain.Quotes;
 using Domain.Sales;
 using Domain.Sales.Attributes;
@@ -90,12 +91,12 @@ internal static class DevDataSeeder
             var cars = await context.Cars.ToListAsync(cancellationToken);
             var clients = await context.Clients.ToListAsync(cancellationToken);
 
-            var quote1 = new Quote(DefaultDealerId, cars[3], clients[0], 21500, DateTime.UtcNow.AddDays(15), "Cotización aceptada", DateTime.UtcNow.AddDays(-2));
+            var quote1 = new Quote(DefaultDealerId, cars[3], clients[0], null, 21500, Domain.Quotes.Attributes.PaymentMethod.Contado, DateTime.UtcNow.AddDays(15), "Cotización aceptada", DateTime.UtcNow.AddDays(-2));
             quote1.Accept(DateTime.UtcNow.AddDays(-1));
 
-            var quote2 = new Quote(DefaultDealerId, cars[4], clients[1], 63000, DateTime.UtcNow.AddDays(7), "Cotización pendiente", DateTime.UtcNow.AddDays(-1));
+            var quote2 = new Quote(DefaultDealerId, cars[4], clients[1], null, 63000, Domain.Quotes.Attributes.PaymentMethod.Financiado, DateTime.UtcNow.AddDays(7), "Cotización pendiente", DateTime.UtcNow.AddDays(-1));
 
-            var quote3 = new Quote(DefaultDealerId, cars[0], clients[2], 24000, DateTime.UtcNow.AddDays(10), "Cotización rechazada", DateTime.UtcNow.AddDays(-5));
+            var quote3 = new Quote(DefaultDealerId, cars[0], clients[2], null, 24000, Domain.Quotes.Attributes.PaymentMethod.Permuta, DateTime.UtcNow.AddDays(10), "Cotización rechazada", DateTime.UtcNow.AddDays(-5));
             quote3.Reject("El precio es muy elevado", DateTime.UtcNow.AddDays(-4));
 
             context.Quotes.AddRange(new[] { quote1, quote2, quote3 });
@@ -125,6 +126,25 @@ internal static class DevDataSeeder
             };
 
             context.Transactions.AddRange(transactions);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        // 6. Leads
+        if (!await context.Leads.IgnoreQueryFilters().AnyAsync(cancellationToken))
+        {
+            var cars = await context.Cars.ToListAsync(cancellationToken);
+            var toyota = cars.First(c => c.Patente == "AB123CD");
+            var hilux = cars.First(c => c.Patente == "AB456EF");
+
+            var lead1 = Lead.Create(DefaultDealerId, "Roberto Sanchez", "roberto@email.com", "+54 11 9999-8888", LeadSource.Portal, DateTime.UtcNow.AddDays(-2), toyota.Id);
+            
+            var lead2 = Lead.Create(DefaultDealerId, "Laura Gomez", "laura.g@email.com", "+54 11 7777-6666", LeadSource.Otro, DateTime.UtcNow.AddDays(-3), hilux.Id);
+            lead2.UpdateStatus(LeadStatus.Contactado, "Interesada en Hilux para trabajo en campo.");
+
+            var lead3 = Lead.Create(DefaultDealerId, "Diego Maradona", "diego@email.com", "+54 11 1010-1010", LeadSource.Web, DateTime.UtcNow.AddDays(-5));
+            lead3.ForceStatus(LeadStatus.Ganado);
+
+            context.Leads.AddRange(new[] { lead1, lead2, lead3 });
             await context.SaveChangesAsync(cancellationToken);
         }
     }

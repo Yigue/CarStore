@@ -19,6 +19,12 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.Property(q => q.Status)
             .HasConversion<string>();
 
+        builder.Property(q => q.PaymentMethod)
+            .HasConversion<string>()
+            .HasColumnName("payment_method")
+            .HasMaxLength(50)
+            .IsRequired();
+
         builder.Property(q => q.ValidUntil)
             .IsRequired();
 
@@ -28,6 +34,14 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.Property(q => q.CreatedAt)
             .IsRequired();
 
+        builder.Property(q => q.IsDeleted)
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(q => q.DeletedAtUtc);
+
+        builder.HasIndex(q => q.IsDeleted);
+
         builder.HasOne(q => q.Car)
             .WithMany()
             .HasForeignKey(q => q.CarId)
@@ -36,6 +50,13 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.HasOne(q => q.Client)
             .WithMany()
             .HasForeignKey(q => q.ClientId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        builder.HasOne(q => q.Lead)
+            .WithMany()
+            .HasForeignKey(q => q.LeadId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }

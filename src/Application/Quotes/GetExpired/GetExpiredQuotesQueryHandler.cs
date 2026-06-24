@@ -24,14 +24,16 @@ internal sealed class GetExpiredQuotesQueryHandler(
             .Include(q => q.Car)
                 .ThenInclude(c => c.Modelo)
             .Include(q => q.Client)
+            .Include(q => q.Lead)
             .ToListAsync(cancellationToken);
 
         List<QuoteResponse> response = quotes.Select(quote => new QuoteResponse
         {
             Id = quote.Id,
             CarId = quote.CarId,
-            ClientId = quote.ClientId,
+            ClientId = quote.ClientId ?? Guid.Empty,
             ProposedPrice = quote.ProposedPrice.Amount,
+            PaymentMethod = quote.PaymentMethod.ToString(),
             Status = quote.Status.ToString(),
             ValidUntil = quote.ValidUntil,
             Comments = quote.Comments,
@@ -39,7 +41,7 @@ internal sealed class GetExpiredQuotesQueryHandler(
             UpdatedAt = quote.UpdatedAt,
             CarBrand = quote.Car?.Marca?.Nombre ?? string.Empty,
             CarModel = quote.Car?.Modelo?.Nombre ?? string.Empty,
-            ClientName = quote.Client != null ? $"{quote.Client.FirstName} {quote.Client.LastName}" : string.Empty
+            ClientName = quote.Client != null ? $"{quote.Client.FirstName} {quote.Client.LastName}" : (quote.Lead != null ? quote.Lead.ClientName : "Desconocido")
         }).ToList();
 
         return response;

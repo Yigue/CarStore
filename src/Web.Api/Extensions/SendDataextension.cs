@@ -31,38 +31,57 @@ public static class SeedDataExtensions
         SeedTransactions(context);
     }
 
+    // URLs públicas de Unsplash (licencia libre) para evitar dependencia de blob storage en dev.
+    private static readonly string[] CarImageUrls =
+    [
+        "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=1200&q=80", // muscle car
+        "https://images.unsplash.com/photo-1542362567-b07e54358753?w=1200&q=80", // sedan blanco
+        "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200&q=80", // deportivo rojo
+        "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?w=1200&q=80", // suv negro
+        "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=1200&q=80", // deportivo amarillo
+        "https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=1200&q=80", // sedan azul
+        "https://images.unsplash.com/photo-1568844293986-8d0400bd4745?w=1200&q=80", // suv plata
+        "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=1200&q=80", // backup
+    ];
+
     private static void SeedCars(ApplicationDbContext context)
     {
         if (!context.Set<Car>().IgnoreQueryFilters().Any())
         {
-             var marcas = new List<Marca>{
-            new Marca("Toyota"),
-            new Marca("Ford"),
-            new Marca("Chevrolet"),
-            new Marca("Honda"),
-            new Marca("Volkswagen")
-        };
-        context.AddRange(marcas);
-        context.SaveChanges(); // Guardar Marcas para obtener sus IDs
+            // BrandsSeeder ya creó marcas y modelos. Las reusamos para no duplicar.
+            // Si por algún motivo no hubiera, sembramos un set mínimo aquí.
+            var marcas = context.Set<Marca>().IgnoreQueryFilters().ToList();
+            if (marcas.Count == 0)
+            {
+                marcas =
+                [
+                    new Marca("Toyota"),
+                    new Marca("Ford"),
+                    new Marca("Chevrolet"),
+                    new Marca("Honda"),
+                    new Marca("Volkswagen")
+                ];
+                context.AddRange(marcas);
+                context.SaveChanges();
+            }
 
-        // 2. Crear Modelos asociados a las Marcas
-        var modelos = new List<Modelo>();
-        foreach (var marca in marcas)
-        {
-            var modeloFaker = new Faker<Modelo>()
-                .CustomInstantiator(f => new Modelo(
-                    f.Vehicle.Model(),
-                    marca.Id // Usar el ID de la marca ya guardada
-                ));
-            modelos.AddRange(modeloFaker.Generate(2)); // 2 modelos por marca
-        }
-        context.AddRange(modelos);
-        context.SaveChanges(); // Guardar Modelos para obtener sus IDs
+            var modelos = context.Set<Modelo>().IgnoreQueryFilters().ToList();
+            if (modelos.Count == 0)
+            {
+                foreach (var marca in marcas)
+                {
+                    var modeloFaker = new Faker<Modelo>()
+                        .CustomInstantiator(f => new Modelo(f.Vehicle.Model(), marca.Id));
+                    modelos.AddRange(modeloFaker.Generate(2));
+                }
+                context.AddRange(modelos);
+                context.SaveChanges();
+            }
 
-        if (marcas.Count == 0 || modelos.Count == 0)
-        {
-            throw new InvalidOperationException("Marcas or Modelos list is empty.");
-        }
+            if (marcas.Count == 0 || modelos.Count == 0)
+            {
+                throw new InvalidOperationException("Marcas or Modelos list is empty.");
+            }
 
         var carFaker = new Faker<Car>()
             .CustomInstantiator(f => new Car(
@@ -84,8 +103,26 @@ public static class SeedDataExtensions
                 DateTime.Now.ToUniversalTime()
             ));
 
-            var cars = carFaker.Generate(5) ;
+            var cars = carFaker.Generate(8);
             context.AddRange(cars);
+            context.SaveChanges();
+
+            // Sembrar 2-3 imágenes por auto. La primera es la imagen principal.
+            var imageFaker = new Faker();
+            foreach (var car in cars)
+            {
+                var count = imageFaker.Random.Int(2, 3);
+                var pickedUrls = imageFaker.PickRandom(CarImageUrls, count).ToList();
+                for (var i = 0; i < pickedUrls.Count; i++)
+                {
+                    var image = new CarImage(
+                        carId: car.Id,
+                        imageUrl: pickedUrls[i],
+                        isCover: i == 0,
+                        displayOrder: i);
+                    context.Add(image);
+                }
+            }
             context.SaveChanges();
         }
     }
@@ -148,7 +185,9 @@ public static class SeedDataExtensions
             Guid.Parse("11111111-1111-1111-1111-111111111111"), // DealerId fijo de desarrollo
             car,
             client,
+            null, // Lead
             f.Random.Decimal((car.Price * 0.9m).Amount, (car.Price * 1.1m).Amount),
+            f.PickRandom<Domain.Quotes.Attributes.PaymentMethod>(),
             f.Date.Future().ToUniversalTime(), // Ensure UTC
             f.Lorem.Sentence(),
             f.Date.Recent().ToUniversalTime()

@@ -23,6 +23,77 @@ namespace Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Domain.Appointments.Appointment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agent_id");
+
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTime>("EndDateTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("end_date_time");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTime>("StartDateTime")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("start_date_time");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("type");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vehicle_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_appointments");
+
+                    b.HasIndex("AgentId")
+                        .HasDatabaseName("ix_appointments_agent_id");
+
+                    b.HasIndex("ClientId")
+                        .HasDatabaseName("ix_appointments_client_id");
+
+                    b.HasIndex("LeadId")
+                        .HasDatabaseName("ix_appointments_lead_id");
+
+                    b.HasIndex("VehicleId")
+                        .HasDatabaseName("ix_appointments_vehicle_id");
+
+                    b.HasIndex("DealerId", "StartDateTime", "EndDateTime")
+                        .HasDatabaseName("ix_appointments_dealer_time_range");
+
+                    b.ToTable("appointments", "public");
+                });
+
             modelBuilder.Entity("Domain.Cars.Attributes.Marca", b =>
                 {
                     b.Property<Guid>("Id")
@@ -68,6 +139,55 @@ namespace Infrastructure.Migrations
                     b.ToTable("modelo", "public");
                 });
 
+            modelBuilder.Entity("Domain.Cars.BackfillAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<int>("AffectedRowCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("affected_row_count");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<int?>("ExecutionTimeMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("execution_time_ms");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("text")
+                        .HasColumnName("metadata_json");
+
+                    b.HasKey("Id")
+                        .HasName("pk_backfill_audit");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_backfill_audit_actor");
+
+                    b.HasIndex("DealerId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_backfill_audit_dealer_created");
+
+                    b.ToTable("backfill_audit", "public");
+                });
+
             modelBuilder.Entity("Domain.Cars.Car", b =>
                 {
                     b.Property<Guid>("Id")
@@ -75,7 +195,7 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<int>("Año")
+                    b.Property<int>("Anio")
                         .HasColumnType("integer")
                         .HasColumnName("año");
 
@@ -119,6 +239,12 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("descripcion");
 
+                    b.Property<bool>("Featured")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("featured");
+
                     b.Property<string>("FuelType")
                         .IsRequired()
                         .HasColumnType("text")
@@ -151,6 +277,13 @@ namespace Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("service_car");
 
+                    b.Property<string>("Transmission")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Manual")
+                        .HasColumnName("transmission");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -182,31 +315,92 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("car_id");
 
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("display_order");
+
                     b.Property<string>("ImageUrl")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("image_url");
 
-                    b.Property<bool>("IsPrimary")
+                    b.Property<bool>("IsCover")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
-                        .HasColumnName("is_primary");
+                        .HasColumnName("is_cover");
 
-                    b.Property<int>("Order")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("order");
+                    b.Property<string>("ObjectKey")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("object_key");
+
+                    b.Property<long?>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
 
                     b.HasKey("Id")
                         .HasName("pk_car_images");
 
                     b.HasIndex("CarId")
-                        .HasDatabaseName("ix_car_images_car_id");
+                        .IsUnique()
+                        .HasDatabaseName("ux_car_images_car_id_is_cover")
+                        .HasFilter("is_cover = true");
+
+                    b.HasIndex("CarId", "DisplayOrder")
+                        .HasDatabaseName("ix_car_images_car_id_display_order");
 
                     b.ToTable("car_images", "public");
+                });
+
+            modelBuilder.Entity("Domain.Cars.ReconditioningTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CarId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("car_id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reconditioning_tasks");
+
+                    b.HasIndex("CarId")
+                        .HasDatabaseName("ix_reconditioning_tasks_car_id");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_reconditioning_tasks_dealer_id");
+
+                    b.ToTable("reconditioning_tasks", "public");
                 });
 
             modelBuilder.Entity("Domain.Clients.Client", b =>
@@ -221,6 +415,11 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("address");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("city");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -254,6 +453,15 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid?>("OriginLeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("origin_lead_id");
+
                     b.Property<string>("Phone")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -265,9 +473,22 @@ namespace Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Individual")
+                        .HasColumnName("type");
+
                     b.Property<DateTime>("UpdateAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("update_at");
+
+                    b.Property<string>("ZipCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("zip_code");
 
                     b.HasKey("Id")
                         .HasName("pk_clients");
@@ -276,7 +497,183 @@ namespace Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_clients_dni");
 
+                    b.HasIndex("OriginLeadId")
+                        .HasDatabaseName("ix_clients_origin_lead_id");
+
                     b.ToTable("clients", "public");
+                });
+
+            modelBuilder.Entity("Domain.DealerSettings.DealerSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .HasColumnType("text")
+                        .HasColumnName("address");
+
+                    b.Property<string>("ContactEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("contact_email");
+
+                    b.Property<string>("CustomDomain")
+                        .HasColumnType("text")
+                        .HasColumnName("custom_domain");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("DealerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("dealer_name");
+
+                    b.Property<string>("FacebookUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("facebook_url");
+
+                    b.Property<string>("FooterText")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("footer_text");
+
+                    b.Property<string>("HostName")
+                        .HasColumnType("text")
+                        .HasColumnName("host_name");
+
+                    b.Property<string>("InstagramUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("instagram_url");
+
+                    b.Property<decimal?>("InterestRateTna")
+                        .HasColumnType("numeric")
+                        .HasColumnName("interest_rate_tna");
+
+                    b.Property<int>("LastAssignedAgentIndex")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("last_assigned_agent_index");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("logo_url");
+
+                    b.Property<bool>("NotificationsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("notifications_enabled");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasColumnType("text")
+                        .HasColumnName("phone_number");
+
+                    b.Property<string>("PrimaryColor")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("primary_color");
+
+                    b.Property<string>("SecondaryColor")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("secondary_color");
+
+                    b.Property<string>("TwitterUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("twitter_url");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dealer_settings");
+
+                    b.HasIndex("DealerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_dealer_settings_dealer_id");
+
+                    b.ToTable("dealer_settings", "public");
+                });
+
+            modelBuilder.Entity("Domain.Documents.Document", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BlobName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("blob_name");
+
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("DiscrepancyNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("discrepancy_notes");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<string>("OcrRawJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("ocr_raw_json");
+
+                    b.Property<string>("OcrStatus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ocr_status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.Property<DateTime>("UploadedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at_utc");
+
+                    b.Property<DateTime?>("VerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("verified_at_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_documents");
+
+                    b.HasIndex("ClientId")
+                        .HasDatabaseName("ix_documents_client_id");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_documents_dealer_id");
+
+                    b.ToTable("documents", "public");
                 });
 
             modelBuilder.Entity("Domain.Financial.Attributes.TransactionCategory", b =>
@@ -378,6 +775,93 @@ namespace Infrastructure.Migrations
                     b.ToTable("transactions", "public");
                 });
 
+            modelBuilder.Entity("Domain.Leads.Lead", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AssignedAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_agent_id");
+
+                    b.Property<string>("ClientName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("client_name");
+
+                    b.Property<Guid?>("ConvertedClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("converted_client_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
+                    b.Property<Guid?>("InterestedVehicleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("interested_vehicle_id");
+
+                    b.Property<string>("LossReason")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("loss_reason");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Nuevo")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_leads");
+
+                    b.HasIndex("ConvertedClientId")
+                        .HasDatabaseName("ix_leads_converted_client_id");
+
+                    b.HasIndex("InterestedVehicleId")
+                        .HasDatabaseName("ix_leads_interested_vehicle_id");
+
+                    b.HasIndex("DealerId", "AssignedAgentId")
+                        .HasDatabaseName("ix_leads_dealer_agent");
+
+                    b.HasIndex("DealerId", "Status")
+                        .HasDatabaseName("ix_leads_dealer_status");
+
+                    b.ToTable("leads", "public");
+                });
+
             modelBuilder.Entity("Domain.Quotes.Quote", b =>
                 {
                     b.Property<Guid>("Id")
@@ -389,7 +873,7 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("car_id");
 
-                    b.Property<Guid>("ClientId")
+                    b.Property<Guid?>("ClientId")
                         .HasColumnType("uuid")
                         .HasColumnName("client_id");
 
@@ -406,6 +890,26 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("DealerId")
                         .HasColumnType("uuid")
                         .HasColumnName("dealer_id");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("payment_method");
 
                     b.Property<decimal>("ProposedPrice")
                         .HasColumnType("numeric")
@@ -432,6 +936,12 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("ClientId")
                         .HasDatabaseName("ix_quotes_client_id");
+
+                    b.HasIndex("IsDeleted")
+                        .HasDatabaseName("ix_quotes_is_deleted");
+
+                    b.HasIndex("LeadId")
+                        .HasDatabaseName("ix_quotes_lead_id");
 
                     b.ToTable("quotes", "public");
                 });
@@ -471,10 +981,18 @@ namespace Infrastructure.Migrations
                         .HasColumnType("numeric")
                         .HasColumnName("final_price");
 
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("payment_method");
+
+                    b.Property<Guid?>("QuoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("quote_id");
 
                     b.Property<DateTime>("SaleDate")
                         .HasColumnType("timestamp with time zone")
@@ -493,6 +1011,12 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("ClientId")
                         .HasDatabaseName("ix_sales_client_id");
+
+                    b.HasIndex("LeadId")
+                        .HasDatabaseName("ix_sales_lead_id");
+
+                    b.HasIndex("QuoteId")
+                        .HasDatabaseName("ix_sales_quote_id");
 
                     b.ToTable("sales", "public");
                 });
@@ -539,6 +1063,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
                     b.Property<Guid>("DealerId")
                         .HasColumnType("uuid")
                         .HasColumnName("dealer_id");
@@ -550,18 +1078,37 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("FirstName")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("first_name");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
 
                     b.Property<string>("LastName")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("role");
 
                     b.HasKey("Id")
                         .HasName("pk_users");
@@ -584,6 +1131,14 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("dealer_id");
 
+                    b.Property<DateTime>("GrantedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at");
+
+                    b.Property<Guid?>("GrantedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("granted_by");
+
                     b.Property<string>("Permission")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -597,10 +1152,82 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_user_permissions");
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_user_permissions_user_id");
+                    b.HasIndex("UserId", "Permission")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_permissions_user_id_permission");
 
                     b.ToTable("UserPermissions", "public");
+                });
+
+            modelBuilder.Entity("Domain.Users.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("token");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_password_reset_tokens");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("ix_password_reset_tokens_token");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_password_reset_tokens_user_id");
+
+                    b.ToTable("password_reset_tokens", "public");
+                });
+
+            modelBuilder.Entity("Domain.Appointments.Appointment", b =>
+                {
+                    b.HasOne("Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("AgentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_appointments_users_agent_id");
+
+                    b.HasOne("Domain.Clients.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_appointments_clients_client_id");
+
+                    b.HasOne("Domain.Leads.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_appointments_leads_lead_id");
+
+                    b.HasOne("Domain.Cars.Car", null)
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_appointments_cars_vehicle_id");
                 });
 
             modelBuilder.Entity("Domain.Cars.Attributes.Modelo", b =>
@@ -631,9 +1258,36 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_cars_modelo_modelo_id");
 
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "PurchaseCost", b1 =>
+                        {
+                            b1.Property<Guid>("CarId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("decimal(18,2)")
+                                .HasColumnName("purchase_cost_amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("purchase_cost_currency");
+
+                            b1.HasKey("CarId");
+
+                            b1.ToTable("cars", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CarId")
+                                .HasConstraintName("fk_cars_cars_id");
+                        });
+
                     b.Navigation("Marca");
 
                     b.Navigation("Modelo");
+
+                    b.Navigation("PurchaseCost");
                 });
 
             modelBuilder.Entity("Domain.Cars.CarImage", b =>
@@ -646,6 +1300,97 @@ namespace Infrastructure.Migrations
                         .HasConstraintName("fk_car_images_cars_car_id");
 
                     b.Navigation("Car");
+                });
+
+            modelBuilder.Entity("Domain.Cars.ReconditioningTask", b =>
+                {
+                    b.HasOne("Domain.Cars.Car", null)
+                        .WithMany("ReconditioningTasks")
+                        .HasForeignKey("CarId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_reconditioning_tasks_cars_car_id");
+
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "Cost", b1 =>
+                        {
+                            b1.Property<Guid>("ReconditioningTaskId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("decimal(18,2)")
+                                .HasColumnName("cost_amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("cost_currency");
+
+                            b1.HasKey("ReconditioningTaskId");
+
+                            b1.ToTable("reconditioning_tasks", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ReconditioningTaskId")
+                                .HasConstraintName("fk_reconditioning_tasks_reconditioning_tasks_id");
+                        });
+
+                    b.Navigation("Cost")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.Clients.Client", b =>
+                {
+                    b.HasOne("Domain.Leads.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("OriginLeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_clients_leads_origin_lead_id");
+                });
+
+            modelBuilder.Entity("Domain.Documents.Document", b =>
+                {
+                    b.HasOne("Domain.Clients.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_documents_clients_client_id");
+
+                    b.OwnsOne("Domain.Documents.OcrExtractedData", "ParsedData", b1 =>
+                        {
+                            b1.Property<Guid>("DocumentId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("DocumentNumber")
+                                .HasColumnType("text");
+
+                            b1.Property<string>("FullName")
+                                .HasColumnType("text");
+
+                            b1.Property<string>("IssueDate")
+                                .HasColumnType("text");
+
+                            b1.Property<string>("VehicleIdentifier")
+                                .HasColumnType("text");
+
+                            b1.Property<string>("VehicleTitleNumber")
+                                .HasColumnType("text");
+
+                            b1.HasKey("DocumentId");
+
+                            b1.ToTable("documents", "public");
+
+                            b1.ToJson("parsed_data");
+
+                            b1.WithOwner()
+                                .HasForeignKey("DocumentId")
+                                .HasConstraintName("fk_documents_documents_id");
+                        });
+
+                    b.Navigation("Client");
+
+                    b.Navigation("ParsedData");
                 });
 
             modelBuilder.Entity("Domain.Financial.FinancialTransaction", b =>
@@ -684,6 +1429,21 @@ namespace Infrastructure.Migrations
                     b.Navigation("Sale");
                 });
 
+            modelBuilder.Entity("Domain.Leads.Lead", b =>
+                {
+                    b.HasOne("Domain.Clients.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ConvertedClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_leads_clients_converted_client_id");
+
+                    b.HasOne("Domain.Cars.Car", null)
+                        .WithMany()
+                        .HasForeignKey("InterestedVehicleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_leads_cars_interested_vehicle_id");
+                });
+
             modelBuilder.Entity("Domain.Quotes.Quote", b =>
                 {
                     b.HasOne("Domain.Cars.Car", "Car")
@@ -697,12 +1457,19 @@ namespace Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_quotes_clients_client_id");
+
+                    b.HasOne("Domain.Leads.Lead", "Lead")
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_quotes_leads_lead_id");
 
                     b.Navigation("Car");
 
                     b.Navigation("Client");
+
+                    b.Navigation("Lead");
                 });
 
             modelBuilder.Entity("Domain.Sales.Sale", b =>
@@ -721,19 +1488,43 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_sales_clients_client_id");
 
+                    b.HasOne("Domain.Leads.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_sales_leads_lead_id");
+
+                    b.HasOne("Domain.Quotes.Quote", null)
+                        .WithMany()
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_sales_quotes_quote_id");
+
                     b.Navigation("Car");
 
                     b.Navigation("Client");
                 });
 
-            modelBuilder.Entity("Domain.Users.UserPermission", b =>
+            modelBuilder.Entity("Domain.Users.PasswordResetToken", b =>
                 {
                     b.HasOne("Domain.Users.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
+                        .HasConstraintName("fk_password_reset_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("Domain.Users.UserPermission", b =>
+                {
+                    b.HasOne("Domain.Users.User", "User")
+                        .WithMany("Permissions")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
                         .HasConstraintName("fk_user_permissions_users_user_id");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Domain.Cars.Attributes.Marca", b =>
@@ -744,11 +1535,18 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Cars.Car", b =>
                 {
                     b.Navigation("Images");
+
+                    b.Navigation("ReconditioningTasks");
                 });
 
             modelBuilder.Entity("Domain.Clients.Client", b =>
                 {
                     b.Navigation("Sales");
+                });
+
+            modelBuilder.Entity("Domain.Users.User", b =>
+                {
+                    b.Navigation("Permissions");
                 });
 #pragma warning restore 612, 618
         }

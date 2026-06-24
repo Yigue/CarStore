@@ -3,6 +3,7 @@ using Application.Abstractions.Data;
 using Domain.Cars.Attributes;
 using Domain.Financial.Attributes;
 using Domain.Users;
+using Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,11 @@ public static class DatabaseSeeder
         ILogger logger,
         CancellationToken cancellationToken = default)
     {
+        // Users are reconciled on every startup: UsersSeeder is idempotent and
+        // self-heals stale roles, so it must run even when the bulk seed data
+        // already exists (the Marca guard below would otherwise skip it).
+        await UsersSeeder.SeedAsync(context, passwordHasher, configuration, logger, cancellationToken);
+
         // Verificar si ya hay datos seedeados
         if (await context.Marca.AnyAsync(cancellationToken))
         {
@@ -34,7 +40,10 @@ public static class DatabaseSeeder
         // Ejecutar seeders en orden
         await BrandsSeeder.SeedAsync(context, cancellationToken);
         await TransactionCategoriesSeeder.SeedAsync(context, cancellationToken);
-        await UsersSeeder.SeedAsync(context, passwordHasher, configuration, logger, cancellationToken);
+        if (context is ApplicationDbContext dbContext)
+        {
+            await DealerSettingsSeeder.SeedAsync(dbContext, cancellationToken);
+        }
         await DevDataSeeder.SeedAsync(context, cancellationToken);
 
         // Guardar todos los cambios

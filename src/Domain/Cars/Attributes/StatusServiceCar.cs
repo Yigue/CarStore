@@ -5,5 +5,8 @@ public enum StatusServiceCar
     EnVenta,
     Vendido,
     Disponible,
-    NoDisponible
+    NoDisponible,
+    // Reservado: un vehículo Disponible tomado por una cotización activa (D-1).
+    // Se libera (-> Disponible) al rechazar/expirar la cotización, o pasa a Vendido al concretar la venta.
+    Reservado
 }
