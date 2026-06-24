@@ -1,6 +1,10 @@
+using System.Security.Cryptography;
+using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Users.GetByEmail;
+using Domain.Users;
 using MediatR;
+using Microsoft.Extensions.Configuration;
 using SharedKernel;
 
 namespace Application.Users.Commands.RequestPasswordReset;
@@ -9,9 +13,13 @@ public sealed record RequestPasswordResetCommand(string Email) : ICommand;
 
 internal sealed class RequestPasswordResetCommandHandler(
     ISender sender,
-    IEmailService emailService
+    IApplicationDbContext context,
+    IEmailService emailService,
+    IConfiguration configuration
 ) : ICommandHandler<RequestPasswordResetCommand>
 {
+    private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(1);
+
     public async Task<Result> Handle(RequestPasswordResetCommand request, CancellationToken cancellationToken)
     {
         // Check if user exists
@@ -23,16 +31,25 @@ internal sealed class RequestPasswordResetCommandHandler(
             return Result.Success();
         }
 
-        // Generate a reset link (placeholder for now, you could use a signed JWT or store a token in DB)
-        // In a real scenario, the link should point to the frontend `/auth/recuperar?token=...`
-        string resetLink = $"https://carstore-app.com/auth/recuperar?token=mock_token_for_{userResult.Value.Id}";
+        UserResponse user = userResult.Value;
+
+        // Single-use, time-limited token. Stored hashed-free (it is already a high-entropy
+        // 256-bit random value) and looked up directly when the user submits the reset.
+        string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        DateTime expiresAt = DateTime.UtcNow.Add(TokenLifetime);
+
+        context.PasswordResetTokens.Add(new PasswordResetToken(user.Id, token, expiresAt));
+        await context.SaveChangesAsync(cancellationToken);
+
+        string baseUrl = (configuration["Frontend:BaseUrl"] ?? "https://carstore-app.com").TrimEnd('/');
+        string resetLink = $"{baseUrl}/reset-password?token={token}";
 
         string subject = "Recuperación de contraseña - CarStore";
         string body = $@"
-Hola {userResult.Value.FirstName},
+Hola {user.FirstName},
 
 Hemos recibido una solicitud para restablecer tu contraseña.
-Haz clic en el siguiente enlace para crear una nueva contraseña:
+Haz clic en el siguiente enlace para crear una nueva contraseña (válido por 1 hora):
 {resetLink}
 
 Si no solicitaste este cambio, ignora este correo.

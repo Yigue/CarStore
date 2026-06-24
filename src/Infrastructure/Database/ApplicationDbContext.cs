@@ -46,6 +46,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<TransactionCategory> TransactionCategories { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<UserPermission> UserPermissions { get; set; }
+    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
     public DbSet<CarImage> CarImages { get; set; }
     public DbSet<ReconditioningTask> ReconditioningTasks { get; set; }

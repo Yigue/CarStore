@@ -45,6 +45,14 @@ public sealed class User : Entity
     private readonly List<UserPermission> _permissions = [];
     public IReadOnlyCollection<UserPermission> Permissions => _permissions;
 
+    public void SetPassword(string passwordHash)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
+            throw new DomainException("Password hash cannot be empty");
+
+        PasswordHash = passwordHash;
+    }
+
     public void UpdatePhone(string? phone)
     {
         Phone = phone;

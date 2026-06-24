@@ -1159,6 +1159,48 @@ namespace Infrastructure.Migrations
                     b.ToTable("UserPermissions", "public");
                 });
 
+            modelBuilder.Entity("Domain.Users.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("token");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_password_reset_tokens");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("ix_password_reset_tokens_token");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_password_reset_tokens_user_id");
+
+                    b.ToTable("password_reset_tokens", "public");
+                });
+
             modelBuilder.Entity("Domain.Appointments.Appointment", b =>
                 {
                     b.HasOne("Domain.Users.User", null)
@@ -1461,6 +1503,16 @@ namespace Infrastructure.Migrations
                     b.Navigation("Car");
 
                     b.Navigation("Client");
+                });
+
+            modelBuilder.Entity("Domain.Users.PasswordResetToken", b =>
+                {
+                    b.HasOne("Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_password_reset_tokens_users_user_id");
                 });
 
             modelBuilder.Entity("Domain.Users.UserPermission", b =>

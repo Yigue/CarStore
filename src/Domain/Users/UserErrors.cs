@@ -24,6 +24,10 @@ public static class UserErrors
         "Users.InvalidPassword",
         "The password provided is incorrect");
 
+    public static readonly Error InvalidResetToken = Error.Problem(
+        "Users.InvalidResetToken",
+        "El token de recuperación es inválido o ha expirado");
+
     public static readonly Error SelfDeleteNotAllowed = Error.Failure(
         "Users.SelfDeleteNotAllowed",
         "No puedes eliminar tu propia cuenta");
