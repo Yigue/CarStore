@@ -91,7 +91,7 @@ internal sealed class GetDashboardSummaryQueryHandler(IApplicationDbContext cont
             DateTime month = windowStart.AddMonths(i);
             decimal revenue = grouped
                 .FirstOrDefault(x => x.Year == month.Year && x.Month == month.Month)?.Revenue ?? 0m;
-            revenueByMonth.Add(new RevenueByMonthDto(month.Year, month.Month, revenue));
+            revenueByMonth.Add(new RevenueByMonthDto($"{month.Year:D4}-{month.Month:D2}", revenue));
         }
 
         var dto = new DashboardSummaryDto(

@@ -10,19 +10,19 @@ public enum ReportGroupBy
 /// <summary>
 /// Backend-aggregated financial report so the frontend renders charts directly
 /// from server data instead of fetching raw transactions and aggregating client-side.
+/// Shape mirrors the frontend FinancialReportDto (src/types/dashboard).
 /// </summary>
 public sealed record FinancialReportDto(
     DateTime From,
     DateTime To,
-    ReportGroupBy GroupBy,
+    string GroupBy,
     decimal TotalIncome,
     decimal TotalExpense,
-    decimal NetTotal,
-    IReadOnlyList<FinancialReportPeriodDto> Periods);
+    decimal NetResult,
+    IReadOnlyList<FinancialReportPeriodDto> ByPeriod);
 
 public sealed record FinancialReportPeriodDto(
-    string Label,
-    DateTime PeriodStart,
+    string Period,
     decimal Income,
     decimal Expense,
     decimal Net);

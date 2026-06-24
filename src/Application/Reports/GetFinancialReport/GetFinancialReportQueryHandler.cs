@@ -38,7 +38,6 @@ internal sealed class GetFinancialReportQueryHandler(IApplicationDbContext conte
                 decimal expense = g.Where(x => x.Type == TransactionType.Expense).Sum(x => x.Amount);
                 return new FinancialReportPeriodDto(
                     Label(g.Key, query.GroupBy),
-                    g.Key,
                     income,
                     expense,
                     income - expense);
@@ -51,7 +50,7 @@ internal sealed class GetFinancialReportQueryHandler(IApplicationDbContext conte
         var dto = new FinancialReportDto(
             from,
             toExclusive,
-            query.GroupBy,
+            query.GroupBy.ToString().ToLowerInvariant(),
             totalIncome,
             totalExpense,
             totalIncome - totalExpense,
