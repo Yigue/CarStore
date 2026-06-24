@@ -35,7 +35,21 @@ internal sealed class CreateSaleCommandHandler(
         {
             return Result.Failure<Guid>(CarErrors.AlreadySold(command.CarId));
         }
- 
+
+        // D-5: a quote converts into at most one sale. Guard against a second sale created
+        // from the same quote (idempotency on the quote -> sale conversion). Sales are
+        // tenant-scoped, so the default query filter keeps this within the dealer.
+        if (command.QuoteId is { } quoteId)
+        {
+            bool alreadyConverted = await context.Sales
+                .AnyAsync(s => s.QuoteId == quoteId, cancellationToken);
+
+            if (alreadyConverted)
+            {
+                return Result.Failure<Guid>(SalesErrors.AlreadyConvertedFromQuote(quoteId));
+            }
+        }
+
         // Verify if client exists
         Client? client = await context.Clients.FindAsync(new object[] { command.ClientId }, cancellationToken);
         if (client == null)

@@ -25,5 +25,9 @@ public static class SalesErrors
     public static Error CannotEditNonPending(Guid saleId) => Error.Conflict(
         "Sales.CannotEditNonPending",
         $"The sale with Id = '{saleId}' cannot be edited because it is not in a pending state.");
+
+    public static Error AlreadyConvertedFromQuote(Guid quoteId) => Error.Conflict(
+        "Sales.AlreadyConvertedFromQuote",
+        $"The quote with Id = '{quoteId}' has already been converted into a sale.");
 }
 
