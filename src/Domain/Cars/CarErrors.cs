@@ -49,6 +49,10 @@ public static class CarErrors
         "Cars.PatenteAlreadyExists",
         $"A car with license plate '{patente}' already exists");
 
+    public static Error NotAvailable(Guid carId) => Error.Conflict(
+        "Cars.NotAvailable",
+        $"The car with Id = '{carId}' is not available (it may be reserved or sold).");
+
     /// <summary>
     /// REQ-FVIP-2: a <c>car_images</c> row was found with no usable URL — every URL-bearing
     /// field is null/empty. The read-path falls back to a stable placeholder; this error

@@ -30,8 +30,9 @@ internal sealed class CreateSaleCommandHandler(
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
         }        
-        // Validate car is available (only check ServiceCar, as CarStatus is about condition, not availability)
-        if (car.ServiceCar != StatusServiceCar.Disponible)
+        // Validate car is available (only check ServiceCar, as CarStatus is about condition, not availability).
+        // D-1: un vehículo Reservado (tomado por la cotización que se está convirtiendo) también es vendible.
+        if (car.ServiceCar != StatusServiceCar.Disponible && car.ServiceCar != StatusServiceCar.Reservado)
         {
             return Result.Failure<Guid>(CarErrors.AlreadySold(command.CarId));
         }

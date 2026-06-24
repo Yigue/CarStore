@@ -155,10 +155,41 @@ public sealed class Car : Entity
     {
         if (ServiceCar == StatusServiceCar.Disponible)
             return;
-        
+
         ServiceCar = StatusServiceCar.Disponible;
         UpdatedAt = updatedAt;
     }
+
+    /// <summary>
+    /// D-1: reserva el vehículo para una cotización activa. Solo un vehículo
+    /// Disponible puede reservarse; cualquier otro estado lanza NotAvailable.
+    /// </summary>
+    public void Reserve(DateTime updatedAt)
+    {
+        if (ServiceCar != StatusServiceCar.Disponible)
+            throw new DomainException($"El vehículo '{Id}' no está disponible para reservar");
+
+        ServiceCar = StatusServiceCar.Reservado;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// D-1: libera una reserva (al rechazar o expirar la cotización). Idempotente:
+    /// si el vehículo no está Reservado no hace nada (p. ej. ya se vendió).
+    /// </summary>
+    public void Release(DateTime updatedAt)
+    {
+        if (ServiceCar != StatusServiceCar.Reservado)
+            return;
+
+        ServiceCar = StatusServiceCar.Disponible;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// D-1: concreta la venta (Reservado o Disponible -> Vendido). Idempotente si ya está vendido.
+    /// </summary>
+    public void Sell(DateTime updatedAt) => MarkAsSold(updatedAt);
     
     public void UpdatePrice(decimal newPrice, DateTime updatedAt)
     {

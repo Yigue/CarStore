@@ -2,6 +2,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
 using Domain.Cars;
+using Domain.Cars.Attributes;
 using Domain.Clients;
 using Domain.Leads;
 using Domain.Quotes;
@@ -30,6 +31,13 @@ internal sealed class CreateQuoteCommandHandler(
         if (car is null)
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
+        }
+
+        // D-1: solo se puede cotizar un vehículo Disponible. Si ya está reservado
+        // (por otra cotización activa) o vendido -> 409.
+        if (car.ServiceCar != StatusServiceCar.Disponible)
+        {
+            return Result.Failure<Guid>(CarErrors.NotAvailable(command.CarId));
         }
 
         // Resolve exactly one party: an existing client, or a lead (which lets the
@@ -77,6 +85,9 @@ internal sealed class CreateQuoteCommandHandler(
             dateTimeProvider.UtcNow);
 
         context.Quotes.Add(quote);
+
+        // D-1: reservar el vehículo en la misma transacción que la cotización.
+        car.Reserve(dateTimeProvider.UtcNow);
 
         await context.SaveChangesAsync(cancellationToken);
 
