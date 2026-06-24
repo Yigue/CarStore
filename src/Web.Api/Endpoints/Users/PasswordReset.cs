@@ -5,13 +5,12 @@ using Web.Api.Infrastructure;
 namespace Web.Api.Endpoints.Users;
 
 /// <summary>
-/// Endpoint stub para solicitar el reset de contraseña.
+/// Solicita el reset de contraseña. Genera un token de un solo uso (válido 1h),
+/// lo persiste en password_reset_tokens y envía por email el link
+/// {Frontend:BaseUrl}/reset-password?token=... (ver RequestPasswordResetCommandHandler).
 ///
-/// Actualmente acepta el request y responde 200 OK con un mensaje neutral
-/// (no revela si el email existe — evita enumeración de cuentas).
-///
-/// TODO: integrar con SMTP/SendGrid + tabla PasswordResetTokens para enviar
-/// el mail con el link de reseteo. Tracking en deuda-tecnica-backend.
+/// Responde 200 OK con un mensaje neutral (no revela si el email existe — evita
+/// enumeración de cuentas).
 /// </summary>
 internal sealed class PasswordReset : IEndpoint
 {
@@ -19,7 +18,7 @@ internal sealed class PasswordReset : IEndpoint
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("users/password-reset", async (
+        app.MapPost("users/forgot-password", async (
             [FromBody] Request request,
             MediatR.ISender sender,
             CancellationToken cancellationToken) =>
