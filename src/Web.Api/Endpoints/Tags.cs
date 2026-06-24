@@ -15,4 +15,6 @@ public static class Tags
     public const string Leads = "leads";
     public const string Documents = "documents";
     public const string Appointments = "appointments";
+    public const string Dashboard = "dashboard";
+    public const string Reports = "reports";
 }
