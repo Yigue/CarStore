@@ -39,6 +39,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<TransactionCategory> TransactionCategories => Set<TransactionCategory>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<CarImage> CarImages => Set<CarImage>();
     public DbSet<ReconditioningTask> ReconditioningTasks => Set<ReconditioningTask>();

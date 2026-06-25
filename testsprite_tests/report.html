@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title id="head-title">report.html</title>
+      <link href="assets/style.css" rel="stylesheet" type="text/css"/>
+  </head>
+  <body>
+    <h1 id="title">report.html</h1>
+    <p>Report generated on 24-Jun-2026 at 21:42:15 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a>
+        v4.2.0</p>
+    <div id="environment-header">
+      <h2>Environment</h2>
+    </div>
+    <table id="environment"></table>
+    <!-- TEMPLATES -->
+      <template id="template_environment_row">
+      <tr>
+        <td></td>
+        <td></td>
+      </tr>
+    </template>
+    <template id="template_results-table__body--empty">
+      <tbody class="results-table-row">
+        <tr id="not-found-message">
+          <td colspan="4">No results found. Check the filters.</td>
+        </tr>
+      </tbody>
+    </template>
+    <template id="template_results-table__tbody">
+      <tbody class="results-table-row">
+        <tr class="collapsible">
+        </tr>
+        <tr class="extras-row">
+          <td class="extra" colspan="4">
+            <div class="extraHTML"></div>
+            <div class="media">
+              <div class="media-container">
+                  <div class="media-container__nav--left">&lt;</div>
+                  <div class="media-container__viewport">
+                    <img src="" />
+                    <video controls>
+                      <source src="" type="video/mp4">
+                    </video>
+                  </div>
+                  <div class="media-container__nav--right">&gt;</div>
+                </div>
+                <div class="media__name"></div>
+                <div class="media__counter"></div>
+            </div>
+            <div class="logwrapper">
+              <div class="logexpander"></div>
+              <div class="log"></div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </template>
+    <!-- END TEMPLATES -->
+    <div class="summary">
+      <div class="summary__data">
+        <h2>Summary</h2>
+        <div class="additional-summary prefix">
+        </div>
+        <p class="run-count">12 tests took 00:00:04.</p>
+        <p class="filter">(Un)check the boxes to filter the results.</p>
+        <div class="summary__reload">
+          <div class="summary__reload__button hidden" onclick="location.reload()">
+            <div>There are still tests running. <br />Reload this page to get the latest results!</div>
+          </div>
+        </div>
+        <div class="summary__spacer"></div>
+        <div class="controls">
+          <div class="filters">
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="failed" >
+            <span class="failed">5 Failed,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="passed" >
+            <span class="passed">7 Passed,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="skipped" disabled>
+            <span class="skipped">0 Skipped,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="xfailed" disabled>
+            <span class="xfailed">0 Expected failures,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="xpassed" disabled>
+            <span class="xpassed">0 Unexpected passes,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="error" disabled>
+            <span class="error">0 Errors,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="rerun" disabled>
+            <span class="rerun">0 Reruns</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="retried" disabled>
+            <span class="retried">0 Retried,</span>
+          </div>
+          <div class="collapse">
+            <button id="show_all_details">Show all details</button>&nbsp;/&nbsp;<button id="hide_all_details">Hide all details</button>
+          </div>
+        </div>
+      </div>
+      <div class="additional-summary summary">
+      </div>
+      <div class="additional-summary postfix">
+      </div>
+    </div>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable" data-column-type="result">Result</th>
+          <th class="sortable" data-column-type="testId">Test</th>
+          <th class="sortable" data-column-type="duration">Duration</th>
+          <th>Links</th>
+        </tr>
+      </thead>
+    </table>
+  <footer>
+    <div id="data-container" data-jsonblob="{&#34;environment&#34;: {&#34;Python&#34;: &#34;3.14.5&#34;, &#34;Platform&#34;: &#34;Linux-7.0.12-1-cachyos-x86_64-with-glibc2.43&#34;, &#34;Packages&#34;: {&#34;pytest&#34;: &#34;9.1.1&#34;, &#34;pluggy&#34;: &#34;1.6.0&#34;}, &#34;Plugins&#34;: {&#34;metadata&#34;: &#34;3.1.1&#34;, &#34;asyncio&#34;: &#34;1.4.0&#34;, &#34;html&#34;: &#34;4.2.0&#34;}}, &#34;tests&#34;: {&#34;CarStore-BackEnd/testsprite_tests/TC001_create_new_lead_with_vehicle_and_contact_info.py::test_create_lead_with_vehicle_and_contact_info&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC001_create_new_lead_with_vehicle_and_contact_info.py::test_create_lead_with_vehicle_and_contact_info&#34;, &#34;duration&#34;: &#34;343 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC001_create_new_lead_with_vehicle_and_contact_info.py::test_create_lead_with_vehicle_and_contact_info&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;343 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC001_createleadwithvehicleandcontactinfo.py::test_createleadwithvehicleandcontactinfo&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Failed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC001_createleadwithvehicleandcontactinfo.py::test_createleadwithvehicleandcontactinfo&#34;, &#34;duration&#34;: &#34;339 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Failed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC001_createleadwithvehicleandcontactinfo.py::test_createleadwithvehicleandcontactinfo&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;339 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;def test_createleadwithvehicleandcontactinfo():\n        session = requests.Session()\n        try:\n            # Step 1: LOGIN and get token\n            login_url = f&amp;quot;{BASE_URL}/api/v1/users/login&amp;quot;\n            login_payload = {&amp;quot;email&amp;quot;: &amp;quot;admin@carstore.com&amp;quot;, &amp;quot;password&amp;quot;: &amp;quot;Admin123!&amp;quot;}\n            login_resp = session.post(login_url, json=login_payload, timeout=TIMEOUT)\n            assert login_resp.status_code == 200, f&amp;quot;Login failed: {login_resp.text}&amp;quot;\n            token = login_resp.json().get(&amp;quot;token&amp;quot;)\n            assert token, &amp;quot;Token not found in login response&amp;quot;\n            headers = {&amp;quot;Authorization&amp;quot;: f&amp;quot;Bearer {token}&amp;quot;}\n    \n            # Step 2: GET /api/v1/cars - fetch first car id\n            cars_url = f&amp;quot;{BASE_URL}/api/v1/cars&amp;quot;\n            cars_resp = session.get(cars_url, headers=headers, timeout=TIMEOUT)\n            assert cars_resp.status_code == 200, f&amp;quot;Failed to get cars: {cars_resp.text}&amp;quot;\n            cars_data = cars_resp.json()\n            assert &amp;quot;items&amp;quot; in cars_data and isinstance(cars_data[&amp;quot;items&amp;quot;], list) and len(cars_data[&amp;quot;items&amp;quot;]) &amp;gt; 0, &amp;quot;Cars list empty&amp;quot;\n            car_id = cars_data[&amp;quot;items&amp;quot;][0].get(&amp;quot;id&amp;quot;)\n            assert car_id, &amp;quot;First car id not found&amp;quot;\n    \n            # Step 3: CREATE LEAD with given contact info, interestedVehicleId null\n            create_lead_url = f&amp;quot;{BASE_URL}/api/v1/leads&amp;quot;\n            lead_payload = {\n                &amp;quot;clientName&amp;quot;: &amp;quot;John Doe&amp;quot;,\n                &amp;quot;email&amp;quot;: &amp;quot;johndoe@example.com&amp;quot;,\n                &amp;quot;phone&amp;quot;: &amp;quot;1234567890&amp;quot;,\n                &amp;quot;source&amp;quot;: 0,\n                &amp;quot;notes&amp;quot;: &amp;quot;Test notes&amp;quot;,\n                &amp;quot;interestedVehicleId&amp;quot;: None\n            }\n            create_lead_resp = session.post(create_lead_url, headers=headers, json=lead_payload, timeout=TIMEOUT)\n            assert create_lead_resp.status_code == 201, f&amp;quot;Create lead failed: {create_lead_resp.text}&amp;quot;\n            lead_id = create_lead_resp.json().get(&amp;quot;id&amp;quot;)\n            assert lead_id, &amp;quot;Lead ID not returned after creation&amp;quot;\n    \n            # Step 4: UPDATE LEAD STATUS to 1 (Contactado) with notes\n            update_status_url = f&amp;quot;{BASE_URL}/api/v1/leads/{lead_id}/status&amp;quot;\n            update_status_payload = {&amp;quot;newStatus&amp;quot;: 1, &amp;quot;notes&amp;quot;: &amp;quot;Called lead&amp;quot;}\n            update_status_resp = session.patch(update_status_url, headers=headers, json=update_status_payload, timeout=TIMEOUT)\n            assert update_status_resp.status_code == 204, f&amp;quot;Update lead status failed: {update_status_resp.text}&amp;quot;\n    \n            # Step 5: LINK VEHICLE to lead\n            link_vehicle_url = f&amp;quot;{BASE_URL}/api/v1/leads/{lead_id}/vehicle&amp;quot;\n            link_vehicle_payload = {&amp;quot;vehicleId&amp;quot;: car_id}\n            link_vehicle_resp = session.patch(link_vehicle_url, headers=headers, json=link_vehicle_payload, timeout=TIMEOUT)\n            assert link_vehicle_resp.status_code == 204, f&amp;quot;Link vehicle failed: {link_vehicle_resp.text}&amp;quot;\n    \n            # Step 6: CONVERT LEAD\n            convert_lead_url = f&amp;quot;{BASE_URL}/api/v1/leads/{lead_id}/convert&amp;quot;\n            convert_payload = {&amp;quot;dni&amp;quot;: &amp;quot;12345678&amp;quot;, &amp;quot;address&amp;quot;: &amp;quot;123 Main St&amp;quot;}\n            convert_resp = session.post(convert_lead_url, headers=headers, json=convert_payload, timeout=TIMEOUT)\n            assert convert_resp.status_code == 201, f&amp;quot;Convert lead failed: {convert_resp.text}&amp;quot;\n            client_id = convert_resp.json().get(&amp;quot;clientId&amp;quot;)\n            assert client_id, &amp;quot;Client ID not found after lead conversion&amp;quot;\n    \n            # Step 7: CREATE QUOTE for lead and car\n            create_quote_url = f&amp;quot;{BASE_URL}/api/v1/quotes&amp;quot;\n            quote_payload = {\n                &amp;quot;carId&amp;quot;: car_id,\n                &amp;quot;clientId&amp;quot;: None,\n                &amp;quot;leadId&amp;quot;: lead_id,\n                &amp;quot;proposedPrice&amp;quot;: 15000.0,\n                &amp;quot;paymentMethod&amp;quot;: 0,\n                &amp;quot;validUntil&amp;quot;: &amp;quot;2026-07-20T00:00:00Z&amp;quot;,\n                &amp;quot;comments&amp;quot;: &amp;quot;Quote comments&amp;quot;\n            }\n            create_quote_resp = session.post(create_quote_url, headers=headers, json=quote_payload, timeout=TIMEOUT)\n&amp;gt;           assert create_quote_resp.status_code == 201, f&amp;quot;Create quote failed: {create_quote_resp.text}&amp;quot;\nE           AssertionError: Create quote failed: {&amp;quot;type&amp;quot;:&amp;quot;https://tools.ietf.org/html/rfc7231#section-6.5.8&amp;quot;,&amp;quot;title&amp;quot;:&amp;quot;Cars.NotAvailable&amp;quot;,&amp;quot;status&amp;quot;:409,&amp;quot;detail&amp;quot;:&amp;quot;The car with Id = &amp;#x27;44a73216-6bd0-4efe-982d-b1f87dceb3d3&amp;#x27; is not available (it may be reserved or sold).&amp;quot;,&amp;quot;traceId&amp;quot;:&amp;quot;00-5415b4562be88a760bd03df514d03f9b-262a775d4f3daa77-01&amp;quot;}\nE           assert 409 == 201\nE            +  where 409 = &amp;lt;Response [409]&amp;gt;.status_code\n\nCarStore-BackEnd/testsprite_tests/TC001_createleadwithvehicleandcontactinfo.py:76: AssertionError\n&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC002_update_lead_status_with_valid_data.py::test_update_lead_status_with_valid_data&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC002_update_lead_status_with_valid_data.py::test_update_lead_status_with_valid_data&#34;, &#34;duration&#34;: &#34;337 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC002_update_lead_status_with_valid_data.py::test_update_lead_status_with_valid_data&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;337 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC002_updateleadstatuswithvaliddata.py::test_update_lead_status_with_valid_data&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC002_updateleadstatuswithvaliddata.py::test_update_lead_status_with_valid_data&#34;, &#34;duration&#34;: &#34;320 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC002_updateleadstatuswithvaliddata.py::test_update_lead_status_with_valid_data&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;320 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC003_link_vehicle_to_existing_lead.py::test_link_vehicle_to_lead&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC003_link_vehicle_to_existing_lead.py::test_link_vehicle_to_lead&#34;, &#34;duration&#34;: &#34;410 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC003_link_vehicle_to_existing_lead.py::test_link_vehicle_to_lead&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;410 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC003_linkvehicletolead.py::test_link_vehicle_to_lead&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC003_linkvehicletolead.py::test_link_vehicle_to_lead&#34;, &#34;duration&#34;: &#34;361 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC003_linkvehicletolead.py::test_link_vehicle_to_lead&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;361 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC004_convert_lead_to_client_successfully.py::test_convert_lead_to_client&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC004_convert_lead_to_client_successfully.py::test_convert_lead_to_client&#34;, &#34;duration&#34;: &#34;317 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC004_convert_lead_to_client_successfully.py::test_convert_lead_to_client&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;317 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC004_convertleadtoclient.py::test_convertleadtoclient&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC004_convertleadtoclient.py::test_convertleadtoclient&#34;, &#34;duration&#34;: &#34;410 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC004_convertleadtoclient.py::test_convertleadtoclient&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;410 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC005_create_quote_for_lead_or_client.py::test_create_quote_for_lead_or_client&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Failed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC005_create_quote_for_lead_or_client.py::test_create_quote_for_lead_or_client&#34;, &#34;duration&#34;: &#34;313 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Failed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC005_create_quote_for_lead_or_client.py::test_create_quote_for_lead_or_client&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;313 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;def test_create_quote_for_lead_or_client():\n        session = requests.Session()\n    \n        # 1. Login\n        login_payload = {&amp;#x27;email&amp;#x27;: &amp;#x27;admin@carstore.com&amp;#x27;, &amp;#x27;password&amp;#x27;: &amp;#x27;Admin123!&amp;#x27;}\n        login_resp = session.post(LOGIN_URL, json=login_payload, timeout=TIMEOUT)\n        assert login_resp.status_code == 200, f&amp;quot;Login failed: {login_resp.text}&amp;quot;\n        token = login_resp.json().get(&amp;quot;token&amp;quot;)\n        assert token, &amp;quot;Token not found&amp;quot;\n    \n        headers = {\n            &amp;#x27;Authorization&amp;#x27;: f&amp;#x27;Bearer {token}&amp;#x27;,\n            &amp;#x27;Content-Type&amp;#x27;: &amp;#x27;application/json&amp;#x27;\n        }\n    \n        # 2. Get valid car ID\n        cars_resp = session.get(CARS_URL, headers=headers, timeout=TIMEOUT)\n        assert cars_resp.status_code == 200, f&amp;quot;Get cars failed: {cars_resp.text}&amp;quot;\n        cars_data = cars_resp.json()\n        items = cars_data.get(&amp;quot;items&amp;quot;, [])\n        assert len(items) &amp;gt; 0, &amp;quot;No cars found in database&amp;quot;\n        car_id = items[0][&amp;quot;id&amp;quot;]\n    \n        # 3. Create lead\n        lead_payload = {\n            &amp;#x27;clientName&amp;#x27;: &amp;#x27;John Doe&amp;#x27;,\n            &amp;#x27;email&amp;#x27;: &amp;#x27;johndoe@example.com&amp;#x27;,\n            &amp;#x27;phone&amp;#x27;: &amp;#x27;1234567890&amp;#x27;,\n            &amp;#x27;source&amp;#x27;: 0, # Web\n            &amp;#x27;notes&amp;#x27;: &amp;#x27;Test notes&amp;#x27;,\n            &amp;#x27;interestedVehicleId&amp;#x27;: car_id\n        }\n        create_resp = session.post(LEADS_URL, headers=headers, json=lead_payload, timeout=TIMEOUT)\n        assert create_resp.status_code == 201, f&amp;quot;Create lead failed: {create_resp.text}&amp;quot;\n        lead_data = create_resp.json()\n        lead_id = lead_data.get(&amp;quot;id&amp;quot;)\n        assert lead_id, &amp;quot;Lead ID not found in response&amp;quot;\n    \n        # 4. Create quote\n        quote_payload = {\n            &amp;quot;carId&amp;quot;: car_id,\n            &amp;quot;clientId&amp;quot;: None,\n            &amp;quot;leadId&amp;quot;: lead_id,\n            &amp;quot;proposedPrice&amp;quot;: 15000.0,\n            &amp;quot;paymentMethod&amp;quot;: 0, # Contado\n            &amp;quot;validUntil&amp;quot;: &amp;quot;2026-07-20T00:00:00Z&amp;quot;,\n            &amp;quot;comments&amp;quot;: &amp;quot;Quote comments&amp;quot;\n        }\n        quote_resp = session.post(QUOTES_URL, headers=headers, json=quote_payload, timeout=TIMEOUT)\n&amp;gt;       assert quote_resp.status_code == 201, f&amp;quot;Create quote failed: {quote_resp.status_code}, {quote_resp.text}&amp;quot;\nE       AssertionError: Create quote failed: 409, {&amp;quot;type&amp;quot;:&amp;quot;https://tools.ietf.org/html/rfc7231#section-6.5.8&amp;quot;,&amp;quot;title&amp;quot;:&amp;quot;Cars.NotAvailable&amp;quot;,&amp;quot;status&amp;quot;:409,&amp;quot;detail&amp;quot;:&amp;quot;The car with Id = &amp;#x27;44a73216-6bd0-4efe-982d-b1f87dceb3d3&amp;#x27; is not available (it may be reserved or sold).&amp;quot;,&amp;quot;traceId&amp;quot;:&amp;quot;00-2058275ec7555da5e0c2773f20907025-192e46a3058076cd-01&amp;quot;}\nE       assert 409 == 201\nE        +  where 409 = &amp;lt;Response [409]&amp;gt;.status_code\n\nCarStore-BackEnd/testsprite_tests/TC005_create_quote_for_lead_or_client.py:59: AssertionError\n&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC005_createquoteforleadorclient.py::test_create_quote_for_lead_or_client&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Failed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC005_createquoteforleadorclient.py::test_create_quote_for_lead_or_client&#34;, &#34;duration&#34;: &#34;329 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Failed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC005_createquoteforleadorclient.py::test_create_quote_for_lead_or_client&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;329 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;def test_create_quote_for_lead_or_client():\n        timeout = 30\n        headers = {&amp;quot;Content-Type&amp;quot;: &amp;quot;application/json&amp;quot;}\n    \n        # Step 1: Login and get token\n        login_resp = requests.post(\n            LOGIN_URL,\n            json={&amp;quot;email&amp;quot;: EMAIL, &amp;quot;password&amp;quot;: PASSWORD},\n            timeout=timeout\n        )\n        assert login_resp.status_code == 200, f&amp;quot;Login failed: {login_resp.text}&amp;quot;\n        token = login_resp.json().get(&amp;quot;token&amp;quot;)\n        assert token and isinstance(token, str), &amp;quot;No token returned from login&amp;quot;\n        auth_headers = {&amp;quot;Authorization&amp;quot;: f&amp;quot;Bearer {token}&amp;quot;, &amp;quot;Content-Type&amp;quot;: &amp;quot;application/json&amp;quot;}\n    \n        # Step 2: Get a valid car ID from GET /api/v1/cars\n        cars_resp = requests.get(CARS_URL, headers=auth_headers, timeout=timeout)\n        assert cars_resp.status_code == 200, f&amp;quot;Failed to fetch cars: {cars_resp.text}&amp;quot;\n        cars_data = cars_resp.json()\n        items = cars_data.get(&amp;quot;items&amp;quot;)\n        assert isinstance(items, list) and len(items) &amp;gt; 0, &amp;quot;No cars found in the response&amp;quot;\n        car_id = items[0].get(&amp;quot;id&amp;quot;)\n        assert car_id and isinstance(car_id, str), &amp;quot;Invalid car ID&amp;quot;\n    \n        # Step 3: Create a new lead (required to create quote for lead)\n        lead_payload = {\n            &amp;quot;clientName&amp;quot;: &amp;quot;John Doe&amp;quot;,\n            &amp;quot;email&amp;quot;: &amp;quot;johndoe@example.com&amp;quot;,\n            &amp;quot;phone&amp;quot;: &amp;quot;1234567890&amp;quot;,\n            &amp;quot;source&amp;quot;: 0,\n            &amp;quot;notes&amp;quot;: &amp;quot;Test notes&amp;quot;,\n            &amp;quot;interestedVehicleId&amp;quot;: None\n        }\n        lead_resp = requests.post(LEADS_URL, json=lead_payload, headers=auth_headers, timeout=timeout)\n        assert lead_resp.status_code == 201, f&amp;quot;Lead creation failed: {lead_resp.text}&amp;quot;\n        lead_id = lead_resp.json().get(&amp;quot;id&amp;quot;)\n        assert lead_id and isinstance(lead_id, str), &amp;quot;No lead ID returned&amp;quot;\n    \n        # Create the quote for the lead and verify creation and Pending status\n        quote_id = None\n        try:\n            quote_payload = {\n                &amp;quot;carId&amp;quot;: car_id,\n                &amp;quot;clientId&amp;quot;: None,\n                &amp;quot;leadId&amp;quot;: lead_id,\n                &amp;quot;proposedPrice&amp;quot;: 15000.0,\n                &amp;quot;paymentMethod&amp;quot;: 0,\n                &amp;quot;validUntil&amp;quot;: &amp;quot;2026-07-20T00:00:00Z&amp;quot;,\n                &amp;quot;comments&amp;quot;: &amp;quot;Quote comments&amp;quot;\n            }\n            quote_resp = requests.post(QUOTES_URL, json=quote_payload, headers=auth_headers, timeout=timeout)\n&amp;gt;           assert quote_resp.status_code == 201, f&amp;quot;Quote creation failed: {quote_resp.text}&amp;quot;\nE           AssertionError: Quote creation failed: {&amp;quot;type&amp;quot;:&amp;quot;https://tools.ietf.org/html/rfc7231#section-6.5.8&amp;quot;,&amp;quot;title&amp;quot;:&amp;quot;Cars.NotAvailable&amp;quot;,&amp;quot;status&amp;quot;:409,&amp;quot;detail&amp;quot;:&amp;quot;The car with Id = &amp;#x27;44a73216-6bd0-4efe-982d-b1f87dceb3d3&amp;#x27; is not available (it may be reserved or sold).&amp;quot;,&amp;quot;traceId&amp;quot;:&amp;quot;00-0f567193f7db05e37604855930824819-b4f0c61e2c0a81e2-01&amp;quot;}\nE           assert 409 == 201\nE            +  where 409 = &amp;lt;Response [409]&amp;gt;.status_code\n\nCarStore-BackEnd/testsprite_tests/TC005_createquoteforleadorclient.py:64: AssertionError\n&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC006_accept_quote_and_trigger_domain_events.py::test_acceptquoteandtriggerdomainevents&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Failed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC006_accept_quote_and_trigger_domain_events.py::test_acceptquoteandtriggerdomainevents&#34;, &#34;duration&#34;: &#34;352 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Failed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC006_accept_quote_and_trigger_domain_events.py::test_acceptquoteandtriggerdomainevents&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;352 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;def test_acceptquoteandtriggerdomainevents():\n        session = requests.Session()\n    \n        # 1. Login\n        login_payload = {&amp;#x27;email&amp;#x27;: &amp;#x27;admin@carstore.com&amp;#x27;, &amp;#x27;password&amp;#x27;: &amp;#x27;Admin123!&amp;#x27;}\n        login_resp = session.post(LOGIN_URL, json=login_payload, timeout=TIMEOUT)\n        assert login_resp.status_code == 200, f&amp;quot;Login failed: {login_resp.text}&amp;quot;\n        token = login_resp.json().get(&amp;quot;token&amp;quot;)\n        assert token, &amp;quot;Token not found&amp;quot;\n    \n        headers = {\n            &amp;#x27;Authorization&amp;#x27;: f&amp;#x27;Bearer {token}&amp;#x27;,\n            &amp;#x27;Content-Type&amp;#x27;: &amp;#x27;application/json&amp;#x27;\n        }\n    \n        # 2. Get valid car ID\n        cars_resp = session.get(CARS_URL, headers=headers, timeout=TIMEOUT)\n        assert cars_resp.status_code == 200, f&amp;quot;Get cars failed: {cars_resp.text}&amp;quot;\n        cars_data = cars_resp.json()\n        items = cars_data.get(&amp;quot;items&amp;quot;, [])\n        assert len(items) &amp;gt; 0, &amp;quot;No cars found in database&amp;quot;\n        car_id = items[0][&amp;quot;id&amp;quot;]\n    \n        # 3. Create lead\n        lead_payload = {\n            &amp;#x27;clientName&amp;#x27;: &amp;#x27;John Doe&amp;#x27;,\n            &amp;#x27;email&amp;#x27;: &amp;#x27;johndoe@example.com&amp;#x27;,\n            &amp;#x27;phone&amp;#x27;: &amp;#x27;1234567890&amp;#x27;,\n            &amp;#x27;source&amp;#x27;: 0, # Web\n            &amp;#x27;notes&amp;#x27;: &amp;#x27;Test notes&amp;#x27;,\n            &amp;#x27;interestedVehicleId&amp;#x27;: car_id\n        }\n        create_resp = session.post(LEADS_URL, headers=headers, json=lead_payload, timeout=TIMEOUT)\n        assert create_resp.status_code == 201, f&amp;quot;Create lead failed: {create_resp.text}&amp;quot;\n        lead_id = create_resp.json().get(&amp;quot;id&amp;quot;)\n        assert lead_id, &amp;quot;Lead ID not found in response&amp;quot;\n    \n        # 4. Update status to Contactado (1)\n        status_payload = {\n            &amp;#x27;newStatus&amp;#x27;: 1,\n            &amp;#x27;notes&amp;#x27;: &amp;#x27;Contacted client&amp;#x27;\n        }\n        status_resp = session.patch(f&amp;quot;{LEADS_URL}/{lead_id}/status&amp;quot;, headers=headers, json=status_payload, timeout=TIMEOUT)\n        assert status_resp.status_code == 204, f&amp;quot;Update status failed: {status_resp.text}&amp;quot;\n    \n        # 5. Link vehicle (PATCH leads/{id}/vehicle)\n        link_payload = {\n            &amp;#x27;vehicleId&amp;#x27;: car_id\n        }\n        link_resp = session.patch(f&amp;quot;{LEADS_URL}/{lead_id}/vehicle&amp;quot;, headers=headers, json=link_payload, timeout=TIMEOUT)\n        assert link_resp.status_code == 204, f&amp;quot;Link vehicle failed: {link_resp.text}&amp;quot;\n    \n        # 6. Convert lead to client\n        convert_payload = {\n            &amp;#x27;dni&amp;#x27;: &amp;#x27;12345678&amp;#x27;,\n            &amp;#x27;address&amp;#x27;: &amp;#x27;123 Main St&amp;#x27;\n        }\n        convert_resp = session.post(f&amp;quot;{LEADS_URL}/{lead_id}/convert&amp;quot;, headers=headers, json=convert_payload, timeout=TIMEOUT)\n        assert convert_resp.status_code in (200, 201), f&amp;quot;Convert lead failed: {convert_resp.text}&amp;quot;\n        client_id = convert_resp.json().get(&amp;quot;clientId&amp;quot;)\n        assert client_id, &amp;quot;Client ID not returned in convert response&amp;quot;\n    \n        # 7. Create quote\n        quote_payload = {\n            &amp;quot;carId&amp;quot;: car_id,\n            &amp;quot;clientId&amp;quot;: None,\n            &amp;quot;leadId&amp;quot;: lead_id,\n            &amp;quot;proposedPrice&amp;quot;: 15000.0,\n            &amp;quot;paymentMethod&amp;quot;: 0, # Contado\n            &amp;quot;validUntil&amp;quot;: &amp;quot;2026-07-20T00:00:00Z&amp;quot;,\n            &amp;quot;comments&amp;quot;: &amp;quot;Quote comments&amp;quot;\n        }\n        quote_resp = session.post(QUOTES_URL, headers=headers, json=quote_payload, timeout=TIMEOUT)\n&amp;gt;       assert quote_resp.status_code == 201, f&amp;quot;Create quote failed: {quote_resp.text}&amp;quot;\nE       AssertionError: Create quote failed: {&amp;quot;type&amp;quot;:&amp;quot;https://tools.ietf.org/html/rfc7231#section-6.5.8&amp;quot;,&amp;quot;title&amp;quot;:&amp;quot;Cars.NotAvailable&amp;quot;,&amp;quot;status&amp;quot;:409,&amp;quot;detail&amp;quot;:&amp;quot;The car with Id = &amp;#x27;44a73216-6bd0-4efe-982d-b1f87dceb3d3&amp;#x27; is not available (it may be reserved or sold).&amp;quot;,&amp;quot;traceId&amp;quot;:&amp;quot;00-c4c718c274ad45798c228589d9f05fc4-c476cbb58009e9f7-01&amp;quot;}\nE       assert 409 == 201\nE        +  where 409 = &amp;lt;Response [409]&amp;gt;.status_code\n\nCarStore-BackEnd/testsprite_tests/TC006_accept_quote_and_trigger_domain_events.py:85: AssertionError\n&#34;}], &#34;CarStore-BackEnd/testsprite_tests/TC006_acceptquoteandtriggerdomainevents.py::test_acceptquoteandtriggerdomainevents&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Failed&#34;, &#34;testId&#34;: &#34;CarStore-BackEnd/testsprite_tests/TC006_acceptquoteandtriggerdomainevents.py::test_acceptquoteandtriggerdomainevents&#34;, &#34;duration&#34;: &#34;333 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Failed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;CarStore-BackEnd/testsprite_tests/TC006_acceptquoteandtriggerdomainevents.py::test_acceptquoteandtriggerdomainevents&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;333 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;def test_acceptquoteandtriggerdomainevents():\n        session = requests.Session()\n        session.timeout = TIMEOUT\n    \n        # 1. LOGIN to get token\n        login_payload = {\n            &amp;quot;email&amp;quot;: &amp;quot;admin@carstore.com&amp;quot;,\n            &amp;quot;password&amp;quot;: &amp;quot;Admin123!&amp;quot;\n        }\n        login_resp = session.post(LOGIN_URL, json=login_payload, timeout=TIMEOUT)\n        assert login_resp.status_code == 200, f&amp;quot;Login failed: {login_resp.text}&amp;quot;\n        token = login_resp.json().get(&amp;quot;token&amp;quot;)\n        assert token, &amp;quot;No token returned in login response&amp;quot;\n        headers = {&amp;quot;Authorization&amp;quot;: f&amp;quot;Bearer {token}&amp;quot;}\n        session.headers.update(headers)\n    \n        # 2. Get car id from /api/v1/cars\n        cars_resp = session.get(CARS_URL, timeout=TIMEOUT)\n        assert cars_resp.status_code == 200, f&amp;quot;Failed fetching cars: {cars_resp.text}&amp;quot;\n        cars_data = cars_resp.json()\n        assert &amp;quot;items&amp;quot; in cars_data and len(cars_data[&amp;quot;items&amp;quot;]) &amp;gt; 0, &amp;quot;No cars available&amp;quot;\n        car_id = cars_data[&amp;quot;items&amp;quot;][0].get(&amp;quot;id&amp;quot;)\n        assert car_id, &amp;quot;First car id not found&amp;quot;\n    \n        lead_id = None\n        client_id = None\n        quote_id = None\n    \n        try:\n            # 3. Create lead\n            lead_payload = {\n                &amp;quot;clientName&amp;quot;: &amp;quot;John Doe&amp;quot;,\n                &amp;quot;email&amp;quot;: &amp;quot;johndoe@example.com&amp;quot;,\n                &amp;quot;phone&amp;quot;: &amp;quot;1234567890&amp;quot;,\n                &amp;quot;source&amp;quot;: 0,\n                &amp;quot;notes&amp;quot;: &amp;quot;Test notes&amp;quot;,\n                &amp;quot;interestedVehicleId&amp;quot;: None\n            }\n            lead_resp = session.post(LEADS_URL, json=lead_payload, timeout=TIMEOUT)\n            assert lead_resp.status_code == 201, f&amp;quot;Lead creation failed: {lead_resp.text}&amp;quot;\n            lead_json = lead_resp.json()\n            lead_id = lead_json.get(&amp;quot;id&amp;quot;)\n            assert lead_id, &amp;quot;Lead ID not returned&amp;quot;\n    \n            # 4. Update lead status to 1 with notes\n            status_url = f&amp;quot;{LEADS_URL}/{lead_id}/status&amp;quot;\n            status_payload = {&amp;quot;newStatus&amp;quot;: 1, &amp;quot;notes&amp;quot;: &amp;quot;Called lead&amp;quot;}\n            status_resp = session.patch(status_url, json=status_payload, timeout=TIMEOUT)\n            assert status_resp.status_code == 204, f&amp;quot;Update lead status failed: {status_resp.text}&amp;quot;\n    \n            # 5. Link vehicle to lead\n            vehicle_url = f&amp;quot;{LEADS_URL}/{lead_id}/vehicle&amp;quot;\n            vehicle_payload = {&amp;quot;vehicleId&amp;quot;: car_id}\n            vehicle_resp = session.patch(vehicle_url, json=vehicle_payload, timeout=TIMEOUT)\n            assert vehicle_resp.status_code == 204, f&amp;quot;Link vehicle failed: {vehicle_resp.text}&amp;quot;\n    \n            # 6. Convert lead to client\n            convert_url = f&amp;quot;{LEADS_URL}/{lead_id}/convert&amp;quot;\n            convert_payload = {&amp;quot;dni&amp;quot;: &amp;quot;12345678&amp;quot;, &amp;quot;address&amp;quot;: &amp;quot;123 Main St&amp;quot;}\n            convert_resp = session.post(convert_url, json=convert_payload, timeout=TIMEOUT)\n            assert convert_resp.status_code == 201, f&amp;quot;Convert lead failed: {convert_resp.text}&amp;quot;\n            convert_json = convert_resp.json()\n            client_id = convert_json.get(&amp;quot;clientId&amp;quot;)\n            assert client_id, &amp;quot;clientId not returned on conversion&amp;quot;\n    \n            # 7. Create quote for lead (clientId null)\n            quote_payload = {\n                &amp;quot;carId&amp;quot;: car_id,\n                &amp;quot;clientId&amp;quot;: None,\n                &amp;quot;leadId&amp;quot;: lead_id,\n                &amp;quot;proposedPrice&amp;quot;: 15000.0,\n                &amp;quot;paymentMethod&amp;quot;: 0,\n                &amp;quot;validUntil&amp;quot;: &amp;quot;2026-07-20T00:00:00Z&amp;quot;,\n                &amp;quot;comments&amp;quot;: &amp;quot;Quote comments&amp;quot;\n            }\n            quote_resp = session.post(QUOTES_URL, json=quote_payload, timeout=TIMEOUT)\n&amp;gt;           assert quote_resp.status_code == 201, f&amp;quot;Quote creation failed: {quote_resp.text}&amp;quot;\nE           AssertionError: Quote creation failed: {&amp;quot;type&amp;quot;:&amp;quot;https://tools.ietf.org/html/rfc7231#section-6.5.8&amp;quot;,&amp;quot;title&amp;quot;:&amp;quot;Cars.NotAvailable&amp;quot;,&amp;quot;status&amp;quot;:409,&amp;quot;detail&amp;quot;:&amp;quot;The car with Id = &amp;#x27;44a73216-6bd0-4efe-982d-b1f87dceb3d3&amp;#x27; is not available (it may be reserved or sold).&amp;quot;,&amp;quot;traceId&amp;quot;:&amp;quot;00-eaad8b3e7d87dd890b1a5d82ae34a16a-ab821df68b55be62-01&amp;quot;}\nE           assert 409 == 201\nE            +  where 409 = &amp;lt;Response [409]&amp;gt;.status_code\n\nCarStore-BackEnd/testsprite_tests/TC006_acceptquoteandtriggerdomainevents.py:88: AssertionError\n&#34;}]}, &#34;renderCollapsed&#34;: [&#34;passed&#34;], &#34;initialSort&#34;: &#34;result&#34;, &#34;title&#34;: &#34;report.html&#34;}"></div>
+    <script>
+      (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+const { getCollapsedCategory, setCollapsedIds } = require('./storage.js')
+
+class DataManager {
+    setManager(data) {
+        const collapsedCategories = [...getCollapsedCategory(data.renderCollapsed)]
+        const collapsedIds = []
+        const tests = Object.values(data.tests).flat().map((test, index) => {
+            const collapsed = collapsedCategories.includes(test.result.toLowerCase())
+            const id = `test_${index}`
+            if (collapsed) {
+                collapsedIds.push(id)
+            }
+            return {
+                ...test,
+                id,
+                collapsed,
+            }
+        })
+        const dataBlob = { ...data, tests }
+        this.data = { ...dataBlob }
+        this.renderData = { ...dataBlob }
+        setCollapsedIds(collapsedIds)
+    }
+
+    get allData() {
+        return { ...this.data }
+    }
+
+    resetRender() {
+        this.renderData = { ...this.data }
+    }
+
+    setRender(data) {
+        this.renderData.tests = [...data]
+    }
+
+    toggleCollapsedItem(id) {
+        this.renderData.tests = this.renderData.tests.map((test) =>
+            test.id === id ? { ...test, collapsed: !test.collapsed } : test,
+        )
+    }
+
+    set allCollapsed(collapsed) {
+        this.renderData = { ...this.renderData, tests: [...this.renderData.tests.map((test) => (
+            { ...test, collapsed }
+        ))] }
+    }
+
+    get testSubset() {
+        return [...this.renderData.tests]
+    }
+
+    get environment() {
+        return this.renderData.environment
+    }
+
+    get initialSort() {
+        return this.data.initialSort
+    }
+}
+
+module.exports = {
+    manager: new DataManager(),
+}
+
+},{"./storage.js":8}],2:[function(require,module,exports){
+const mediaViewer = require('./mediaviewer.js')
+const templateEnvRow = document.getElementById('template_environment_row')
+const templateResult = document.getElementById('template_results-table__tbody')
+
+function htmlToElements(html) {
+    const temp = document.createElement('template')
+    temp.innerHTML = html
+    return temp.content.childNodes
+}
+
+const find = (selector, elem) => {
+    if (!elem) {
+        elem = document
+    }
+    return elem.querySelector(selector)
+}
+
+const findAll = (selector, elem) => {
+    if (!elem) {
+        elem = document
+    }
+    return [...elem.querySelectorAll(selector)]
+}
+
+const dom = {
+    getStaticRow: (key, value) => {
+        const envRow = templateEnvRow.content.cloneNode(true)
+        const isObj = typeof value === 'object' && value !== null
+        const values = isObj ? Object.keys(value).map((k) => `${k}: ${value[k]}`) : null
+
+        const valuesElement = htmlToElements(
+            values ? `<ul>${values.map((val) => `<li>${val}</li>`).join('')}<ul>` : `<div>${value}</div>`)[0]
+        const td = findAll('td', envRow)
+        td[0].textContent = key
+        td[1].appendChild(valuesElement)
+
+        return envRow
+    },
+    getResultTBody: ({ testId, id, log, extras, resultsTableRow, tableHtml, result, collapsed }) => {
+        const resultBody = templateResult.content.cloneNode(true)
+        resultBody.querySelector('tbody').classList.add(result.toLowerCase())
+        resultBody.querySelector('tbody').id = testId
+        resultBody.querySelector('.collapsible').dataset.id = id
+
+        resultsTableRow.forEach((html) => {
+            const t = document.createElement('template')
+            t.innerHTML = html
+            resultBody.querySelector('.collapsible').appendChild(t.content)
+        })
+
+        if (log) {
+            // Wrap lines starting with "E" with span.error to color those lines red
+            const wrappedLog = log.replace(/^E.*$/gm, (match) => `<span class="error">${match}</span>`)
+            resultBody.querySelector('.log').innerHTML = wrappedLog
+        } else {
+            resultBody.querySelector('.log').remove()
+        }
+
+        if (collapsed) {
+            resultBody.querySelector('.collapsible > .col-result')?.classList.add('collapsed')
+            resultBody.querySelector('.extras-row').classList.add('hidden')
+        } else {
+            resultBody.querySelector('.collapsible > .col-result')?.classList.remove('collapsed')
+        }
+
+        const media = []
+        extras?.forEach(({ name, format_type, content }) => {
+            if (['image', 'video'].includes(format_type)) {
+                media.push({ path: content, name, format_type })
+            }
+
+            if (format_type === 'html') {
+                resultBody.querySelector('.extraHTML').insertAdjacentHTML('beforeend', `<div>${content}</div>`)
+            }
+        })
+        mediaViewer.setup(resultBody, media)
+
+        // Add custom html from the pytest_html_results_table_html hook
+        tableHtml?.forEach((item) => {
+            resultBody.querySelector('td[class="extra"]').insertAdjacentHTML('beforeend', item)
+        })
+
+        return resultBody
+    },
+}
+
+module.exports = {
+    dom,
+    htmlToElements,
+    find,
+    findAll,
+}
+
+},{"./mediaviewer.js":6}],3:[function(require,module,exports){
+const { manager } = require('./datamanager.js')
+const { doSort } = require('./sort.js')
+const storageModule = require('./storage.js')
+
+const getFilteredSubSet = (filter) =>
+    manager.allData.tests.filter(({ result }) => filter.includes(result.toLowerCase()))
+
+const doInitFilter = () => {
+    const currentFilter = storageModule.getVisible()
+    const filteredSubset = getFilteredSubSet(currentFilter)
+    manager.setRender(filteredSubset)
+}
+
+const doFilter = (type, show) => {
+    if (show) {
+        storageModule.showCategory(type)
+    } else {
+        storageModule.hideCategory(type)
+    }
+
+    const currentFilter = storageModule.getVisible()
+    const filteredSubset = getFilteredSubSet(currentFilter)
+    manager.setRender(filteredSubset)
+
+    const sortColumn = storageModule.getSort()
+    doSort(sortColumn, true)
+}
+
+module.exports = {
+    doFilter,
+    doInitFilter,
+}
+
+},{"./datamanager.js":1,"./sort.js":7,"./storage.js":8}],4:[function(require,module,exports){
+const { redraw, bindEvents, renderStatic } = require('./main.js')
+const { doInitFilter } = require('./filter.js')
+const { doInitSort } = require('./sort.js')
+const { manager } = require('./datamanager.js')
+const data = JSON.parse(document.getElementById('data-container').dataset.jsonblob)
+
+function init() {
+    manager.setManager(data)
+    doInitFilter()
+    doInitSort()
+    renderStatic()
+    redraw()
+    bindEvents()
+}
+
+init()
+
+},{"./datamanager.js":1,"./filter.js":3,"./main.js":5,"./sort.js":7}],5:[function(require,module,exports){
+const { dom, find, findAll } = require('./dom.js')
+const { manager } = require('./datamanager.js')
+const { doSort } = require('./sort.js')
+const { doFilter } = require('./filter.js')
+const {
+    getVisible,
+    getCollapsedIds,
+    setCollapsedIds,
+    getSort,
+    getSortDirection,
+    possibleFilters,
+} = require('./storage.js')
+
+const removeChildren = (node) => {
+    while (node.firstChild) {
+        node.removeChild(node.firstChild)
+    }
+}
+
+const renderStatic = () => {
+    const renderEnvironmentTable = () => {
+        const environment = manager.environment
+        const rows = Object.keys(environment).map((key) => dom.getStaticRow(key, environment[key]))
+        const table = document.getElementById('environment')
+        removeChildren(table)
+        rows.forEach((row) => table.appendChild(row))
+    }
+    renderEnvironmentTable()
+}
+
+const addItemToggleListener = (elem) => {
+    elem.addEventListener('click', ({ target }) => {
+        const id = target.parentElement.dataset.id
+        manager.toggleCollapsedItem(id)
+
+        const collapsedIds = getCollapsedIds()
+        if (collapsedIds.includes(id)) {
+            const updated = collapsedIds.filter((item) => item !== id)
+            setCollapsedIds(updated)
+        } else {
+            collapsedIds.push(id)
+            setCollapsedIds(collapsedIds)
+        }
+        redraw()
+    })
+}
+
+const renderContent = (tests) => {
+    const sortAttr = getSort(manager.initialSort)
+    const sortAsc = JSON.parse(getSortDirection())
+    const rows = tests.map(dom.getResultTBody)
+    const table = document.getElementById('results-table')
+    const tableHeader = document.getElementById('results-table-head')
+
+    const newTable = document.createElement('table')
+    newTable.id = 'results-table'
+
+    // remove all sorting classes and set the relevant
+    findAll('.sortable', tableHeader).forEach((elem) => elem.classList.remove('asc', 'desc'))
+    tableHeader.querySelector(`.sortable[data-column-type="${sortAttr}"]`)?.classList.add(sortAsc ? 'desc' : 'asc')
+    newTable.appendChild(tableHeader)
+
+    if (!rows.length) {
+        const emptyTable = document.getElementById('template_results-table__body--empty').content.cloneNode(true)
+        newTable.appendChild(emptyTable)
+    } else {
+        rows.forEach((row) => {
+            if (!!row) {
+                findAll('.collapsible td:not(.col-links', row).forEach(addItemToggleListener)
+                find('.logexpander', row).addEventListener('click',
+                    (evt) => evt.target.parentNode.classList.toggle('expanded'),
+                )
+                newTable.appendChild(row)
+            }
+        })
+    }
+
+    table.replaceWith(newTable)
+}
+
+const renderDerived = () => {
+    const currentFilter = getVisible()
+    possibleFilters.forEach((result) => {
+        const input = document.querySelector(`input[data-test-result="${result}"]`)
+        input.checked = currentFilter.includes(result)
+    })
+}
+
+const bindEvents = () => {
+    const filterColumn = (evt) => {
+        const { target: element } = evt
+        const { testResult } = element.dataset
+
+        doFilter(testResult, element.checked)
+        const collapsedIds = getCollapsedIds()
+        const updated = manager.renderData.tests.map((test) => {
+            return {
+                ...test,
+                collapsed: collapsedIds.includes(test.id),
+            }
+        })
+        manager.setRender(updated)
+        redraw()
+    }
+
+    const header = document.getElementById('environment-header')
+    header.addEventListener('click', () => {
+        const table = document.getElementById('environment')
+        table.classList.toggle('hidden')
+        header.classList.toggle('collapsed')
+    })
+
+    findAll('input[name="filter_checkbox"]').forEach((elem) => {
+        elem.addEventListener('click', filterColumn)
+    })
+
+    findAll('.sortable').forEach((elem) => {
+        elem.addEventListener('click', (evt) => {
+            const { target: element } = evt
+            const { columnType } = element.dataset
+            doSort(columnType)
+            redraw()
+        })
+    })
+
+    document.getElementById('show_all_details').addEventListener('click', () => {
+        manager.allCollapsed = false
+        setCollapsedIds([])
+        redraw()
+    })
+    document.getElementById('hide_all_details').addEventListener('click', () => {
+        manager.allCollapsed = true
+        const allIds = manager.renderData.tests.map((test) => test.id)
+        setCollapsedIds(allIds)
+        redraw()
+    })
+}
+
+const redraw = () => {
+    const { testSubset } = manager
+
+    renderContent(testSubset)
+    renderDerived()
+}
+
+module.exports = {
+    redraw,
+    bindEvents,
+    renderStatic,
+}
+
+},{"./datamanager.js":1,"./dom.js":2,"./filter.js":3,"./sort.js":7,"./storage.js":8}],6:[function(require,module,exports){
+class MediaViewer {
+    constructor(assets) {
+        this.assets = assets
+        this.index = 0
+    }
+
+    nextActive() {
+        this.index = this.index === this.assets.length - 1 ? 0 : this.index + 1
+        return [this.activeFile, this.index]
+    }
+
+    prevActive() {
+        this.index = this.index === 0 ? this.assets.length - 1 : this.index -1
+        return [this.activeFile, this.index]
+    }
+
+    get currentIndex() {
+        return this.index
+    }
+
+    get activeFile() {
+        return this.assets[this.index]
+    }
+}
+
+
+const setup = (resultBody, assets) => {
+    if (!assets.length) {
+        resultBody.querySelector('.media').classList.add('hidden')
+        return
+    }
+
+    const mediaViewer = new MediaViewer(assets)
+    const container = resultBody.querySelector('.media-container')
+    const leftArrow = resultBody.querySelector('.media-container__nav--left')
+    const rightArrow = resultBody.querySelector('.media-container__nav--right')
+    const mediaName = resultBody.querySelector('.media__name')
+    const counter = resultBody.querySelector('.media__counter')
+    const imageEl = resultBody.querySelector('img')
+    const sourceEl = resultBody.querySelector('source')
+    const videoEl = resultBody.querySelector('video')
+
+    const setImg = (media, index) => {
+        if (media?.format_type === 'image') {
+            imageEl.src = media.path
+
+            imageEl.classList.remove('hidden')
+            videoEl.classList.add('hidden')
+        } else if (media?.format_type === 'video') {
+            sourceEl.src = media.path
+
+            videoEl.classList.remove('hidden')
+            imageEl.classList.add('hidden')
+        }
+
+        mediaName.innerText = media?.name
+        counter.innerText = `${index + 1} / ${assets.length}`
+    }
+    setImg(mediaViewer.activeFile, mediaViewer.currentIndex)
+
+    const moveLeft = () => {
+        const [media, index] = mediaViewer.prevActive()
+        setImg(media, index)
+    }
+    const doRight = () => {
+        const [media, index] = mediaViewer.nextActive()
+        setImg(media, index)
+    }
+    const openImg = () => {
+        window.open(mediaViewer.activeFile.path, '_blank')
+    }
+    if (assets.length === 1) {
+        container.classList.add('media-container--fullscreen')
+    } else {
+        leftArrow.addEventListener('click', moveLeft)
+        rightArrow.addEventListener('click', doRight)
+    }
+    imageEl.addEventListener('click', openImg)
+}
+
+module.exports = {
+    setup,
+}
+
+},{}],7:[function(require,module,exports){
+const { manager } = require('./datamanager.js')
+const storageModule = require('./storage.js')
+
+const genericSort = (list, key, ascending, customOrder) => {
+    let sorted
+    if (customOrder) {
+        sorted = list.sort((a, b) => {
+            const aValue = a.result.toLowerCase()
+            const bValue = b.result.toLowerCase()
+
+            const aIndex = customOrder.findIndex((item) => item.toLowerCase() === aValue)
+            const bIndex = customOrder.findIndex((item) => item.toLowerCase() === bValue)
+
+            // Compare the indices to determine the sort order
+            return aIndex - bIndex
+        })
+    } else {
+        sorted = list.sort((a, b) => a[key] === b[key] ? 0 : a[key] > b[key] ? 1 : -1)
+    }
+
+    if (ascending) {
+        sorted.reverse()
+    }
+    return sorted
+}
+
+const durationSort = (list, ascending) => {
+    const parseDuration = (duration) => {
+        if (duration.includes(':')) {
+            // If it's in the format "HH:mm:ss"
+            const [hours, minutes, seconds] = duration.split(':').map(Number)
+            return (hours * 3600 + minutes * 60 + seconds) * 1000
+        } else {
+            // If it's in the format "nnn ms"
+            return parseInt(duration)
+        }
+    }
+    const sorted = list.sort((a, b) => parseDuration(a['duration']) - parseDuration(b['duration']))
+    if (ascending) {
+        sorted.reverse()
+    }
+    return sorted
+}
+
+const doInitSort = () => {
+    const type = storageModule.getSort(manager.initialSort)
+    const ascending = storageModule.getSortDirection()
+    const list = manager.testSubset
+    const initialOrder = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed', 'Skipped', 'Passed']
+
+    storageModule.setSort(type)
+    storageModule.setSortDirection(ascending)
+
+    if (type?.toLowerCase() === 'original') {
+        manager.setRender(list)
+    } else {
+        let sortedList
+        switch (type) {
+        case 'duration':
+            sortedList = durationSort(list, ascending)
+            break
+        case 'result':
+            sortedList = genericSort(list, type, ascending, initialOrder)
+            break
+        default:
+            sortedList = genericSort(list, type, ascending)
+            break
+        }
+        manager.setRender(sortedList)
+    }
+}
+
+const doSort = (type, skipDirection) => {
+    const newSortType = storageModule.getSort(manager.initialSort) !== type
+    const currentAsc = storageModule.getSortDirection()
+    let ascending
+    if (skipDirection) {
+        ascending = currentAsc
+    } else {
+        ascending = newSortType ? false : !currentAsc
+    }
+    storageModule.setSort(type)
+    storageModule.setSortDirection(ascending)
+
+    const list = manager.testSubset
+    const sortedList = type === 'duration' ? durationSort(list, ascending) : genericSort(list, type, ascending)
+    manager.setRender(sortedList)
+}
+
+module.exports = {
+    doInitSort,
+    doSort,
+}
+
+},{"./datamanager.js":1,"./storage.js":8}],8:[function(require,module,exports){
+const possibleFilters = [
+    'passed',
+    'skipped',
+    'failed',
+    'error',
+    'xfailed',
+    'xpassed',
+    'rerun',
+]
+
+const getVisible = () => {
+    const url = new URL(window.location.href)
+    const settings = new URLSearchParams(url.search).get('visible')
+    const lower = (item) => {
+        const lowerItem = item.toLowerCase()
+        if (possibleFilters.includes(lowerItem)) {
+            return lowerItem
+        }
+        return null
+    }
+    return settings === null ?
+        possibleFilters :
+        [...new Set(settings?.split(',').map(lower).filter((item) => item))]
+}
+
+const hideCategory = (categoryToHide) => {
+    const url = new URL(window.location.href)
+    const visibleParams = new URLSearchParams(url.search).get('visible')
+    const currentVisible = visibleParams ? visibleParams.split(',') : [...possibleFilters]
+    const settings = [...new Set(currentVisible)].filter((f) => f !== categoryToHide).join(',')
+
+    url.searchParams.set('visible', settings)
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const showCategory = (categoryToShow) => {
+    if (typeof window === 'undefined') {
+        return
+    }
+    const url = new URL(window.location.href)
+    const currentVisible = new URLSearchParams(url.search).get('visible')?.split(',').filter(Boolean) ||
+        [...possibleFilters]
+    const settings = [...new Set([categoryToShow, ...currentVisible])]
+    const noFilter = possibleFilters.length === settings.length || !settings.length
+
+    noFilter ? url.searchParams.delete('visible') : url.searchParams.set('visible', settings.join(','))
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const getSort = (initialSort) => {
+    const url = new URL(window.location.href)
+    let sort = new URLSearchParams(url.search).get('sort')
+    if (!sort) {
+        sort = initialSort || 'result'
+    }
+    return sort
+}
+
+const setSort = (type) => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('sort', type)
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const getCollapsedCategory = (renderCollapsed) => {
+    let categories
+    if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href)
+        const collapsedItems = new URLSearchParams(url.search).get('collapsed')
+        switch (true) {
+        case !renderCollapsed && collapsedItems === null:
+            categories = ['passed']
+            break
+        case collapsedItems?.length === 0 || /^["']{2}$/.test(collapsedItems):
+            categories = []
+            break
+        case /^all$/.test(collapsedItems) || collapsedItems === null && /^all$/.test(renderCollapsed):
+            categories = [...possibleFilters]
+            break
+        default:
+            categories = collapsedItems?.split(',').map((item) => item.toLowerCase()) || renderCollapsed
+            break
+        }
+    } else {
+        categories = []
+    }
+    return categories
+}
+
+const getSortDirection = () => JSON.parse(sessionStorage.getItem('sortAsc')) || false
+const setSortDirection = (ascending) => sessionStorage.setItem('sortAsc', ascending)
+
+const getCollapsedIds = () => JSON.parse(sessionStorage.getItem('collapsedIds')) || []
+const setCollapsedIds = (list) => sessionStorage.setItem('collapsedIds', JSON.stringify(list))
+
+module.exports = {
+    getVisible,
+    hideCategory,
+    showCategory,
+    getCollapsedIds,
+    setCollapsedIds,
+    getSort,
+    setSort,
+    getSortDirection,
+    setSortDirection,
+    getCollapsedCategory,
+    possibleFilters,
+}
+
+},{}]},{},[4]);
+    </script>
+  </footer>
+  </body>
+</html>

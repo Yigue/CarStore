@@ -70,4 +70,4 @@ def test_link_vehicle_to_lead():
                 pass
 
 
-test_link_vehicle_to_lead()
+# test_link_vehicle_to_lead()
