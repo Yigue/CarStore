@@ -1,4 +1,5 @@
 using Application.Financial.GetAll;
+using Application.Queries.Financial.GetSummary;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Clients;
@@ -359,5 +360,88 @@ public class FinancialIntegrationTests
         createdTransaction.ClientId.Should().Be(testClient.Id);
         createdTransaction.SaleId.Should().Be(sale.Id);
         createdTransaction.Category.Name.Should().Be("Venta de Auto");
+    }
+
+    [Fact]
+    public async Task GET_FinancialSummary_WithFromToQueryParams_ReturnsNarrowedTotals()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var category = await context.TransactionCategories
+            .IgnoreQueryFilters()
+            .FirstAsync(c => c.Name == "Venta de Auto");
+
+        var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
+
+        // Add transaction within the window
+        var txInWindow = new FinancialTransaction(
+            dealerId,
+            TransactionType.Income,
+            2000m,
+            "In window",
+            PaymentMethod.Cash,
+            category,
+            null,
+            null,
+            null,
+            new DateTime(2050, 6, 15, 12, 0, 0, DateTimeKind.Utc));
+
+        // Add transaction outside the window (before)
+        var txBeforeWindow = new FinancialTransaction(
+            dealerId,
+            TransactionType.Income,
+            5000m,
+            "Before window",
+            PaymentMethod.Cash,
+            category,
+            null,
+            null,
+            null,
+            new DateTime(2050, 5, 20, 12, 0, 0, DateTimeKind.Utc));
+
+        // Add transaction outside the window (after)
+        var txAfterWindow = new FinancialTransaction(
+            dealerId,
+            TransactionType.Expense,
+            1000m,
+            "After window",
+            PaymentMethod.Cash,
+            category,
+            null,
+            null,
+            null,
+            new DateTime(2050, 7, 5, 12, 0, 0, DateTimeKind.Utc));
+
+        context.Transactions.AddRange(txInWindow, txBeforeWindow, txAfterWindow);
+        await context.SaveChangesAsync();
+
+        // Query the endpoint
+        var response = await client.GetAsync("/api/v1/financial/summary?from=2050-06-01&to=2050-06-30");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var summary = await response.Content.ReadFromJsonAsync<FinancialSummaryResponse>(IntegrationTestHelpers.JsonOptions);
+        summary.Should().NotBeNull();
+        summary!.TotalIncome.Should().Be(2000m); // only txInWindow
+        summary.TotalExpenses.Should().Be(0m);
+        summary.EntryCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GET_FinancialSummary_WithInvalidDate_Returns400()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        // Query with invalid date
+        var response = await client.GetAsync("/api/v1/financial/summary?from=invalid-date");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }
