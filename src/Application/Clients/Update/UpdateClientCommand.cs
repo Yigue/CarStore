@@ -12,6 +12,7 @@ public sealed record UpdateClientCommand(
     string Phone,
     string Address,
     ClientStatus Status,
+    Domain.Clients.Attributes.ClientType Type,
     string? City = null,
     string? ZipCode = null,
     string? Notes = null) : ICommand<Guid>;

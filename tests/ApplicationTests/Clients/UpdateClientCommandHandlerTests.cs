@@ -29,7 +29,7 @@ public class UpdateClientCommandHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new UpdateClientCommandHandler(context, dateProvider);
-        var command = new UpdateClientCommand(client.Id, "Jane", "Smith", "456", "jane@test.com", "999", "Street 2", ClientStatus.Inactive);
+        var command = new UpdateClientCommand(client.Id, "Jane", "Smith", "456", "jane@test.com", "999", "Street 2", ClientStatus.Inactive, ClientType.Corporate);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -37,6 +37,7 @@ public class UpdateClientCommandHandlerTests
         var updated = await context.Clients.FindAsync(client.Id);
         updated!.FirstName.Should().Be("Jane");
         updated.UpdateAt.Should().Be(dateProvider.UtcNow);
+        updated.Type.Should().Be(ClientType.Corporate, "the handler must persist the Type from the command");
     }
 
     [Theory]
@@ -52,7 +53,7 @@ public class UpdateClientCommandHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new UpdateClientCommandHandler(context, dateProvider);
-        var command = new UpdateClientCommand(client.Id, "John", "Doe", "123", "john@test.com", "555", "Street 1", targetStatus);
+        var command = new UpdateClientCommand(client.Id, "John", "Doe", "123", "john@test.com", "555", "Street 1", targetStatus, ClientType.Individual);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -68,7 +69,7 @@ public class UpdateClientCommandHandlerTests
         var dateProvider = new FakeDateTimeProvider();
         var handler = new UpdateClientCommandHandler(context, dateProvider);
         var id = Guid.NewGuid();
-        var command = new UpdateClientCommand(id, "Jane", "Doe", "123", "jane@test.com", "000", "Address", ClientStatus.Active);
+        var command = new UpdateClientCommand(id, "Jane", "Doe", "123", "jane@test.com", "000", "Address", ClientStatus.Active, ClientType.Individual);
 
         var result = await handler.Handle(command, CancellationToken.None);
 

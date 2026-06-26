@@ -21,6 +21,7 @@ internal sealed class Update : IEndpoint
                 request.Phone,
                 request.Address,
                 request.Status,
+                request.Type,
                 request.City,
                 request.ZipCode,
                 request.Notes);
@@ -49,6 +50,7 @@ public sealed record UpdateClientRequest(
     string Phone,
     string Address,
     ClientStatus Status,
+    Domain.Clients.Attributes.ClientType Type,
     string? City = null,
     string? ZipCode = null,
     string? Notes = null);

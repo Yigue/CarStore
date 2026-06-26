@@ -24,6 +24,7 @@ internal sealed class CreateClientCommandHandler(
             command.Phone,
             command.Address,
             dateTimeProvider.UtcNow,
+            command.Type,
             city: command.City,
             zipCode: command.ZipCode,
             notes: command.Notes);

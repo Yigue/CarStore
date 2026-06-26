@@ -1,3 +1,4 @@
+using Domain.Clients.Attributes;
 using FluentValidation;
 
 namespace Application.Clients.Update;
@@ -36,5 +37,9 @@ public sealed class UpdateClientCommandValidator : AbstractValidator<UpdateClien
 
         RuleFor(x => x.Status)
             .IsInEnum();
+
+        RuleFor(x => x.Type)
+            .IsInEnum()
+            .WithMessage("El campo 'type' es obligatorio.");
     }
 }

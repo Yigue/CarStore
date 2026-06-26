@@ -1,3 +1,4 @@
+using Domain.Clients.Attributes;
 using FluentValidation;
 
 namespace Application.Clients.Create;
@@ -29,5 +30,9 @@ public sealed class CreateClientCommandValidator : AbstractValidator<CreateClien
         RuleFor(x => x.Address)
             .NotEmpty()
             .MaximumLength(200);
+
+        RuleFor(x => x.Type)
+            .IsInEnum()
+            .WithMessage("El campo 'type' es obligatorio.");
     }
 }

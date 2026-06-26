@@ -1,4 +1,5 @@
 using Application.Clients.Create;
+using Domain.Clients.Attributes;
 using MediatR;
 using SharedKernel;
 using Web.Api.Infrastructure;
@@ -12,8 +13,8 @@ internal sealed class Subscribe : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("newsletter/subscribe", async (
-            Request request, 
-            ISender sender, 
+            Request request,
+            ISender sender,
             CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.Contains('@'))
@@ -27,7 +28,8 @@ internal sealed class Subscribe : IEndpoint
                 request.Email,
                 "N/A",
                 "Suscripto via Web",
-                $"NL-{Guid.NewGuid().ToString()[..8]}"); // Ensure a unique DNI placeholder
+                $"NL-{Guid.NewGuid().ToString()[..8]}",
+                ClientType.Individual); // Newsletter subscribers default to Individual
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

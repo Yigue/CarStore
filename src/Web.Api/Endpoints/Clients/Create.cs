@@ -1,4 +1,5 @@
 using Application.Clients.Create;
+using Domain.Clients.Attributes;
 using MediatR;
 using SharedKernel;
 using Web.Api.Extensions;
@@ -15,6 +16,7 @@ internal sealed class Create : IEndpoint
         string Phone,
         string Address,
         string DNI,
+        Domain.Clients.Attributes.ClientType Type,
         string? City = null,
         string? ZipCode = null,
         string? Notes = null);
@@ -30,6 +32,7 @@ internal sealed class Create : IEndpoint
                 request.Email,
                 request.Phone,
                 request.Address,
+                request.Type,
                 request.City,
                 request.ZipCode,
                 request.Notes);
