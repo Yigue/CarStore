@@ -73,4 +73,73 @@ public class ClientTests
         var updated = new ClientUpdatedDomainEvent(clientId);
         updated.ClientId.Should().Be(clientId);
     }
+
+    // PR1 — Client.ChangeType() + ClientTypeChangedDomainEvent (RED -> GREEN)
+
+    [Fact]
+    public void Constructor_Should_Default_Type_To_Individual()
+    {
+        var dealerId = Guid.NewGuid();
+        var date = DateTime.UtcNow;
+        var client = new Client(dealerId, "John", "Doe", "12345678", "john@test.com", "555", "Street 1", date);
+
+        client.Type.Should().Be(ClientType.Individual);
+    }
+
+    [Fact]
+    public void ChangeType_Should_Update_Type_And_Raise_ClientTypeChangedDomainEvent()
+    {
+        var dealerId = Guid.NewGuid();
+        var occurredAt = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var client = new Client(dealerId, "John", "Doe", "12345678", "john@test.com", "555", "Street 1", occurredAt);
+        // Clear the constructor event so we only assert the ChangeType event.
+        client.ClearDomainEvents();
+
+        client.ChangeType(ClientType.Corporate, occurredAt);
+
+        client.Type.Should().Be(ClientType.Corporate);
+        client.UpdateAt.Should().Be(occurredAt);
+
+        client.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<ClientTypeChangedDomainEvent>()
+            .Subject.Should().Match<ClientTypeChangedDomainEvent>(e =>
+                e.ClientId == client.Id
+                && e.From == ClientType.Individual
+                && e.To == ClientType.Corporate
+                && e.OccurredAtUtc == occurredAt);
+    }
+
+    [Fact]
+    public void ChangeType_Should_Not_Raise_Event_When_Value_Is_Same()
+    {
+        var dealerId = Guid.NewGuid();
+        var occurredAt = DateTime.UtcNow;
+        var client = new Client(dealerId, "John", "Doe", "12345678", "john@test.com", "555", "Street 1", occurredAt);
+        client.ClearDomainEvents();
+
+        // Already Individual by default -> no event should fire.
+        client.ChangeType(ClientType.Individual, occurredAt);
+
+        client.Type.Should().Be(ClientType.Individual);
+        client.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Update_With_Type_Should_Change_Type_And_Raise_ClientTypeChangedDomainEvent()
+    {
+        var dealerId = Guid.NewGuid();
+        var now = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var client = new Client(dealerId, "John", "Doe", "12345678", "john@test.com", "555", "Street 1", now);
+        client.ClearDomainEvents();
+
+        client.Update(
+            "John", "Doe", "john@test.com", "555", "Street 1",
+            now,
+            city: null, zipCode: null, notes: null,
+            type: ClientType.Corporate);
+
+        client.Type.Should().Be(ClientType.Corporate);
+        client.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<ClientTypeChangedDomainEvent>();
+    }
 }

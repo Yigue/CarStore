@@ -78,7 +78,8 @@ public sealed class Client : Entity
         DateTime updatedAt,
         string? city = null,
         string? zipCode = null,
-        string? notes = null)
+        string? notes = null,
+        ClientType? type = null)
     {
         if (string.IsNullOrWhiteSpace(firstName))
             throw new DomainException("FirstName cannot be empty");
@@ -94,6 +95,30 @@ public sealed class Client : Entity
         ZipCode = zipCode;
         Notes = notes;
         UpdateAt = updatedAt;
+
+        if (type.HasValue && type.Value != Type)
+        {
+            ChangeType(type.Value, updatedAt);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the <see cref="Type"/> value. Raises <see cref="ClientTypeChangedDomainEvent"/>
+    /// when the value actually differs from the current one. No event is raised when the
+    /// caller passes the same value (idempotent semantics).
+    /// </summary>
+    public void ChangeType(ClientType newType, DateTime occurredAtUtc)
+    {
+        if (newType == Type)
+        {
+            return;
+        }
+
+        ClientType previous = Type;
+        Type = newType;
+        UpdateAt = occurredAtUtc;
+
+        Raise(new ClientTypeChangedDomainEvent(Id, previous, newType, occurredAtUtc));
     }
     
     public void Deactivate()
