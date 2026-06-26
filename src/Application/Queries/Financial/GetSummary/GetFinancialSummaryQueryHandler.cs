@@ -47,16 +47,29 @@ internal sealed class GetFinancialSummaryQueryHandler
 
         // REQ-FIN-SUMMARY-002: Perform single-query aggregation in SQL
         // Use EF.Property<decimal> to refer directly to the database column of the value-converted Amount property,
-        // resolving translation limitations of nested group aggregates.
-        var summaryData = await baseQuery
-            .GroupBy(t => 1)
-            .Select(g => new
-            {
-                TotalIncome = g.Where(t => t.Type == TransactionType.Income).Sum(t => (decimal?)EF.Property<decimal>(t, "Amount")) ?? 0m,
-                TotalExpenses = g.Where(t => t.Type == TransactionType.Expense).Sum(t => (decimal?)EF.Property<decimal>(t, "Amount")) ?? 0m,
-                EntryCount = g.Count()
-            })
-            .FirstOrDefaultAsync(cancellationToken);
+        // resolving translation limitations of nested group aggregates on relational databases.
+        // For In-Memory databases (used in unit tests), use standard property access as EF.Property on converted values is not supported.
+        var isInMemory = _context is DbContext db && db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+
+        var summaryData = isInMemory
+            ? await baseQuery
+                .GroupBy(t => 1)
+                .Select(g => new
+                {
+                    TotalIncome = g.Where(t => t.Type == TransactionType.Income).Sum(t => (decimal?)t.Amount.Amount) ?? 0m,
+                    TotalExpenses = g.Where(t => t.Type == TransactionType.Expense).Sum(t => (decimal?)t.Amount.Amount) ?? 0m,
+                    EntryCount = g.Count()
+                })
+                .FirstOrDefaultAsync(cancellationToken)
+            : await baseQuery
+                .GroupBy(t => 1)
+                .Select(g => new
+                {
+                    TotalIncome = g.Where(t => t.Type == TransactionType.Income).Sum(t => (decimal?)EF.Property<decimal>(t, "Amount")) ?? 0m,
+                    TotalExpenses = g.Where(t => t.Type == TransactionType.Expense).Sum(t => (decimal?)EF.Property<decimal>(t, "Amount")) ?? 0m,
+                    EntryCount = g.Count()
+                })
+                .FirstOrDefaultAsync(cancellationToken);
 
         var totalIncome = summaryData?.TotalIncome ?? 0m;
         var totalExpenses = summaryData?.TotalExpenses ?? 0m;
