@@ -39,9 +39,10 @@ public class FinancialReportJsonShapeTests
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var category = await context.TransactionCategories.FirstAsync();
+        var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
         
         var t1 = new FinancialTransaction(
-            IntegrationTestHelpers.DefaultDealerId,
+            dealerId,
             TransactionType.Income,
             1000m,
             "T1",
@@ -50,7 +51,7 @@ public class FinancialReportJsonShapeTests
             transactionDate: new DateTime(2050, 6, 1, 12, 0, 0, DateTimeKind.Utc));
 
         var t2 = new FinancialTransaction(
-            IntegrationTestHelpers.DefaultDealerId,
+            dealerId,
             TransactionType.Expense,
             400m,
             "T2",
