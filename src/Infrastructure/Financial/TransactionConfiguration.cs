@@ -32,6 +32,7 @@ public class TransactionConfiguration : IEntityTypeConfiguration<FinancialTransa
         builder.Property(t => t.Amount)
             .HasConversion(new MoneyValueConverter())
             .HasColumnName("amount")
+            .HasPrecision(18, 2)
             .IsRequired();
 
         builder.Property(t => t.Type)

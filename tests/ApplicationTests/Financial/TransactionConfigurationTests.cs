@@ -86,4 +86,23 @@ public class TransactionConfigurationTests
         var propNames = idx.Properties.Select(p => p.Name).ToList();
         propNames.Should().Equal("ReconditioningTaskId", "SourceId");
     }
+
+    [Fact]
+    public void AmountColumn_HasPrecision_18_2()
+    {
+        // REQ-FIN-PRECISION-001: transactions.amount is numeric(18, 2).
+        // We assert via the EF model's annotations rather than the relational
+        // type mapping (which is unavailable under the InMemory provider used
+        // by this test).
+        using var ctx = CreateContext();
+        var entityType = ctx.Model.FindEntityType(typeof(FinancialTransaction));
+        var amountProperty = entityType!.FindProperty("Amount");
+        amountProperty.Should().NotBeNull();
+
+        // The HasPrecision(18, 2) call registers annotations on the property.
+        var precision = amountProperty!.FindAnnotation("Precision")?.Value;
+        var scale = amountProperty.FindAnnotation("Scale")?.Value;
+        precision.Should().Be(18);
+        scale.Should().Be(2);
+    }
 }
