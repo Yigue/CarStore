@@ -107,6 +107,58 @@ public class FinancialIntegrationTests
     }
 
     [Fact]
+    public async Task CreateFinancialCategories_WithDescription_Persists()
+    {
+        // REQ-FIN-FORM-001 (financial/spec.md + entity-cruds/spec.md):
+        // TransactionCategory.Description is persisted and returned by GET.
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        var newName = $"CAT-{Guid.NewGuid():N}".Substring(0, 16);
+        var request = new
+        {
+            Name = newName,
+            Description = "Servicios profesionales a clientes",
+            Type = (int)TransactionType.Income,
+        };
+
+        var response = await client.PostAsJsonAsync("/api/v1/financial/categories", request, IntegrationTestHelpers.JsonOptions);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Follow-up GET: assert the description echoes back
+        var getResponse = await client.GetAsync("/api/v1/financial/categories");
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var categories = await getResponse.Content.ReadFromJsonAsync<List<TransactionCategory>>(IntegrationTestHelpers.JsonOptions);
+        categories.Should().NotBeNull();
+        var created = categories!.FirstOrDefault(c => c.Name == newName);
+        created.Should().NotBeNull();
+        created!.Description.Should().Be("Servicios profesionales a clientes");
+    }
+
+    [Fact]
+    public async Task CreateFinancialCategories_WithDescriptionExceeding500Chars_Returns400()
+    {
+        // REQ-FIN-FORM-001 + entity-cruds/spec.md: server-side MaximumLength(500).
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        var newName = $"OVR-{Guid.NewGuid():N}".Substring(0, 12);
+        var request = new
+        {
+            Name = newName,
+            Description = new string('x', 501),
+            Type = (int)TransactionType.Income,
+        };
+
+        var response = await client.PostAsJsonAsync("/api/v1/financial/categories", request, IntegrationTestHelpers.JsonOptions);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task CreateFinancialTransaction_WithSeededCategoryAndCar_ShouldSucceed()
     {
         await using var factory = new CustomWebApplicationFactory();
