@@ -34,6 +34,10 @@ internal sealed class ReconditioningTaskCompletedHandler(
             currency: notification.Currency,
             category: Category,
             occurredAt: notification.CompletedAt,
+            // REQ-FIN-LEDGER-001: composite idempotency key. Today both fields
+            // carry the same TaskId; the composite key leaves room for future
+            // partial-completion flows that derive a divergent SourceId.
+            reconditioningTaskId: notification.TaskId,
             sourceId: notification.TaskId,
             cancellationToken: cancellationToken);
     }

@@ -107,9 +107,10 @@ public static class DependencyInjection
         services.AddScoped<IUserNotificationService, UserNotificationService>();
         services.AddScoped<IRoundRobinLeadAllocator, RoundRobinLeadAllocator>();
 
-        // PHASE-4: Reconditioning costs land here on TaskCompleted. Currently a no-op
-        // (logs only) — swap for a real ledger when finance integration is wired.
-        services.AddScoped<IFinancialLedgerService, NoOpFinancialLedgerService>();
+        // REQ-FIN-LEDGER-001: real EF-backed ledger. Replaces NoOpFinancialLedgerService
+        // (deleted with this change). Idempotency is enforced via the partial
+        // unique index `IX_transactions_ReconditioningTaskId_SourceId` (B.6).
+        services.AddScoped<IFinancialLedgerService, EfFinancialLedgerService>();
 
         // PHASE-3: OCR. Defaults to MockOcrService (logs + canned ParsedDocumentDto).
         // AzureDocumentIntelligenceOcrService is wired only when Endpoint + ApiKey are
