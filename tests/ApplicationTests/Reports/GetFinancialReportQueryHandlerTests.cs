@@ -10,6 +10,10 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using SharedKernel;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Xunit;
 
 namespace Application.UnitTests.Reports;
 
@@ -23,9 +27,8 @@ namespace Application.UnitTests.Reports;
 public class GetFinancialReportQueryHandlerTests
 {
     private static readonly Guid DealerA = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    private static readonly Guid DealerB = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
-    private static (TestApplicationDbContext context, Guid catId) Seed()
+    private static (TestApplicationDbContext context, Guid catId) Seed(DateTime date)
     {
         var options = new DbContextOptionsBuilder<TestApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -34,8 +37,8 @@ public class GetFinancialReportQueryHandlerTests
         ctx.DealerSettings.Add(new Domain.DealerSettings.DealerSettings(DealerA, "Test", "test@test.com"));
         var cat = new TransactionCategory("X", "d", TransactionType.Income);
         ctx.TransactionCategories.Add(cat);
-        ctx.Transactions.Add(new FinancialTransaction(DealerA, TransactionType.Income, 100m, "A", PaymentMethod.Cash, cat));
-        ctx.Transactions.Add(new FinancialTransaction(DealerA, TransactionType.Expense, 50m, "B", PaymentMethod.Cash, cat));
+        ctx.Transactions.Add(new FinancialTransaction(DealerA, TransactionType.Income, 100m, "A", PaymentMethod.Cash, cat, transactionDate: date));
+        ctx.Transactions.Add(new FinancialTransaction(DealerA, TransactionType.Expense, 50m, "B", PaymentMethod.Cash, cat, transactionDate: date));
         ctx.SaveChanges();
         return (ctx, cat.Id);
     }
@@ -43,14 +46,15 @@ public class GetFinancialReportQueryHandlerTests
     [Fact]
     public async Task Handle_NoTenant_ReturnsForbidden()
     {
-        var (ctx, _) = Seed();
+        var date = new DateTime(2050, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        var (ctx, _) = Seed(date);
         var tenantMock = new Mock<ICurrentTenantService>();
         tenantMock.SetupGet(t => t.HasTenant).Returns(false);
 
         var handler = new GetFinancialReportQueryHandler(ctx, tenantMock.Object);
 
         var result = await handler.Handle(
-            new GetFinancialReportQuery(DateTime.UtcNow.AddDays(-7), DateTime.UtcNow, ReportGroupBy.Day),
+            new GetFinancialReportQuery(date, date, ReportGroupBy.Day),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -60,11 +64,8 @@ public class GetFinancialReportQueryHandlerTests
     [Fact]
     public async Task Handle_WithTenant_ReturnsReportForThatTenantOnly()
     {
-        // The in-memory provider doesn't have a multi-tenant fixture set up
-        // here; the relevant invariant is that the handler does NOT throw and
-        // that the rows come from the dealer's slice. We seed 2 rows for
-        // DealerA and query as DealerA — success.
-        var (ctx, _) = Seed();
+        var date = new DateTime(2050, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        var (ctx, _) = Seed(date);
         var tenantMock = new Mock<ICurrentTenantService>();
         tenantMock.SetupGet(t => t.HasTenant).Returns(true);
         tenantMock.SetupGet(t => t.DealerId).Returns(DealerA);
@@ -72,14 +73,19 @@ public class GetFinancialReportQueryHandlerTests
         var handler = new GetFinancialReportQueryHandler(ctx, tenantMock.Object);
 
         var result = await handler.Handle(
-            new GetFinancialReportQuery(DateTime.UtcNow.AddDays(-7), DateTime.UtcNow, ReportGroupBy.Day),
+            new GetFinancialReportQuery(date, date, ReportGroupBy.Day),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
-        // 2 rows for DealerA → 1 day bucket with income=100, expense=50.
-        result.Value!.ByPeriod.Should().HaveCount(1);
-        result.Value.ByPeriod[0].Income.Should().Be(100m);
-        result.Value.ByPeriod[0].Expense.Should().Be(50m);
+        result.Value!.Currency.Should().Be("ARS");
+        result.Value.Series.Should().HaveCount(1);
+        result.Value.Series[0].Bucket.Should().Be("2050-06-01");
+        result.Value.Series[0].Income.Should().Be(100m);
+        result.Value.Series[0].Expense.Should().Be(50m);
+        result.Value.Series[0].Balance.Should().Be(50m);
+        result.Value.Totals.Income.Should().Be(100m);
+        result.Value.Totals.Expense.Should().Be(50m);
+        result.Value.Totals.Balance.Should().Be(50m);
     }
 }
