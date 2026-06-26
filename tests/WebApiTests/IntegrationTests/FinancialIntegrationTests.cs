@@ -46,7 +46,7 @@ public class FinancialIntegrationTests
             PaymentMethod = (int)PaymentMethod.Cash,
             ReferenceNumber = "REF-2024-001",
             TransactionDate = DateTime.UtcNow,
-            category = category.Id.ToString(),
+            categoryId = category.Id.ToString(),
             CarId = (string?)null,
             ClientId = (string?)null,
             SaleId = (string?)null
@@ -68,6 +68,42 @@ public class FinancialIntegrationTests
         createdTransaction.Type.Should().Be(TransactionType.Income);
         createdTransaction.Amount.Amount.Should().Be(25000m);
         createdTransaction.Category.Name.Should().Be("Venta de Auto");
+    }
+
+    [Fact]
+    public async Task CreateFinancial_WithLegacyCategoryField_Returns400()
+    {
+        // REQ-FIN-FIELD-001: legacy `category` field must be rejected with 400.
+        // The endpoint Request DTO field is `categoryId`; clients that still send
+        // `category` (a previous FE bug) MUST NOT silently bind to the new field.
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var category = await context.TransactionCategories
+            .IgnoreQueryFilters()
+            .FirstAsync(c => c.Name == "Venta de Auto");
+        var request = new
+        {
+            Type = (int)TransactionType.Income,
+            Amount = 100m,
+            Description = "Legacy payload",
+            PaymentMethod = (int)PaymentMethod.Cash,
+            ReferenceNumber = "LEG-001",
+            TransactionDate = DateTime.UtcNow,
+            // Legacy field name — must NOT bind to `categoryId`.
+            category = category.Id.ToString(),
+            CarId = (string?)null,
+            ClientId = (string?)null,
+            SaleId = (string?)null
+        };
+
+        var response = await client.PostAsJsonAsync("/api/v1/financial", request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
@@ -117,7 +153,7 @@ public class FinancialIntegrationTests
             PaymentMethod = (int)PaymentMethod.CreditCard,
             ReferenceNumber = "SRV-2024-001",
             TransactionDate = DateTime.UtcNow,
-            category = category.Id.ToString(),
+            categoryId = category.Id.ToString(),
             CarId = car.Id.ToString(),
             ClientId = (string?)null,
             SaleId = (string?)null
@@ -247,7 +283,7 @@ public class FinancialIntegrationTests
             PaymentMethod = (int)PaymentMethod.Cash,
             ReferenceNumber = "VTA-2024-004",
             TransactionDate = DateTime.UtcNow,
-            category = category.Id.ToString(),
+            categoryId = category.Id.ToString(),
             CarId = car.Id.ToString(),
             ClientId = testClient.Id.ToString(),
             SaleId = sale.Id.ToString()
