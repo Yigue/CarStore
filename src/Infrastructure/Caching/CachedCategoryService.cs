@@ -91,7 +91,8 @@ internal sealed class CachedCategoryService : ICachedCategoryService
     public async Task InvalidateCacheAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Invalidating transaction categories cache");
-        await Task.CompletedTask;
+        var cacheKey = CacheKeys.AllTransactionCategories();
+        await _cacheService.RemoveAsync(cacheKey, cancellationToken);
     }
 }
 

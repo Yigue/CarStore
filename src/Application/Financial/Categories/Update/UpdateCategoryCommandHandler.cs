@@ -6,7 +6,9 @@ using SharedKernel;
 
 namespace Application.Financial.Categories.Update;
 
-internal sealed class UpdateCategoryCommandHandler(IApplicationDbContext context)
+internal sealed class UpdateCategoryCommandHandler(
+    IApplicationDbContext context,
+    Application.Abstractions.Caching.ICachedCategoryService cachedCategoryService)
     : ICommandHandler<UpdateCategoryCommand>
 {
     public async Task<Result> Handle(UpdateCategoryCommand command, CancellationToken cancellationToken)
@@ -25,6 +27,8 @@ internal sealed class UpdateCategoryCommandHandler(IApplicationDbContext context
             command.Type);
 
         await context.SaveChangesAsync(cancellationToken);
+
+        await cachedCategoryService.InvalidateCacheAsync(cancellationToken);
 
         return Result.Success();
     }

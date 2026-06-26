@@ -5,7 +5,9 @@ using SharedKernel;
 
 namespace Application.Financial.Categories.Delete;
 
-internal sealed class DeleteCategoryCommandHandler(IApplicationDbContext context)
+internal sealed class DeleteCategoryCommandHandler(
+    IApplicationDbContext context,
+    Application.Abstractions.Caching.ICachedCategoryService cachedCategoryService)
     : ICommandHandler<DeleteCategoryCommand>
 {
     public async Task<Result> Handle(DeleteCategoryCommand command, CancellationToken cancellationToken)
@@ -21,6 +23,8 @@ internal sealed class DeleteCategoryCommandHandler(IApplicationDbContext context
         context.TransactionCategories.Remove(category);
 
         await context.SaveChangesAsync(cancellationToken);
+
+        await cachedCategoryService.InvalidateCacheAsync(cancellationToken);
 
         return Result.Success();
     }
