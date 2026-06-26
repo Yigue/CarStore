@@ -1,6 +1,8 @@
 using System.Globalization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Financial.Attributes;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -14,17 +16,30 @@ namespace Application.Reports.GetFinancialReport;
 /// start) does not translate reliably across providers, so all three modes share
 /// one in-memory grouping path for consistency. The date window keeps the set small.
 /// </summary>
-internal sealed class GetFinancialReportQueryHandler(IApplicationDbContext context)
+internal sealed class GetFinancialReportQueryHandler(
+    IApplicationDbContext context,
+    ICurrentTenantService tenantService)
     : IQueryHandler<GetFinancialReportQuery, FinancialReportDto>
 {
     public async Task<Result<FinancialReportDto>> Handle(
         GetFinancialReportQuery query,
         CancellationToken cancellationToken)
     {
+        // REQ-FIN-TENANT-001 (audit-gap #13): defense-in-handler. The EF GQF
+        // already filters by DealerId, but the reports endpoint runs through
+        // a raw SQL-shaped path that may bypass it. Explicitly require a
+        // tenant context here so we never aggregate across tenants.
+        var guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<FinancialReportDto>(guard.Error);
+        }
+
         DateTime from = query.From;
         DateTime toExclusive = query.To;
 
         var rows = await context.Transactions.AsNoTracking()
+            .Where(t => t.DealerId == tenantService.DealerId)
             .Where(t => t.TransactionDate >= from && t.TransactionDate <= toExclusive)
             .Select(t => new TransactionRow(t.TransactionDate, t.Type, t.Amount.Amount))
             .ToListAsync(cancellationToken);
