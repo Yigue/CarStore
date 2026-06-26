@@ -1,6 +1,8 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Financial;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -8,7 +10,8 @@ using SharedKernel;
 namespace Application.Financial.Update;
 
 internal sealed class UpdateFinancialCommandHandler(
-    IApplicationDbContext context)
+    IApplicationDbContext context,
+    ICurrentTenantService tenantService)
     : ICommandHandler<UpdateFinancialCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(UpdateFinancialCommand command, CancellationToken cancellationToken)
@@ -19,6 +22,16 @@ internal sealed class UpdateFinancialCommandHandler(
         if (financial is null)
         {
             return Result.Failure<Guid>(FinancialErrors.NotFound(command.Id));
+        }
+
+        // REQ-FIN-TENANT-001: defense-in-handler. The EF GQF already filters by
+        // DealerId, but a cross-tenant attacker with a known tx id could still
+        // reach this code via raw SQL or after the GQF is bypassed. Reject
+        // BEFORE the Update + SaveChanges so no DB write occurs.
+        var guard = TenantGuard.EnsureSameDealer(tenantService, financial.DealerId);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<Guid>(guard.Error);
         }
 
         financial.Update(
