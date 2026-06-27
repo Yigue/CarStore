@@ -27,7 +27,7 @@ public class TransactionConfiguration : IEntityTypeConfiguration<FinancialTransa
         builder.HasIndex(t => new { t.ReconditioningTaskId, t.SourceId })
             .HasDatabaseName("IX_transactions_ReconditioningTaskId_SourceId")
             .IsUnique()
-            .HasFilter("\"ReconditioningTaskId\" IS NOT NULL AND \"SourceId\" IS NOT NULL");
+            .HasFilter("\"reconditioning_task_id\" IS NOT NULL AND \"source_id\" IS NOT NULL");
 
         builder.Property(t => t.Amount)
             .HasConversion(new MoneyValueConverter())

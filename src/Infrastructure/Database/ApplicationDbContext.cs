@@ -93,8 +93,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         
         modelBuilder.Entity<Car>().HasQueryFilter(x => 
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
-        modelBuilder.Entity<Client>().HasQueryFilter(x => 
-            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Client>().HasQueryFilter(x =>
+            (!_tenantService.HasTenant || x.DealerId == _tenantService.DealerId) && !x.IsDeleted);
         modelBuilder.Entity<Quote>().HasQueryFilter(x =>
             (!_tenantService.HasTenant || x.DealerId == _tenantService.DealerId) && !x.IsDeleted);
         modelBuilder.Entity<Sale>().HasQueryFilter(x => 
@@ -135,19 +135,22 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             {
                 var domainEvents = entity.DomainEvents;
                 entity.ClearDomainEvents();
-                return domainEvents;
+                return domainEvents.Select(ev => (entity, ev));
             })
-            .Select(domainEvent => new OutboxMessage
+            .Select(pair => new OutboxMessage
             {
                 Id = Guid.NewGuid(),
                 OccurredOnUtc = DateTime.UtcNow,
-                Type = domainEvent.GetType().Name,
+                Type = pair.ev.GetType().Name,
                 Content = JsonConvert.SerializeObject(
-                    domainEvent,
+                    pair.ev,
                     new JsonSerializerSettings
                     {
                         TypeNameHandling = TypeNameHandling.None
-                    })
+                    }),
+                AggregateId = pair.entity.Id,
+                AggregateType = pair.entity.GetType().Name,
+                DealerId = pair.entity.DealerId == Guid.Empty ? null : pair.entity.DealerId
             })
             .ToList();
 

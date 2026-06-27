@@ -34,7 +34,7 @@ internal sealed class Create : IEndpoint
                 id => Results.Created($"/leads/{id}", new { id }),
                 CustomResults.Problem);
         })
-        .HasPermission(Permissions.LeadsCreate)
+        .HasPermission(Permissions.LeadsWrite)
         .WithTags(Tags.Leads)
         .WithName("CreateLead")
         .Produces<Guid>(StatusCodes.Status201Created)

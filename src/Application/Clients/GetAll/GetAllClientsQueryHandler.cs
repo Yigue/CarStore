@@ -1,5 +1,6 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Clients.Projections;
 using Domain.Clients;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -13,22 +14,15 @@ internal sealed class GetAllClientsQueryHandler(IApplicationDbContext context)
         GetAllClientsQuery query,
         CancellationToken cancellationToken)
     {
-        List<ClientResponse> clients = await context
-            .Clients
+        List<Client> clients = await context.Clients
             .AsNoTracking()
-            .Select(client => new ClientResponse(
-                client.Id,
-                client.FirstName,
-                client.LastName,
-                client.DNI,
-                client.Email.Value,
-                client.Phone,
-                client.Address,
-                client.Status,
-                client.CreatedAt,
-                client.UpdateAt))
+            .Include(c => c.Sales)
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<ClientResponse>>(clients);
+        List<ClientResponse> responses = clients
+            .Select(ClientResponseMapper.Map)
+            .ToList();
+
+        return Result.Success<IReadOnlyList<ClientResponse>>(responses);
     }
 }

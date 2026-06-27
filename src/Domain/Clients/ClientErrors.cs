@@ -18,5 +18,17 @@ public static class ClientErrors
     public static Error Inactive(Guid clientId) => Error.Problem(
         "Clients.Inactive",
         $"The client with Id = '{clientId}' is inactive and cannot be used in operations");
+
+    public static Error AlreadyDeleted(Guid clientId) => Error.Problem(
+        "Clients.AlreadyDeleted",
+        $"The client with Id = '{clientId}' is already deleted.");
+
+    public static Error NotDeleted(Guid clientId) => Error.Conflict(
+        "Clients.NotDeleted",
+        $"The client with Id = '{clientId}' is not deleted and cannot be restored.");
+
+    public static Error NotesTooLong() => Error.Validation(
+        "Clients.NotesTooLong",
+        "Notes cannot exceed 2000 characters.");
 }
 

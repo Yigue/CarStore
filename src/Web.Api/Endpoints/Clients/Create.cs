@@ -4,11 +4,13 @@ using MediatR;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
+using System.Text.Json.Serialization;
 
 namespace Web.Api.Endpoints.Clients;
 
 internal sealed class Create : IEndpoint
 {
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
     public sealed record Request(
         string FirstName,
         string LastName,
@@ -43,7 +45,7 @@ internal sealed class Create : IEndpoint
                 id => Results.Created($"/clients/{id}", new { id }),
                 CustomResults.Problem);
         })
-        .HasPermission(Permissions.ClientsCreate)
+        .HasPermission(Permissions.ClientsWrite)
         .WithTags(Tags.Clients)
         .WithName("CreateClient")
         .Produces<Guid>(StatusCodes.Status201Created)

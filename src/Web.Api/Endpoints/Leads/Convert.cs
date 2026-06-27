@@ -20,7 +20,7 @@ internal sealed class Convert : IEndpoint
                 clientId => Results.Created($"/clients/{clientId}", new { clientId }),
                 CustomResults.Problem);
         })
-        .HasPermission(Permissions.LeadsUpdate)
+        .HasPermission(Permissions.LeadsWrite)
         .WithTags(Tags.Leads)
         .WithName("ConvertLeadToClient")
         .Produces<Guid>(StatusCodes.Status201Created)

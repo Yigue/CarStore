@@ -1,6 +1,8 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Clients.GetAll;
+using Application.Clients.Projections;
+using Domain.Clients;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -23,23 +25,14 @@ internal sealed class GetRecentClientsQueryHandler
         // Cap at 100 max
         var cappedLimit = Math.Min(query.Limit, 100);
 
-        var clients = await _context.Clients
+        List<Client> clients = await _context.Clients
             .AsNoTracking()
+            .Include(c => c.Sales)
             .OrderByDescending(c => c.CreatedAt)
             .Take(cappedLimit)
-            .Select(c => new ClientResponse(
-                c.Id,
-                c.FirstName,
-                c.LastName,
-                c.DNI,
-                c.Email.Value,
-                c.Phone,
-                c.Address,
-                c.Status,
-                c.CreatedAt,
-                c.UpdateAt))
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IEnumerable<ClientResponse>>(clients);
+        IEnumerable<ClientResponse> responses = clients.Select(ClientResponseMapper.Map);
+        return Result.Success<IEnumerable<ClientResponse>>(responses);
     }
 }

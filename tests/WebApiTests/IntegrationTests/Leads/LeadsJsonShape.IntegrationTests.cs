@@ -115,10 +115,11 @@ public class LeadsJsonShapeIntegrationTests
         var clientJson = await clientResponse.Content.ReadFromJsonAsync<JsonElement>();
 
         clientJson.TryGetProperty("id", out _).Should().BeTrue("key 'id' (camelCase) must be present");
-        clientJson.TryGetProperty("dni", out var dniProp).Should().BeTrue("key 'dni' (lowercase) must be present");
+        // PR1 (task 1.2.2): field renamed from 'dni' → 'documentNumber' in ClientResponse DTO
+        clientJson.TryGetProperty("documentNumber", out var dniProp).Should().BeTrue("key 'documentNumber' (camelCase) must be present");
         clientJson.TryGetProperty("address", out var addrProp).Should().BeTrue("key 'address' (camelCase) must be present");
 
-        dniProp.GetString().Should().Be("12345678", "persisted DNI must match the convert request");
+        dniProp.GetString().Should().Be("12345678", "persisted document number must match the convert request Dni");
         addrProp.GetString().Should().Be("Av. Rivadavia 1001", "persisted address must match the convert request");
     }
 }

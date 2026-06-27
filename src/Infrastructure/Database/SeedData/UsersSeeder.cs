@@ -92,6 +92,8 @@ internal static class UsersSeeder
             "users:read", "users:create", "users:access", "CanManageUsers", "CanManageRoles",
             "CanManageSettings",
             "leads:read", "leads:create", "leads:update", "leads:delete",
+            "leads:write", "leads:archive",
+            "clients:write",
             "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
             "admin:backfill"
         };

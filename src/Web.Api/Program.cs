@@ -34,6 +34,7 @@ if (builder.Environment.IsEnvironment("Testing"))
 builder.Services
     .AddApplication()
     .AddPresentation()
+    .AddFeatureFlags(builder.Configuration)
     .AddInfrastructure(builder.Configuration);
 
 builder.Services.ConfigureHttpJsonOptions(o =>

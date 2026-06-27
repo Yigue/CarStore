@@ -17,7 +17,7 @@ internal sealed class Delete : IEndpoint
                 () => Results.NoContent(),
                 CustomResults.Problem);
         })
-        .HasPermission(Permissions.LeadsUpdate)
+        .HasPermission(Permissions.LeadsWrite)
         .WithTags(Tags.Leads)
         .WithName("DeleteLead")
         .Produces(StatusCodes.Status204NoContent)

@@ -1,6 +1,8 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Clients.GetAll;
+using Application.Clients.Projections;
+using Domain.Clients;
 using Domain.Shared.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -30,27 +32,18 @@ internal sealed class SearchClientsQueryHandler
         // address. Partial-email search is intentionally unsupported with this mapping.
         Email? emailTerm = TryParseEmail(rawTerm);
 
-        var clients = await _context.Clients
+        List<Client> clients = await _context.Clients
             .AsNoTracking()
+            .Include(c => c.Sales)
             .Where(c => searchTerm == string.Empty ||
                         c.FirstName.ToLower().Contains(searchTerm) ||
                         c.LastName.ToLower().Contains(searchTerm) ||
                         (emailTerm != null && c.Email == emailTerm))
             .Take(50)
-            .Select(c => new ClientResponse(
-                c.Id,
-                c.FirstName,
-                c.LastName,
-                c.DNI,
-                c.Email.Value,
-                c.Phone,
-                c.Address,
-                c.Status,
-                c.CreatedAt,
-                c.UpdateAt))
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IEnumerable<ClientResponse>>(clients);
+        IEnumerable<ClientResponse> responses = clients.Select(ClientResponseMapper.Map);
+        return Result.Success<IEnumerable<ClientResponse>>(responses);
     }
 
     private static Email? TryParseEmail(string value)

@@ -43,7 +43,7 @@ namespace Infrastructure.Migrations
                 table: "transactions",
                 columns: new[] { "reconditioning_task_id", "source_id" },
                 unique: true,
-                filter: "\"ReconditioningTaskId\" IS NOT NULL AND \"SourceId\" IS NOT NULL");
+                filter: "\"reconditioning_task_id\" IS NOT NULL AND \"source_id\" IS NOT NULL");
         }
 
         /// <inheritdoc />
