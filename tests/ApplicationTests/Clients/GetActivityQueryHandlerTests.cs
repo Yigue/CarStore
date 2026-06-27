@@ -28,6 +28,7 @@ public class GetActivityQueryHandlerTests
         idProp?.SetValue(client, clientId);
         
         context.Clients.Add(client);
+        context.SaveChanges();
     }
 
     private static OutboxMessage MakeMessage(Guid clientId, Guid dealerId, string eventType, DateTime occurredAt)
