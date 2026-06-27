@@ -20,6 +20,16 @@ public class GetActivityQueryHandlerTests
         return new TestApplicationDbContext(options);
     }
 
+    private static void SeedClient(TestApplicationDbContext context, Guid clientId, Guid dealerId)
+    {
+        var client = new Client(dealerId, "Test", "Client", "12345678", "test@example.com", "555", "Av. Test 1", DateTime.UtcNow);
+        
+        var idProp = typeof(Entity).GetProperty(nameof(Entity.Id));
+        idProp?.SetValue(client, clientId);
+        
+        context.Clients.Add(client);
+    }
+
     private static OutboxMessage MakeMessage(Guid clientId, Guid dealerId, string eventType, DateTime occurredAt)
         => new()
         {
@@ -36,10 +46,14 @@ public class GetActivityQueryHandlerTests
     public async Task Handle_Returns_Empty_When_No_Events_For_Client()
     {
         using var context = CreateContext();
+        var clientId = Guid.NewGuid();
+        var dealerId = Guid.NewGuid();
+        SeedClient(context, clientId, dealerId);
+        
         var handler = new GetActivityQueryHandler(context);
 
         var result = await handler.Handle(
-            new GetActivityQuery(Guid.NewGuid()),
+            new GetActivityQuery(clientId),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -53,12 +67,13 @@ public class GetActivityQueryHandlerTests
         using var context = CreateContext();
         var clientId = Guid.NewGuid();
         var dealerId = Guid.NewGuid();
+        SeedClient(context, clientId, dealerId);
+        
         var otherId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
 
         context.OutboxMessages.AddRange(
-            MakeMessage(clientId, dealerId, "ClientNotesUpdatedDomainEvent", now),
-            MakeMessage(otherId, dealerId, "ClientNotesUpdatedDomainEvent", now)
+            MakeMessage(clientId, dealerId, "ClientNotesUpdatedDomainEvent", DateTime.UtcNow),
+            MakeMessage(otherId, dealerId, "ClientNotesUpdatedDomainEvent", DateTime.UtcNow)
         );
         await context.SaveChangesAsync();
 
@@ -76,6 +91,8 @@ public class GetActivityQueryHandlerTests
         using var context = CreateContext();
         var clientId = Guid.NewGuid();
         var dealerId = Guid.NewGuid();
+        SeedClient(context, clientId, dealerId);
+        
         var now = DateTime.UtcNow;
 
         // Message with same AggregateId but different AggregateType (e.g. Lead)
@@ -105,6 +122,8 @@ public class GetActivityQueryHandlerTests
         using var context = CreateContext();
         var clientId = Guid.NewGuid();
         var dealerId = Guid.NewGuid();
+        SeedClient(context, clientId, dealerId);
+        
         var base_ = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
 
         context.OutboxMessages.AddRange(
@@ -128,6 +147,8 @@ public class GetActivityQueryHandlerTests
         using var context = CreateContext();
         var clientId = Guid.NewGuid();
         var dealerId = Guid.NewGuid();
+        SeedClient(context, clientId, dealerId);
+        
         var base_ = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
 
         for (int i = 0; i < 10; i++)
