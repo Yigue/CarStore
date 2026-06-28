@@ -10,14 +10,10 @@ namespace Application.Documents.Commands.VerifyDocument;
 internal sealed class VerifyDocumentCommandHandler : IRequestHandler<VerifyDocumentCommand, Result>
 {
     private readonly IApplicationDbContext _context;
-    private readonly IBlobStorageService _blobStorageService;
 
-    public VerifyDocumentCommandHandler(
-        IApplicationDbContext context,
-        IBlobStorageService blobStorageService)
+    public VerifyDocumentCommandHandler(IApplicationDbContext context)
     {
         _context = context;
-        _blobStorageService = blobStorageService;
     }
 
     public async Task<Result> Handle(VerifyDocumentCommand request, CancellationToken ct)

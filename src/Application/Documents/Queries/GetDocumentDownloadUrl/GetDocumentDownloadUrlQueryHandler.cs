@@ -12,14 +12,14 @@ namespace Application.Documents.Queries.GetDocumentDownloadUrl;
 internal sealed class GetDocumentDownloadUrlQueryHandler : IRequestHandler<GetDocumentDownloadUrlQuery, Result<string>>
 {
     private readonly IApplicationDbContext _context;
-    private readonly IBlobStorageService _blobStorageService;
+    private readonly IStorageService _storageService;
 
     public GetDocumentDownloadUrlQueryHandler(
         IApplicationDbContext context,
-        IBlobStorageService blobStorageService)
+        IStorageService storageService)
     {
         _context = context;
-        _blobStorageService = blobStorageService;
+        _storageService = storageService;
     }
 
     public async Task<Result<string>> Handle(GetDocumentDownloadUrlQuery request, CancellationToken cancellationToken)
@@ -34,8 +34,8 @@ internal sealed class GetDocumentDownloadUrlQueryHandler : IRequestHandler<GetDo
 
         // PHASE-3: SAS URL TTL is 15 minutes (spec). Short-lived links reduce
         // accidental sharing/replay risk for legal documents.
-        var sasUri = await _blobStorageService.GenerateSasUrlAsync(
-            document.BlobUrl,
+        var sasUri = await _storageService.GetPresignedUrlAsync(
+            document.BlobName,
             TimeSpan.FromMinutes(15),
             cancellationToken);
 
