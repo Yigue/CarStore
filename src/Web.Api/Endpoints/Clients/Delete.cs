@@ -1,4 +1,4 @@
-using Application.Clients.Delete;
+using Application.Clients.SoftDelete;
 using MediatR;
 using SharedKernel;
 using Web.Api.Infrastructure;
@@ -11,7 +11,7 @@ internal sealed class Delete : IEndpoint
     {
         app.MapDelete("clients/{id}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
         {
-            var command = new DeleteClientCommand(id);
+            var command = new SoftDeleteClientCommand(id);
 
             Result result = await sender.Send(command, cancellationToken);
 

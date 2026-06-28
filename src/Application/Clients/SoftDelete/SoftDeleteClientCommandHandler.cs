@@ -1,5 +1,3 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
@@ -7,17 +5,21 @@ using Domain.Clients;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
-namespace Application.Clients.Delete;
+namespace Application.Clients.SoftDelete;
 
-internal sealed class DeleteClientCommandHandler(
+/// <summary>
+/// Soft-deletes a client (idempotent). If the client is already deleted, returns success without
+/// raising a domain event. Tenant-scoped via the global query filter.
+/// </summary>
+internal sealed class SoftDeleteClientCommandHandler(
     IApplicationDbContext context,
     IUserContext userContext,
     IDateTimeProvider dateTimeProvider)
-    : ICommandHandler<DeleteClientCommand, Guid>
+    : ICommandHandler<SoftDeleteClientCommand, Guid>
 {
-    public async Task<Result<Guid>> Handle(DeleteClientCommand command, CancellationToken cancellationToken)
+    public async Task<Result<Guid>> Handle(SoftDeleteClientCommand command, CancellationToken cancellationToken)
     {
-        // IgnoreQueryFilters: detect already-deleted clients for idempotent soft-delete
+        // IgnoreQueryFilters to detect already-deleted clients for idempotent behaviour
         Client? client = await context.Clients
             .IgnoreQueryFilters()
             .SingleOrDefaultAsync(c => c.Id == command.Id, cancellationToken);
@@ -25,7 +27,7 @@ internal sealed class DeleteClientCommandHandler(
         if (client is null)
             return Result.Failure<Guid>(ClientErrors.NotFound(command.Id));
 
-        // Idempotent: if already deleted, return success without raising event
+        // Idempotent: already deleted — return success without event
         if (client.IsDeleted)
             return Result.Success(client.Id);
 

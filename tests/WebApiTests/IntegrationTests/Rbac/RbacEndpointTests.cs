@@ -361,4 +361,35 @@ public class RbacEndpointTests
 
         AssertForbiddenEmptyBody(response);
     }
+
+    // ── crm-hardening PR2 (W1): notes/activity endpoints RBAC ───────────────
+
+    [Fact]
+    public async Task UpdateNotes_WithUserLackingClientsWrite_Returns403()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await RegisterAndLoginFreshUserAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/v1/clients/{Guid.NewGuid()}/notes",
+            new { Notes = "x" },
+            IntegrationTestHelpers.JsonOptions);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task GetActivity_WithUserLackingClientsRead_Returns403()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await RegisterAndLoginFreshUserAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        var response = await client.GetAsync($"/api/v1/clients/{Guid.NewGuid()}/activity");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
 }

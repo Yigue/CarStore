@@ -6,7 +6,7 @@ using Domain.Shared.ValueObjects;
 
 namespace Domain.Clients;
 
-public sealed class Client : Entity
+public sealed class Client : Entity, ISoftDeletable
 {
     public string FirstName { get; private set; }
     public string LastName { get; private set; }

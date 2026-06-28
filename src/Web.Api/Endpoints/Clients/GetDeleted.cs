@@ -1,45 +1,26 @@
+using Application.Clients.GetDeleted;
 using Application.Clients.GetAll;
 using MediatR;
 using SharedKernel;
 using Web.Api.Infrastructure;
-using System;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Builder;
+using System.Threading;
 
 namespace Web.Api.Endpoints.Clients;
 
-internal sealed class Get : IEndpoint
+internal sealed class GetDeleted : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapGet("clients", async (
+        app.MapGet("clients/deleted", async (
             ISender sender,
-            string? search,
-            string? status,
-            string? type,
-            string? source,
-            Guid? assignedAgentId,
-            DateTime? createdFrom,
-            DateTime? createdTo,
-            decimal? totalSalesMin,
-            decimal? totalSalesMax,
             int page = 1,
             int pageSize = 20,
             CancellationToken cancellationToken = default) =>
         {
-            var query = new GetAllClientsQuery(
-                search,
-                status,
-                type,
-                source,
-                assignedAgentId,
-                createdFrom,
-                createdTo,
-                totalSalesMin,
-                totalSalesMax,
-                page,
-                pageSize);
+            var query = new GetDeletedClientsQuery(page, pageSize);
 
             Result<PaginatedResult<ClientResponse>> result = await sender.Send(query, cancellationToken);
 
@@ -47,9 +28,9 @@ internal sealed class Get : IEndpoint
                 paginated => Results.Ok(paginated),
                 CustomResults.Problem);
         })
-        .HasPermission(Permissions.ClientsRead)
+        .HasPermission(Permissions.ClientsDelete)
         .WithTags(Tags.Clients)
-        .WithName("GetAllClients")
+        .WithName("GetDeletedClients")
         .Produces<PaginatedResult<ClientResponse>>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
     }

@@ -85,7 +85,8 @@ internal static class UsersSeeder
         var permissions = new List<string>
         {
             "cars:read", "cars:create", "cars:update", "cars:delete",
-            "clients:read", "clients:create", "clients:update", "clients:delete",
+            // clients:create and clients:update removed in DropLegacyCRMPermissions migration (PR3)
+            "clients:read", "clients:write", "clients:delete",
             "sales:read", "sales:create", "sales:update", "sales:delete",
             "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
             "financial:read", "financial:create", "financial:update", "financial:delete",
@@ -93,7 +94,6 @@ internal static class UsersSeeder
             "CanManageSettings",
             "leads:read", "leads:create", "leads:update", "leads:delete",
             "leads:write", "leads:archive",
-            "clients:write",
             "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
             "admin:backfill"
         };
