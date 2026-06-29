@@ -76,12 +76,18 @@ internal sealed class GetDashboardSummaryQueryHandler(IApplicationDbContext cont
         // Last 12 months revenue, grouped in SQL then gap-filled in memory.
         var grouped = await completedSales
             .Where(s => s.SaleDate >= windowStart)
-            .GroupBy(s => new { s.SaleDate.Year, s.SaleDate.Month })
+            .Select(s => new
+            {
+                s.SaleDate.Year,
+                s.SaleDate.Month,
+                Amount = EF.Property<decimal>(s, "FinalPrice")
+            })
+            .GroupBy(x => new { x.Year, x.Month })
             .Select(g => new
             {
                 g.Key.Year,
                 g.Key.Month,
-                Revenue = g.Sum(s => EF.Property<decimal>(s, "FinalPrice"))
+                Revenue = g.Sum(x => x.Amount)
             })
             .ToListAsync(cancellationToken);
 
