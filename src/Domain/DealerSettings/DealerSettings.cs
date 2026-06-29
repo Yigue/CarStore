@@ -45,6 +45,50 @@ public sealed class DealerSettings : Entity
         UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Provisioning ctor — mints the row PK and tenant FK to the SAME
+    /// <paramref name="id"/> per design ADR-1 + the orchestrator locked decision.
+    /// Used by <c>ProvisionDealerCommandHandler</c> only; the legacy ctor above
+    /// keeps its independent <c>Guid.NewGuid()</c> semantics for backfill / seed paths.
+    /// </summary>
+    public DealerSettings(
+        Guid id,
+        Guid dealerId,
+        string dealerName,
+        string contactEmail,
+        bool notificationsEnabled = true,
+        string? hostName = null,
+        string? customDomain = null,
+        string? address = null,
+        string? phoneNumber = null,
+        string? facebookUrl = null,
+        string? instagramUrl = null,
+        string? twitterUrl = null,
+        decimal? interestRateTna = null)
+    {
+        if (id != dealerId)
+        {
+            throw new DomainException(
+                "Provisioning requires DealerSettings.Id to equal DealerSettings.DealerId.");
+        }
+
+        SetDealer(dealerId);
+        Id = id;
+        DealerName = dealerName;
+        ContactEmail = contactEmail;
+        NotificationsEnabled = notificationsEnabled;
+        HostName = hostName;
+        CustomDomain = customDomain;
+        Address = address;
+        PhoneNumber = phoneNumber;
+        FacebookUrl = facebookUrl;
+        InstagramUrl = instagramUrl;
+        TwitterUrl = twitterUrl;
+        InterestRateTna = interestRateTna;
+        LastAssignedAgentIndex = 0;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public string DealerName { get; private set; }
 
     public string ContactEmail { get; private set; }
