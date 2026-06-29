@@ -12,6 +12,7 @@ public static class Tags
     public const string Marcas = "marcas";
     public const string Modelos = "modelos";
     public const string DealerSettings = "dealer-settings";
+    public const string Dealers = "Dealers";
     public const string Leads = "leads";
     public const string Documents = "documents";
     public const string Appointments = "appointments";
