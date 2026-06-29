@@ -29,8 +29,6 @@ public sealed class DealerSettings : Entity
         Guid dealerId,
         string dealerName,
         string contactEmail,
-        string? slug = null,
-        bool isActive = true,
         bool notificationsEnabled = true,
         string? hostName = null,
         string? customDomain = null,
@@ -39,14 +37,14 @@ public sealed class DealerSettings : Entity
         string? facebookUrl = null,
         string? instagramUrl = null,
         string? twitterUrl = null,
-        decimal? interestRateTna = null)
+        decimal? interestRateTna = null,
+        string? slug = null,
+        bool isActive = true)
     {
         SetDealer(dealerId);
         Id = Guid.NewGuid();
         DealerName = dealerName;
         ContactEmail = contactEmail;
-        Slug = slug;
-        IsActive = isActive;
         NotificationsEnabled = notificationsEnabled;
         HostName = hostName;
         CustomDomain = customDomain;
@@ -56,6 +54,11 @@ public sealed class DealerSettings : Entity
         InstagramUrl = instagramUrl;
         TwitterUrl = twitterUrl;
         InterestRateTna = interestRateTna;
+        // PR1 (saas-custom-domains): Slug + IsActive appended at the end so the
+        // existing positional parameter ordering for UpdateDealerSettingsCommandHandler
+        // is preserved.
+        Slug = slug;
+        IsActive = isActive;
         LastAssignedAgentIndex = 0;
         UpdatedAt = DateTime.UtcNow;
     }

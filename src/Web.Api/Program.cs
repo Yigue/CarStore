@@ -5,8 +5,11 @@ using Application;
 using HealthChecks.UI.Client;
 using Infrastructure;
 using Infrastructure.Middleware;
+using Infrastructure.Tenancy;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Web.Api;
 using Web.Api.Extensions;
@@ -141,6 +144,19 @@ if (!isDevOrTesting && jwtSecret.Length < 32)
     throw new InvalidOperationException(
         "Jwt:Secret must be at least 32 characters in non-development environments " +
         "to provide adequate signing strength for HMAC-SHA256.");
+}
+
+// PR1 (saas-custom-domains) ADR-1: refuse to start the host if a dev-fallback
+// is configured outside Development. Mirrors the Jwt:Secret fail-fast above.
+// Spec: openspec/changes/saas-custom-domains/specs/tenant-safety-default-deny
+TenantFallbackOptions fallback = app.Services.GetRequiredService<IOptions<TenantFallbackOptions>>().Value;
+if (fallback.DevFallbackDealerId is not null && !app.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "Tenant:DevFallbackDealerId is not allowed in " +
+        app.Environment.EnvironmentName + ". " +
+        "Remove the key for non-Development environments to prevent cross-tenant data leaks. " +
+        "PR1 saas-custom-domains ADR-1 — see openspec/changes/saas-custom-domains/specs/tenant-safety-default-deny.");
 }
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
