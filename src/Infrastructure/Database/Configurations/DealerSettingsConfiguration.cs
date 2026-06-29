@@ -15,6 +15,15 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
         // Una fila por dealer.
         builder.HasIndex(s => s.DealerId).IsUnique();
 
+        // Subdomain uniqueness — DB is the source of truth (REQ: concurrent
+        // provisioning cannot race past an app-level check). PostgreSQL partial
+        // unique index ignores rows with NULL HostName so legacy seed rows
+        // without a subdomain continue to work.
+        builder.HasIndex(s => s.HostName)
+            .IsUnique()
+            .HasFilter("\"HostName\" IS NOT NULL")
+            .HasDatabaseName("IX_DealerSettings_HostName_Unique");
+
         builder.Property(s => s.DealerName)
             .HasMaxLength(200)
             .IsRequired();
