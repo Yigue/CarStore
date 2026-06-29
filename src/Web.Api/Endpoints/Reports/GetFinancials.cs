@@ -18,6 +18,15 @@ internal sealed class GetFinancials : IEndpoint
             ISender sender,
             CancellationToken cancellationToken) =>
         {
+            // REQ-FIN-REPORT-001: FinancialTransaction.TransactionDate is mapped by EF Core
+            // convention to PostgreSQL `timestamp without time zone` (no explicit Configuration
+            // file exists for this aggregate). ASP.NET model-binds ISO strings with a trailing
+            // `Z` as DateTimeKind.Utc. Npgsql 6+ refuses to compare a DateTime(Utc) against
+            // a `timestamp without time zone` column → InvalidCastException → 500.
+            // Strip the Kind so EF binds cleanly to the convention-mapped column.
+            from = DateTime.SpecifyKind(from, DateTimeKind.Unspecified);
+            to = DateTime.SpecifyKind(to, DateTimeKind.Unspecified);
+
             ReportGroupBy grouping = Enum.TryParse(groupBy, ignoreCase: true, out ReportGroupBy parsed)
                 ? parsed
                 : ReportGroupBy.Month;
