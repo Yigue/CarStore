@@ -33,11 +33,11 @@ internal sealed class GetDashboardSummaryQueryHandler(IApplicationDbContext cont
             context.Sales.AsNoTracking().Where(s => s.Status == SaleStatus.Completed);
 
         decimal totalRevenue = await completedSales
-            .SumAsync(s => (decimal?)s.FinalPrice.Amount, cancellationToken) ?? 0m;
+            .SumAsync(s => (decimal?)EF.Property<decimal>(s, "FinalPrice"), cancellationToken) ?? 0m;
 
         decimal revenueThisMonth = await completedSales
             .Where(s => s.SaleDate >= monthStart)
-            .SumAsync(s => (decimal?)s.FinalPrice.Amount, cancellationToken) ?? 0m;
+            .SumAsync(s => (decimal?)EF.Property<decimal>(s, "FinalPrice"), cancellationToken) ?? 0m;
 
         int totalSales = await completedSales.CountAsync(cancellationToken);
 
@@ -81,7 +81,7 @@ internal sealed class GetDashboardSummaryQueryHandler(IApplicationDbContext cont
             {
                 g.Key.Year,
                 g.Key.Month,
-                Revenue = g.Sum(s => s.FinalPrice.Amount)
+                Revenue = g.Sum(s => EF.Property<decimal>(s, "FinalPrice"))
             })
             .ToListAsync(cancellationToken);
 
