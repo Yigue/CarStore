@@ -89,7 +89,7 @@ internal sealed class ProvisionDealerCommandHandler(
             var dashboardUrl = $"https://{subdomain}.{DashboardBaseUrl}/dashboard";
 
             await publisher.Publish(
-                new DealerProvisionedDomainEvent(dealerId, user.Id, subdomain, dashboardUrl),
+                new DealerProvisionedDomainEvent(dealerId, user.Id, command.AdminEmail, subdomain, dashboardUrl),
                 cancellationToken);
 
             return Result.Success(new ProvisionDealerResponse(dealerId, user.Id, subdomain));

@@ -131,6 +131,7 @@ public class ProvisionDealerCommandHandlerTests
             p => p.Publish(It.Is<DealerProvisionedDomainEvent>(e =>
                 e.DealerId == result.Value.DealerId &&
                 e.AdminUserId == result.Value.AdminUserId &&
+                e.AdminEmail == "admin@automotors.com" &&
                 e.Subdomain == "acme" &&
                 e.DashboardUrl.Contains("acme.carstore.com")),
                 It.IsAny<CancellationToken>()),

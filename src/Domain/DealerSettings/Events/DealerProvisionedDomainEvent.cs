@@ -11,5 +11,6 @@ namespace Domain.DealerSettings.Events;
 public sealed record DealerProvisionedDomainEvent(
     Guid DealerId,
     Guid AdminUserId,
+    string AdminEmail,
     string Subdomain,
     string DashboardUrl) : IDomainEvent;

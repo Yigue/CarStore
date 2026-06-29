@@ -12,6 +12,8 @@ using Infrastructure.Caching;
 using Infrastructure.Database;
 using Infrastructure.Storage;
 using Domain.Services;
+using Application.Abstractions.Messaging;
+using Infrastructure.Dealers;
 using Infrastructure.Services;
 using Infrastructure.Tenancy;
 using Infrastructure.Time;
@@ -105,6 +107,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IUserNotificationService, UserNotificationService>();
+        services.AddScoped<IDealerNotificationService, DealerNotificationService>();
         services.AddScoped<IRoundRobinLeadAllocator, RoundRobinLeadAllocator>();
 
         // REQ-FIN-LEDGER-001: real EF-backed ledger. Replaces NoOpFinancialLedgerService
