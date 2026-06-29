@@ -53,6 +53,12 @@ public sealed class DealerSettings : Entity
 
     public DateTime UpdatedAt { get; private set; }
 
+    /// <summary>
+    /// Subdomain slug that the tenant middleware resolves against
+    /// <c>Host</c>/<c>X-Tenant-Host</c>. Enforced unique at the DB level
+    /// (partial unique index — null values are ignored for backward compat with
+    /// legacy seed rows). Always stored lowercase.
+    /// </summary>
     public string? HostName { get; private set; }
 
     public string? CustomDomain { get; private set; }
