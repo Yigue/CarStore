@@ -1,6 +1,7 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Domain.DealerSettings;
 using Domain.DealerSettings.Events;
 using Domain.Users;
 using MediatR;
@@ -94,6 +95,17 @@ internal sealed class ProvisionDealerCommandHandler(
 
             return Result.Success(new ProvisionDealerResponse(dealerId, user.Id, subdomain));
         }
+        catch (DbUpdateException ex) when (IsHostNameUniqueViolation(ex))
+        {
+            // Lost the race against a concurrent provisioning for the same slug.
+            // The DB unique index is the source of truth — translate to a
+            // Conflict so the FE can surface a clear field-level error.
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            return Result.Failure<ProvisionDealerResponse>(DealerSettingsErrors.HostNameNotUnique);
+        }
         catch
         {
             if (transaction is not null)
@@ -109,5 +121,19 @@ internal sealed class ProvisionDealerCommandHandler(
                 await transaction.DisposeAsync();
             }
         }
+    }
+
+    /// <summary>
+    /// Detects a unique-index violation on <c>DealerSettings.HostName</c>.
+    /// Provider-agnostic — checks the inner exception message rather than a
+    /// provider-specific error code so it works against both Npgsql and the
+    /// SQLite test in-memory store.
+    /// </summary>
+    private static bool IsHostNameUniqueViolation(DbUpdateException ex)
+    {
+        var message = ex.InnerException?.Message ?? string.Empty;
+        return message.Contains("HostName", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("host_name", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("dealer_settings", StringComparison.OrdinalIgnoreCase) && message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase);
     }
 }

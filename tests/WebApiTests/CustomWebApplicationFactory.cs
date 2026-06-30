@@ -69,6 +69,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
+            // ProvisionDealerCommandHandler needs the base DbContext for BeginTransactionAsync.
+            // Resolved to the same scoped ApplicationDbContext instance as IApplicationDbContext.
+            services.AddScoped<DbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+
             // Swap the real MinIO-backed storage for the in-memory fake.
             services.RemoveAll<IStorageService>();
             services.AddSingleton<IStorageService>(Storage);

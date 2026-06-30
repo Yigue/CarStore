@@ -175,19 +175,24 @@ public static class DependencyInjection
 
         string? connectionString = configuration.GetConnectionString("Database") ?? throw new ArgumentNullException(nameof(configuration));
 
-        services.AddDbContext<ApplicationDbContext>(
-            options => options
-                .UseNpgsql(connectionString, npgsqlOptions =>
-                {
-                    npgsqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Default);
-                    npgsqlOptions.MigrationsAssembly("Infrastructure");
-                    npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", "public");
-                })
-                .UseSnakeCaseNamingConvention());
+services.AddDbContext<ApplicationDbContext>(
+                options => options
+                    .UseNpgsql(connectionString, npgsqlOptions =>
+                    {
+                        npgsqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Default);
+                        npgsqlOptions.MigrationsAssembly("Infrastructure");
+                        npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", "public");
+                    })
+                    .UseSnakeCaseNamingConvention());
 
-        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+            services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
-        return services;
+            // The ProvisionDealerCommandHandler needs both IApplicationDbContext (for DbSet
+            // access) and the base DbContext (for Database.BeginTransactionAsync). Both resolve
+            // to the same scoped ApplicationDbContext instance.
+            services.AddScoped<DbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+
+            return services;
     }
 
     private static IServiceCollection AddCaching(this IServiceCollection services, IConfiguration configuration)
