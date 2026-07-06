@@ -32,6 +32,34 @@ public sealed class User : Entity
         Raise(new UserRegisteredDomainEvent(Id));
     }
 
+    /// <summary>
+    /// Factory for the platform-level SuperAdmin user.
+    /// SuperAdmin has DealerId = Guid.Empty by contract (ADR-1); this factory
+    /// bypasses the non-empty DealerId invariant enforced by SetDealer().
+    /// </summary>
+    public static User CreateSuperAdmin(
+        string email,
+        string firstName,
+        string lastName,
+        string passwordHash)
+    {
+        // Use the private parameterless EF constructor — DealerId stays Guid.Empty.
+        var user = new User();
+
+        user.Id = Guid.NewGuid();
+        user.Email = new Email(email);
+        user.FirstName = firstName;
+        user.LastName = lastName;
+        user.PasswordHash = passwordHash;
+        user.Role = UserRole.SuperAdmin;
+        user.IsActive = true;
+        user.CreatedAt = DateTime.UtcNow;
+
+        user.Raise(new UserRegisteredDomainEvent(user.Id));
+
+        return user;
+    }
+
     public Email Email { get; private set; }
     public string FirstName { get; private set; }
     public string LastName { get; private set; }

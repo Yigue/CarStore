@@ -1,0 +1,196 @@
+{
+  "info": {
+    "_postman_id": "carstore-platform-api-collection",
+    "name": "CarStore Platform API — SuperAdmin",
+    "description": "Endpoints for the SuperAdmin panel (saas-super-admin change).\nRequires a JWT issued for a SuperAdmin user (role=SuperAdmin, platform_role=super_admin).\n\n## Pre-requisite: seed a SuperAdmin user\n\nRun the following SQL against your Postgres database before using this collection:\n\n```sql\n-- Step 1: insert the SuperAdmin user\nINSERT INTO users (id, email, password_hash, role, dealer_id, is_active, created_at)\nVALUES (\n  gen_random_uuid(),\n  'ops@carstore.io',\n  '<bcrypt-hash-of-your-password>',\n  'SuperAdmin',\n  '00000000-0000-0000-0000-000000000000',\n  true,\n  NOW()\n) RETURNING id;\n\n-- Step 2: grant all platform permissions (replace <user-id> with the id from step 1)\nINSERT INTO user_permissions (user_id, permission)\nSELECT '<user-id>', unnest(ARRAY[\n  'platform:dealers:read',\n  'platform:dealers:suspend',\n  'platform:dealers:activate',\n  'platform:metrics:read'\n]);\n```\n\nOr use the application seeder (ops@carstore.io / Ops123! for dev environments).\n\n## Authentication\n1. Run 'P0 Login as SuperAdmin' first.\n2. The token is saved in the 'platformToken' variable automatically.\n3. All other requests use that token via Bearer auth.\n\n## ETag / concurrency\nSuspend and Activate send the `eTag` field in the request body (NOT as an HTTP If-Match header).\nThe `eTag` value comes from the `eTag` field in the GET /dealers response.\nOn a 412 response, re-run GET /dealers to refresh the ETag before retrying.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "platformToken", "value": "", "type": "string" },
+    { "key": "dealerId", "value": "", "type": "string" },
+    { "key": "dealerETag", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "P0 Login as SuperAdmin",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.collectionVariables.set('platformToken', jsonData.token);",
+              "    console.log('SuperAdmin token saved.');",
+              "}",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Token present', () => {",
+              "    var body = pm.response.json();",
+              "    pm.expect(body.token).to.be.a('string').and.not.be.empty;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"email\": \"ops@carstore.io\",\n    \"password\": \"Ops123!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "login"]
+        }
+      },
+      "description": "Log in as the seeded SuperAdmin user. Saves the JWT to 'platformToken'."
+    },
+    {
+      "name": "P1 GET /api/platform/dealers",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response is array', () => {",
+              "    var body = pm.response.json();",
+              "    pm.expect(body).to.be.an('array');",
+              "});",
+              "// Save first dealer id + eTag for subsequent requests",
+              "var body = pm.response.json();",
+              "if (body.length > 0) {",
+              "    pm.collectionVariables.set('dealerId', body[0].id);",
+              "    pm.collectionVariables.set('dealerETag', body[0].eTag);",
+              "    console.log('Saved dealerId=' + body[0].id + ', eTag=' + body[0].eTag);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{platformToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/platform/dealers",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "platform", "dealers"]
+        }
+      },
+      "description": "Returns all dealers across all tenants, ordered by createdAt desc.\nRequires permission: platform:dealers:read.\n\nThe response includes an 'eTag' field per dealer (xmin row version).\nSave it before calling suspend/activate."
+    },
+    {
+      "name": "P2 POST /api/platform/dealers/{id}/suspend",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 (success) or 409 (idempotent)', () => {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 409]);",
+              "});",
+              "if (pm.response.code === 412) {",
+              "    console.warn('412 Precondition Failed — ETag is stale. Re-run P1 to refresh dealerETag.');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{platformToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"reason\": \"Policy violation — manual suspension via Postman\",\n    \"eTag\": \"{{dealerETag}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/platform/dealers/{{dealerId}}/suspend",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "platform", "dealers", "{{dealerId}}", "suspend"]
+        }
+      },
+      "description": "Soft-suspends a dealer. Sets IsActive=false.\nRequires permission: platform:dealers:suspend.\n\nBody fields:\n- reason (string, required, max 500 chars)\n- eTag (string, required) — from the 'eTag' field in GET /dealers response\n\nErrors:\n- 400: empty reason\n- 404: dealer not found\n- 412: ETag mismatch (stale — re-GET dealers to refresh)"
+    },
+    {
+      "name": "P3 POST /api/platform/dealers/{id}/activate",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 412) {",
+              "    console.warn('412 Precondition Failed — ETag is stale. Re-run P1 to refresh dealerETag.');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{platformToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"eTag\": \"{{dealerETag}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/platform/dealers/{{dealerId}}/activate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "platform", "dealers", "{{dealerId}}", "activate"]
+        }
+      },
+      "description": "Reactivates a suspended dealer. Idempotent — already-active returns 200.\nRequires permission: platform:dealers:activate.\n\nBody fields:\n- eTag (string, required) — from the 'eTag' field in GET /dealers response\n\nErrors:\n- 404: dealer not found\n- 412: ETag mismatch (stale — re-GET dealers to refresh)"
+    },
+    {
+      "name": "P4 GET /api/platform/metrics",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response has required fields', () => {",
+              "    var body = pm.response.json();",
+              "    pm.expect(body.totalDealers).to.be.a('number');",
+              "    pm.expect(body.activeDealers).to.be.a('number');",
+              "    pm.expect(body.suspendedDealers).to.be.a('number');",
+              "    pm.expect(body.totalUsers).to.be.a('number');",
+              "    pm.expect(body.mrr).to.be.an('object');",
+              "    pm.expect(body.mrr.isStub).to.be.true;",
+              "    pm.expect(body.mrr.stubReason).to.include('saas-subscription-payments');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{platformToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/platform/metrics",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "platform", "metrics"]
+        }
+      },
+      "description": "Returns aggregated platform metrics.\nRequires permission: platform:metrics:read.\n\nNote: mrr.isStub is always true until saas-subscription-payments is implemented.\nmrr.stubReason contains the grep-findable string 'Requires saas-subscription-payments'."
+    }
+  ]
+}

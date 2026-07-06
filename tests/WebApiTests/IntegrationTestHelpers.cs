@@ -32,7 +32,23 @@ public static class IntegrationTestHelpers
 
         var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", loginRequest, JsonOptions);
         loginResponse.EnsureSuccessStatusCode();
-        
+
+        var result = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(JsonOptions);
+        return result!.Token;
+    }
+
+    public static async Task<string> GetSuperAdminTokenAsync(CustomWebApplicationFactory factory)
+    {
+        var client = factory.CreateClient();
+        var loginRequest = new
+        {
+            Email = "superadmin@carstore.com",
+            Password = "SuperAdmin123!"
+        };
+
+        var loginResponse = await client.PostAsJsonAsync("/api/v1/users/login", loginRequest, JsonOptions);
+        loginResponse.EnsureSuccessStatusCode();
+
         var result = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(JsonOptions);
         return result!.Token;
     }

@@ -55,6 +55,12 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
         // This ensures all entity configurations (including value object conversions) are used
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(Infrastructure.Database.ApplicationDbContext).Assembly);
 
+        // RowVersion is mapped to the Postgres xmin system column (see DealerSettingsConfiguration).
+        // For InMemory provider, the xmin shadow property exists (UseXminAsConcurrencyToken)
+        // but the explicit RowVersion property must be ignored to avoid "no column" errors.
+        // RowVersion will default to 0 for all InMemory entities (accepted in tests).
+        modelBuilder.Entity<DealerSettingsEntity>().Ignore(s => s.RowVersion);
+
         base.OnModelCreating(modelBuilder);
     }
 }

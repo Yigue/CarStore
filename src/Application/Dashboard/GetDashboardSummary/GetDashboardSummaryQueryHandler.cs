@@ -32,18 +32,23 @@ internal sealed class GetDashboardSummaryQueryHandler(IApplicationDbContext cont
         IQueryable<Domain.Sales.Sale> completedSales =
             context.Sales.AsNoTracking().Where(s => s.Status == SaleStatus.Completed);
 
-        decimal totalRevenue = await completedSales
-            .SumAsync(s => (decimal?)EF.Property<decimal>(s, "FinalPrice"), cancellationToken) ?? 0m;
+        // EF Core cannot translate Money (ValueConverter) in any aggregate LINQ expression.
+        // AsEnumerable() forces client-side evaluation after the WHERE filter runs in SQL,
+        // then we project the already-materialized Money.Amount in memory.
+        var salePrices = completedSales
+            .AsEnumerable()
+            .Select(s => new { s.SaleDate, Amount = s.FinalPrice.Amount })
+            .ToList();
 
-        decimal revenueThisMonth = await completedSales
-            .Where(s => s.SaleDate >= monthStart)
-            .SumAsync(s => (decimal?)EF.Property<decimal>(s, "FinalPrice"), cancellationToken) ?? 0m;
+        decimal totalRevenue = salePrices.Sum(x => x.Amount);
 
-        int totalSales = await completedSales.CountAsync(cancellationToken);
+        decimal revenueThisMonth = salePrices
+            .Where(x => x.SaleDate >= monthStart)
+            .Sum(x => x.Amount);
 
-        int salesThisMonth = await completedSales
-            .Where(s => s.SaleDate >= monthStart)
-            .CountAsync(cancellationToken);
+        int totalSales = salePrices.Count;
+
+        int salesThisMonth = salePrices.Count(x => x.SaleDate >= monthStart);
 
         int totalLeads = await context.Leads.AsNoTracking().CountAsync(cancellationToken);
 
@@ -73,23 +78,13 @@ internal sealed class GetDashboardSummaryQueryHandler(IApplicationDbContext cont
         int upcomingAppointments = await context.Appointments.AsNoTracking()
             .CountAsync(a => a.StartDateTime >= now, cancellationToken);
 
-        // Last 12 months revenue, grouped in SQL then gap-filled in memory.
-        var grouped = await completedSales
-            .Where(s => s.SaleDate >= windowStart)
-            .Select(s => new
-            {
-                s.SaleDate.Year,
-                s.SaleDate.Month,
-                Amount = EF.Property<decimal>(s, "FinalPrice")
-            })
-            .GroupBy(x => new { x.Year, x.Month })
-            .Select(g => new
-            {
-                g.Key.Year,
-                g.Key.Month,
-                Revenue = g.Sum(x => x.Amount)
-            })
-            .ToListAsync(cancellationToken);
+        // GroupBy in-memory over the already-loaded salePrices — avoids the Money translation
+        // issue and costs zero extra DB round trips since salePrices is already fetched.
+        var grouped = salePrices
+            .Where(x => x.SaleDate >= windowStart)
+            .GroupBy(x => new { x.SaleDate.Year, x.SaleDate.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, Revenue = g.Sum(x => x.Amount) })
+            .ToList();
 
         var revenueByMonth = new List<RevenueByMonthDto>(12);
         for (int i = 0; i < 12; i++)

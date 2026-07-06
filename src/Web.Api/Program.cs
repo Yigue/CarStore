@@ -35,7 +35,7 @@ builder.Services
     .AddApplication()
     .AddPresentation()
     .AddFeatureFlags(builder.Configuration)
-    .AddInfrastructure(builder.Configuration);
+    .AddInfrastructure(builder.Configuration, builder.Environment);
 
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
@@ -197,6 +197,10 @@ app.UseAuthentication();
 
 // Tenant resolution middleware - now it can see authentication claims
 app.UseTenantResolution();
+
+// ADR-6: Dealer suspension check — runs after tenant resolution so DealerId is known.
+// SuperAdmin requests bypass this check via the platform_role claim.
+app.UseDealerSuspensionCheck();
 
 app.UseAuthorization();
 

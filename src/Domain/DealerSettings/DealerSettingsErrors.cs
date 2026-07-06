@@ -28,4 +28,16 @@ public static class DealerSettingsErrors
     public static Error ReservedSubdomain(string name) => Error.Validation(
         "DealerSettings.HostName",
         $"'{name}' is reserved");
+
+    public static readonly Error SuspendReasonRequired = Error.Validation(
+        "DealerSettings.SuspendReasonRequired",
+        "A non-empty suspend reason is required.");
+
+    public static readonly Error AlreadySuspended = Error.Problem(
+        "DealerSettings.AlreadySuspended",
+        "The dealer is already suspended.");
+
+    public static readonly Error NotSuspended = Error.Problem(
+        "DealerSettings.NotSuspended",
+        "The dealer is not currently suspended.");
 }

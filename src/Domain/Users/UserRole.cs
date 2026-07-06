@@ -10,5 +10,6 @@ public enum UserRole
     Admin,
     Empleado,
     Cliente,
-    Invitado
+    Invitado,
+    SuperAdmin
 }

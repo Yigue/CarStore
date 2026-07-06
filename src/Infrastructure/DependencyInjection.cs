@@ -21,11 +21,13 @@ using Infrastructure.Users;
 using Application.Users.Register;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -43,9 +45,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration) =>
+        IConfiguration configuration,
+        IWebHostEnvironment? environment = null) =>
         services
-            .AddTenancy()
+            .AddTenancy(environment)
             .AddServices()
             .AddDatabase(configuration)
             .AddCaching(configuration)
@@ -55,11 +58,20 @@ public static class DependencyInjection
             .ConfigureOpenTelemetry()
             .AddBackgroundJobs();
 
-    private static IServiceCollection AddTenancy(this IServiceCollection services)
+    private static IServiceCollection AddTenancy(
+        this IServiceCollection services,
+        IWebHostEnvironment? environment = null)
     {
         // Multi-tenancy service: reads DealerId from JWT "dealer_id" claim via IHttpContextAccessor
         // IHttpContextAccessor is registered in AddAuthenticationInternal()
         services.AddScoped<ICurrentTenantService, CurrentTenantService>();
+
+        // ADR-1 production guard: NoTenantService MUST never be the active ICurrentTenantService
+        // in production. Register a startup filter that validates the registration at app startup.
+        if (environment?.IsProduction() == true)
+        {
+            services.AddTransient<IStartupFilter, NoTenantServiceProductionGuard>();
+        }
 
         return services;
     }

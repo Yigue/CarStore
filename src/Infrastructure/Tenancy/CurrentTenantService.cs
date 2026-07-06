@@ -87,6 +87,17 @@ public class CurrentTenantService : ICurrentTenantService
     {
         get
         {
+            // ADR-1: positive-claim gate. A SuperAdmin JWT carries platform_role=super_admin;
+            // that explicit claim flips HasTenant to false (cross-tenant context).
+            // The host-header fallback branch MUST NOT execute for SuperAdmin requests.
+            var platformRoleClaim = _httpContextAccessor.HttpContext?.User?.FindFirst("platform_role");
+            if (platformRoleClaim?.Value == "super_admin")
+            {
+                return false;
+            }
+
+            // Tenant users: JWT dealer_id claim or host-header resolution must produce
+            // a non-empty DealerId. Missing dealer_id alone does NOT bypass tenancy.
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("dealer_id");
             if (claim is not null && Guid.TryParse(claim.Value, out _))
             {

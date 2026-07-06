@@ -119,6 +119,7 @@ internal static class UsersSeeder
         }
 
         await SeedEmpleadoAsync(context, passwordHasher, configuration, dealerId, cancellationToken);
+        await SeedSuperAdminAsync(context, passwordHasher, configuration, logger, cancellationToken);
     }
 
     /// <summary>
@@ -173,6 +174,80 @@ internal static class UsersSeeder
                 context.UserPermissions.Add(new UserPermission(empleado.Id, permission));
             }
 
+            await context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Seeds the platform SuperAdmin user for development / testing.
+    /// SuperAdmin always has DealerId = Guid.Empty (no tenant scope).
+    /// In production the first SuperAdmin is provisioned via manual SQL (see docs/operations/super-admin-seed.sql).
+    /// </summary>
+    private static async Task SeedSuperAdminAsync(
+        IApplicationDbContext context,
+        IPasswordHasher passwordHasher,
+        IConfiguration configuration,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        const string superAdminEmail = "superadmin@carstore.com";
+        string superAdminPassword = configuration["SUPER_ADMIN_SEED_PASSWORD"] ?? "SuperAdmin123!";
+
+        var superAdmin = context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefault(u => u.Email == superAdminEmail);
+
+        if (superAdmin is null)
+        {
+            var passwordHash = passwordHasher.Hash(superAdminPassword);
+
+            // SuperAdmin has DealerId = Guid.Empty by contract (ADR-1).
+            // We bypass SetDealer() by creating via the factory method which skips the
+            // non-empty invariant — SuperAdmin is a platform-level user, not tenant-scoped.
+            superAdmin = User.CreateSuperAdmin(superAdminEmail, "Super", "Admin", passwordHash);
+
+            context.Users.Add(superAdmin);
+            await context.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("SuperAdmin seeded with email {Email}", superAdminEmail);
+        }
+        else if (superAdmin.Role != UserRole.SuperAdmin)
+        {
+            // Self-heal: correct the role if it was accidentally set to something else.
+            superAdmin.UpdateRole(UserRole.SuperAdmin);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        // Invariant: SuperAdmin must have DealerId = Guid.Empty
+        if (superAdmin.DealerId != Guid.Empty)
+        {
+            logger.LogError(
+                "SuperAdmin user {Id} has non-empty DealerId {DealerId}. " +
+                "This violates the platform isolation invariant.",
+                superAdmin.Id, superAdmin.DealerId);
+        }
+
+        // Grant all platform:* permissions
+        var platformPermissions = new List<string>
+        {
+            "platform:dealers:read",
+            "platform:dealers:suspend",
+            "platform:dealers:activate",
+            "platform:metrics:read"
+        };
+
+        var existingPermissions = context.UserPermissions
+            .IgnoreQueryFilters()
+            .Where(p => p.UserId == superAdmin.Id)
+            .Select(p => p.Permission)
+            .ToHashSet();
+
+        var missingPermissions = platformPermissions.Where(p => !existingPermissions.Contains(p)).ToList();
+        if (missingPermissions.Count > 0)
+        {
+            foreach (var permission in missingPermissions)
+            {
+                context.UserPermissions.Add(new UserPermission(superAdmin.Id, permission));
+            }
             await context.SaveChangesAsync(cancellationToken);
         }
     }

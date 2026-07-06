@@ -71,6 +71,17 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
                 .IsUnique()
                 .HasFilter("is_cover = true")
                 .HasDatabaseName("ux_car_images_car_id_is_cover");
+
+            // Map RowVersion to the Postgres xmin system column (concurrency token).
+            // xmin is a Postgres system column — no CREATE COLUMN in migrations.
+            // The manual migration 20260628_AddDealerSuspensionColumns does NOT include xmin;
+            // this mapping is Postgres-runtime-only.
+            modelBuilder.Entity<DealerSettingsEntity>()
+                .Property(s => s.RowVersion)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         }
 
         // Ignorar DealerId en entidades compartidas (catálogo)

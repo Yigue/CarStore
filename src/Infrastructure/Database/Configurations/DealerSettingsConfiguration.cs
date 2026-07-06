@@ -35,12 +35,37 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
         builder.Property(s => s.NotificationsEnabled)
             .HasDefaultValue(true);
 
+        builder.Property(s => s.CreatedAt)
+            .IsRequired();
+
         builder.Property(s => s.UpdatedAt)
             .IsRequired();
 
         builder.Property(s => s.LastAssignedAgentIndex)
             .HasDefaultValue(0)
             .IsRequired();
+
+        // Platform suspension columns
+        builder.Property(s => s.IsActive)
+            .HasDefaultValue(true)
+            .IsRequired();
+
+        builder.HasIndex(s => s.IsActive)
+            .HasDatabaseName("ix_dealer_settings_is_active");
+
+        builder.Property(s => s.SuspendedAt)
+            .IsRequired(false);
+
+        builder.Property(s => s.SuspendReason)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
+        // RowVersion is intentionally NOT mapped here.
+        // For Postgres: ApplicationDbContext.OnModelCreating maps it to the xmin system column
+        // (concurrency token) in the Postgres-only block.
+        // For InMemory / SQLite (tests): it is ignored so no extra column is created.
+        // RowVersion will be 0 for all test entities (accepted; ETag = "v0").
+        builder.Ignore(s => s.RowVersion);
 
         // Visual settings
         builder.Property(s => s.LogoUrl)

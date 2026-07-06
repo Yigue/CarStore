@@ -1,3 +1,4 @@
+using Domain.DealerSettings.Events;
 using SharedKernel;
 
 namespace Domain.DealerSettings;
@@ -42,6 +43,7 @@ public sealed class DealerSettings : Entity
         TwitterUrl = twitterUrl;
         InterestRateTna = interestRateTna;
         LastAssignedAgentIndex = 0;
+        CreatedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -95,6 +97,8 @@ public sealed class DealerSettings : Entity
 
     public bool NotificationsEnabled { get; private set; }
 
+    public DateTime CreatedAt { get; private set; }
+
     public DateTime UpdatedAt { get; private set; }
 
     /// <summary>
@@ -124,6 +128,17 @@ public sealed class DealerSettings : Entity
     public string? PrimaryColor { get; private set; }
     public string? SecondaryColor { get; private set; }
     public string? FooterText { get; private set; }
+
+    // Platform suspension
+    public bool IsActive { get; private set; } = true;
+    public DateTime? SuspendedAt { get; private set; }
+    public string? SuspendReason { get; private set; }
+
+    /// <summary>
+    /// Postgres xmin concurrency token. Populated by EF Core (Npgsql) from the
+    /// xmin system column. Zero on non-Postgres providers (InMemory/SQLite).
+    /// </summary>
+    public uint RowVersion { get; internal set; }
 
     /// <summary>
     /// Puntero round-robin para asignación automática de leads a agentes.
@@ -156,8 +171,8 @@ public sealed class DealerSettings : Entity
     }
 
     public void Update(
-        string dealerName, 
-        string contactEmail, 
+        string dealerName,
+        string contactEmail,
         bool notificationsEnabled,
         string? hostName,
         string? customDomain,
@@ -186,5 +201,41 @@ public sealed class DealerSettings : Entity
         TwitterUrl = twitterUrl;
         InterestRateTna = interestRateTna;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Soft-suspends the dealer. Idempotent: calling on an already-suspended dealer is a no-op.
+    /// </summary>
+    public void Suspend(string reason, Guid actorId, DateTime utcNow)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new DomainException("SuspendReason cannot be empty");
+
+        if (!IsActive)
+            return; // idempotent
+
+        IsActive = false;
+        SuspendedAt = utcNow;
+        SuspendReason = reason;
+        UpdatedAt = utcNow;
+
+        Raise(new DealerSuspendedDomainEvent(Id, reason, actorId, utcNow));
+    }
+
+    /// <summary>
+    /// Reactivates the dealer. Idempotent: calling on an already-active dealer is a no-op.
+    /// </summary>
+    public void Activate()
+    {
+        if (IsActive)
+            return; // idempotent
+
+        var reactivatedAt = DateTime.UtcNow;
+        IsActive = true;
+        SuspendedAt = null;
+        SuspendReason = null;
+        UpdatedAt = reactivatedAt;
+
+        Raise(new DealerReactivatedDomainEvent(Id, reactivatedAt));
     }
 }
