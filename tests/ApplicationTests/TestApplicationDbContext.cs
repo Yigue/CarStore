@@ -10,6 +10,7 @@ using Domain.Sales;
 using Domain.Users;
 using Domain.Shared;
 using Domain.Leads;
+using Domain.Billing;
 using Microsoft.EntityFrameworkCore;
 using DealerSettingsEntity = Domain.DealerSettings.DealerSettings;
 
@@ -48,6 +49,8 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<Domain.Documents.Document> Documents => Set<Domain.Documents.Document>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<BackfillAudit> BackfillAudits => Set<BackfillAudit>();
+    public DbSet<DealerSubscription> DealerSubscriptions => Set<DealerSubscription>();
+    public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

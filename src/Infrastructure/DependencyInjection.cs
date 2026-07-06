@@ -38,6 +38,8 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Quartz;
 using Infrastructure.BackgroundJobs;
+using Infrastructure.Billing;
+using Application.Abstractions.Billing;
 
 namespace Infrastructure;
 
@@ -56,7 +58,21 @@ public static class DependencyInjection
             .AddAuthenticationInternal(configuration)
             .AddAuthorizationInternal()
             .ConfigureOpenTelemetry()
-            .AddBackgroundJobs();
+            .AddBackgroundJobs()
+            .AddBilling(configuration);
+
+    private static IServiceCollection AddBilling(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<StripeOptions>()
+            .BindConfiguration(StripeOptions.SectionName)
+            .ValidateDataAnnotations();
+
+        services.AddScoped<ISubscriptionGateway, NoOpSubscriptionGateway>();
+        services.AddScoped<ISubscriptionStatusCache, NoOpSubscriptionStatusCache>();
+        services.AddScoped<IDealerSubscriptionRepository, DealerSubscriptionRepository>();
+
+        return services;
+    }
 
     private static IServiceCollection AddTenancy(
         this IServiceCollection services,

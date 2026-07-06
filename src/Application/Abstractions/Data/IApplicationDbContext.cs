@@ -8,6 +8,7 @@ using Domain.Leads;
 using Domain.Quotes;
 using Domain.Sales;
 using Domain.Users;
+using Domain.Billing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
@@ -37,6 +38,9 @@ public interface IApplicationDbContext
     DbSet<Domain.Documents.Document> Documents { get; }
     DbSet<Appointment> Appointments { get; }
     DbSet<BackfillAudit> BackfillAudits { get; }
+    DbSet<DealerSubscription> DealerSubscriptions { get; }
+    DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
+
