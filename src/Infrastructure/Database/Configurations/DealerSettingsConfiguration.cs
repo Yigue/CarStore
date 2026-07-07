@@ -60,10 +60,10 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
         // predicates are not portable to SQLite EnsureCreated (used by tests).
         //
         // Locked decisions applied here:
-        // - O2: HostName stays nullable in dev until the backfill runs;
-        //   IsRequired() is NOT applied yet at the EF level — it is enforced
-        //   by the schema migration's `ALTER COLUMN … SET NOT NULL` AFTER
-        //   backfill so existing rows do not break.
+        // - O2: HostName stays nullable — NOT NULL is explicitly NOT enforced
+        //   this change (tasks.md Locked Decision O2), at the EF level nor the
+        //   DB level. Do not add a `SET NOT NULL` step to the schema migration
+        //   without also revisiting this IsRequired(false) and O2 itself.
         // - O5: HostName itself is validated at the Domain layer
         //   (DealerSettings.ChangeSlug / ValidateFullyQualifiedHostName).
         // ──────────────────────────────────────────────────────────────────────

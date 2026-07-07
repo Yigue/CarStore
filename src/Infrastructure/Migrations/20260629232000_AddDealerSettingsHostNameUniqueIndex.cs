@@ -8,10 +8,13 @@ namespace Infrastructure.Migrations
     /// PR1 (saas-custom-domains) constraint enforcement.
     /// <para>
     /// Depends on <c>BackfillDealerSettingsHostName</c> having populated every
-    /// legacy row's <c>host_name</c> + <c>slug</c>. Once that succeeds:
+    /// legacy row's <c>slug</c> (and <c>host_name</c> where derivable). Once that succeeds:
     /// </para>
     /// <list type="bullet">
-    ///   <item>Sets <c>host_name</c> + <c>slug</c> to <c>NOT NULL</c>.</item>
+    ///   <item>Sets <c>slug</c> to <c>NOT NULL</c>. <c>host_name</c> stays nullable
+    ///   per Locked Decision O2 (tasks.md) — NOT NULL is explicitly NOT enforced
+    ///   this change, matching <c>DealerSettingsConfiguration.cs</c>'s
+    ///   <c>IsRequired(false)</c> on <c>HostName</c>.</item>
     ///   <item>
     ///     Creates partial UNIQUE indexes (one per column) using
     ///     <c>CREATE UNIQUE INDEX CONCURRENTLY</c> so the deploy does not lock
@@ -35,7 +38,11 @@ namespace Infrastructure.Migrations
             // Plain ALTER COLUMN (NOT NULL) — must run AFTER backfill.
             // If legacy rows are still NULL this throws and the operator can
             // re-run the backfill migration before retrying.
-            migrationBuilder.Sql("ALTER TABLE public.dealer_settings ALTER COLUMN host_name SET NOT NULL;");
+            // NOTE: host_name intentionally stays nullable — Locked Decision O2
+            // (tasks.md) says "HostName NOT NULL NOT enforced this change".
+            // Enforcing it here would drift from DealerSettingsConfiguration.cs's
+            // IsRequired(false) and surface a raw Postgres NOT NULL violation
+            // instead of a clean domain error.
             migrationBuilder.Sql("ALTER TABLE public.dealer_settings ALTER COLUMN slug SET NOT NULL;");
 
             // CONCURRENTLY so the index build does not take an ACCESS EXCLUSIVE
@@ -63,7 +70,6 @@ namespace Infrastructure.Migrations
             migrationBuilder.Sql("DROP INDEX IF EXISTS public.ux_dealer_settings_host_name;");
 
             migrationBuilder.Sql("ALTER TABLE public.dealer_settings ALTER COLUMN slug DROP NOT NULL;");
-            migrationBuilder.Sql("ALTER TABLE public.dealer_settings ALTER COLUMN host_name DROP NOT NULL;");
         }
     }
 }
