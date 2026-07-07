@@ -9,6 +9,8 @@ public sealed record DealerSettingsResponse
     public bool NotificationsEnabled { get; init; }
     public DateTime UpdatedAt { get; init; }
     public string? HostName { get; init; }
+    public string? Slug { get; init; }
+    public bool IsActive { get; init; }
     public string? CustomDomain { get; init; }
     public string? Address { get; init; }
     public string? PhoneNumber { get; init; }

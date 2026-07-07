@@ -32,7 +32,7 @@ public sealed class TenantResolutionMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var tenantDealerId = ResolveTenant(context);
+        var (tenantDealerId, hostMiss) = ResolveTenant(context);
 
         if (tenantDealerId != Guid.Empty)
         {
@@ -45,6 +45,18 @@ public sealed class TenantResolutionMiddleware
 
             _logger.LogDebug("Resolved tenant {DealerId} from request", tenantDealerId);
         }
+        else if (hostMiss)
+        {
+            // PR1 (saas-custom-domains) ADR-1 — tenant-safety-default-deny:
+            // A host header was present but matched no registered DealerSettings row.
+            // Short-circuit with 404 so callers cannot probe unregistered hostnames.
+            _logger.LogWarning(
+                "TenantResolutionMiddleware: host not registered — returning 404 (tenant-safety-default-deny). Path={Path}",
+                context.Request.Path);
+
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
         else
         {
             _logger.LogWarning("Could not resolve tenant for request {Path}", context.Request.Path);
@@ -53,16 +65,20 @@ public sealed class TenantResolutionMiddleware
         await _next(context);
     }
 
-    private Guid ResolveTenant(HttpContext context)
+    /// <summary>
+    /// Returns the resolved DealerId and a flag indicating whether the failure was
+    /// a host miss (host provided but not found in DealerSettings).
+    /// </summary>
+    private (Guid DealerId, bool HostMiss) ResolveTenant(HttpContext context)
     {
-        // 1. Check authenticated user claim first
+        // 1. Check authenticated user claim first — always wins.
         var dealerClaim = context.User.FindFirst("dealer_id");
         if (dealerClaim is not null && Guid.TryParse(dealerClaim.Value, out var dealerIdFromClaim))
         {
-            return dealerIdFromClaim;
+            return (dealerIdFromClaim, false);
         }
 
-        // 2. Anonymous request - resolve from headers
+        // 2. Anonymous request — resolve from headers.
         var tenantHost = context.Request.Headers["X-Tenant-Host"].ToString();
 
         if (string.IsNullOrWhiteSpace(tenantHost))
@@ -77,7 +93,8 @@ public sealed class TenantResolutionMiddleware
 
         if (string.IsNullOrWhiteSpace(tenantHost))
         {
-            return Guid.Empty;
+            // No host header at all — not a miss, just no context.
+            return (Guid.Empty, false);
         }
 
         // Clean the host (remove port, lowercase)
@@ -88,7 +105,7 @@ public sealed class TenantResolutionMiddleware
         if (dbContext is null)
         {
             _logger.LogWarning("Could not resolve IApplicationDbContext from services");
-            return Guid.Empty;
+            return (Guid.Empty, false);
         }
 
         var settings = dbContext.DealerSettings
@@ -97,7 +114,10 @@ public sealed class TenantResolutionMiddleware
                 (s.HostName != null && s.HostName.ToLower() == cleanHost) ||
                 (s.CustomDomain != null && s.CustomDomain.ToLower() == cleanHost));
 
-        return settings?.DealerId ?? Guid.Empty;
+        // If a host was provided but no matching row was found → host miss → 404.
+        return settings is null
+            ? (Guid.Empty, true)
+            : (settings.DealerId, false);
     }
 
     private static string ExtractHost(string urlOrHost)
