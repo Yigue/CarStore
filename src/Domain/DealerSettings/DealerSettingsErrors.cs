@@ -40,4 +40,12 @@ public static class DealerSettingsErrors
     public static readonly Error NotSuspended = Error.Problem(
         "DealerSettings.NotSuspended",
         "The dealer is not currently suspended.");
+
+    /// <summary>
+    /// Returned when a PUT /dealer-settings/hostname attempt collides with an existing
+    /// HostName or Slug unique index (HTTP 409). PR1 task 1.5.1.
+    /// </summary>
+    public static readonly Error HostNameConflict = Error.Conflict(
+        "DealerSettings.HostNameConflict",
+        "The requested HostName or Slug is already in use by another dealer.");
 }

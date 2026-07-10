@@ -91,6 +91,12 @@ public static class DependencyInjection
     {
         // Multi-tenancy service: reads DealerId from JWT "dealer_id" claim via IHttpContextAccessor
         // IHttpContextAccessor is registered in AddAuthenticationInternal()
+        //
+        // PR1 (saas-custom-domains) ADR-1: bind Tenant:DevFallbackDealerId so the
+        // non-test safety assertion in Web.Api/Program.cs can read it and the
+        // CurrentTenantService can honor the Development-only convenience fallback.
+        services.AddOptions<TenantFallbackOptions>()
+            .BindConfiguration(TenantFallbackOptions.SectionName);
         services.AddScoped<ICurrentTenantService, CurrentTenantService>();
 
         // ADR-1 production guard: NoTenantService MUST never be the active ICurrentTenantService

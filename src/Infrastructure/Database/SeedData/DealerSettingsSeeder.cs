@@ -1,46 +1,43 @@
-using Application.Abstractions.Data;
+using Domain.DealerSettings;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Database.SeedData;
 
 public static class DealerSettingsSeeder
 {
+    private static readonly Guid DefaultDealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid DefaultSettingsId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
     public static async Task SeedAsync(ApplicationDbContext context, CancellationToken cancellationToken = default)
     {
         var exists = await context.DealerSettings
             .IgnoreQueryFilters()
-            .AnyAsync(s => s.DealerId == Guid.Parse("11111111-1111-1111-1111-111111111111"), cancellationToken);
+            .AnyAsync(s => s.DealerId == DefaultDealerId, cancellationToken);
 
         if (exists)
         {
             return;
         }
 
-        await context.Database.ExecuteSqlRawAsync(@"
-            INSERT INTO public.dealer_settings (
-                id, dealer_id, dealer_name, contact_email, notifications_enabled, 
-                updated_at, host_name, custom_domain, address, phone_number, 
-                facebook_url, instagram_url, twitter_url, interest_rate_tna, 
-                footer_text
-            )
-            VALUES (
-                '22222222-2222-2222-2222-222222222222', 
-                '11111111-1111-1111-1111-111111111111', 
-                'Lux Dealership', 
-                'info@luxdealership.com', 
-                TRUE, 
-                NOW(), 
-                '127.0.0.1', 
-                'lux.localhost', 
-                'Av. del Libertador 4500, Palermo, CABA', 
-                '+54 11 9999-8888', 
-                'https://facebook.com/luxdealership', 
-                'https://instagram.com/luxdealership', 
-                'https://twitter.com/luxdealership', 
-                65.50, 
-                '© 2024 Lux Dealership. Todos los derechos reservados.'
-            )
-            ON CONFLICT (dealer_id) DO NOTHING;
-        ", cancellationToken);
+        // Use EF Core API (cross-DB: works on both PostgreSQL and SQLite used in tests).
+        // HostName is set to "localhost" so the default test-client Host header resolves correctly.
+        var settings = new DealerSettings(
+            dealerId: DefaultDealerId,
+            dealerName: "Lux Dealership",
+            contactEmail: "info@luxdealership.com",
+            notificationsEnabled: true,
+            hostName: "localhost",
+            customDomain: "lux.localhost",
+            address: "Av. del Libertador 4500, Palermo, CABA",
+            phoneNumber: "+54 11 9999-8888",
+            facebookUrl: "https://facebook.com/luxdealership",
+            instagramUrl: "https://instagram.com/luxdealership",
+            twitterUrl: "https://twitter.com/luxdealership",
+            interestRateTna: 65.50m,
+            slug: "lux",
+            isActive: true);
+
+        context.DealerSettings.Add(settings);
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

@@ -28,6 +28,8 @@ internal sealed class GetDealerSettingsQueryHandler(
                 NotificationsEnabled = s.NotificationsEnabled,
                 UpdatedAt = s.UpdatedAt,
                 HostName = s.HostName,
+                Slug = s.Slug,
+                IsActive = s.IsActive,
                 CustomDomain = s.CustomDomain,
                 Address = s.Address,
                 PhoneNumber = s.PhoneNumber,

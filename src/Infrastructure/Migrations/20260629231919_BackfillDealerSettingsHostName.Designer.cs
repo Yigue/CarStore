@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260629231919_BackfillDealerSettingsHostName")]
+    partial class BackfillDealerSettingsHostName
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -92,92 +95,6 @@ namespace Infrastructure.Migrations
                         .HasDatabaseName("ix_appointments_dealer_time_range");
 
                     b.ToTable("appointments", "public");
-                });
-
-            modelBuilder.Entity("Domain.Billing.DealerSubscription", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime?>("CancelledAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("cancelled_at");
-
-                    b.Property<DateTime>("CurrentPeriodEnd")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("current_period_end");
-
-                    b.Property<DateTime>("CurrentPeriodStart")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("current_period_start");
-
-                    b.Property<Guid>("DealerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dealer_id");
-
-                    b.Property<string>("PlanId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("plan_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("status");
-
-                    b.Property<string>("StripeCustomerId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("stripe_customer_id");
-
-                    b.Property<string>("StripeSubscriptionId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("stripe_subscription_id");
-
-                    b.Property<DateTime?>("TrialEndsAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("trial_ends_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_dealer_subscriptions");
-
-                    b.HasIndex("DealerId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_dealer_subscriptions_dealer_id");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_dealer_subscriptions_status");
-
-                    b.HasIndex("StripeSubscriptionId")
-                        .HasDatabaseName("ix_dealer_subscriptions_stripe_subscription_id");
-
-                    b.ToTable("dealer_subscriptions", "public");
-                });
-
-            modelBuilder.Entity("Domain.Billing.ProcessedStripeEvent", b =>
-                {
-                    b.Property<string>("StripeEventId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("stripe_event_id");
-
-                    b.Property<Guid?>("DealerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dealer_id");
-
-                    b.Property<DateTime>("ProcessedOnUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("processed_on_utc");
-
-                    b.HasKey("StripeEventId")
-                        .HasName("pk_processed_stripe_events");
-
-                    b.ToTable("processed_stripe_events", "public");
                 });
 
             modelBuilder.Entity("Domain.Cars.Attributes.Marca", b =>
@@ -632,10 +549,6 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("contact_email");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
                     b.Property<string>("CustomDomain")
                         .HasColumnType("text")
                         .HasColumnName("custom_domain");
@@ -704,12 +617,6 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(7)")
                         .HasColumnName("primary_color");
 
-                    b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
                     b.Property<string>("SecondaryColor")
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)")
@@ -719,15 +626,6 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(63)
                         .HasColumnType("character varying(63)")
                         .HasColumnName("slug");
-
-                    b.Property<string>("SuspendReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("suspend_reason");
-
-                    b.Property<DateTime?>("SuspendedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("suspended_at");
 
                     b.Property<string>("TwitterUrl")
                         .HasColumnType("text")
@@ -744,25 +642,10 @@ namespace Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_dealer_settings_dealer_id");
 
-                    // NOTE: two separately-authored migrations each add a UNIQUE index on
-                    // HostName under different names (IX_DealerSettings_HostName_Unique from
-                    // the dealer-suspension/provisioning migration, ux_dealer_settings_host_name
-                    // from saas-custom-domains PR1) — both indexes genuinely exist in the
-                    // database after both migrations run. Redundant but not incorrect; a
-                    // follow-up migration could drop one. Reflecting both here for snapshot
-                    // accuracy against the real applied migration history.
-                    b.HasIndex("HostName")
-                        .IsUnique()
-                        .HasDatabaseName("IX_DealerSettings_HostName_Unique")
-                        .HasFilter("\"HostName\" IS NOT NULL");
-
                     b.HasIndex("HostName")
                         .IsUnique()
                         .HasDatabaseName("ux_dealer_settings_host_name")
                         .HasFilter("\"HostName\" IS NOT NULL");
-
-                    b.HasIndex("IsActive")
-                        .HasDatabaseName("ix_dealer_settings_is_active");
 
                     b.HasIndex("Slug")
                         .IsUnique()

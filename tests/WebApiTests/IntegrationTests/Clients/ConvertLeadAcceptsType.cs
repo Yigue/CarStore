@@ -86,6 +86,12 @@ public class ConvertLeadAcceptsTypeIntegrationTests
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
         // Assert: exactly ONE LeadStatusChangedDomainEvent with NewStatus=Ganado in the outbox
+        // FOR THIS LEAD. Scoped by AggregateId==leadId per the test's documented intent
+        // ("per convert call" — i.e. this lead's own conversion emits exactly one event;
+        // it still catches the duplicate-emission bug this test guards against, since a
+        // double-emit on THIS lead would still yield count=2 for its own AggregateId).
+        // Unscoped, this assertion would also count unrelated Ganado leads seeded by
+        // DevDataSeeder (a legitimate dev fixture, not a bug) sharing the same in-memory DB.
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
@@ -95,6 +101,7 @@ public class ConvertLeadAcceptsTypeIntegrationTests
         var ganadoEvents = db.OutboxMessages
             .AsNoTracking()
             .AsEnumerable()
+            .Where(m => m.AggregateId == leadId)
             .Where(m =>
             {
                 if (!m.Type.Equals(nameof(LeadStatusChangedDomainEvent), StringComparison.Ordinal))

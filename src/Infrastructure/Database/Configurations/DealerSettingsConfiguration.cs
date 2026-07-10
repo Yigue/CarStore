@@ -83,5 +83,59 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
         builder.Property(s => s.FooterText)
             .HasMaxLength(200)
             .IsRequired(false);
+
+        // ──────────────────────────────────────────────────────────────────────
+        // PR1 (saas-custom-domains) tenant-identity hardening.
+        //
+        // HostName is the public DNS label the tenant serves on
+        // (e.g. xyz.carstore.com). Must fit a fully-qualified hostname (≤253
+        // chars, dotted). The unique + lookup indexes are hand-written in the
+        // AddDealerSettingsHostNameUniqueIndex migration because partial
+        // predicates are not portable to SQLite EnsureCreated (used by tests).
+        //
+        // Locked decisions applied here:
+        // - O2: HostName stays nullable — NOT NULL is explicitly NOT enforced
+        //   this change (tasks.md Locked Decision O2), at the EF level nor the
+        //   DB level. Do not add a `SET NOT NULL` step to the schema migration
+        //   without also revisiting this IsRequired(false) and O2 itself.
+        // - O5: HostName itself is validated at the Domain layer
+        //   (DealerSettings.ChangeSlug / ValidateFullyQualifiedHostName).
+        // ──────────────────────────────────────────────────────────────────────
+        builder.Property(s => s.HostName)
+            .HasMaxLength(253)
+            .IsRequired(false);
+
+        // Slug: the public tenant identifier on {slug}.carstore.com.
+        // Currently nullable at the DB level so legacy rows can survive the
+        // backfill window; the NOT NULL + UNIQUE enforcement is a follow-up.
+        builder.Property(s => s.Slug)
+            .HasMaxLength(DealerSettingsEntity.TenantLabelMaxLength)
+            .IsRequired(false);
+
+        builder.Property(s => s.IsActive)
+            .HasDefaultValue(true)
+            .IsRequired();
+
+        // EF Core declares a partial UNIQUE index for HostName. The schema
+        // migration AddDealerSettingsHostNameUniqueIndex re-creates this index
+        // via CREATE UNIQUE INDEX CONCURRENTLY … WHERE HostName IS NOT NULL
+        // (and a parallel non-unique index on lower(host_name) for
+        // case-insensitive lookup), but the EF model snapshot intentionally
+        // mirrors the indexes so dotnet ef migrations script keeps them
+        // idempotent.
+        builder.HasIndex(s => s.HostName)
+            .HasDatabaseName("ux_dealer_settings_host_name")
+            .IsUnique()
+            .HasFilter("\"HostName\" IS NOT NULL");
+
+        builder.HasIndex(s => s.Slug)
+            .HasDatabaseName("ux_dealer_settings_slug")
+            .IsUnique()
+            .HasFilter("\"Slug\" IS NOT NULL");
+
+        builder.HasIndex(s => new { s.HostName, s.IsActive })
+            .HasDatabaseName("ix_dealer_settings_host_name_active_lookup")
+            .IsUnique(false)
+            .HasFilter("\"IsActive\" = true");
     }
 }
