@@ -50,6 +50,7 @@
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.2" />
     <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
+    <PackageVersion Include="Stripe.net" Version="45.10.0" />
     <!-- Web.Api -->
     <PackageVersion Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2" />

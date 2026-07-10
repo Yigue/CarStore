@@ -18,11 +18,13 @@ using Infrastructure.Services;
 using Infrastructure.Tenancy;
 using Infrastructure.Time;
 using Infrastructure.Users;
-using Application.Users.Register;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Stripe;
+using Application.Abstractions.Billing;
+using Infrastructure.Billing;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
@@ -38,8 +40,6 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Quartz;
 using Infrastructure.BackgroundJobs;
-using Infrastructure.Billing;
-using Application.Abstractions.Billing;
 
 namespace Infrastructure;
 
@@ -67,9 +67,20 @@ public static class DependencyInjection
             .BindConfiguration(StripeOptions.SectionName)
             .ValidateDataAnnotations();
 
-        services.AddScoped<ISubscriptionGateway, NoOpSubscriptionGateway>();
+        var secretKey = configuration["Stripe:SecretKey"];
+        if (!string.IsNullOrWhiteSpace(secretKey))
+        {
+            services.AddSingleton<IStripeClient>(new StripeClient(secretKey));
+            services.AddScoped<ISubscriptionGateway, StripeSubscriptionGateway>();
+        }
+        else
+        {
+            services.AddScoped<ISubscriptionGateway, NoOpSubscriptionGateway>();
+        }
+
         services.AddScoped<ISubscriptionStatusCache, NoOpSubscriptionStatusCache>();
         services.AddScoped<IDealerSubscriptionRepository, DealerSubscriptionRepository>();
+        services.AddScoped<ProcessedStripeEventRepository>();
 
         return services;
     }
@@ -365,6 +376,16 @@ services.AddDbContext<ApplicationDbContext>(
                     trigger.ForJob(expiredQuotesJobKey)
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInMinutes(5) // Check every 5 minutes
+                                .RepeatForever()));
+
+            // Job 3: Process Stripe Webhooks
+            var stripeJobKey = new JobKey(nameof(ProcessStripeWebhooksJob));
+            configure
+                .AddJob<ProcessStripeWebhooksJob>(opts => opts.WithIdentity(stripeJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(stripeJobKey)
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInSeconds(5)
                                 .RepeatForever()));
         });
 

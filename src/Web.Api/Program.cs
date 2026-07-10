@@ -5,6 +5,7 @@ using Application;
 using HealthChecks.UI.Client;
 using Infrastructure;
 using Infrastructure.Middleware;
+using Infrastructure.Billing;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
@@ -143,6 +144,21 @@ if (!isDevOrTesting && jwtSecret.Length < 32)
         "to provide adequate signing strength for HMAC-SHA256.");
 }
 
+bool subscriptionEnforcement = false;
+bool.TryParse(app.Configuration["FeatureFlags:SubscriptionEnforcement"], out subscriptionEnforcement);
+string? stripeWebhookSecret = app.Configuration["Stripe:WebhookSecret"];
+if (string.IsNullOrWhiteSpace(stripeWebhookSecret))
+{
+    if (subscriptionEnforcement)
+    {
+        throw new InvalidOperationException("Stripe:WebhookSecret is required when FeatureFlags:SubscriptionEnforcement is true.");
+    }
+    else
+    {
+        app.Logger.LogWarning("Stripe:WebhookSecret is not configured. Webhook signature verification will fail for real events.");
+    }
+}
+
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.ApplyMigrations();
@@ -206,6 +222,7 @@ app.UseAuthorization();
 
 // Mapear endpoints despuÃ©s de configurar middleware
 app.MapGet("/debug-test", () => "OK");
+app.MapStripeWebhook();
 
 ApiVersionSet apiVersionSet = app.NewApiVersionSet()
     .HasApiVersion(new ApiVersion(1))
@@ -217,6 +234,7 @@ RouteGroupBuilder versionedGroup = app
     .WithApiVersionSet(apiVersionSet);
 
 versionedGroup.MapEndpoints();
+versionedGroup.MapBillingEndpoints();
 app.MapHealthChecks("health", new HealthCheckOptions
 {
     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse

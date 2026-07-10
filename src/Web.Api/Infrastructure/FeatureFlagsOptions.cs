@@ -25,4 +25,7 @@ public sealed class FeatureFlagsOptions
 
     /// <summary>PR2: When true, client notes PUT endpoint requires the updated notes contract.</summary>
     public bool CrmClientNotes { get; set; } = false;
+
+    /// <summary>PR3: When true, subscription payment status is enforced.</summary>
+    public bool SubscriptionEnforcement { get; set; } = false;
 }
