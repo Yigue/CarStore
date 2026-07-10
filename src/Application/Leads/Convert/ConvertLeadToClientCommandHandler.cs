@@ -48,7 +48,7 @@ internal sealed class ConvertLeadToClientCommandHandler(
                 lead.Phone,
                 command.Address,
                 dateTimeProvider.UtcNow,
-                Domain.Clients.Attributes.ClientType.Individual,
+                command.Type,
                 lead.Id);
 
             context.Clients.Add(targetClient);

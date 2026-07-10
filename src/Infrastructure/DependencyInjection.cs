@@ -12,18 +12,24 @@ using Infrastructure.Caching;
 using Infrastructure.Database;
 using Infrastructure.Storage;
 using Domain.Services;
+using Application.Abstractions.Messaging;
+using Infrastructure.Dealers;
 using Infrastructure.Services;
 using Infrastructure.Tenancy;
 using Infrastructure.Time;
 using Infrastructure.Users;
-using Application.Users.Register;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Stripe;
+using Application.Abstractions.Billing;
+using Infrastructure.Billing;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -41,9 +47,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration) =>
+        IConfiguration configuration,
+        IWebHostEnvironment? environment = null) =>
         services
-            .AddTenancy()
+            .AddTenancy(environment)
             .AddServices()
             .AddDatabase(configuration)
             .AddCaching(configuration)
@@ -51,13 +58,53 @@ public static class DependencyInjection
             .AddAuthenticationInternal(configuration)
             .AddAuthorizationInternal()
             .ConfigureOpenTelemetry()
-            .AddBackgroundJobs();
+            .AddBackgroundJobs()
+            .AddBilling(configuration);
 
-    private static IServiceCollection AddTenancy(this IServiceCollection services)
+    private static IServiceCollection AddBilling(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<StripeOptions>()
+            .BindConfiguration(StripeOptions.SectionName)
+            .ValidateDataAnnotations();
+
+        var secretKey = configuration["Stripe:SecretKey"];
+        if (!string.IsNullOrWhiteSpace(secretKey))
+        {
+            services.AddSingleton<IStripeClient>(new StripeClient(secretKey));
+            services.AddScoped<ISubscriptionGateway, StripeSubscriptionGateway>();
+        }
+        else
+        {
+            services.AddScoped<ISubscriptionGateway, NoOpSubscriptionGateway>();
+        }
+
+        services.AddScoped<ISubscriptionStatusCache, RedisSubscriptionStatusCache>();
+        services.AddScoped<IDealerSubscriptionRepository, DealerSubscriptionRepository>();
+        services.AddScoped<ProcessedStripeEventRepository>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddTenancy(
+        this IServiceCollection services,
+        IWebHostEnvironment? environment = null)
     {
         // Multi-tenancy service: reads DealerId from JWT "dealer_id" claim via IHttpContextAccessor
         // IHttpContextAccessor is registered in AddAuthenticationInternal()
+        //
+        // PR1 (saas-custom-domains) ADR-1: bind Tenant:DevFallbackDealerId so the
+        // non-test safety assertion in Web.Api/Program.cs can read it and the
+        // CurrentTenantService can honor the Development-only convenience fallback.
+        services.AddOptions<TenantFallbackOptions>()
+            .BindConfiguration(TenantFallbackOptions.SectionName);
         services.AddScoped<ICurrentTenantService, CurrentTenantService>();
+
+        // ADR-1 production guard: NoTenantService MUST never be the active ICurrentTenantService
+        // in production. Register a startup filter that validates the registration at app startup.
+        if (environment?.IsProduction() == true)
+        {
+            services.AddTransient<IStartupFilter, NoTenantServiceProductionGuard>();
+        }
 
         return services;
     }
@@ -105,11 +152,13 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IUserNotificationService, UserNotificationService>();
+        services.AddScoped<IDealerNotificationService, DealerNotificationService>();
         services.AddScoped<IRoundRobinLeadAllocator, RoundRobinLeadAllocator>();
 
-        // PHASE-4: Reconditioning costs land here on TaskCompleted. Currently a no-op
-        // (logs only) — swap for a real ledger when finance integration is wired.
-        services.AddScoped<IFinancialLedgerService, NoOpFinancialLedgerService>();
+        // REQ-FIN-LEDGER-001: real EF-backed ledger. Replaces NoOpFinancialLedgerService
+        // (deleted with this change). Idempotency is enforced via the partial
+        // unique index `IX_transactions_ReconditioningTaskId_SourceId` (B.6).
+        services.AddScoped<IFinancialLedgerService, EfFinancialLedgerService>();
 
         // PHASE-3: OCR. Defaults to MockOcrService (logs + canned ParsedDocumentDto).
         // AzureDocumentIntelligenceOcrService is wired only when Endpoint + ApiKey are
@@ -171,19 +220,24 @@ public static class DependencyInjection
 
         string? connectionString = configuration.GetConnectionString("Database") ?? throw new ArgumentNullException(nameof(configuration));
 
-        services.AddDbContext<ApplicationDbContext>(
-            options => options
-                .UseNpgsql(connectionString, npgsqlOptions =>
-                {
-                    npgsqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Default);
-                    npgsqlOptions.MigrationsAssembly("Infrastructure");
-                    npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", "public");
-                })
-                .UseSnakeCaseNamingConvention());
+services.AddDbContext<ApplicationDbContext>(
+                options => options
+                    .UseNpgsql(connectionString, npgsqlOptions =>
+                    {
+                        npgsqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Default);
+                        npgsqlOptions.MigrationsAssembly("Infrastructure");
+                        npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", "public");
+                    })
+                    .UseSnakeCaseNamingConvention());
 
-        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+            services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
-        return services;
+            // The ProvisionDealerCommandHandler needs both IApplicationDbContext (for DbSet
+            // access) and the base DbContext (for Database.BeginTransactionAsync). Both resolve
+            // to the same scoped ApplicationDbContext instance.
+            services.AddScoped<DbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+
+            return services;
     }
 
     private static IServiceCollection AddCaching(this IServiceCollection services, IConfiguration configuration)
@@ -328,6 +382,16 @@ public static class DependencyInjection
                     trigger.ForJob(expiredQuotesJobKey)
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInMinutes(5) // Check every 5 minutes
+                                .RepeatForever()));
+
+            // Job 3: Process Stripe Webhooks
+            var stripeJobKey = new JobKey(nameof(ProcessStripeWebhooksJob));
+            configure
+                .AddJob<ProcessStripeWebhooksJob>(opts => opts.WithIdentity(stripeJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(stripeJobKey)
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInSeconds(5)
                                 .RepeatForever()));
         });
 

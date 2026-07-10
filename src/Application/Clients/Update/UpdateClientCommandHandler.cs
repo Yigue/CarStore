@@ -32,7 +32,8 @@ internal sealed class UpdateClientCommandHandler(
             dateTimeProvider.UtcNow,
             city: command.City,
             zipCode: command.ZipCode,
-            notes: command.Notes);
+            notes: command.Notes,
+            type: command.Type);
         
         // Handle status change using domain methods
         if (command.Status == ClientStatus.Active)

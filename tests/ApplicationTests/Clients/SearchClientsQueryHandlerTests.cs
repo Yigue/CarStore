@@ -7,6 +7,9 @@ using Application.Clients.GetAll;
 using Domain.Clients;
 using Domain.Clients.Attributes;
 using Microsoft.EntityFrameworkCore;
+using SharedKernel;
+using Xunit;
+using FluentAssertions;
 
 namespace Application.UnitTests.Clients;
 
@@ -122,5 +125,25 @@ public class SearchClientsQueryHandlerTests
         var clients = result.Value.ToList();
         clients.Should().HaveCount(1);
         clients[0].FirstName.Should().Be("Carlos");
+    }
+
+    [Fact]
+    public async Task Handle_Should_SearchByFullName_CaseAndAccentInsensitive()
+    {
+        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        context.Clients.Add(new Client(dealerId, "María", "González", "11111111", "maria@test.com", "111", "Addr1", now));
+        await context.SaveChangesAsync();
+
+        var handler = new SearchClientsQueryHandler(context);
+        
+        // Search term with matching name but lowercase and no accents
+        var result = await handler.Handle(new SearchClientsQuery { SearchTerm = "maria gonzalez" }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var items = result.Value.ToList();
+        items.Should().ContainSingle();
+        items[0].FirstName.Should().Be("María");
     }
 }

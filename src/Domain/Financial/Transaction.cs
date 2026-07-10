@@ -24,6 +24,13 @@ public sealed class FinancialTransaction : Entity
     public Guid? ClientId { get; private set; }
     public Guid? SaleId { get; private set; }
 
+    // REQ-FIN-LEDGER-001: idempotency key for ledger writes driven by the
+    // ReconditioningTaskCompletedDomainEvent. Both columns are nullable so
+    // regular user-created transactions (with neither column set) are NOT
+    // subject to the partial unique index — only the ledger-driven rows are.
+    public Guid? ReconditioningTaskId { get; private set; }
+    public Guid? SourceId { get; private set; }
+
     // Propiedades de navegación - Cambiamos a init para EF Core
     public TransactionCategory Category { get; private init; }
     public Car? Car { get; private init; }
@@ -44,7 +51,9 @@ public sealed class FinancialTransaction : Entity
         Car? car = null,
         Client? client = null,
         Sale? sale = null,
-        DateTime transactionDate = default)
+        DateTime transactionDate = default,
+        Guid? reconditioningTaskId = null,
+        Guid? sourceId = null)
     {
         SetDealer(dealerId);
         Type = type;
@@ -69,8 +78,10 @@ public sealed class FinancialTransaction : Entity
             SaleId = sale.Id;
         }
         TransactionDate = transactionDate == default ? DateTime.UtcNow : transactionDate;
+        ReconditioningTaskId = reconditioningTaskId;
+        SourceId = sourceId;
     }
-    
+
     public FinancialTransaction(
         Guid dealerId,
         TransactionType type,
@@ -81,7 +92,9 @@ public sealed class FinancialTransaction : Entity
         Car? car = null,
         Client? client = null,
         Sale? sale = null,
-        DateTime transactionDate = default)
+        DateTime transactionDate = default,
+        Guid? reconditioningTaskId = null,
+        Guid? sourceId = null)
     {
         SetDealer(dealerId);
         Type = type;
@@ -106,6 +119,8 @@ public sealed class FinancialTransaction : Entity
             SaleId = sale.Id;
         }
         TransactionDate = transactionDate == default ? DateTime.UtcNow : transactionDate;
+        ReconditioningTaskId = reconditioningTaskId;
+        SourceId = sourceId;
     }
 
     // Métodos para actualizar propiedades

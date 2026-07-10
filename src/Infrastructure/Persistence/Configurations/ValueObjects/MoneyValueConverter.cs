@@ -11,8 +11,8 @@ namespace Infrastructure.Persistence.Configurations.ValueObjects;
 public class MoneyValueConverter : ValueConverter<Money, decimal>
 {
     public MoneyValueConverter() : base(
-        money => money.Amount,
-        amount => new Money(amount, "USD"))
+        money => Math.Round(money.Amount, 2, MidpointRounding.ToEven),
+        amount => new Money(Math.Round(amount, 2, MidpointRounding.ToEven), "ARS"))
     {
     }
 }

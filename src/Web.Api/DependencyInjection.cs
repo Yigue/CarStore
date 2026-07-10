@@ -1,4 +1,5 @@
-﻿using Web.Api.Infrastructure;
+﻿using Microsoft.Extensions.Options;
+using Web.Api.Infrastructure;
 using Asp.Versioning;
 
 namespace Web.Api;
@@ -25,6 +26,16 @@ public static class DependencyInjection
 
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
+
+        return services;
+    }
+
+    public static IServiceCollection AddFeatureFlags(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<FeatureFlagsOptions>(
+            configuration.GetSection(FeatureFlagsOptions.SectionName));
 
         return services;
     }

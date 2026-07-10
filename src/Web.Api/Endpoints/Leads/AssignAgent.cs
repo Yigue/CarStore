@@ -19,7 +19,7 @@ internal sealed class AssignAgent : IEndpoint
                 () => Results.NoContent(),
                 CustomResults.Problem);
         })
-        .HasPermission(Permissions.LeadsUpdate)
+        .HasPermission(Permissions.LeadsWrite)
         .WithTags(Tags.Leads)
         .WithName("AssignAgentToLead")
         .Produces(StatusCodes.Status204NoContent)

@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Financial.Attributes;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -10,30 +12,69 @@ internal sealed class GetFinancialSummaryQueryHandler
     : IQueryHandler<GetFinancialSummaryQuery, FinancialSummaryResponse>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICurrentTenantService _tenantService;
 
-    public GetFinancialSummaryQueryHandler(IApplicationDbContext context)
+    public GetFinancialSummaryQueryHandler(IApplicationDbContext context, ICurrentTenantService tenantService)
     {
         _context = context;
+        _tenantService = tenantService;
     }
 
     public async Task<Result<FinancialSummaryResponse>> Handle(
         GetFinancialSummaryQuery query,
         CancellationToken cancellationToken)
     {
-        var transactions = await _context.Transactions
+        // REQ-FIN-TENANT-001: Enforce tenant context check at handler layer
+        var tenantGuard = TenantGuard.EnsureHasTenant(_tenantService);
+        if (tenantGuard.IsFailure)
+        {
+            return Result.Failure<FinancialSummaryResponse>(tenantGuard.Error);
+        }
+
+        var baseQuery = _context.Transactions
             .AsNoTracking()
-            .ToListAsync(cancellationToken);
+            .Where(t => t.DealerId == _tenantService.DealerId);
 
-        var totalIncome = transactions
-            .Where(t => t.Type == TransactionType.Income)
-            .Sum(t => t.Amount.Amount);
+        if (query.From.HasValue)
+        {
+            baseQuery = baseQuery.Where(t => t.TransactionDate >= query.From.Value);
+        }
 
-        var totalExpenses = transactions
-            .Where(t => t.Type == TransactionType.Expense)
-            .Sum(t => t.Amount.Amount);
+        if (query.To.HasValue)
+        {
+            baseQuery = baseQuery.Where(t => t.TransactionDate <= query.To.Value);
+        }
 
+        // REQ-FIN-SUMMARY-002: Perform single-query aggregation in SQL
+        // Use EF.Property<decimal> to refer directly to the database column of the value-converted Amount property,
+        // resolving translation limitations of nested group aggregates on relational databases.
+        // For In-Memory databases (used in unit tests), use standard property access as EF.Property on converted values is not supported.
+        var isInMemory = _context is DbContext db && db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+
+        var summaryData = isInMemory
+            ? await baseQuery
+                .GroupBy(t => 1)
+                .Select(g => new
+                {
+                    TotalIncome = g.Where(t => t.Type == TransactionType.Income).Sum(t => (decimal?)t.Amount.Amount) ?? 0m,
+                    TotalExpenses = g.Where(t => t.Type == TransactionType.Expense).Sum(t => (decimal?)t.Amount.Amount) ?? 0m,
+                    EntryCount = g.Count()
+                })
+                .FirstOrDefaultAsync(cancellationToken)
+            : await baseQuery
+                .GroupBy(t => 1)
+                .Select(g => new
+                {
+                    TotalIncome = g.Where(t => t.Type == TransactionType.Income).Sum(t => (decimal?)EF.Property<decimal>(t, "Amount")) ?? 0m,
+                    TotalExpenses = g.Where(t => t.Type == TransactionType.Expense).Sum(t => (decimal?)EF.Property<decimal>(t, "Amount")) ?? 0m,
+                    EntryCount = g.Count()
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+        var totalIncome = summaryData?.TotalIncome ?? 0m;
+        var totalExpenses = summaryData?.TotalExpenses ?? 0m;
         var balance = totalIncome - totalExpenses;
-        var entryCount = transactions.Count;
+        var entryCount = summaryData?.EntryCount ?? 0;
 
         var response = new FinancialSummaryResponse(
             totalIncome,

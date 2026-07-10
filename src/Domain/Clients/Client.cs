@@ -6,7 +6,7 @@ using Domain.Shared.ValueObjects;
 
 namespace Domain.Clients;
 
-public sealed class Client : Entity
+public sealed class Client : Entity, ISoftDeletable
 {
     public string FirstName { get; private set; }
     public string LastName { get; private set; }
@@ -23,6 +23,15 @@ public sealed class Client : Entity
     public List<Sale> Sales { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdateAt { get; private set; }
+
+    // Soft-delete fields (mirrors Quote pattern — ADR-2)
+    public bool IsDeleted { get; private set; }
+    public DateTime? DeletedAtUtc { get; private set; }
+    public Guid? DeletedBy { get; private set; }
+
+    // Enrichment fields (ADR-1 / REQ-001)
+    public AcquisitionSource? AcquisitionSource { get; private set; }
+    public Guid? AssignedAgentId { get; private set; }
     
     private Client() 
     {
@@ -78,7 +87,8 @@ public sealed class Client : Entity
         DateTime updatedAt,
         string? city = null,
         string? zipCode = null,
-        string? notes = null)
+        string? notes = null,
+        ClientType? type = null)
     {
         if (string.IsNullOrWhiteSpace(firstName))
             throw new DomainException("FirstName cannot be empty");
@@ -94,6 +104,30 @@ public sealed class Client : Entity
         ZipCode = zipCode;
         Notes = notes;
         UpdateAt = updatedAt;
+
+        if (type.HasValue && type.Value != Type)
+        {
+            ChangeType(type.Value, updatedAt);
+        }
+    }
+
+    /// <summary>
+    /// Replaces the <see cref="Type"/> value. Raises <see cref="ClientTypeChangedDomainEvent"/>
+    /// when the value actually differs from the current one. No event is raised when the
+    /// caller passes the same value (idempotent semantics).
+    /// </summary>
+    public void ChangeType(ClientType newType, DateTime occurredAtUtc)
+    {
+        if (newType == Type)
+        {
+            return;
+        }
+
+        ClientType previous = Type;
+        Type = newType;
+        UpdateAt = occurredAtUtc;
+
+        Raise(new ClientTypeChangedDomainEvent(Id, previous, newType, occurredAtUtc));
     }
     
     public void Deactivate()
@@ -127,5 +161,52 @@ public sealed class Client : Entity
             return;
 
         Status = ClientStatus.VIP;
+    }
+
+    /// <summary>
+    /// Soft-deletes the client. Idempotent: raises no event if already deleted (ADR-2).
+    /// </summary>
+    public void Delete(Guid actorId, DateTime occurredAtUtc)
+    {
+        if (IsDeleted)
+            return;
+
+        IsDeleted = true;
+        DeletedAtUtc = occurredAtUtc;
+        DeletedBy = actorId;
+
+        Raise(new ClientSoftDeletedDomainEvent(Id, occurredAtUtc, actorId));
+    }
+
+    /// <summary>
+    /// Restores a soft-deleted client. Returns failure if the client is not deleted.
+    /// </summary>
+    public Result Restore(Guid actorId, DateTime occurredAtUtc)
+    {
+        if (!IsDeleted)
+            return Result.Failure(ClientErrors.NotDeleted(Id));
+
+        IsDeleted = false;
+        DeletedAtUtc = null;
+        DeletedBy = null;
+
+        Raise(new ClientRestoredDomainEvent(Id, occurredAtUtc, actorId));
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Updates client notes. Max 2000 characters; null is allowed to clear notes.
+    /// </summary>
+    public Result UpdateNotes(string? notes, Guid? actorId, DateTime occurredAtUtc)
+    {
+        if (notes is not null && notes.Length > 2000)
+            return Result.Failure(ClientErrors.NotesTooLong());
+
+        Notes = notes;
+
+        Raise(new ClientNotesUpdatedDomainEvent(Id, occurredAtUtc, actorId));
+
+        return Result.Success();
     }
 }

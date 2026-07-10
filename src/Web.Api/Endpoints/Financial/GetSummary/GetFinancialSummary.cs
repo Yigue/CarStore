@@ -12,10 +12,12 @@ public sealed class GetFinancialSummary : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("financial/summary", async (
+            [Microsoft.AspNetCore.Mvc.FromQuery] DateTime? from,
+            [Microsoft.AspNetCore.Mvc.FromQuery] DateTime? to,
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            var result = await sender.Send(new GetFinancialSummaryQuery(), cancellationToken);
+            var result = await sender.Send(new GetFinancialSummaryQuery(from, to), cancellationToken);
 
             return result.Match(
                 data => Results.Ok(data),

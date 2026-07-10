@@ -17,15 +17,24 @@ internal sealed class TokenProvider(IConfiguration configuration) : ITokenProvid
 
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
+        var claims = new List<Claim>
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.Email, user.Email),
+            new Claim("dealer_id", user.DealerId.ToString()),
+            new Claim("role", user.Role.ToString().ToLowerInvariant())
+        };
+
+        // ADR-1: emit platform_role claim only for SuperAdmin users.
+        // Claim absence is the correct signal for all tenant-scoped roles.
+        if (user.Role == UserRole.SuperAdmin)
+        {
+            claims.Add(new Claim("platform_role", "super_admin"));
+        }
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(
-            [
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim("dealer_id", user.DealerId.ToString()),
-                new Claim("role", user.Role.ToString().ToLowerInvariant())
-            ]),
+            Subject = new ClaimsIdentity(claims),
             Expires = DateTime.UtcNow.AddMinutes(configuration.GetValue<int>("Jwt:ExpirationInMinutes")),
             SigningCredentials = credentials,
             Issuer = configuration["Jwt:Issuer"],

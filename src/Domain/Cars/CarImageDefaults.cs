@@ -12,5 +12,5 @@ public static class CarImageDefaults
     /// Public path to a stable SVG placeholder served by the web tier. Returned by
     /// <c>GetPrimaryImageUrlAsync</c> when every URL field on the image row is null/empty.
     /// </summary>
-    public const string NoImagePlaceholderUrl = "/static/placeholders/vehicle-no-image.svg";
+    public const string NoImagePlaceholderUrl = "/images/placeholder-car.svg";
 }

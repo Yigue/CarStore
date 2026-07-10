@@ -53,6 +53,11 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("Storage__Minio__AccessKey", "minioadmin");
         Environment.SetEnvironmentVariable("Storage__Minio__SecretKey", "minioadmin123");
         Environment.SetEnvironmentVariable("Storage__Minio__BucketName", "cars");
+        
+        // Mock Stripe secrets to bypass SubscriptionEnforcement checks
+        Environment.SetEnvironmentVariable("Stripe__SecretKey", "sk_test_mock");
+        Environment.SetEnvironmentVariable("Stripe__WebhookSecret", "whsec_mock");
+        Environment.SetEnvironmentVariable("Stripe__PriceId", "price_mock");
 
         builder.UseEnvironment("Testing");
 
@@ -68,6 +73,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 options.UseSqlite(_connection));
 
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+
+            // ProvisionDealerCommandHandler needs the base DbContext for BeginTransactionAsync.
+            // Resolved to the same scoped ApplicationDbContext instance as IApplicationDbContext.
+            services.AddScoped<DbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
             // Swap the real MinIO-backed storage for the in-memory fake.
             services.RemoveAll<IStorageService>();

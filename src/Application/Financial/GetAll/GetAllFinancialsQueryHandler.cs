@@ -1,15 +1,27 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Financial.GetAll;
 
-internal sealed class GetAllFinancialsQueryHandler(IApplicationDbContext context)
+internal sealed class GetAllFinancialsQueryHandler(
+    IApplicationDbContext context,
+    ICurrentTenantService tenantService)
     : IQueryHandler<GetAllFinancialsQuery, IReadOnlyList<FinancialResponses>>
 {
     public async Task<Result<IReadOnlyList<FinancialResponses>>> Handle(GetAllFinancialsQuery query, CancellationToken cancellationToken)
     {
+        // REQ-FIN-TENANT-001: short-circuit before any DB round-trip if the
+        // request lacks a tenant context (e.g. an anonymous migration job).
+        var guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<IReadOnlyList<FinancialResponses>>(guard.Error);
+        }
+
         List<FinancialResponses> transactions = await context.Transactions
             .AsNoTracking()
             .Select(transaction => new FinancialResponses(

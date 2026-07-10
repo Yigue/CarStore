@@ -18,7 +18,7 @@ internal sealed class Create : IEndpoint
        decimal amount,
        string description,
        int paymentMethod,
-       Guid category,
+       Guid categoryId,
        Guid? carId,
        Guid? clientId,
        Guid? saleId);
@@ -31,7 +31,7 @@ internal sealed class Create : IEndpoint
                 request.amount,
                 request.description,
                 (PaymentMethod)request.paymentMethod,
-                request.category,
+                request.categoryId,
                 request.carId,
                 request.clientId,
                 request.saleId);

@@ -94,6 +94,92 @@ namespace Infrastructure.Migrations
                     b.ToTable("appointments", "public");
                 });
 
+            modelBuilder.Entity("Domain.Billing.DealerSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<DateTime>("CurrentPeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_end");
+
+                    b.Property<DateTime>("CurrentPeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_start");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("PlanId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("plan_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StripeCustomerId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("stripe_customer_id");
+
+                    b.Property<string>("StripeSubscriptionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("stripe_subscription_id");
+
+                    b.Property<DateTime?>("TrialEndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trial_ends_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dealer_subscriptions");
+
+                    b.HasIndex("DealerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dealer_subscriptions_dealer_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_dealer_subscriptions_status");
+
+                    b.HasIndex("StripeSubscriptionId")
+                        .HasDatabaseName("ix_dealer_subscriptions_stripe_subscription_id");
+
+                    b.ToTable("dealer_subscriptions", "public");
+                });
+
+            modelBuilder.Entity("Domain.Billing.ProcessedStripeEvent", b =>
+                {
+                    b.Property<string>("StripeEventId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("stripe_event_id");
+
+                    b.Property<Guid?>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTime>("ProcessedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_on_utc");
+
+                    b.HasKey("StripeEventId")
+                        .HasName("pk_processed_stripe_events");
+
+                    b.ToTable("processed_stripe_events", "public");
+                });
+
             modelBuilder.Entity("Domain.Cars.Attributes.Marca", b =>
                 {
                     b.Property<Guid>("Id")
@@ -410,11 +496,20 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AcquisitionSource")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("acquisition_source");
+
                     b.Property<string>("Address")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("address");
+
+                    b.Property<Guid?>("AssignedAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_agent_id");
 
                     b.Property<string>("City")
                         .HasMaxLength(100)
@@ -435,6 +530,14 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("dealer_id");
 
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -447,6 +550,12 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("first_name");
 
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -454,8 +563,8 @@ namespace Infrastructure.Migrations
                         .HasColumnName("last_name");
 
                     b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
                         .HasColumnName("notes");
 
                     b.Property<Guid?>("OriginLeadId")
@@ -497,6 +606,9 @@ namespace Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_clients_dni");
 
+                    b.HasIndex("IsDeleted")
+                        .HasDatabaseName("ix_clients_is_deleted");
+
                     b.HasIndex("OriginLeadId")
                         .HasDatabaseName("ix_clients_origin_lead_id");
 
@@ -519,6 +631,10 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("contact_email");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("CustomDomain")
                         .HasColumnType("text")
@@ -544,7 +660,8 @@ namespace Infrastructure.Migrations
                         .HasColumnName("footer_text");
 
                     b.Property<string>("HostName")
-                        .HasColumnType("text")
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)")
                         .HasColumnName("host_name");
 
                     b.Property<string>("InstagramUrl")
@@ -554,6 +671,12 @@ namespace Infrastructure.Migrations
                     b.Property<decimal?>("InterestRateTna")
                         .HasColumnType("numeric")
                         .HasColumnName("interest_rate_tna");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
 
                     b.Property<int>("LastAssignedAgentIndex")
                         .ValueGeneratedOnAdd()
@@ -581,10 +704,30 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(7)")
                         .HasColumnName("primary_color");
 
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.Property<string>("SecondaryColor")
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)")
                         .HasColumnName("secondary_color");
+
+                    b.Property<string>("Slug")
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("slug");
+
+                    b.Property<string>("SuspendReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("suspend_reason");
+
+                    b.Property<DateTime?>("SuspendedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("suspended_at");
 
                     b.Property<string>("TwitterUrl")
                         .HasColumnType("text")
@@ -600,6 +743,35 @@ namespace Infrastructure.Migrations
                     b.HasIndex("DealerId")
                         .IsUnique()
                         .HasDatabaseName("ix_dealer_settings_dealer_id");
+
+                    // NOTE: two separately-authored migrations each add a UNIQUE index on
+                    // HostName under different names (IX_DealerSettings_HostName_Unique from
+                    // the dealer-suspension/provisioning migration, ux_dealer_settings_host_name
+                    // from saas-custom-domains PR1) — both indexes genuinely exist in the
+                    // database after both migrations run. Redundant but not incorrect; a
+                    // follow-up migration could drop one. Reflecting both here for snapshot
+                    // accuracy against the real applied migration history.
+                    b.HasIndex("HostName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_DealerSettings_HostName_Unique")
+                        .HasFilter("\"HostName\" IS NOT NULL");
+
+                    b.HasIndex("HostName")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dealer_settings_host_name")
+                        .HasFilter("\"HostName\" IS NOT NULL");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_dealer_settings_is_active");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dealer_settings_slug")
+                        .HasFilter("\"Slug\" IS NOT NULL");
+
+                    b.HasIndex("HostName", "IsActive")
+                        .HasDatabaseName("ix_dealer_settings_host_name_active_lookup")
+                        .HasFilter("\"IsActive\" = true");
 
                     b.ToTable("dealer_settings", "public");
                 });
@@ -711,7 +883,8 @@ namespace Infrastructure.Migrations
                         .HasColumnName("id");
 
                     b.Property<decimal>("Amount")
-                        .HasColumnType("numeric")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
                         .HasColumnName("amount");
 
                     b.Property<Guid?>("CarId")
@@ -740,6 +913,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("payment_method");
 
+                    b.Property<Guid?>("ReconditioningTaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reconditioning_task_id");
+
                     b.Property<string>("ReferenceNumber")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
@@ -748,6 +925,10 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("SaleId")
                         .HasColumnType("uuid")
                         .HasColumnName("sale_id");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
 
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("timestamp with time zone")
@@ -771,6 +952,17 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("SaleId")
                         .HasDatabaseName("ix_transactions_sale_id");
+
+                    b.HasIndex("DealerId", "CategoryId")
+                        .HasDatabaseName("IX_transactions_DealerId_CategoryId");
+
+                    b.HasIndex("DealerId", "TransactionDate")
+                        .HasDatabaseName("IX_transactions_DealerId_TransactionDate");
+
+                    b.HasIndex("ReconditioningTaskId", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_transactions_ReconditioningTaskId_SourceId")
+                        .HasFilter("\"reconditioning_task_id\" IS NOT NULL AND \"source_id\" IS NOT NULL");
 
                     b.ToTable("transactions", "public");
                 });
@@ -1028,10 +1220,23 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("AggregateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("aggregate_id");
+
+                    b.Property<string>("AggregateType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("aggregate_type");
+
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("content");
+
+                    b.Property<Guid?>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
 
                     b.Property<string>("Error")
                         .HasColumnType("text")
@@ -1053,7 +1258,55 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_outbox_messages");
 
+                    b.HasIndex("AggregateType", "DealerId")
+                        .HasDatabaseName("ix_outbox_dealer");
+
+                    b.HasIndex("Type", "OccurredOnUtc")
+                        .HasDatabaseName("ix_outbox_type_occurred");
+
                     b.ToTable("OutboxMessages", "public");
+                });
+
+            modelBuilder.Entity("Domain.Users.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("token");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_password_reset_tokens");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("ix_password_reset_tokens_token");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_password_reset_tokens_user_id");
+
+                    b.ToTable("password_reset_tokens", "public");
                 });
 
             modelBuilder.Entity("Domain.Users.User", b =>
@@ -1157,48 +1410,6 @@ namespace Infrastructure.Migrations
                         .HasDatabaseName("ix_user_permissions_user_id_permission");
 
                     b.ToTable("UserPermissions", "public");
-                });
-
-            modelBuilder.Entity("Domain.Users.PasswordResetToken", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("token");
-
-                    b.Property<DateTime?>("UsedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("used_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_password_reset_tokens");
-
-                    b.HasIndex("Token")
-                        .IsUnique()
-                        .HasDatabaseName("ix_password_reset_tokens_token");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_password_reset_tokens_user_id");
-
-                    b.ToTable("password_reset_tokens", "public");
                 });
 
             modelBuilder.Entity("Domain.Appointments.Appointment", b =>

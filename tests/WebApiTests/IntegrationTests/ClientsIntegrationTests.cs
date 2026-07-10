@@ -93,11 +93,11 @@ public class ClientsIntegrationTests
         var response = await client.GetAsync("/api/v1/clients");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        var clients = await response.Content.ReadFromJsonAsync<List<Application.Clients.GetAll.ClientResponse>>(IntegrationTestHelpers.JsonOptions);
-        clients.Should().NotBeNull();
-        clients!.Count.Should().BeGreaterThanOrEqualTo(2);
-        clients.Should().Contain(c => c.Email == "maria.gonzalez@example.com");
-        clients.Should().Contain(c => c.Email == "carlos.rodriguez@example.com");
+        var paginated = await response.Content.ReadFromJsonAsync<SharedKernel.PaginatedResult<Application.Clients.GetAll.ClientResponse>>(IntegrationTestHelpers.JsonOptions);
+        paginated.Should().NotBeNull();
+        paginated!.Items.Count.Should().BeGreaterThanOrEqualTo(2);
+        paginated.Items.Should().Contain(c => c.Email == "maria.gonzalez@example.com");
+        paginated.Items.Should().Contain(c => c.Email == "carlos.rodriguez@example.com");
     }
 
     [Fact]
@@ -178,6 +178,58 @@ public class ClientsIntegrationTests
         var updatedClient = await context.Clients.IgnoreQueryFilters().AsNoTracking().FirstAsync(c => c.Id == testClient.Id);
         updatedClient.Email.Value.Should().Be("luis.fernandez.updated@example.com");
         updatedClient.Phone.Should().Be("+54 11 3333-9999");
+    }
+
+    [Fact]
+    public async Task DeleteRestoreAndGetDeleted_ShouldBehaveCorrectly()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        
+        var dealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var testClient = new Domain.Clients.Client(
+            dealerId,
+            "SoftDelete",
+            "IntegrationTest",
+            "77889900",
+            "softdelete.test@example.com",
+            "+54 11 9999-8888",
+            "Test Street 123",
+            DateTime.UtcNow);
+        
+        context.Clients.Add(testClient);
+        await context.SaveChangesAsync();
+
+        // 1. Soft Delete
+        var deleteResponse = await client.DeleteAsync($"/api/v1/clients/{testClient.Id}");
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Client should not be returned in regular list
+        var getListResponse = await client.GetAsync("/api/v1/clients");
+        getListResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var activeList = await getListResponse.Content.ReadFromJsonAsync<SharedKernel.PaginatedResult<Application.Clients.GetAll.ClientResponse>>(IntegrationTestHelpers.JsonOptions);
+        activeList!.Items.Should().NotContain(c => c.Id == testClient.Id);
+
+        // 2. Get Deleted Clients
+        var getDeletedResponse = await client.GetAsync("/api/v1/clients/deleted");
+        getDeletedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var deletedList = await getDeletedResponse.Content.ReadFromJsonAsync<SharedKernel.PaginatedResult<Application.Clients.GetAll.ClientResponse>>(IntegrationTestHelpers.JsonOptions);
+        deletedList!.Items.Should().Contain(c => c.Id == testClient.Id);
+
+        // 3. Restore Client
+        var restoreResponse = await client.PostAsync($"/api/v1/clients/{testClient.Id}/restore", new StringContent(string.Empty));
+        restoreResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Verify client is restored (visible in active list again)
+        var getListResponse2 = await client.GetAsync("/api/v1/clients");
+        getListResponse2.StatusCode.Should().Be(HttpStatusCode.OK);
+        var activeList2 = await getListResponse2.Content.ReadFromJsonAsync<SharedKernel.PaginatedResult<Application.Clients.GetAll.ClientResponse>>(IntegrationTestHelpers.JsonOptions);
+        activeList2!.Items.Should().Contain(c => c.Id == testClient.Id);
     }
 }
 

@@ -19,6 +19,7 @@ using SharedKernel;
 using Newtonsoft.Json;
 using Domain.Shared;
 using Infrastructure.Persistence.Configurations.ValueObjects;
+using Domain.Billing;
 
 namespace Infrastructure.Database;
 
@@ -55,6 +56,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Domain.Documents.Document> Documents { get; set; }
     public DbSet<Appointment> Appointments { get; set; }
     public DbSet<BackfillAudit> BackfillAudits { get; set; }
+    public DbSet<DealerSubscription> DealerSubscriptions { get; set; }
+    public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,6 +74,17 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
                 .IsUnique()
                 .HasFilter("is_cover = true")
                 .HasDatabaseName("ux_car_images_car_id_is_cover");
+
+            // Map RowVersion to the Postgres xmin system column (concurrency token).
+            // xmin is a Postgres system column — no CREATE COLUMN in migrations.
+            // The manual migration 20260628_AddDealerSuspensionColumns does NOT include xmin;
+            // this mapping is Postgres-runtime-only.
+            modelBuilder.Entity<DealerSettingsEntity>()
+                .Property(s => s.RowVersion)
+                .HasColumnName("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
         }
 
         // Ignorar DealerId en entidades compartidas (catálogo)
@@ -93,8 +107,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         
         modelBuilder.Entity<Car>().HasQueryFilter(x => 
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
-        modelBuilder.Entity<Client>().HasQueryFilter(x => 
-            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Client>().HasQueryFilter(x =>
+            (!_tenantService.HasTenant || x.DealerId == _tenantService.DealerId) && !x.IsDeleted);
         modelBuilder.Entity<Quote>().HasQueryFilter(x =>
             (!_tenantService.HasTenant || x.DealerId == _tenantService.DealerId) && !x.IsDeleted);
         modelBuilder.Entity<Sale>().HasQueryFilter(x => 
@@ -114,6 +128,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Appointment>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<BackfillAudit>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<DealerSubscription>().HasQueryFilter(x => 
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         // Note: Marca, Modelo, TransactionCategory, CarImage are shared across tenants (catalog data)
     }
@@ -135,19 +151,22 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             {
                 var domainEvents = entity.DomainEvents;
                 entity.ClearDomainEvents();
-                return domainEvents;
+                return domainEvents.Select(ev => (entity, ev));
             })
-            .Select(domainEvent => new OutboxMessage
+            .Select(pair => new OutboxMessage
             {
                 Id = Guid.NewGuid(),
                 OccurredOnUtc = DateTime.UtcNow,
-                Type = domainEvent.GetType().Name,
+                Type = pair.ev.GetType().Name,
                 Content = JsonConvert.SerializeObject(
-                    domainEvent,
+                    pair.ev,
                     new JsonSerializerSettings
                     {
                         TypeNameHandling = TypeNameHandling.None
-                    })
+                    }),
+                AggregateId = pair.entity.Id,
+                AggregateType = pair.entity.GetType().Name,
+                DealerId = pair.entity.DealerId == Guid.Empty ? null : pair.entity.DealerId
             })
             .ToList();
 

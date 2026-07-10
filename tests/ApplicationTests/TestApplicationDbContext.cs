@@ -10,6 +10,7 @@ using Domain.Sales;
 using Domain.Users;
 using Domain.Shared;
 using Domain.Leads;
+using Domain.Billing;
 using Microsoft.EntityFrameworkCore;
 using DealerSettingsEntity = Domain.DealerSettings.DealerSettings;
 
@@ -48,12 +49,20 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<Domain.Documents.Document> Documents => Set<Domain.Documents.Document>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<BackfillAudit> BackfillAudits => Set<BackfillAudit>();
+    public DbSet<DealerSubscription> DealerSubscriptions => Set<DealerSubscription>();
+    public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Apply configurations from the Infrastructure assembly
         // This ensures all entity configurations (including value object conversions) are used
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(Infrastructure.Database.ApplicationDbContext).Assembly);
+
+        // RowVersion is mapped to the Postgres xmin system column (see DealerSettingsConfiguration).
+        // For InMemory provider, the xmin shadow property exists (UseXminAsConcurrencyToken)
+        // but the explicit RowVersion property must be ignored to avoid "no column" errors.
+        // RowVersion will default to 0 for all InMemory entities (accepted in tests).
+        modelBuilder.Entity<DealerSettingsEntity>().Ignore(s => s.RowVersion);
 
         base.OnModelCreating(modelBuilder);
     }

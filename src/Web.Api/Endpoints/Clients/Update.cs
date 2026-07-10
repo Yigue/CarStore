@@ -3,6 +3,7 @@ using Domain.Clients.Attributes;
 using MediatR;
 using SharedKernel;
 using Web.Api.Infrastructure;
+using System.Text.Json.Serialization;
 
 namespace Web.Api.Endpoints.Clients;
 
@@ -21,6 +22,7 @@ internal sealed class Update : IEndpoint
                 request.Phone,
                 request.Address,
                 request.Status,
+                request.Type,
                 request.City,
                 request.ZipCode,
                 request.Notes);
@@ -31,7 +33,7 @@ internal sealed class Update : IEndpoint
                 () => Results.NoContent(),
                 CustomResults.Problem);
         })
-        .HasPermission(Permissions.ClientsUpdate)
+        .HasPermission(Permissions.ClientsWrite)
         .WithTags(Tags.Clients)
         .WithName("UpdateClient")
         .Produces(StatusCodes.Status204NoContent)
@@ -41,6 +43,7 @@ internal sealed class Update : IEndpoint
     }   
 }
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record UpdateClientRequest(
     string FirstName,
     string LastName,
@@ -49,6 +52,7 @@ public sealed record UpdateClientRequest(
     string Phone,
     string Address,
     ClientStatus Status,
+    Domain.Clients.Attributes.ClientType Type,
     string? City = null,
     string? ZipCode = null,
     string? Notes = null);

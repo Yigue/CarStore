@@ -4,7 +4,8 @@ public enum ReportGroupBy
 {
     Day,
     Week,
-    Month
+    Month,
+    Year
 }
 
 /// <summary>
@@ -13,16 +14,20 @@ public enum ReportGroupBy
 /// Shape mirrors the frontend FinancialReportDto (src/types/dashboard).
 /// </summary>
 public sealed record FinancialReportDto(
+    string Currency,
     DateTime From,
     DateTime To,
     string GroupBy,
-    decimal TotalIncome,
-    decimal TotalExpense,
-    decimal NetResult,
-    IReadOnlyList<FinancialReportPeriodDto> ByPeriod);
+    IReadOnlyList<FinancialReportSeriesDto> Series,
+    FinancialReportTotalsDto Totals);
 
-public sealed record FinancialReportPeriodDto(
-    string Period,
+public sealed record FinancialReportSeriesDto(
+    string Bucket,
     decimal Income,
     decimal Expense,
-    decimal Net);
+    decimal Balance);
+
+public sealed record FinancialReportTotalsDto(
+    decimal Income,
+    decimal Expense,
+    decimal Balance);

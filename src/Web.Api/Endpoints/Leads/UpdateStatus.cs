@@ -20,7 +20,7 @@ internal sealed class UpdateStatus : IEndpoint
                 () => Results.NoContent(),
                 CustomResults.Problem);
         })
-        .HasPermission(Permissions.LeadsUpdate)
+        .HasPermission(Permissions.LeadsWrite)
         .WithTags(Tags.Leads)
         .WithName("UpdateLeadStatus")
         .Produces(StatusCodes.Status204NoContent)

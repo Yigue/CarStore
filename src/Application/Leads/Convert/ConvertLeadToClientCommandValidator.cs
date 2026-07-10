@@ -1,3 +1,4 @@
+using Domain.Clients.Attributes;
 using FluentValidation;
 
 namespace Application.Leads.Convert;
@@ -15,5 +16,9 @@ public sealed class ConvertLeadToClientCommandValidator : AbstractValidator<Conv
             .NotEmpty().WithMessage("La dirección es obligatoria para convertir el lead en cliente.")
             .Must(address => !string.IsNullOrWhiteSpace(address))
             .WithMessage("La dirección no puede contener solo espacios en blanco.");
+
+        RuleFor(x => x.Type)
+            .IsInEnum()
+            .WithMessage("El campo 'type' es obligatorio.");
     }
 }

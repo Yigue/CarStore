@@ -26,6 +26,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
     <PackageReference Include="Quartz.AspNetCore" />
     <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="Stripe.net" />
   </ItemGroup>
 
   <ItemGroup>

@@ -14,12 +14,6 @@ internal static class TransactionCategoriesSeeder
     /// </summary>
     public static async Task SeedAsync(IApplicationDbContext context, CancellationToken cancellationToken = default)
     {
-        // Verificar si ya hay categorÃ­as
-        if (context.TransactionCategories.IgnoreQueryFilters().Any())
-        {
-            return;
-        }
-
         var categories = new List<TransactionCategory>
         {
             // Ingresos
@@ -36,6 +30,11 @@ internal static class TransactionCategoriesSeeder
             new TransactionCategory(
                 "Garantía",
                 "Ingresos por servicios de garantía",
+                TransactionType.Income),
+
+            new TransactionCategory(
+                "VehicleSale",
+                "Ingresos por ventas de vehículos del ledger",
                 TransactionType.Income),
 
             // Egresos
@@ -57,10 +56,26 @@ internal static class TransactionCategoriesSeeder
             new TransactionCategory(
                 "Publicidad",
                 "Gastos en publicidad y marketing",
+                TransactionType.Expense),
+
+            new TransactionCategory(
+                "Reconditioning",
+                "Gastos de reacondicionamiento de vehículos del ledger",
                 TransactionType.Expense)
         };
 
-        context.TransactionCategories.AddRange(categories);
+        foreach (var category in categories)
+        {
+            var exists = await context.TransactionCategories
+                .IgnoreQueryFilters()
+                .AnyAsync(c => c.Name == category.Name, cancellationToken);
+
+            if (!exists)
+            {
+                context.TransactionCategories.Add(category);
+            }
+        }
+
         await context.SaveChangesAsync(cancellationToken);
     }
 }

@@ -11,9 +11,28 @@ public class TransactionConfiguration : IEntityTypeConfiguration<FinancialTransa
     {
         builder.HasKey(t => t.Id);
 
+        // REQ-FIN-INDEX-001 + REQ-FIN-LEDGER-001:
+        //   - (DealerId, TransactionDate) — supports the summary endpoint's
+        //     tenant-scoped WHERE + ORDER BY.
+        //   - (DealerId, CategoryId) — supports the toolbar's category filter.
+        //   - (ReconditioningTaskId, SourceId) — partial unique index; DB
+        //     floor for ledger idempotency. The partial filter is applied in
+        //     the generated migration via .HasFilter().
+        builder.HasIndex(t => new { t.DealerId, t.TransactionDate })
+            .HasDatabaseName("IX_transactions_DealerId_TransactionDate");
+
+        builder.HasIndex(t => new { t.DealerId, t.CategoryId })
+            .HasDatabaseName("IX_transactions_DealerId_CategoryId");
+
+        builder.HasIndex(t => new { t.ReconditioningTaskId, t.SourceId })
+            .HasDatabaseName("IX_transactions_ReconditioningTaskId_SourceId")
+            .IsUnique()
+            .HasFilter("\"reconditioning_task_id\" IS NOT NULL AND \"source_id\" IS NOT NULL");
+
         builder.Property(t => t.Amount)
             .HasConversion(new MoneyValueConverter())
             .HasColumnName("amount")
+            .HasPrecision(18, 2)
             .IsRequired();
 
         builder.Property(t => t.Type)

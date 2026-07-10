@@ -1,11 +1,14 @@
 namespace Application.Abstractions;
 
 /// <summary>
-/// Abstraction over the financial ledger. Implementations must be IDEMPOTENT
-/// per <paramref name="sourceId"/> — calling RegisterExpenseAsync twice with the
-/// same sourceId MUST NOT create duplicate entries.
+/// Abstraction over the financial ledger. Implementations MUST be IDEMPOTENT
+/// keyed by the composite <c>(reconditioningTaskId, sourceId)</c> — calling
+/// <see cref="RegisterExpenseAsync"/> twice with the same pair MUST NOT create
+/// duplicate entries. Outbox replays and concurrent handler invocations MUST
+/// converge to one row.
 ///
-/// PHASE-4: real implementation is out of scope; see NoOpFinancialLedgerService.
+/// REQ-FIN-LEDGER-001 (financial/spec.md + enterprise-erp-crm/spec.md
+/// SCENARIO 3.B / 3.D).
 /// </summary>
 public interface IFinancialLedgerService
 {
@@ -15,6 +18,7 @@ public interface IFinancialLedgerService
         string currency,
         string category,
         DateTime occurredAt,
+        Guid reconditioningTaskId,
         Guid sourceId,
         CancellationToken cancellationToken);
 }

@@ -1,6 +1,13 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Clients.GetAll;
+using Application.Clients.Projections;
+using Domain.Clients;
 using Domain.Shared.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -24,33 +31,39 @@ internal sealed class SearchClientsQueryHandler
         var rawTerm = query.SearchTerm ?? string.Empty;
         var searchTerm = rawTerm.ToLower();
 
-        // Email is persisted through a value converter (EmailValueConverter), so EF Core
-        // cannot translate a substring match on it to SQL. Names are matched by substring
-        // in the database; the email is matched exactly when the term is a well-formed
-        // address. Partial-email search is intentionally unsupported with this mapping.
         Email? emailTerm = TryParseEmail(rawTerm);
 
-        var clients = await _context.Clients
+        var dbQuery = _context.Clients
             .AsNoTracking()
-            .Where(c => searchTerm == string.Empty ||
-                        c.FirstName.ToLower().Contains(searchTerm) ||
-                        c.LastName.ToLower().Contains(searchTerm) ||
-                        (emailTerm != null && c.Email == emailTerm))
+            .Include(c => c.Sales)
+            .AsQueryable();
+
+        if (searchTerm != string.Empty)
+        {
+            bool isInMemory = _context is DbContext dbContext && dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+
+            if (isInMemory)
+            {
+                var normalizedSearch = RemoveAccents(searchTerm).ToLowerInvariant();
+                dbQuery = dbQuery.Where(c => 
+                    RemoveAccents(c.FirstName + " " + c.LastName).ToLower().Contains(normalizedSearch) ||
+                    (emailTerm != null && c.Email == emailTerm));
+            }
+            else
+            {
+                var normalizedSearch = RemoveAccents(searchTerm);
+                dbQuery = dbQuery.Where(c => 
+                    EF.Functions.Collate(c.FirstName + " " + c.LastName, "und-u-ks-primary").Contains(normalizedSearch) ||
+                    (emailTerm != null && c.Email == emailTerm));
+            }
+        }
+
+        List<Client> clients = await dbQuery
             .Take(50)
-            .Select(c => new ClientResponse(
-                c.Id,
-                c.FirstName,
-                c.LastName,
-                c.DNI,
-                c.Email.Value,
-                c.Phone,
-                c.Address,
-                c.Status,
-                c.CreatedAt,
-                c.UpdateAt))
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IEnumerable<ClientResponse>>(clients);
+        IEnumerable<ClientResponse> responses = clients.Select(ClientResponseMapper.Map);
+        return Result.Success<IEnumerable<ClientResponse>>(responses);
     }
 
     private static Email? TryParseEmail(string value)
@@ -64,9 +77,21 @@ internal sealed class SearchClientsQueryHandler
         {
             return new Email(value);
         }
-        catch (SharedKernel.DomainException)
+        catch (DomainException)
         {
             return null;
         }
+    }
+
+    private static string RemoveAccents(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return text;
+
+        return new string(text
+            .Normalize(System.Text.NormalizationForm.FormD)
+            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray())
+            .Normalize(System.Text.NormalizationForm.FormC);
     }
 }

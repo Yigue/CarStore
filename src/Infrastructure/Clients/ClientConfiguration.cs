@@ -1,4 +1,5 @@
 using Domain.Clients;
+using Domain.Clients.Attributes;
 using Infrastructure.Persistence.Configurations.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -47,7 +48,7 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
 
         builder.Property(c => c.Notes)
             .HasColumnName("notes")
-            .HasMaxLength(1000);
+            .HasMaxLength(2000);
 
         builder.Property(c => c.Status)
             .HasConversion<string>();
@@ -56,6 +57,30 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
             .HasConversion<string>()
             .HasMaxLength(20)
             .HasDefaultValue(Domain.Clients.Attributes.ClientType.Individual);
+
+        // Soft-delete columns (ADR-2, mirrors Quote pattern)
+        builder.Property(c => c.IsDeleted)
+            .HasColumnName("is_deleted")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.HasIndex(c => c.IsDeleted)
+            .HasDatabaseName("ix_clients_is_deleted");
+
+        builder.Property(c => c.DeletedAtUtc)
+            .HasColumnName("deleted_at_utc");
+
+        builder.Property(c => c.DeletedBy)
+            .HasColumnName("deleted_by");
+
+        // Enrichment columns (REQ-001)
+        builder.Property(c => c.AcquisitionSource)
+            .HasConversion<string>()
+            .HasColumnName("acquisition_source")
+            .HasMaxLength(20);
+
+        builder.Property(c => c.AssignedAgentId)
+            .HasColumnName("assigned_agent_id");
 
         builder.Property(c => c.OriginLeadId);
 

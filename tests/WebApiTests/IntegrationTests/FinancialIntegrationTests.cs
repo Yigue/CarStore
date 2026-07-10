@@ -1,4 +1,5 @@
 using Application.Financial.GetAll;
+using Application.Queries.Financial.GetSummary;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Clients;
@@ -46,7 +47,7 @@ public class FinancialIntegrationTests
             PaymentMethod = (int)PaymentMethod.Cash,
             ReferenceNumber = "REF-2024-001",
             TransactionDate = DateTime.UtcNow,
-            category = category.Id.ToString(),
+            categoryId = category.Id.ToString(),
             CarId = (string?)null,
             ClientId = (string?)null,
             SaleId = (string?)null
@@ -68,6 +69,94 @@ public class FinancialIntegrationTests
         createdTransaction.Type.Should().Be(TransactionType.Income);
         createdTransaction.Amount.Amount.Should().Be(25000m);
         createdTransaction.Category.Name.Should().Be("Venta de Auto");
+    }
+
+    [Fact]
+    public async Task CreateFinancial_WithLegacyCategoryField_Returns400()
+    {
+        // REQ-FIN-FIELD-001: legacy `category` field must be rejected with 400.
+        // The endpoint Request DTO field is `categoryId`; clients that still send
+        // `category` (a previous FE bug) MUST NOT silently bind to the new field.
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var category = await context.TransactionCategories
+            .IgnoreQueryFilters()
+            .FirstAsync(c => c.Name == "Venta de Auto");
+        var request = new
+        {
+            Type = (int)TransactionType.Income,
+            Amount = 100m,
+            Description = "Legacy payload",
+            PaymentMethod = (int)PaymentMethod.Cash,
+            ReferenceNumber = "LEG-001",
+            TransactionDate = DateTime.UtcNow,
+            // Legacy field name — must NOT bind to `categoryId`.
+            category = category.Id.ToString(),
+            CarId = (string?)null,
+            ClientId = (string?)null,
+            SaleId = (string?)null
+        };
+
+        var response = await client.PostAsJsonAsync("/api/v1/financial", request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateFinancialCategories_WithDescription_Persists()
+    {
+        // REQ-FIN-FORM-001 (financial/spec.md + entity-cruds/spec.md):
+        // TransactionCategory.Description is persisted and returned by GET.
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        var newName = $"CAT-{Guid.NewGuid():N}".Substring(0, 16);
+        var request = new
+        {
+            Name = newName,
+            Description = "Servicios profesionales a clientes",
+            Type = (int)TransactionType.Income,
+        };
+
+        var response = await client.PostAsJsonAsync("/api/v1/financial/categories", request, IntegrationTestHelpers.JsonOptions);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Follow-up GET: assert the description echoes back
+        var getResponse = await client.GetAsync("/api/v1/financial/categories");
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var categories = await getResponse.Content.ReadFromJsonAsync<List<TransactionCategory>>(IntegrationTestHelpers.JsonOptions);
+        categories.Should().NotBeNull();
+        var created = categories!.FirstOrDefault(c => c.Name == newName);
+        created.Should().NotBeNull();
+        created!.Description.Should().Be("Servicios profesionales a clientes");
+    }
+
+    [Fact]
+    public async Task CreateFinancialCategories_WithDescriptionExceeding500Chars_Returns400()
+    {
+        // REQ-FIN-FORM-001 + entity-cruds/spec.md: server-side MaximumLength(500).
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        var newName = $"OVR-{Guid.NewGuid():N}".Substring(0, 12);
+        var request = new
+        {
+            Name = newName,
+            Description = new string('x', 501),
+            Type = (int)TransactionType.Income,
+        };
+
+        var response = await client.PostAsJsonAsync("/api/v1/financial/categories", request, IntegrationTestHelpers.JsonOptions);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
@@ -117,7 +206,7 @@ public class FinancialIntegrationTests
             PaymentMethod = (int)PaymentMethod.CreditCard,
             ReferenceNumber = "SRV-2024-001",
             TransactionDate = DateTime.UtcNow,
-            category = category.Id.ToString(),
+            categoryId = category.Id.ToString(),
             CarId = car.Id.ToString(),
             ClientId = (string?)null,
             SaleId = (string?)null
@@ -247,7 +336,7 @@ public class FinancialIntegrationTests
             PaymentMethod = (int)PaymentMethod.Cash,
             ReferenceNumber = "VTA-2024-004",
             TransactionDate = DateTime.UtcNow,
-            category = category.Id.ToString(),
+            categoryId = category.Id.ToString(),
             CarId = car.Id.ToString(),
             ClientId = testClient.Id.ToString(),
             SaleId = sale.Id.ToString()
@@ -271,5 +360,88 @@ public class FinancialIntegrationTests
         createdTransaction.ClientId.Should().Be(testClient.Id);
         createdTransaction.SaleId.Should().Be(sale.Id);
         createdTransaction.Category.Name.Should().Be("Venta de Auto");
+    }
+
+    [Fact]
+    public async Task GET_FinancialSummary_WithFromToQueryParams_ReturnsNarrowedTotals()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var category = await context.TransactionCategories
+            .IgnoreQueryFilters()
+            .FirstAsync(c => c.Name == "Venta de Auto");
+
+        var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
+
+        // Add transaction within the window
+        var txInWindow = new FinancialTransaction(
+            dealerId,
+            TransactionType.Income,
+            2000m,
+            "In window",
+            PaymentMethod.Cash,
+            category,
+            null,
+            null,
+            null,
+            new DateTime(2050, 6, 15, 12, 0, 0, DateTimeKind.Utc));
+
+        // Add transaction outside the window (before)
+        var txBeforeWindow = new FinancialTransaction(
+            dealerId,
+            TransactionType.Income,
+            5000m,
+            "Before window",
+            PaymentMethod.Cash,
+            category,
+            null,
+            null,
+            null,
+            new DateTime(2050, 5, 20, 12, 0, 0, DateTimeKind.Utc));
+
+        // Add transaction outside the window (after)
+        var txAfterWindow = new FinancialTransaction(
+            dealerId,
+            TransactionType.Expense,
+            1000m,
+            "After window",
+            PaymentMethod.Cash,
+            category,
+            null,
+            null,
+            null,
+            new DateTime(2050, 7, 5, 12, 0, 0, DateTimeKind.Utc));
+
+        context.Transactions.AddRange(txInWindow, txBeforeWindow, txAfterWindow);
+        await context.SaveChangesAsync();
+
+        // Query the endpoint
+        var response = await client.GetAsync("/api/v1/financial/summary?from=2050-06-01&to=2050-06-30");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var summary = await response.Content.ReadFromJsonAsync<FinancialSummaryResponse>(IntegrationTestHelpers.JsonOptions);
+        summary.Should().NotBeNull();
+        summary!.TotalIncome.Should().Be(2000m); // only txInWindow
+        summary.TotalExpenses.Should().Be(0m);
+        summary.EntryCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GET_FinancialSummary_WithInvalidDate_Returns400()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        // Query with invalid date
+        var response = await client.GetAsync("/api/v1/financial/summary?from=invalid-date");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }

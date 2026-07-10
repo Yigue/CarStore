@@ -8,4 +8,9 @@ public sealed class OutboxMessage
     public DateTime OccurredOnUtc { get; set; }
     public DateTime? ProcessedOnUtc { get; set; }
     public string? Error { get; set; }
+
+    // Q3A: aggregate routing columns for tenant-scoped activity queries (ADR-3)
+    public Guid? AggregateId { get; set; }
+    public string? AggregateType { get; set; }
+    public Guid? DealerId { get; set; }
 }

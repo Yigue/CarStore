@@ -65,6 +65,8 @@ internal sealed class UpdateDealerSettingsCommandHandler(
             NotificationsEnabled = settings.NotificationsEnabled,
             UpdatedAt = settings.UpdatedAt,
             HostName = settings.HostName,
+            Slug = settings.Slug,
+            IsActive = settings.IsActive,
             CustomDomain = settings.CustomDomain,
             Address = settings.Address,
             PhoneNumber = settings.PhoneNumber,
