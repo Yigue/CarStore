@@ -78,7 +78,7 @@ public static class DependencyInjection
             services.AddScoped<ISubscriptionGateway, NoOpSubscriptionGateway>();
         }
 
-        services.AddScoped<ISubscriptionStatusCache, NoOpSubscriptionStatusCache>();
+        services.AddScoped<ISubscriptionStatusCache, RedisSubscriptionStatusCache>();
         services.AddScoped<IDealerSubscriptionRepository, DealerSubscriptionRepository>();
         services.AddScoped<ProcessedStripeEventRepository>();
 

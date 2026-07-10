@@ -53,6 +53,11 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("Storage__Minio__AccessKey", "minioadmin");
         Environment.SetEnvironmentVariable("Storage__Minio__SecretKey", "minioadmin123");
         Environment.SetEnvironmentVariable("Storage__Minio__BucketName", "cars");
+        
+        // Mock Stripe secrets to bypass SubscriptionEnforcement checks
+        Environment.SetEnvironmentVariable("Stripe__SecretKey", "sk_test_mock");
+        Environment.SetEnvironmentVariable("Stripe__WebhookSecret", "whsec_mock");
+        Environment.SetEnvironmentVariable("Stripe__PriceId", "price_mock");
 
         builder.UseEnvironment("Testing");
 

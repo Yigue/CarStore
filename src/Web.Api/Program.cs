@@ -218,6 +218,12 @@ app.UseTenantResolution();
 // SuperAdmin requests bypass this check via the platform_role claim.
 app.UseDealerSuspensionCheck();
 
+var flags = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<Web.Api.Infrastructure.FeatureFlagsOptions>>().Value;
+if (flags.SubscriptionEnforcement)
+{
+    app.UseSubscriptionGuard();
+}
+
 app.UseAuthorization();
 
 // Mapear endpoints despuÃ©s de configurar middleware
