@@ -49,17 +49,23 @@ namespace Infrastructure.Migrations
             // lock on `dealer_settings`. PostgreSQL requires these statements
             // to run outside a transaction, which is why this migration is
             // separate from the backfill above (which IS transactional).
+            // suppressTransaction is required: EF Core wraps each migration in a
+            // transaction and PostgreSQL rejects CREATE INDEX CONCURRENTLY inside
+            // a transaction block. Being a separate migration is not enough.
             migrationBuilder.Sql(
                 "CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS ux_dealer_settings_host_name "
-                + "ON public.dealer_settings (host_name) WHERE host_name IS NOT NULL;");
+                + "ON public.dealer_settings (host_name) WHERE host_name IS NOT NULL;",
+                suppressTransaction: true);
 
             migrationBuilder.Sql(
                 "CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS ux_dealer_settings_slug "
-                + "ON public.dealer_settings (slug) WHERE slug IS NOT NULL;");
+                + "ON public.dealer_settings (slug) WHERE slug IS NOT NULL;",
+                suppressTransaction: true);
 
             migrationBuilder.Sql(
                 "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_dealer_settings_host_name_active "
-                + "ON public.dealer_settings (host_name) WHERE is_active = true;");
+                + "ON public.dealer_settings (host_name) WHERE is_active = true;",
+                suppressTransaction: true);
         }
 
         /// <inheritdoc />

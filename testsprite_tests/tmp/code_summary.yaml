@@ -2,89 +2,85 @@ version: "2"
 type: backend
 tech_stack:
   - C#
-  - .NET 8
-  - ASP.NET Core Minimal API
+  - ASP.NET Core 8
   - Entity Framework Core
-  - MediatR
   - PostgreSQL
-routes:
-  - path: /api/v1/users/login
-    file: src/Web.Api/Endpoints/Users/Login.cs
-    auth_required: false
-    description: Login to get JWT token
-  - path: /api/v1/cars
-    file: src/Web.Api/Endpoints/Cars/Create.cs
-    auth_required: true
-    description: Create a vehicle
-  - path: /api/v1/leads
-    file: src/Web.Api/Endpoints/Leads/GetAll.cs
-    auth_required: true
-    description: Get all leads
-  - path: /api/v1/leads/{id}
-    file: src/Web.Api/Endpoints/Leads/GetById.cs
-    auth_required: true
-    description: Get a lead by ID
-  - path: /api/v1/leads
-    file: src/Web.Api/Endpoints/Leads/Create.cs
-    auth_required: true
-    description: Create a new lead
-  - path: /api/v1/leads/{id}/status
-    file: src/Web.Api/Endpoints/Leads/UpdateStatus.cs
-    auth_required: true
-    description: Update status of a lead
-  - path: /api/v1/leads/{id}/convert
-    file: src/Web.Api/Endpoints/Leads/Convert.cs
-    auth_required: true
-    description: Convert a lead to a client
-  - path: /api/v1/leads/{id}/vehicle
-    file: src/Web.Api/Endpoints/Leads/LinkVehicle.cs
-    auth_required: true
-    description: Link a vehicle to a lead
-  - path: /api/v1/quotes
-    file: src/Web.Api/Endpoints/Quotes/Create.cs
-    auth_required: true
-    description: Create a quote
-  - path: /api/v1/quotes/{id}/accept
-    file: src/Web.Api/Endpoints/Quotes/Accept.cs
-    auth_required: true
-    description: Accept a quote
+  - MediatR (CQRS)
+  - FluentValidation
 features:
-  - name: CRM Lead Management
-    description: Full lifecycle of leads from capture to conversion and status updates
+  - name: Inventory Management API
+    description: CRUD operations for vehicles and images
     files:
+      - src/Web.Api/Endpoints/Cars/Create.cs
+      - src/Web.Api/Endpoints/Cars/Update.cs
+      - src/Web.Api/Endpoints/Cars/GetById.cs
+      - src/Web.Api/Endpoints/Cars/Delete.cs
+    endpoints:
+      - method: GET
+        path: /api/v1/cars
+        description: List all vehicles
+        auth_required: true
+        response_schema:
+          "200": PaginatedResult<CarResponse>
+      - method: POST
+        path: /api/v1/cars
+        description: Create a new vehicle
+        auth_required: true
+        request_schema:
+          body:
+            marca: string
+            modelo: string
+            patente: string
+        response_schema:
+          "200": string (Guid)
+          "400": Validation error
+      - method: PUT
+        path: /api/v1/cars/{id}
+        description: Update a vehicle
+        auth_required: true
+        request_schema:
+          body:
+            marca: string
+            modelo: string
+        response_schema:
+          "204": NoContent
+          "400": Validation error
+          "404": NotFound
+  - name: CRM API
+    description: Management of Clients and Leads
+    files:
+      - src/Web.Api/Endpoints/Clients/Create.cs
       - src/Web.Api/Endpoints/Leads/Create.cs
-      - src/Web.Api/Endpoints/Leads/UpdateStatus.cs
-      - src/Web.Api/Endpoints/Leads/LinkVehicle.cs
-      - src/Web.Api/Endpoints/Leads/Convert.cs
-    entry_route: /api/v1/leads
-    user_interactions:
-      - Create a new lead with vehicle and contact info
-      - Link interested vehicle to the lead
-      - Update lead status
-      - Convert lead to client
-    api_calls:
+    endpoints:
+      - method: GET
+        path: /api/v1/clients
+        description: List clients
+        auth_required: true
+        response_schema:
+          "200": PaginatedResult<ClientResponse>
       - method: POST
-        endpoint: /api/v1/leads
-      - method: PATCH
-        endpoint: /api/v1/leads/{id}/status
-      - method: PATCH
-        endpoint: /api/v1/leads/{id}/vehicle
-      - method: POST
-        endpoint: /api/v1/leads/{id}/convert
-    auth_required: true
-  - name: CRM Quotes & Deals
-    description: Creating and accepting quotes to close sales and automatically convert leads
+        path: /api/v1/clients
+        description: Create a client
+        auth_required: true
+        request_schema:
+          body:
+            firstName: string
+            lastName: string
+        response_schema:
+          "200": string (Guid)
+  - name: Finance API
+    description: Management of Financial Transactions
     files:
-      - src/Web.Api/Endpoints/Quotes/Create.cs
-      - src/Web.Api/Endpoints/Quotes/Accept.cs
-    entry_route: /api/v1/quotes
-    user_interactions:
-      - Create quote for a lead or client
-      - Accept quote which triggers domain event to update lead status and create client
-    api_calls:
+      - src/Web.Api/Endpoints/Financial/Create.cs
+    endpoints:
       - method: POST
-        endpoint: /api/v1/quotes
-      - method: POST
-        endpoint: /api/v1/quotes/{id}/accept
-    auth_required: true
+        path: /api/v1/financial
+        description: Create a financial transaction
+        auth_required: true
+        request_schema:
+          body:
+            amount: number
+            type: string
+        response_schema:
+          "200": string (Guid)
 known_limitations: []

@@ -95,7 +95,8 @@ internal static class UsersSeeder
             "leads:read", "leads:create", "leads:update", "leads:delete",
             "leads:write", "leads:archive",
             "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
-            "admin:backfill"
+            "admin:backfill",
+            "webhooks:manage"
         };
 
         // Reconcile: add any permissions the admin is missing. Self-heals when new
@@ -154,22 +155,32 @@ internal static class UsersSeeder
             await context.SaveChangesAsync(cancellationToken);
         }
 
-        if (!context.UserPermissions
-            .IgnoreQueryFilters()
-            .Any(p => p.UserId == empleado.Id))
+        var empleadoPermissions = new List<string>
         {
-            var empleadoPermissions = new List<string>
-            {
-                "cars:read",
-                "clients:read",
-                "sales:read",
-                "quotes:read",
-                "quotes:create",
-                "leads:read",
-                "appointments:read"
-            };
+            "cars:read",
+            "clients:read",
+            "sales:read",
+            "sales:create",
+            "sales:update",
+            "quotes:read",
+            "quotes:create",
+            "leads:read",
+            "appointments:read"
+        };
 
-            foreach (var permission in empleadoPermissions)
+        // Reconcile: add any permissions the empleado is missing. Self-heals when new
+        // permissions are introduced (e.g. sales:create/sales:update) without a fresh
+        // re-seed, since the all-or-nothing guard used to skip existing empleados entirely.
+        var existingEmpleadoPermissions = context.UserPermissions
+            .IgnoreQueryFilters()
+            .Where(p => p.UserId == empleado.Id)
+            .Select(p => p.Permission)
+            .ToHashSet();
+
+        var missingEmpleadoPermissions = empleadoPermissions.Where(p => !existingEmpleadoPermissions.Contains(p)).ToList();
+        if (missingEmpleadoPermissions.Count > 0)
+        {
+            foreach (var permission in missingEmpleadoPermissions)
             {
                 context.UserPermissions.Add(new UserPermission(empleado.Id, permission));
             }

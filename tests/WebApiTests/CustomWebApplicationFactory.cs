@@ -68,9 +68,13 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll<ApplicationDbContext>();
             services.RemoveAll<IApplicationDbContext>();
 
-            // Registrar el DbContext con Sqlite real
+            // Registrar el DbContext con Sqlite real.
+            // UseSnakeCaseNamingConvention must match production's Npgsql registration
+            // (DependencyInjection.cs) — raw-SQL filtered indexes reference physical
+            // snake_case column names and silently produce an empty schema on EnsureCreated
+            // if the convention is missing here.
             services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlite(_connection));
+                options.UseSqlite(_connection).UseSnakeCaseNamingConvention());
 
             services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 

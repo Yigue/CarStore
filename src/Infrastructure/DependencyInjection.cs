@@ -393,9 +393,41 @@ services.AddDbContext<ApplicationDbContext>(
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(5)
                                 .RepeatForever()));
+
+            // Job 4: Dispatch outgoing webhook deliveries (retry/backoff state lives on
+            // WebhookDelivery rows — see Domain.Webhooks.WebhookRetryPolicy).
+            var webhookDispatchJobKey = new JobKey(nameof(DispatchWebhookDeliveriesJob));
+            configure
+                .AddJob<DispatchWebhookDeliveriesJob>(opts => opts.WithIdentity(webhookDispatchJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(webhookDispatchJobKey)
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInSeconds(15)
+                                .RepeatForever()));
+
+            // Job 5: Lost-lead re-engagement (disabled by default — Crm:Reengagement:Enabled).
+            var reengagementJobKey = new JobKey(nameof(LeadReengagementJob));
+            configure
+                .AddJob<LeadReengagementJob>(opts => opts.WithIdentity(reengagementJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(reengagementJobKey)
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInHours(24)
+                                .RepeatForever()));
         });
 
         services.AddQuartzHostedService();
+
+        // Named client for outgoing webhook deliveries — short timeout so a slow/unreachable
+        // tenant endpoint can never stall the dispatcher job.
+        services.AddHttpClient(DispatchWebhookDeliveriesJob.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+
+        // Crm:Reengagement:Enabled defaults to false — see CrmReengagementOptions.
+        services.AddOptions<CrmReengagementOptions>()
+            .BindConfiguration(CrmReengagementOptions.SectionName);
 
         return services;
     }

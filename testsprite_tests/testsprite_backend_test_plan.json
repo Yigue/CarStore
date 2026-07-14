@@ -1,32 +1,52 @@
 [
   {
     "id": "TC001",
-    "title": "createleadwithvehicleandcontactinfo",
-    "description": "Test creating a new lead with valid contact and vehicle information via POST /api/v1/leads and verify the lead is created successfully."
+    "title": "create_vehicle_with_valid_data",
+    "description": "Test POST /api/v1/cars with valid marca, modelo, and patente to ensure a vehicle is created successfully and a 200 response with the vehicle Guid is returned."
   },
   {
     "id": "TC002",
-    "title": "updateleadstatuswithvaliddata",
-    "description": "Test updating the status of an existing lead using PATCH /api/v1/leads/{id}/status with valid status data and verify the status is updated correctly."
+    "title": "create_vehicle_with_duplicate_patente",
+    "description": "Test POST /api/v1/cars with a patente that already exists to verify the API returns a 400 validation error and does not create a duplicate vehicle."
   },
   {
     "id": "TC003",
-    "title": "linkvehicletolead",
-    "description": "Test linking a vehicle to an existing lead via PATCH /api/v1/leads/{id}/vehicle and verify the vehicle is associated with the lead."
+    "title": "update_vehicle_with_valid_data",
+    "description": "Test PUT /api/v1/cars/{id} with valid update data to confirm the vehicle is updated successfully and a 204 NoContent response is returned."
   },
   {
     "id": "TC004",
-    "title": "convertleadtoclient",
-    "description": "Test converting a lead to a client using POST /api/v1/leads/{id}/convert with JSON body {'dni': '12345678', 'address': '123 Main St'} and verify the lead is converted and client record is created."
+    "title": "update_vehicle_with_nonexistent_id",
+    "description": "Test PUT /api/v1/cars/{id} using a nonexistent vehicle id to ensure the API returns a 404 NotFound response."
   },
   {
     "id": "TC005",
-    "title": "createquoteforleadorclient",
-    "description": "Test creating a new quote for a lead or client via POST /api/v1/quotes and verify the quote is created with Pending status."
+    "title": "list_vehicles_with_authentication",
+    "description": "Test GET /api/v1/cars with a valid authentication token to verify the API returns a 200 response with a paginated list of vehicles."
   },
   {
     "id": "TC006",
-    "title": "acceptquoteandtriggerdomainevents",
-    "description": "Test accepting a quote using POST /api/v1/quotes/{id}/accept and verify the quote status changes to Accepted and related domain events update lead status and create client as expected."
+    "title": "list_clients_with_authentication",
+    "description": "Test GET /api/v1/clients with a valid auth token to ensure the API returns a 200 response with a paginated list of clients."
+  },
+  {
+    "id": "TC007",
+    "title": "create_client_with_valid_data",
+    "description": "Test POST /api/v1/clients with valid firstName and lastName to verify a client is created successfully and a 200 response with the client Guid is returned."
+  },
+  {
+    "id": "TC008",
+    "title": "create_client_with_missing_name_fields",
+    "description": "Test POST /api/v1/clients with missing firstName or lastName to confirm the API returns a 400 validation or request error."
+  },
+  {
+    "id": "TC009",
+    "title": "create_financial_transaction_with_valid_data",
+    "description": "Test POST /api/v1/financial with valid amount and type to ensure a financial transaction is created successfully and a 200 response with the transaction Guid is returned."
+  },
+  {
+    "id": "TC010",
+    "title": "create_financial_transaction_with_invalid_data",
+    "description": "Test POST /api/v1/financial with invalid amount or missing required fields to verify the API returns a 400 validation error."
   }
 ]

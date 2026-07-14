@@ -1,10 +1,12 @@
 using System.Data;
 using Application.Abstractions.Data;
 using Domain.Shared;
+using Domain.Webhooks;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Quartz;
 
 using SharedKernel;
@@ -84,6 +86,25 @@ public class ProcessOutboxMessagesJob(
                 continue;
             }
 
+            // Outgoing webhooks: fan out to tenant subscriptions before publishing so a
+            // failing in-process MediatR handler never blocks external delivery. Enqueue
+            // is idempotent (checked against WebhookDelivery.EventId) so re-reads of a
+            // still-unprocessed message on the next tick never double-enqueue.
+            if (outboxMessage.DealerId is Guid dealerId)
+            {
+                if (WebhookEventCatalog.FromDomainEventTypeName.TryGetValue(outboxMessage.Type, out string? catalogEventType))
+                {
+                    await EnqueueWebhookDeliveriesAsync(dealerId, outboxMessage, catalogEventType, context.CancellationToken);
+                }
+            }
+            else if (WebhookEventCatalog.FromDomainEventTypeName.ContainsKey(outboxMessage.Type))
+            {
+                logger.LogWarning(
+                    "Outbox message {MessageId} of type {EventType} is webhook-catalogued but has no DealerId — skipping webhook fan-out.",
+                    outboxMessage.Id,
+                    outboxMessage.Type);
+            }
+
             try
             {
                 await publisher.Publish(domainEvent, context.CancellationToken);
@@ -97,5 +118,73 @@ public class ProcessOutboxMessagesJob(
         }
 
         await dbContext.SaveChangesAsync(context.CancellationToken);
+    }
+
+    /// <remarks>internal (not private) so ApplicationTests (Infrastructure InternalsVisibleTo target)
+    /// can exercise the enqueue/idempotency/tenant-filtering logic without standing up a Quartz
+    /// IJobExecutionContext.</remarks>
+    internal async Task EnqueueWebhookDeliveriesAsync(
+        Guid dealerId,
+        OutboxMessage outboxMessage,
+        string eventType,
+        CancellationToken cancellationToken)
+    {
+        List<WebhookSubscription> subscriptions = await dbContext.WebhookSubscriptions
+            .IgnoreQueryFilters() // background job runs without tenant context
+            .Where(s => s.DealerId == dealerId && s.IsActive)
+            .ToListAsync(cancellationToken);
+
+        if (subscriptions.Count == 0)
+        {
+            return;
+        }
+
+        List<WebhookSubscription> matching = subscriptions
+            .Where(s => s.IsSubscribedTo(eventType))
+            .ToList();
+
+        if (matching.Count == 0)
+        {
+            return;
+        }
+
+        List<Guid> subscriptionIds = matching.Select(s => s.Id).ToList();
+
+        HashSet<Guid> alreadyEnqueued = (await dbContext.WebhookDeliveries
+                .IgnoreQueryFilters()
+                .Where(d => d.EventId == outboxMessage.Id && subscriptionIds.Contains(d.SubscriptionId))
+                .Select(d => d.SubscriptionId)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        // Envelope wraps the already-serialized domain event (JRaw) so the wire payload is
+        // stable and independent of how the outbox stored it.
+        string payload = JsonConvert.SerializeObject(new
+        {
+            @event = eventType,
+            occurredAt = outboxMessage.OccurredOnUtc,
+            dealerId,
+            data = new JRaw(outboxMessage.Content)
+        });
+
+        DateTime now = DateTime.UtcNow;
+
+        foreach (WebhookSubscription subscription in matching)
+        {
+            if (alreadyEnqueued.Contains(subscription.Id))
+            {
+                continue;
+            }
+
+            WebhookDelivery delivery = WebhookDelivery.Create(
+                dealerId,
+                subscription.Id,
+                outboxMessage.Id,
+                eventType,
+                payload,
+                now);
+
+            dbContext.WebhookDeliveries.Add(delivery);
+        }
     }
 }

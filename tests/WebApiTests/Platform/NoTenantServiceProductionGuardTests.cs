@@ -71,7 +71,7 @@ public class NoTenantServiceProductionGuardTests
                 services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
                 services.RemoveAll<ApplicationDbContext>();
                 services.RemoveAll<IApplicationDbContext>();
-                services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connection));
+                services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connection).UseSnakeCaseNamingConvention());
                 services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
                 // Replace storage with no-op fake to avoid Minio dependency.

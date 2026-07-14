@@ -63,6 +63,10 @@ internal sealed class CreateFinancialCommandHandler(
         {
             return Result.Failure<Guid>(FinancialErrors.AttributesInvalid());
         }
+        
+        // Attach the category since it comes from the cache and is untracked.
+        // Otherwise, EF Core will try to re-insert it and throw a unique constraint violation.
+        context.TransactionCategories.Attach(category);
 
         var financial = new FinancialTransaction(
             tenantService.DealerId,

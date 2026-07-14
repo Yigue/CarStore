@@ -17,6 +17,7 @@ public sealed class Sale : Entity
     public Client Client { get; private set; }
     public Guid? QuoteId { get; private set; }
     public Guid? LeadId { get; private set; }
+    public Guid? SalespersonId { get; private set; }
     public Money FinalPrice { get; private set; }
     public SaleStatus Status { get; private set; }
     public PaymentMethod PaymentMethod { get; private set; }
@@ -40,7 +41,8 @@ public sealed class Sale : Entity
         string comments,
         DateTime saleDate,
         Guid? leadId = null,
-        Guid? quoteId = null)
+        Guid? quoteId = null,
+        Guid? salespersonId = null)
     {
         SetDealer(dealerId);
         Id = Guid.NewGuid();
@@ -48,6 +50,7 @@ public sealed class Sale : Entity
         ClientId = clientId;
         LeadId = leadId;
         QuoteId = quoteId;
+        SalespersonId = salespersonId;
         FinalPrice = new Money(finalPrice);
         PaymentMethod = paymentMethod;
         ContractNumber = contractNumber;
@@ -55,7 +58,7 @@ public sealed class Sale : Entity
         Status = SaleStatus.Pending;
         SaleDate = saleDate;
 
-        Raise(new SaleCreatedDomainEvent(Id, CarId, ClientId, FinalPrice));
+        Raise(new SaleCreatedDomainEvent(Id, CarId, ClientId, FinalPrice, LeadId));
     }
 
     public void Complete()
@@ -107,5 +110,14 @@ public sealed class Sale : Entity
         PaymentMethod = paymentMethod;
         ContractNumber = contractNumber;
         Comments = comments;
+    }
+
+    /// <summary>
+    /// Assigns (or reassigns) the salesperson who closed this sale. Nullable — a sale
+    /// can be recorded without a salesperson on file.
+    /// </summary>
+    public void AssignSalesperson(Guid? salespersonId)
+    {
+        SalespersonId = salespersonId;
     }
 }

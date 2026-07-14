@@ -20,6 +20,13 @@ public sealed class Lead : Entity
     public Guid? ConvertedClientId { get; private set; }
     public LeadLossReason? LossReason { get; private set; }
 
+    /// <summary>
+    /// UTC timestamp of the one-shot re-engagement email sent to Perdido leads
+    /// (see <c>Infrastructure.BackgroundJobs.LeadReengagementJob</c>). Null until sent;
+    /// once set, this lead is never re-engaged again (v1: one email ever per lead).
+    /// </summary>
+    public DateTime? ReengagementSentAtUtc { get; private set; }
+
     // Required by EF Core
     private Lead()
     {
@@ -140,6 +147,17 @@ public sealed class Lead : Entity
             throw new DomainException("ClientId cannot be empty when marking a lead as converted.");
 
         ConvertedClientId = clientId;
+    }
+
+    /// <summary>
+    /// Stamps the one-shot lost-lead re-engagement email as sent. Called only from
+    /// <c>Infrastructure.BackgroundJobs.LeadReengagementJob</c> after the email was
+    /// accepted by the mail server — never before, so a transient SMTP failure leaves
+    /// the lead eligible again on the next run instead of silently losing the outreach.
+    /// </summary>
+    public void MarkReengagementSent(DateTime sentAtUtc)
+    {
+        ReengagementSentAtUtc = sentAtUtc;
     }
 
     /// <summary>

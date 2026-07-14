@@ -8,7 +8,9 @@ public sealed class CalculateFinancingEndpoint : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/v1/financing/calculate", async (
+        // Relative path: IEndpoints are mapped onto the versioned group
+        // (api/v{version}), so an absolute /api/v1 path would double-prefix.
+        app.MapPost("financing/calculate", async (
             FinancingCalculationRequest request,
             ISender sender,
             CancellationToken ct) =>

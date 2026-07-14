@@ -15,8 +15,10 @@ internal sealed class Update : IEndpoint
     decimal FinalPrice,
     int PaymentMethod,
     int Status,
-    string ContractNumber,
-    string Comments);
+    // Optional: omitted/null keeps the existing value on the sale.
+    string? ContractNumber = null,
+    string? Comments = null,
+    Guid? SalespersonId = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -28,7 +30,8 @@ internal sealed class Update : IEndpoint
                 (PaymentMethod)request.PaymentMethod,
                 (SaleStatus)request.Status,
                 request.ContractNumber,
-                request.Comments);
+                request.Comments,
+                request.SalespersonId);
 
             Result result = await sender.Send(command, cancellationToken);
 

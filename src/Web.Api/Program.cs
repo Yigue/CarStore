@@ -126,6 +126,19 @@ builder.Services.AddCors(options =>
 
 WebApplication app = builder.Build();
 
+// Migration runner mode: when Migration:RunAndExit is true, apply pending EF Core
+// migrations and exit cleanly WITHOUT starting the web host. Intended for one-off
+// migration containers/jobs (e.g. an init container before the app rollout).
+// Default behavior is unchanged when the flag is absent or false.
+bool migrationRunAndExit = false;
+bool.TryParse(app.Configuration["Migration:RunAndExit"], out migrationRunAndExit);
+if (migrationRunAndExit)
+{
+    app.Logger.LogInformation("Migration:RunAndExit is enabled — applying migrations and exiting without starting the web host.");
+    app.ApplyMigrations();
+    return;
+}
+
 // Fail fast if the JWT signing key is missing or still set to the committed placeholder.
 // The secret MUST be provided at runtime via the Jwt__Secret environment variable,
 // a secrets manager, or dotnet user-secrets — never committed to source control.

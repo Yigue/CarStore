@@ -19,9 +19,11 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
         // provisioning cannot race past an app-level check). PostgreSQL partial
         // unique index ignores rows with NULL HostName so legacy seed rows
         // without a subdomain continue to work.
+        // HasFilter is raw SQL: it bypasses the snake_case naming convention,
+        // so it must reference the physical column name (host_name).
         builder.HasIndex(s => s.HostName)
             .IsUnique()
-            .HasFilter("\"HostName\" IS NOT NULL")
+            .HasFilter("host_name IS NOT NULL")
             .HasDatabaseName("IX_DealerSettings_HostName_Unique");
 
         builder.Property(s => s.DealerName)
@@ -126,16 +128,16 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
         builder.HasIndex(s => s.HostName)
             .HasDatabaseName("ux_dealer_settings_host_name")
             .IsUnique()
-            .HasFilter("\"HostName\" IS NOT NULL");
+            .HasFilter("host_name IS NOT NULL");
 
         builder.HasIndex(s => s.Slug)
             .HasDatabaseName("ux_dealer_settings_slug")
             .IsUnique()
-            .HasFilter("\"Slug\" IS NOT NULL");
+            .HasFilter("slug IS NOT NULL");
 
         builder.HasIndex(s => new { s.HostName, s.IsActive })
             .HasDatabaseName("ix_dealer_settings_host_name_active_lookup")
             .IsUnique(false)
-            .HasFilter("\"IsActive\" = true");
+            .HasFilter("is_active = true");
     }
 }

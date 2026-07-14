@@ -28,22 +28,31 @@ internal sealed class UpdateSaleCommandHandler(
             return Result.Failure<Guid>(SalesErrors.CannotEditNonPending(command.Id));
         }
 
+        // Only overwrite ContractNumber/Comments when the caller actually sent a value —
+        // both are optional on update, so a null keeps the sale's current value.
+        string contractNumber = command.ContractNumber ?? sale.ContractNumber;
+        string comments = command.Comments ?? sale.Comments;
+
+        // Same "null keeps current value" convention as ContractNumber/Comments above —
+        // there is currently no way to explicitly clear a previously assigned salesperson.
+        sale.AssignSalesperson(command.SalespersonId ?? sale.SalespersonId);
+
         switch (command.Status)
         {
             case SaleStatus.Pending:
                 sale.Update(
                     command.FinalPrice,
                     command.PaymentMethod,
-                    command.ContractNumber,
-                    command.Comments);
+                    contractNumber,
+                    comments);
                 break;
 
             case SaleStatus.Completed:
                 sale.Update(
                     command.FinalPrice,
                     command.PaymentMethod,
-                    command.ContractNumber,
-                    command.Comments);
+                    contractNumber,
+                    comments);
                 sale.Complete();
                 break;
 

@@ -754,12 +754,12 @@ namespace Infrastructure.Migrations
                     b.HasIndex("HostName")
                         .IsUnique()
                         .HasDatabaseName("IX_DealerSettings_HostName_Unique")
-                        .HasFilter("\"HostName\" IS NOT NULL");
+                        .HasFilter("host_name IS NOT NULL");
 
                     b.HasIndex("HostName")
                         .IsUnique()
                         .HasDatabaseName("ux_dealer_settings_host_name")
-                        .HasFilter("\"HostName\" IS NOT NULL");
+                        .HasFilter("host_name IS NOT NULL");
 
                     b.HasIndex("IsActive")
                         .HasDatabaseName("ix_dealer_settings_is_active");
@@ -767,11 +767,11 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Slug")
                         .IsUnique()
                         .HasDatabaseName("ux_dealer_settings_slug")
-                        .HasFilter("\"Slug\" IS NOT NULL");
+                        .HasFilter("slug IS NOT NULL");
 
                     b.HasIndex("HostName", "IsActive")
                         .HasDatabaseName("ix_dealer_settings_host_name_active_lookup")
-                        .HasFilter("\"IsActive\" = true");
+                        .HasFilter("is_active = true");
 
                     b.ToTable("dealer_settings", "public");
                 });
@@ -1022,6 +1022,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("phone");
 
+                    b.Property<DateTime?>("ReengagementSentAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reengagement_sent_at_utc");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -1190,6 +1194,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("sale_date");
 
+                    b.Property<Guid?>("SalespersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("salesperson_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1209,6 +1217,9 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("QuoteId")
                         .HasDatabaseName("ix_sales_quote_id");
+
+                    b.HasIndex("SalespersonId")
+                        .HasDatabaseName("ix_sales_salesperson_id");
 
                     b.ToTable("sales", "public");
                 });
@@ -1410,6 +1421,125 @@ namespace Infrastructure.Migrations
                         .HasDatabaseName("ix_user_permissions_user_id_permission");
 
                     b.ToTable("UserPermissions", "public");
+                });
+
+            modelBuilder.Entity("Domain.Webhooks.WebhookDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTime?>("DeliveredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered_at_utc");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<int?>("LastStatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_status_code");
+
+                    b.Property<DateTime>("NextRetryAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_retry_at_utc");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_webhook_deliveries");
+
+                    b.HasIndex("Status", "NextRetryAtUtc")
+                        .HasDatabaseName("ix_webhook_deliveries_status_next_retry");
+
+                    b.HasIndex("SubscriptionId", "EventId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_webhook_deliveries_subscription_event");
+
+                    b.ToTable("webhook_deliveries", "public");
+                });
+
+            modelBuilder.Entity("Domain.Webhooks.WebhookSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("EventTypes")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("event_types");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Secret")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("secret");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("url");
+
+                    b.HasKey("Id")
+                        .HasName("pk_webhook_subscriptions");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_webhook_subscriptions_dealer_id");
+
+                    b.ToTable("webhook_subscriptions", "public");
                 });
 
             modelBuilder.Entity("Domain.Appointments.Appointment", b =>
@@ -1736,6 +1866,16 @@ namespace Infrastructure.Migrations
                         .HasConstraintName("fk_user_permissions_users_user_id");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Domain.Webhooks.WebhookDelivery", b =>
+                {
+                    b.HasOne("Domain.Webhooks.WebhookSubscription", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_webhook_deliveries_webhook_subscriptions_subscription_id");
                 });
 
             modelBuilder.Entity("Domain.Cars.Attributes.Marca", b =>

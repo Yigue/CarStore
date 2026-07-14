@@ -85,4 +85,65 @@ public class UpdateSaleCommandHandlerTests
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Be(SalesErrors.CannotEditNonPending(sale.Id));
     }
+
+    [Fact]
+    public async Task Handle_Should_KeepExistingContractNumberAndComments_When_NotProvided()
+    {
+        // Bug 3: ContractNumber/Comments are optional on update. A null value must NOT
+        // overwrite the sale's existing value with an empty string.
+        using var context = CreateContext();
+        var sale = NewPendingSale();
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateSaleCommandHandler(context);
+        var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var updated = await context.Sales.FirstAsync(s => s.Id == sale.Id);
+        updated.FinalPrice.Amount.Should().Be(12345m);
+        updated.ContractNumber.Should().Be("CN-1");
+        updated.Comments.Should().Be("initial");
+    }
+
+    [Fact]
+    public async Task Handle_Should_AssignSalesperson_When_Provided()
+    {
+        using var context = CreateContext();
+        var sale = NewPendingSale();
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var salespersonId = Guid.NewGuid();
+        var handler = new UpdateSaleCommandHandler(context);
+        var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending, SalespersonId: salespersonId);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var updated = await context.Sales.FirstAsync(s => s.Id == sale.Id);
+        updated.SalespersonId.Should().Be(salespersonId);
+    }
+
+    [Fact]
+    public async Task Handle_Should_KeepExistingSalesperson_When_NotProvided()
+    {
+        using var context = CreateContext();
+        var sale = NewPendingSale();
+        var originalSalespersonId = Guid.NewGuid();
+        sale.AssignSalesperson(originalSalespersonId);
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateSaleCommandHandler(context);
+        var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var updated = await context.Sales.FirstAsync(s => s.Id == sale.Id);
+        updated.SalespersonId.Should().Be(originalSalespersonId);
+    }
 }

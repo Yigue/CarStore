@@ -36,6 +36,14 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
 
         builder.Property(s => s.LeadId);
 
+        // No hard FK to Users — mirrors Lead.AssignedAgentId / Client.AssignedAgentId
+        // convention (agent references stay a plain column + index, not a constrained FK).
+        builder.Property(s => s.SalespersonId)
+            .HasColumnName("salesperson_id");
+
+        builder.HasIndex(s => s.SalespersonId)
+            .HasDatabaseName("ix_sales_salesperson_id");
+
         builder.HasOne(s => s.Car)
             .WithMany()
             .HasForeignKey(s => s.CarId)

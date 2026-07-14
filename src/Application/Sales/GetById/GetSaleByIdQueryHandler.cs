@@ -23,6 +23,13 @@ internal sealed class GetSaleByIdQueryHandler(IApplicationDbContext context)
             return Result.Failure<SaleResponse>(SalesErrors.NotFound(query.Id));
         }
 
+        string? salespersonName = sale.SalespersonId is { } salespersonId
+            ? await context.Users
+                .Where(u => u.Id == salespersonId)
+                .Select(u => u.FirstName + " " + u.LastName)
+                .FirstOrDefaultAsync(cancellationToken)
+            : null;
+
         var response = new SaleResponse
         {
             Id = sale.Id,
@@ -30,6 +37,7 @@ internal sealed class GetSaleByIdQueryHandler(IApplicationDbContext context)
             ClientId = sale.ClientId,
             QuoteId = sale.QuoteId,
             LeadId = sale.LeadId,
+            SalespersonId = sale.SalespersonId,
             FinalPrice = sale.FinalPrice.Amount,
             PaymentMethod = sale.PaymentMethod.ToString(),
             Status = sale.Status.ToString(),
@@ -39,6 +47,7 @@ internal sealed class GetSaleByIdQueryHandler(IApplicationDbContext context)
             CarBrand = sale.Car.Marca.Nombre,
             CarModel = sale.Car.Modelo.Nombre,
             ClientName = $"{sale.Client.FirstName} {sale.Client.LastName}",
+            SalespersonName = salespersonName,
         };
 
         return response;

@@ -29,5 +29,9 @@ public static class SalesErrors
     public static Error AlreadyConvertedFromQuote(Guid quoteId) => Error.Conflict(
         "Sales.AlreadyConvertedFromQuote",
         $"The quote with Id = '{quoteId}' has already been converted into a sale.");
+
+    public static Error CannotDeleteCompleted(Guid saleId) => Error.Conflict(
+        "Sales.CannotDeleteCompleted",
+        $"The sale with Id = '{saleId}' cannot be deleted because it is Completed. Completed sales have a linked financial transaction.");
 }
 

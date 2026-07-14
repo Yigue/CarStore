@@ -11,6 +11,7 @@ using Domain.Users;
 using Domain.Shared;
 using Domain.Leads;
 using Domain.Billing;
+using Domain.Webhooks;
 using Microsoft.EntityFrameworkCore;
 using DealerSettingsEntity = Domain.DealerSettings.DealerSettings;
 
@@ -51,6 +52,8 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<BackfillAudit> BackfillAudits => Set<BackfillAudit>();
     public DbSet<DealerSubscription> DealerSubscriptions => Set<DealerSubscription>();
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
+    public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

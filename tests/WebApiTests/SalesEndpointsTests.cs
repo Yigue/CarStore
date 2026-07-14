@@ -55,8 +55,10 @@ public class SalesEndpointsTests
         var saleId = result!.id;
 
         context.Sales.IgnoreQueryFilters().Should().ContainSingle(s => s.Id == saleId);
+        // Bug 1 fix: sales are no longer force-completed at creation. Without an
+        // explicit Status the sale stays Pending and the car is reserved (not sold).
         var updatedCar = await context.Cars.IgnoreQueryFilters().AsNoTracking().FirstAsync(c => c.Id == car.Id);
-        updatedCar.ServiceCar.Should().Be(StatusServiceCar.Vendido);
+        updatedCar.ServiceCar.Should().Be(StatusServiceCar.Reservado);
 
         var get = await http.GetAsync($"/api/v1/sales/{saleId}");
         get.StatusCode.Should().Be(HttpStatusCode.OK);

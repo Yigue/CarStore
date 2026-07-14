@@ -92,11 +92,12 @@ public class SalesIntegrationTests
         createdSale.ClientId.Should().Be(testClient.Id);
         createdSale.FinalPrice.Amount.Should().Be(22000m);
         createdSale.PaymentMethod.Should().Be(PaymentMethod.Cash);
-        createdSale.Status.Should().Be(SaleStatus.Completed);
-        
-        // Verificar que el carro se marcó como vendido
+        // Bug 1 fix: sales are no longer force-completed at creation. Without an
+        // explicit Status the sale stays Pending and the car is reserved (not sold).
+        createdSale.Status.Should().Be(SaleStatus.Pending);
+
         var updatedCar = await context.Cars.IgnoreQueryFilters().AsNoTracking().FirstAsync(c => c.Id == car.Id);
-        updatedCar!.ServiceCar.Should().Be(StatusServiceCar.Vendido);
+        updatedCar!.ServiceCar.Should().Be(StatusServiceCar.Reservado);
     }
 
     [Fact]

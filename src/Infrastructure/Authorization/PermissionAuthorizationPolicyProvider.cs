@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Authorization;
@@ -22,12 +22,8 @@ internal sealed class PermissionAuthorizationPolicyProvider : DefaultAuthorizati
             return policy;
         }
 
-        AuthorizationPolicy permissionPolicy = new AuthorizationPolicyBuilder()
+        return new AuthorizationPolicyBuilder()
             .AddRequirements(new PermissionRequirement(policyName))
             .Build();
-
-        _authorizationOptions.AddPolicy(policyName, permissionPolicy);
-
-        return permissionPolicy;
     }
 }

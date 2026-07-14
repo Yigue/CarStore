@@ -16,7 +16,7 @@ public class DocumentEndpoints : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/documents")
+        var group = app.MapGroup("documents")
             .WithTags("Documents")
             .RequireAuthorization();
 

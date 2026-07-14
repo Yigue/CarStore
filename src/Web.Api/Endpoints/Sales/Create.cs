@@ -1,6 +1,7 @@
 using Application.Sales.Create;
 using Domain.Financial.Attributes;
 using Domain.Sales;
+using Domain.Sales.Attributes;
 using MediatR;
 using SharedKernel;
 using Web.Api.Infrastructure;
@@ -14,11 +15,14 @@ internal sealed class Create : IEndpoint
         Guid ClientId,
         decimal FinalPrice,
         PaymentMethod PaymentMethod,
-        string Status,
         string ContractNumber,
         string Comments,
+        // Optional initial status. Null/omitted leaves the sale Pending — it is
+        // only force-completed when the caller explicitly requests Completed.
+        SaleStatus? Status = null,
         Guid? LeadId = null,
-        Guid? QuoteId = null);
+        Guid? QuoteId = null,
+        Guid? SalespersonId = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -32,7 +36,9 @@ internal sealed class Create : IEndpoint
                 request.ContractNumber,
                 request.Comments,
                 request.LeadId,
-                request.QuoteId);
+                request.QuoteId,
+                request.Status,
+                request.SalespersonId);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

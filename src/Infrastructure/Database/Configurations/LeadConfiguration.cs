@@ -55,6 +55,8 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
             .HasConversion<string>()
             .HasMaxLength(30);
 
+        builder.Property(l => l.ReengagementSentAtUtc);
+
         builder.HasOne<Domain.Cars.Car>()
             .WithMany()
             .HasForeignKey(l => l.InterestedVehicleId)

@@ -1,5 +1,7 @@
 using Application.Clients.GetActivity;
 using Domain.Clients;
+using Domain.Financial.Attributes;
+using Domain.Sales;
 using Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -165,5 +167,89 @@ public class GetActivityQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.TotalCount.Should().Be(10);
         result.Value.Items.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task Handle_Includes_Sale_Events_For_This_Clients_Sales()
+    {
+        // Sale domain events land in the outbox keyed by SaleId (AggregateType="Sale"),
+        // not by ClientId — the handler must fold them into the client's timeline by
+        // resolving the client's own sale ids first.
+        using var context = CreateContext();
+        var clientId = Guid.NewGuid();
+        var dealerId = Guid.NewGuid();
+        SeedClient(context, clientId, dealerId);
+
+        var sale = new Sale(
+            dealerId,
+            Guid.NewGuid(),
+            clientId,
+            10000m,
+            PaymentMethod.Cash,
+            "CN-1",
+            "comment",
+            DateTime.UtcNow);
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        context.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            Type = "SaleCreatedDomainEvent",
+            Content = "{}",
+            OccurredOnUtc = DateTime.UtcNow,
+            AggregateId = sale.Id,
+            AggregateType = "Sale",
+            DealerId = dealerId
+        });
+        await context.SaveChangesAsync();
+
+        var handler = new GetActivityQueryHandler(context);
+        var result = await handler.Handle(new GetActivityQuery(clientId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.TotalCount.Should().Be(1);
+        result.Value.Items.Should().ContainSingle(e => e.EventType == "SaleCreatedDomainEvent");
+    }
+
+    [Fact]
+    public async Task Handle_Does_Not_Include_Sale_Events_For_Other_Clients_Sales()
+    {
+        using var context = CreateContext();
+        var clientId = Guid.NewGuid();
+        var dealerId = Guid.NewGuid();
+        SeedClient(context, clientId, dealerId);
+
+        var otherClientId = Guid.NewGuid();
+        var otherSale = new Sale(
+            dealerId,
+            Guid.NewGuid(),
+            otherClientId,
+            10000m,
+            PaymentMethod.Cash,
+            "CN-2",
+            "comment",
+            DateTime.UtcNow);
+        context.Sales.Add(otherSale);
+        await context.SaveChangesAsync();
+
+        context.OutboxMessages.Add(new OutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            Type = "SaleCreatedDomainEvent",
+            Content = "{}",
+            OccurredOnUtc = DateTime.UtcNow,
+            AggregateId = otherSale.Id,
+            AggregateType = "Sale",
+            DealerId = dealerId
+        });
+        await context.SaveChangesAsync();
+
+        var handler = new GetActivityQueryHandler(context);
+        var result = await handler.Handle(new GetActivityQuery(clientId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().BeEmpty();
+        result.Value.TotalCount.Should().Be(0);
     }
 }

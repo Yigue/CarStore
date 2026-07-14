@@ -38,7 +38,12 @@ internal sealed class GetTodaySalesQueryHandler
                 s.SaleDate,
                 s.Comments,
                 s.Car != null ? s.Car.Patente.Value : null,
-                s.Client != null ? $"{s.Client.FirstName} {s.Client.LastName}" : null))
+                s.Client != null ? $"{s.Client.FirstName} {s.Client.LastName}" : null,
+                s.SalespersonId,
+                _context.Users
+                    .Where(u => u.Id == s.SalespersonId)
+                    .Select(u => u.FirstName + " " + u.LastName)
+                    .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
         var totalAmount = todaySales.Sum(s => s.FinalPrice);

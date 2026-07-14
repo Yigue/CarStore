@@ -1,11 +1,14 @@
 using System.Security.Claims;
 using Application.Abstractions.Data;
 using Application.Abstractions.Tenancy;
+using Infrastructure.Tenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Middleware;
 
@@ -20,19 +23,43 @@ namespace Infrastructure.Middleware;
 public sealed class TenantResolutionMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly IHostEnvironment _env;
+    private readonly TenantFallbackOptions _fallbackOptions;
     private readonly ILogger<TenantResolutionMiddleware> _logger;
 
     public TenantResolutionMiddleware(
         RequestDelegate next,
+        IHostEnvironment environment,
+        IOptions<TenantFallbackOptions> fallbackOptions,
         ILogger<TenantResolutionMiddleware> logger)
     {
         _next = next;
+        _env = environment;
+        _fallbackOptions = fallbackOptions.Value;
         _logger = logger;
     }
 
     public async Task InvokeAsync(HttpContext context)
     {
         var (tenantDealerId, hostMiss) = ResolveTenant(context);
+
+        // Development-only convenience fallback (ADR-1) — mirrors
+        // CurrentTenantService: a host miss in Development resolves to the
+        // configured dealer instead of the default-deny 404. Outside
+        // Development this path is dead code; Program.cs refuses the config
+        // at startup.
+        if (tenantDealerId == Guid.Empty
+            && hostMiss
+            && _env.IsDevelopment()
+            && _fallbackOptions.DevFallbackDealerId is { } configuredFallback)
+        {
+            _logger.LogInformation(
+                "TenantResolutionMiddleware: host miss in Development — using Tenant:DevFallbackDealerId={DealerId}.",
+                configuredFallback);
+
+            tenantDealerId = configuredFallback;
+            hostMiss = false;
+        }
 
         if (tenantDealerId != Guid.Empty)
         {

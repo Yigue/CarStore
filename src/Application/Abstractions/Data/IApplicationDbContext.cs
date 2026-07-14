@@ -9,6 +9,7 @@ using Domain.Quotes;
 using Domain.Sales;
 using Domain.Users;
 using Domain.Billing;
+using Domain.Webhooks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
@@ -40,6 +41,8 @@ public interface IApplicationDbContext
     DbSet<BackfillAudit> BackfillAudits { get; }
     DbSet<DealerSubscription> DealerSubscriptions { get; }
     DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; }
+    DbSet<WebhookSubscription> WebhookSubscriptions { get; }
+    DbSet<WebhookDelivery> WebhookDeliveries { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

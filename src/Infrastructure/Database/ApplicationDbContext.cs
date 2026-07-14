@@ -20,6 +20,7 @@ using Newtonsoft.Json;
 using Domain.Shared;
 using Infrastructure.Persistence.Configurations.ValueObjects;
 using Domain.Billing;
+using Domain.Webhooks;
 
 namespace Infrastructure.Database;
 
@@ -58,6 +59,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<BackfillAudit> BackfillAudits { get; set; }
     public DbSet<DealerSubscription> DealerSubscriptions { get; set; }
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
+    public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; }
+    public DbSet<WebhookDelivery> WebhookDeliveries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -129,7 +132,11 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<BackfillAudit>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
-        modelBuilder.Entity<DealerSubscription>().HasQueryFilter(x => 
+        modelBuilder.Entity<DealerSubscription>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<WebhookSubscription>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<WebhookDelivery>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         // Note: Marca, Modelo, TransactionCategory, CarImage are shared across tenants (catalog data)
     }

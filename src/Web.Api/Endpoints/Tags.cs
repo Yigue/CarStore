@@ -19,4 +19,5 @@ public static class Tags
     public const string Dashboard = "dashboard";
     public const string Reports = "reports";
     public const string Platform = "platform";
+    public const string Webhooks = "webhooks";
 }

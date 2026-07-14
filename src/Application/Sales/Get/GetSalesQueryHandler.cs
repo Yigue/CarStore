@@ -18,6 +18,9 @@ internal sealed class GetSalesQueryHandler(IApplicationDbContext context)
                 Id = sale.Id,
                 CarId = sale.CarId,
                 ClientId = sale.ClientId,
+                QuoteId = sale.QuoteId,
+                LeadId = sale.LeadId,
+                SalespersonId = sale.SalespersonId,
                 FinalPrice = sale.FinalPrice.Amount,
                 PaymentMethod = sale.PaymentMethod.ToString(),
                 Status = sale.Status.ToString(),
@@ -27,7 +30,12 @@ internal sealed class GetSalesQueryHandler(IApplicationDbContext context)
                 CarBrand = sale.Car.Marca.Nombre,
                 CarModel = sale.Car.Modelo.Nombre,
                 ClientName = $"{sale.Client.FirstName} {sale.Client.LastName}",
-                
+                // No navigation property to User (mirrors the no-hard-FK convention on
+                // SalespersonId) — resolved as a correlated subquery instead.
+                SalespersonName = context.Users
+                    .Where(u => u.Id == sale.SalespersonId)
+                    .Select(u => u.FirstName + " " + u.LastName)
+                    .FirstOrDefault(),
             })
             .ToListAsync(cancellationToken);
 

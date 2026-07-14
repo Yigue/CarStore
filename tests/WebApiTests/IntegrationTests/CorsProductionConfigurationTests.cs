@@ -86,7 +86,7 @@ public sealed class CorsProductionConfigurationTests
                         services.RemoveAll<ApplicationDbContext>();
                         services.RemoveAll<IApplicationDbContext>();
 
-                        services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connection));
+                        services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connection).UseSnakeCaseNamingConvention());
                         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
                     });
                 });

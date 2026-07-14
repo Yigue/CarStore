@@ -7,6 +7,7 @@ public sealed class SaleResponse
     public Guid ClientId { get; init; }
     public Guid? QuoteId { get; init; }
     public Guid? LeadId { get; init; }
+    public Guid? SalespersonId { get; init; }
 
     public decimal FinalPrice { get; init; }
     public string PaymentMethod { get; init; }
@@ -17,6 +18,7 @@ public sealed class SaleResponse
     public string CarBrand { get; init; }
     public string CarModel { get; init; }
     public string ClientName { get; init; }
+    public string? SalespersonName { get; init; }
     public List<TransactionResponse> Transactions { get; init; }
 }
 

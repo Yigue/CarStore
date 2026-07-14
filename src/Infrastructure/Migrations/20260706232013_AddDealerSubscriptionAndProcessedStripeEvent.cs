@@ -11,37 +11,12 @@ namespace Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTime>(
-                name: "created_at",
-                schema: "public",
-                table: "dealer_settings",
-                type: "timestamp with time zone",
-                nullable: false,
-                defaultValue: new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
-
-            migrationBuilder.AddColumn<bool>(
-                name: "is_active",
-                schema: "public",
-                table: "dealer_settings",
-                type: "boolean",
-                nullable: false,
-                defaultValue: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "suspend_reason",
-                schema: "public",
-                table: "dealer_settings",
-                type: "character varying(500)",
-                maxLength: 500,
-                nullable: true);
-
-            migrationBuilder.AddColumn<DateTime>(
-                name: "suspended_at",
-                schema: "public",
-                table: "dealer_settings",
-                type: "timestamp with time zone",
-                nullable: true);
-
+            // dealer_settings columns are intentionally NOT added here:
+            // - is_active ships with BackfillDealerSettingsHostName (20260629231919)
+            // - created_at, suspended_at, suspend_reason and the is_active index
+            //   ship with AddDealerSuspensionAndCreatedAtColumns (20260706232100)
+            // This migration owns only the subscription tables and the xmin
+            // concurrency token mapping.
             migrationBuilder.AddColumn<uint>(
                 name: "xmin",
                 schema: "public",
@@ -87,12 +62,6 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "ix_dealer_settings_is_active",
-                schema: "public",
-                table: "dealer_settings",
-                column: "is_active");
-
-            migrationBuilder.CreateIndex(
                 name: "ix_dealer_subscriptions_status",
                 schema: "public",
                 table: "dealer_subscriptions",
@@ -122,31 +91,6 @@ namespace Infrastructure.Migrations
             migrationBuilder.DropTable(
                 name: "processed_stripe_events",
                 schema: "public");
-
-            migrationBuilder.DropIndex(
-                name: "ix_dealer_settings_is_active",
-                schema: "public",
-                table: "dealer_settings");
-
-            migrationBuilder.DropColumn(
-                name: "created_at",
-                schema: "public",
-                table: "dealer_settings");
-
-            migrationBuilder.DropColumn(
-                name: "is_active",
-                schema: "public",
-                table: "dealer_settings");
-
-            migrationBuilder.DropColumn(
-                name: "suspend_reason",
-                schema: "public",
-                table: "dealer_settings");
-
-            migrationBuilder.DropColumn(
-                name: "suspended_at",
-                schema: "public",
-                table: "dealer_settings");
 
             migrationBuilder.DropColumn(
                 name: "xmin",

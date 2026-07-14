@@ -18,4 +18,6 @@ public sealed record TodaySaleItem(
     DateTime SaleDate,
     string Comments,
     string? CarPatente,
-    string? ClientName);
+    string? ClientName,
+    Guid? SalespersonId,
+    string? SalespersonName);

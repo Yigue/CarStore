@@ -25,15 +25,26 @@ internal sealed class GetActivityQueryHandler(IApplicationDbContext context)
             return Result.Failure<ClientActivityResponse>(ClientErrors.NotFound(query.ClientId));
         }
 
-        const string aggregateType = "Client";
+        const string clientAggregateType = "Client";
+        const string saleAggregateType = "Sale";
+
+        // Sale domain events are raised on the Sale aggregate, so they land in the outbox
+        // keyed by SaleId, not ClientId. Resolve this client's sale ids so their events can
+        // be folded into the same timeline — same outbox mechanism, just a wider aggregate
+        // scope, instead of inventing a parallel audit trail.
+        List<Guid> saleIds = await context.Sales
+            .AsNoTracking()
+            .Where(s => s.ClientId == query.ClientId)
+            .Select(s => s.Id)
+            .ToListAsync(cancellationToken);
 
         // OutboxMessages has no global tenant filter — scope explicitly by the
         // resolved client's DealerId in addition to the aggregate identity.
         IQueryable<OutboxMessage> activityQuery = context.OutboxMessages
             .AsNoTracking()
-            .Where(m => m.AggregateId == query.ClientId
-                     && m.AggregateType == aggregateType
-                     && m.DealerId == client.DealerId);
+            .Where(m => m.DealerId == client.DealerId
+                     && ((m.AggregateId == query.ClientId && m.AggregateType == clientAggregateType)
+                      || (m.AggregateType == saleAggregateType && m.AggregateId != null && saleIds.Contains(m.AggregateId.Value))));
 
         int totalCount = await activityQuery.CountAsync(cancellationToken);
 

@@ -9,5 +9,8 @@ public sealed record UpdateSaleCommand(
     decimal FinalPrice,
     PaymentMethod PaymentMethod,
     SaleStatus Status,
-    string ContractNumber,
-    string Comments) : ICommand<Guid>;
+    // Optional: when omitted/null, the existing value on the sale is kept.
+    string? ContractNumber = null,
+    string? Comments = null,
+    // Optional: when omitted/null, the sale's current salesperson is kept.
+    Guid? SalespersonId = null) : ICommand<Guid>;

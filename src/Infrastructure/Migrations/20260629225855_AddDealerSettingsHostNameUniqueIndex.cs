@@ -16,7 +16,7 @@ namespace Infrastructure.Migrations
                 table: "dealer_settings",
                 column: "host_name",
                 unique: true,
-                filter: "\"HostName\" IS NOT NULL");
+                filter: "host_name IS NOT NULL");
         }
 
         /// <inheritdoc />

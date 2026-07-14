@@ -7,4 +7,5 @@ public sealed record SaleCreatedDomainEvent(
     Guid SaleId,
     Guid CarId,
     Guid ClientId,
-    Money FinalPrice) : IDomainEvent;
+    Money FinalPrice,
+    Guid? LeadId = null) : IDomainEvent;

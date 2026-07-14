@@ -8,6 +8,7 @@ using Domain.Clients;
 using Domain.Clients.Attributes;
 using Domain.Quotes;
 using Domain.Sales;
+using Domain.Sales.Attributes;
 using Domain.Sales.Events;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -74,16 +75,37 @@ internal sealed class CreateSaleCommandHandler(
             command.Comments,
             dateTimeProvider.UtcNow,
             command.LeadId,
-            command.QuoteId
+            command.QuoteId,
+            command.SalespersonId
             );
- 
-        // Update car status using domain method
-        car.MarkAsSold(dateTimeProvider.UtcNow);
 
-        context.Sales.Add(sale);
+        // Sales are Pending by default. They are only force-completed when the
+        // caller explicitly requests it (e.g. a legacy/cash sale recorded as
+        // already settled). Cancelled as an initial status is rejected by the validator.
+        SaleStatus requestedStatus = command.Status ?? SaleStatus.Pending;
 
-        // Complete the sale to trigger financial transaction
-        sale.Complete();
+        if (requestedStatus == SaleStatus.Completed)
+        {
+            // Update car status using domain method
+            car.MarkAsSold(dateTimeProvider.UtcNow);
+
+            context.Sales.Add(sale);
+
+            // Complete the sale to trigger financial transaction
+            sale.Complete();
+        }
+        else
+        {
+            context.Sales.Add(sale);
+
+            // Pending sale: reserve the car instead of marking it sold outright.
+            // If it's already Reservado (e.g. converted from an accepted quote,
+            // see D-1), leave it as-is — Reserve() would otherwise throw.
+            if (car.ServiceCar == StatusServiceCar.Disponible)
+            {
+                car.Reserve(dateTimeProvider.UtcNow);
+            }
+        }
 
         // Single SaveChangesAsync: persists sale, car status, and all domain events in one transaction
         await context.SaveChangesAsync(cancellationToken);
