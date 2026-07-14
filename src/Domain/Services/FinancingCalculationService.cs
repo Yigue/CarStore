@@ -1,3 +1,5 @@
+using SharedKernel;
+
 namespace Domain.Services;
 
 public sealed class FinancingCalculationService
@@ -7,8 +9,15 @@ public sealed class FinancingCalculationService
         decimal annualRate,
         int installments)
     {
+        // Guard clauses (SDD Parte 1 — Requisito 2): annualRate llega ya
+        // normalizada como fracción (0.72, no 72). Estas validaciones evitan
+        // que un valor inválido llegue a Math.Pow y produzca Infinity/NaN
+        // o un overflow silencioso.
         if (annualRate <= 0)
-            return new FinancingResult(principal, principal, 0m, 0m);
+            throw new DomainException("La tasa (TNA) debe ser mayor a 0.");
+
+        if (installments <= 0)
+            throw new DomainException("La cantidad de cuotas debe ser mayor a 0.");
 
         // CFT = (1 + TEA/12)^12 - 1 where TEA = TNA
         var tea = annualRate;
