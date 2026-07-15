@@ -144,4 +144,36 @@ public class ConvertLeadToClientCommandHandlerTests
         var updatedLead = await context.Leads.FindAsync(lead.Id);
         updatedLead!.Status.Should().Be(LeadStatus.Ganado, "status must remain Ganado");
     }
+
+    // REQ-CRM-DEDUP-001 / ADR-4: ConvertedClientId-first dedup + inline Activate() (ADR-2).
+
+    [Fact]
+    public async Task Handle_LeadAlreadyHasProspectClient_ReusesItAndActivates()
+    {
+        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        var lead = Lead.Create(dealerId, "Lucia Fernandez", "lucia@test.com", "6667778", LeadSource.Web, DateTime.UtcNow);
+        var prospectClient = new Client(dealerId, "Lucia", "Fernandez", "TEMP0002", "lucia@test.com", "6667778", string.Empty, DateTime.UtcNow, ClientType.Individual, lead.Id);
+        prospectClient.SetProspect();
+        context.Leads.Add(lead);
+        context.Clients.Add(prospectClient);
+        await context.SaveChangesAsync();
+
+        lead.MarkConverted(prospectClient.Id);
+        await context.SaveChangesAsync();
+
+        var dateProvider = new FakeDateTimeProvider();
+        var handler = new ConvertLeadToClientCommandHandler(context, dateProvider);
+        var command = new ConvertLeadToClientCommand(lead.Id, "20666777", "Some address", ClientType.Individual);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var clientCount = await context.Clients.CountAsync();
+        clientCount.Should().Be(1, "the Prospect Client created at Negociación must be reused, not duplicated");
+
+        var reused = await context.Clients.SingleAsync();
+        reused.Id.Should().Be(prospectClient.Id);
+        reused.Status.Should().Be(ClientStatus.Active, "reusing the Prospect Client must Activate() it (ADR-2)");
+    }
 }

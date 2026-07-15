@@ -22,10 +22,13 @@ internal sealed class CreateClientFromLeadOnQuoteAcceptedHandler(
         if (quote?.Lead is not null && quote.ClientId is null)
         {
             var lead = quote.Lead;
-            
-            // Check if client with this email already exists
-            var existingClient = await context.Clients
-                .FirstOrDefaultAsync(c => c.Email == lead.Email, cancellationToken);
+
+            // REQ-CRM-DEDUP-001 / ADR-4: check ConvertedClientId first (set when Negociación
+            // already auto-created a Prospect Client for this lead); fall back to the legacy
+            // email-match only when it is null.
+            var existingClient = lead.ConvertedClientId is { } convertedClientId
+                ? await context.Clients.FirstOrDefaultAsync(c => c.Id == convertedClientId, cancellationToken)
+                : await context.Clients.FirstOrDefaultAsync(c => c.Email == lead.Email, cancellationToken);
 
             Client targetClient;
 
@@ -59,6 +62,10 @@ internal sealed class CreateClientFromLeadOnQuoteAcceptedHandler(
 
                 context.Clients.Add(targetClient);
             }
+
+            // ADR-2: activate inline — the client reference is already loaded here,
+            // deterministically (no race with the Negociación-stage creation handler).
+            targetClient.Activate();
 
             // Link the new client to the lead
             lead.MarkConverted(targetClient.Id);

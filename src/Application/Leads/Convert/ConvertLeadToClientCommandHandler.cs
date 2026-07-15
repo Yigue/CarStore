@@ -20,12 +20,15 @@ internal sealed class ConvertLeadToClientCommandHandler(
         if (lead is null)
             return Result.Failure<Guid>(LeadErrors.NotFound(command.LeadId));
 
-        // Check if client with same email already exists.
+        // REQ-CRM-DEDUP-001 / ADR-4: check ConvertedClientId first (set when Negociación
+        // already auto-created a Prospect Client for this lead); fall back to the legacy
+        // email-match only when it is null.
         // Compare the Email value object directly (not .Value) so EF translates it
         // through the value converter — `c.Email.Value == ...` is not translatable
         // against the relational provider and throws at runtime.
-        var existingClient = await context.Clients
-            .FirstOrDefaultAsync(c => c.Email == lead.Email, cancellationToken);
+        var existingClient = lead.ConvertedClientId is { } convertedClientId
+            ? await context.Clients.FirstOrDefaultAsync(c => c.Id == convertedClientId, cancellationToken)
+            : await context.Clients.FirstOrDefaultAsync(c => c.Email == lead.Email, cancellationToken);
 
         Client targetClient;
 
@@ -53,6 +56,9 @@ internal sealed class ConvertLeadToClientCommandHandler(
 
             context.Clients.Add(targetClient);
         }
+
+        // ADR-2: activate inline — deterministic, the client reference is already loaded here.
+        targetClient.Activate();
 
         lead.MarkConverted(targetClient.Id);
 
