@@ -164,6 +164,20 @@ public sealed class Client : Entity, ISoftDeletable
     }
 
     /// <summary>
+    /// Marks the client as a lost funnel outcome (Lead reached Perdido). Distinct from
+    /// <see cref="Deactivate"/>: Lost is a CRM funnel result, not a customer-lifecycle
+    /// deactivation, so it does not raise <see cref="Domain.Clients.Events.ClientDeactivatedDomainEvent"/>.
+    /// Idempotent: a no-op when already Lost.
+    /// </summary>
+    public void MarkAsLost()
+    {
+        if (Status == ClientStatus.Lost)
+            return;
+
+        Status = ClientStatus.Lost;
+    }
+
+    /// <summary>
     /// Soft-deletes the client. Idempotent: raises no event if already deleted (ADR-2).
     /// </summary>
     public void Delete(Guid actorId, DateTime occurredAtUtc)

@@ -5,6 +5,7 @@ public enum ClientStatus
     Active,
     Inactive,
     Prospect,
-    VIP
+    VIP,
+    Lost
 }
 

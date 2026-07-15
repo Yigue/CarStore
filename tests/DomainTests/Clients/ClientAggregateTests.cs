@@ -150,6 +150,43 @@ public class ClientAggregateTests
         client.Notes.Should().BeNull();
     }
 
+    // ── MarkAsLost (REQ-CRM-STATUS-001) ──────────────────────────────────────
+
+    [Fact]
+    public void MarkAsLost_SetsStatusLost()
+    {
+        var client = BuildClient();
+        client.SetProspect();
+        client.ClearDomainEvents();
+
+        client.MarkAsLost();
+
+        client.Status.Should().Be(ClientStatus.Lost);
+    }
+
+    [Fact]
+    public void MarkAsLost_Idempotent_NoThrow()
+    {
+        var client = BuildClient();
+        client.MarkAsLost();
+
+        var act = () => client.MarkAsLost();
+
+        act.Should().NotThrow();
+        client.Status.Should().Be(ClientStatus.Lost);
+    }
+
+    [Fact]
+    public void MarkAsLost_DoesNotRaiseDeactivatedEvent()
+    {
+        var client = BuildClient();
+        client.ClearDomainEvents();
+
+        client.MarkAsLost();
+
+        client.DomainEvents.Should().BeEmpty("Lost is a funnel outcome, not a customer deactivation signal");
+    }
+
     // ── AcquisitionSource ─────────────────────────────────────────────────────
 
     [Fact]
