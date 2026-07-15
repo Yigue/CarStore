@@ -6,4 +6,6 @@ public sealed record ClientStatsResponse(
     int TotalCount,
     Dictionary<string, int> BySource,
     int RecentCount,
-    int ActiveCount);
+    int ActiveCount,
+    int ProspectCount,
+    int LostCount);
