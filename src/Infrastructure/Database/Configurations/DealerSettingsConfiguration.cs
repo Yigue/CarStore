@@ -19,12 +19,14 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
         // provisioning cannot race past an app-level check). PostgreSQL partial
         // unique index ignores rows with NULL HostName so legacy seed rows
         // without a subdomain continue to work.
-        // HasFilter is raw SQL: it bypasses the snake_case naming convention,
-        // so it must reference the physical column name (host_name).
-        builder.HasIndex(s => s.HostName)
-            .IsUnique()
-            .HasFilter("host_name IS NOT NULL")
-            .HasDatabaseName("IX_DealerSettings_HostName_Unique");
+        //
+        // NOTE (saas-custom-domains-followups item 2): this used to declare a
+        // second, duplicate unique index here named "IX_DealerSettings_HostName_Unique"
+        // (PascalCase, predates the project's snake_case index-naming convention).
+        // It was redundant with the "ux_dealer_settings_host_name" index declared
+        // further below (same column, same partial predicate) and has been dropped
+        // via the DropDuplicateDealerSettingsHostNameIndex migration. Keep only the
+        // single HasIndex(s => s.HostName) declaration below.
 
         builder.Property(s => s.DealerName)
             .HasMaxLength(200)
