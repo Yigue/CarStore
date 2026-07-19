@@ -77,6 +77,32 @@ public class TenantIndexesTests : BaseTest
     }
 
     [Fact]
+    public void DealerSettings_Should_Have_Exactly_One_UniqueIndex_On_HostName()
+    {
+        // Arrange — saas-custom-domains-followups item 2: two separately-authored
+        // migrations used to each add a UNIQUE index on HostName under different
+        // names (IX_DealerSettings_HostName_Unique and ux_dealer_settings_host_name).
+        // The redundant one was dropped; only ux_dealer_settings_host_name remains.
+        var model = BuildSnapshotModel();
+        var dealerEntity = model.GetEntityTypes()
+            .Single(t => t.ClrType == typeof(Domain.DealerSettings.DealerSettings));
+
+        // Act
+        var uniqueHostIndexes = dealerEntity.GetIndexes()
+            .Where(i => i.IsUnique
+                && i.Properties.Count == 1
+                && i.Properties[0].Name == nameof(Domain.DealerSettings.DealerSettings.HostName))
+            .ToList();
+
+        // Assert
+        uniqueHostIndexes.Should().ContainSingle(
+            "the redundant IX_DealerSettings_HostName_Unique index was dropped in favor of " +
+            "the single ux_dealer_settings_host_name index — only one UNIQUE index on HostName " +
+            "should remain in the model.");
+        uniqueHostIndexes.Single().GetDatabaseName().Should().Be("ux_dealer_settings_host_name");
+    }
+
+    [Fact]
     public void DealerSettings_Should_Have_Partial_LookupIndex_On_HostName_Where_Active()
     {
         // Arrange
