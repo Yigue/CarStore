@@ -21,15 +21,17 @@ COPY ["src/Application/Application.csproj", "src/Application/"]
 COPY ["src/Domain/Domain.csproj", "src/Domain/"]
 COPY ["src/SharedKernel/SharedKernel.csproj", "src/SharedKernel/"]
 
-# Restore dependencies
-RUN dotnet restore "./src/Web.Api/Web.Api.csproj" --verbosity normal
+# Restore dependencies using BuildKit cache mount
+RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
+    dotnet restore "./src/Web.Api/Web.Api.csproj" --verbosity normal
 
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application using BuildKit cache mount
 WORKDIR "/src/src/Web.Api"
-RUN dotnet build "./Web.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build --no-restore
+RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
+    dotnet build "./Web.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build --no-restore
 
 # Publish the application
 FROM build AS publish
