@@ -4,6 +4,7 @@ using Application.Abstractions.Tenancy;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Clients;
+using Domain.Clients.Attributes;
 using Domain.Leads;
 using Domain.Quotes;
 using Microsoft.EntityFrameworkCore;
@@ -54,15 +55,34 @@ internal sealed class CreateQuoteCommandHandler(
             {
                 return Result.Failure<Guid>(ClientErrors.NotFound(clientId));
             }
+
+            // REQ-QT-GATE-001: a Lost client is a commercially dead deal — reject the
+            // quote before reserving the car. Use-case precondition, not an aggregate
+            // invariant (design.md §1) — the Quote constructor stays untouched.
+            if (client.Status == ClientStatus.Lost)
+            {
+                return Result.Failure<Guid>(QuoteErrors.ClientNotQuotable(client.Id));
+            }
         }
         else if (command.LeadId is { } leadId)
         {
+            // IgnoreQueryFilters: the default LeadConfiguration query filter hides
+            // Archivado leads entirely. We need to still resolve them here so the
+            // gate below can return the precise LeadNotQuotable error instead of a
+            // misleading NotFound for a lead that does exist but is archived.
             lead = await context.Leads
+                .IgnoreQueryFilters()
                 .SingleOrDefaultAsync(l => l.Id == leadId, cancellationToken);
 
             if (lead is null)
             {
                 return Result.Failure<Guid>(LeadErrors.NotFound(leadId));
+            }
+
+            // REQ-QT-GATE-001: Perdido/Archivado leads cannot be legitimately quoted.
+            if (lead.Status is LeadStatus.Perdido or LeadStatus.Archivado)
+            {
+                return Result.Failure<Guid>(QuoteErrors.LeadNotQuotable(lead.Id));
             }
         }
         else

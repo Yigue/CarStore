@@ -30,5 +30,13 @@ public static class QuoteErrors
     public static Error CannotDeleteNonPendingQuote(Guid quoteId) => Error.Problem(
         "Quotes.CannotDeleteNonPendingQuote",
         $"The quote with Id = '{quoteId}' cannot be deleted because it is not in Pending status");
+
+    public static Error ClientNotQuotable(Guid clientId) => Error.Problem(
+        "Quotes.ClientNotQuotable",
+        $"The client with Id = '{clientId}' cannot be quoted because it is marked as Lost.");
+
+    public static Error LeadNotQuotable(Guid leadId) => Error.Problem(
+        "Quotes.LeadNotQuotable",
+        $"The lead with Id = '{leadId}' cannot be quoted because it is Perdido or Archivado.");
 }
 
