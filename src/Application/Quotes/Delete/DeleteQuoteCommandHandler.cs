@@ -1,6 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Quotes;
+using Domain.Quotes.Attributes;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -22,6 +23,16 @@ internal sealed class DeleteQuoteCommandHandler(
         // Soft delete: the row is retained and excluded from default queries via the global
         // query filter. This is an admin action and is allowed regardless of quote status.
         quote.Delete(dateTimeProvider.UtcNow);
+
+        // REQ-QT-LEAK-001: release the reservation only for Pending quotes — the only
+        // status that holds a live reservation. Mirrors RejectQuoteCommandHandler
+        // (idempotent via Car.Release).
+        if (quote.Status == QuoteStatus.Pending)
+        {
+            var car = await context.Cars
+                .SingleOrDefaultAsync(c => c.Id == quote.CarId, cancellationToken);
+            car?.Release(dateTimeProvider.UtcNow);
+        }
 
         await context.SaveChangesAsync(cancellationToken);
 

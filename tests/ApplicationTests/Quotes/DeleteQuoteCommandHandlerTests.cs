@@ -22,28 +22,32 @@ public class DeleteQuoteCommandHandlerTests
         return new TestApplicationDbContext(options);
     }
 
-    private static async Task<Quote> SeedQuoteAsync(TestApplicationDbContext context)
+    private static async Task<(Quote Quote, Car Car)> SeedQuoteAsync(
+        TestApplicationDbContext context,
+        StatusServiceCar carStatus = StatusServiceCar.Reservado,
+        Action<Quote>? mutateQuote = null)
     {
         var dealerId = Guid.NewGuid();
         var marca = new Marca("Peugeot");
         var modelo = new Modelo("208", marca.Id);
-        var car = new Car(dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2021, "DEL001", "desc", 15000m, DateTime.UtcNow);
+        var car = new Car(dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New, carStatus, 4, 5, 1600, 1000, 2021, "DEL001", "desc", 15000m, DateTime.UtcNow);
         var client = new Client(dealerId, "Eve", "Black", "999", "eve@test.com", "444", "Addr", DateTime.UtcNow);
         var quote = new Quote(dealerId, car, client, null, 14000m, PaymentMethod.Contado, DateTime.UtcNow.AddDays(7), "c", DateTime.UtcNow);
+        mutateQuote?.Invoke(quote);
         context.Marca.Add(marca);
         context.Modelo.Add(modelo);
         context.Cars.Add(car);
         context.Clients.Add(client);
         context.Quotes.Add(quote);
         await context.SaveChangesAsync();
-        return quote;
+        return (quote, car);
     }
 
     [Fact]
     public async Task Handle_Should_SoftDelete_SettingIsDeleted_WithoutRemovingRow()
     {
         using var context = CreateContext();
-        var quote = await SeedQuoteAsync(context);
+        var (quote, _) = await SeedQuoteAsync(context);
         var dateProvider = new FakeDateTimeProvider();
         var handler = new DeleteQuoteCommandHandler(context, dateProvider);
 
@@ -68,5 +72,38 @@ public class DeleteQuoteCommandHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Be(QuoteErrors.NotFound(missingId));
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReleaseCar_WhenDeletingPendingQuote()
+    {
+        using var context = CreateContext();
+        var (quote, car) = await SeedQuoteAsync(context, StatusServiceCar.Reservado);
+        var dateProvider = new FakeDateTimeProvider();
+        var handler = new DeleteQuoteCommandHandler(context, dateProvider);
+
+        var result = await handler.Handle(new DeleteQuoteCommand(quote.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var persistedCar = await context.Cars.SingleAsync(c => c.Id == car.Id);
+        persistedCar.ServiceCar.Should().Be(StatusServiceCar.Disponible);
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotReleaseCar_WhenQuoteNotPending()
+    {
+        using var context = CreateContext();
+        var (quote, car) = await SeedQuoteAsync(
+            context,
+            StatusServiceCar.Vendido,
+            q => q.Reject("not interested anymore", DateTime.UtcNow));
+        var dateProvider = new FakeDateTimeProvider();
+        var handler = new DeleteQuoteCommandHandler(context, dateProvider);
+
+        var result = await handler.Handle(new DeleteQuoteCommand(quote.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var persistedCar = await context.Cars.SingleAsync(c => c.Id == car.Id);
+        persistedCar.ServiceCar.Should().Be(StatusServiceCar.Vendido);
     }
 }
