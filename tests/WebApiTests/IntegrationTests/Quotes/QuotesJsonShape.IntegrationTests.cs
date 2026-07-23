@@ -123,6 +123,14 @@ public class QuotesJsonShapeIntegrationTests
         // clientId must be null (not Guid.Empty)
         json.TryGetProperty("clientId", out var clientIdProp).Should().BeTrue("'clientId' key must exist in response");
         clientIdProp.ValueKind.Should().Be(JsonValueKind.Null, "clientId must be null for a lead-quote");
+
+        // REQ-QT-XREF-001: originLeadId/convertedClientId must always be present
+        // in the shape; both null here since the lead was never converted.
+        json.TryGetProperty("originLeadId", out var originLeadIdProp).Should().BeTrue("'originLeadId' key must exist in response");
+        originLeadIdProp.ValueKind.Should().Be(JsonValueKind.Null, "originLeadId must be null when there is no correlation");
+
+        json.TryGetProperty("convertedClientId", out var convertedClientIdProp).Should().BeTrue("'convertedClientId' key must exist in response");
+        convertedClientIdProp.ValueKind.Should().Be(JsonValueKind.Null, "convertedClientId must be null when the lead was never converted");
     }
 
     [Fact]
@@ -199,5 +207,84 @@ public class QuotesJsonShapeIntegrationTests
         // leadId must be null
         json.TryGetProperty("leadId", out var leadIdProp).Should().BeTrue("'leadId' key must exist in response");
         leadIdProp.ValueKind.Should().Be(JsonValueKind.Null, "leadId must be null for a client-quote");
+
+        // REQ-QT-XREF-001: both xrefs null since this client has no OriginLeadId.
+        json.TryGetProperty("originLeadId", out var originLeadIdProp).Should().BeTrue("'originLeadId' key must exist in response");
+        originLeadIdProp.ValueKind.Should().Be(JsonValueKind.Null, "originLeadId must be null when the client has no OriginLeadId");
+
+        json.TryGetProperty("convertedClientId", out var convertedClientIdProp).Should().BeTrue("'convertedClientId' key must exist in response");
+        convertedClientIdProp.ValueKind.Should().Be(JsonValueKind.Null, "convertedClientId must be null for a client-quote");
+    }
+
+    [Fact]
+    public async Task GetQuoteById_ClientLinkedToLead_ProjectsOriginLeadId()
+    {
+        // REQ-QT-XREF-001: a Client-linked quote whose Client has an OriginLeadId
+        // must project that id through the OriginLeadId xref field end-to-end.
+        await using var factory = new CustomWebApplicationFactory();
+
+        Guid quoteId;
+        Guid originLeadId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.Database.EnsureCreated();
+
+            var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
+
+            var marca = new Marca("XrefBrand");
+            var modelo = new Modelo("XrefModel", marca.Id);
+            marca.Modelos.Add(modelo);
+            db.Marca.Add(marca);
+            db.Modelo.Add(modelo);
+            await db.SaveChangesAsync();
+
+            var car = new Car(
+                dealerId, marca, modelo,
+                Color.Blue, TypeCar.Sedan,
+                StatusCar.New, StatusServiceCar.Disponible,
+                4, 5, 2000, 0, 2024,
+                UniquePlate("XRF"),
+                "Xref car",
+                16000m,
+                DateTime.UtcNow);
+            db.Cars.Add(car);
+
+            var originLead = Lead.Create(dealerId, "Origin Lead", "origin.xref@test.com", "1112223300", LeadSource.Web, DateTime.UtcNow);
+            db.Leads.Add(originLead);
+            await db.SaveChangesAsync();
+            originLeadId = originLead.Id;
+
+            var testClient = new Client(
+                dealerId, "Xref", "Client",
+                "40000099", "xref.client@test.com", "9998887700",
+                "Av. Xref 1", DateTime.UtcNow, originLeadId: originLead.Id);
+            db.Clients.Add(testClient);
+            await db.SaveChangesAsync();
+
+            var quote = new Quote(
+                dealerId, car, client: testClient, lead: null,
+                proposedPrice: 16500m,
+                paymentMethod: PaymentMethod.Contado,
+                validUntil: DateTime.UtcNow.AddDays(30),
+                comments: "Xref quote test",
+                date: DateTime.UtcNow);
+            db.Quotes.Add(quote);
+            await db.SaveChangesAsync();
+            quoteId = quote.Id;
+        }
+
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var httpClient = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(httpClient, token);
+
+        var response = await httpClient.GetAsync($"/api/v1/quotes/{quoteId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        json.TryGetProperty("originLeadId", out var originLeadIdProp).Should().BeTrue("'originLeadId' key must exist in response");
+        originLeadIdProp.ValueKind.Should().NotBe(JsonValueKind.Null, "originLeadId must be populated when the linked client has one");
+        originLeadIdProp.GetGuid().Should().Be(originLeadId);
     }
 }
