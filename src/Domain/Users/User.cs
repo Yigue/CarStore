@@ -16,7 +16,7 @@ public sealed class User : Entity
         string firstName,
         string lastName,
         string passwordHash,
-        UserRole role = UserRole.Cliente)
+        Guid roleId)
     {
         _permissions = [];
         SetDealer(dealerId);
@@ -25,7 +25,7 @@ public sealed class User : Entity
         FirstName = firstName;
         LastName = lastName;
         PasswordHash = passwordHash;
-        Role = role;
+        RoleId = roleId;
         IsActive = true;
         CreatedAt = DateTime.UtcNow;
 
@@ -51,7 +51,7 @@ public sealed class User : Entity
         user.FirstName = firstName;
         user.LastName = lastName;
         user.PasswordHash = passwordHash;
-        user.Role = UserRole.SuperAdmin;
+        user.RoleId = Guid.Empty;
         user.IsActive = true;
         user.CreatedAt = DateTime.UtcNow;
 
@@ -64,7 +64,7 @@ public sealed class User : Entity
     public string FirstName { get; private set; }
     public string LastName { get; private set; }
     public string PasswordHash { get; private set; }
-    public UserRole Role { get; private set; }
+    public Guid RoleId { get; private set; }
     public bool IsActive { get; private set; }
     public string? Phone { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -92,9 +92,9 @@ public sealed class User : Entity
         LastName = lastName;
     }
 
-    public void UpdateRole(UserRole role)
+    public void UpdateRole(Guid roleId)
     {
-        Role = role;
+        RoleId = roleId;
     }
 
     public void Deactivate()

@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using System.Text;
 using Application.Abstractions.Authentication;
 using Domain.Users;
@@ -10,7 +10,7 @@ namespace Infrastructure.Authentication;
 
 internal sealed class TokenProvider(IConfiguration configuration) : ITokenProvider
 {
-    public string Create(User user)
+    public string Create(User user, string roleName)
     {
         string secretKey = configuration["Jwt:Secret"]!;
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
@@ -22,12 +22,12 @@ internal sealed class TokenProvider(IConfiguration configuration) : ITokenProvid
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim("dealer_id", user.DealerId.ToString()),
-            new Claim("role", user.Role.ToString().ToLowerInvariant())
+            new Claim("role", roleName)
         };
 
         // ADR-1: emit platform_role claim only for SuperAdmin users.
         // Claim absence is the correct signal for all tenant-scoped roles.
-        if (user.Role == UserRole.SuperAdmin)
+        if (user.RoleId == Guid.Empty)
         {
             claims.Add(new Claim("platform_role", "super_admin"));
         }

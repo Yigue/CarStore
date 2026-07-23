@@ -147,5 +147,20 @@ internal static class DevDataSeeder
             context.Leads.AddRange(new[] { lead1, lead2, lead3 });
             await context.SaveChangesAsync(cancellationToken);
         }
+        // 7. Suscripciones (Mock for Tests/Dev)
+        if (!await context.DealerSubscriptions.IgnoreQueryFilters().AnyAsync(cancellationToken))
+        {
+            var subscription = Domain.Billing.DealerSubscription.Create(
+                DefaultDealerId,
+                "cus_mock",
+                "sub_mock",
+                "plan_mock");
+            
+            // Set it to Active to avoid 402 Payment Required in API tests.
+            subscription.Activate("sub_mock", DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(30));
+
+            context.DealerSubscriptions.Add(subscription);
+            await context.SaveChangesAsync(cancellationToken);
+        }
     }
 }

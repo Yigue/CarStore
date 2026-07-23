@@ -134,6 +134,15 @@ public class UsersControllerTests
         var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(IntegrationTestHelpers.JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.token);
 
+        // Create a role to assign
+        var adminRole = new Domain.Users.Role(Guid.Parse(CustomWebApplicationFactory.AdminDealerId), "Admin", "Admin");
+        using (var scope2 = factory.Services.CreateScope())
+        {
+            var ctx = scope2.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            ctx.Roles.Add(adminRole);
+            await ctx.SaveChangesAsync();
+        }
+
         // Update user
         var update = new
         {
@@ -141,12 +150,13 @@ public class UsersControllerTests
             FirstName = "Updated",
             LastName = "Name",
             Phone = "+5491112345678",
-            Role = "Admin",
+            Role = adminRole.Id.ToString(),
             IsActive = true
         };
         var response = await client.PutAsJsonAsync($"/api/v1/users/{regResult.id}", update);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, content);
     }
 
     [Fact]
@@ -239,11 +249,21 @@ public class UsersControllerTests
         var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(IntegrationTestHelpers.JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.token);
 
-        // Assign role
-        var assignRole = new { Role = "Admin" };
-        var response = await client.PostAsJsonAsync($"/api/v1/users/{targetResult!.id}/role", assignRole);
+        // Create a role to assign
+        var adminRole = new Domain.Users.Role(Guid.Parse(CustomWebApplicationFactory.AdminDealerId), "Admin", "Admin");
+        using (var scope2 = factory.Services.CreateScope())
+        {
+            var ctx = scope2.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            ctx.Roles.Add(adminRole);
+            await ctx.SaveChangesAsync();
+        }
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        // Assign role
+        var assignRole = new { Role = adminRole.Id.ToString() };
+        var response = await client.PostAsJsonAsync($"/api/v1/users/{targetResult!.id}/role", assignRole);
+        
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, content);
     }
 
     private sealed record RegisterResponse(Guid id);

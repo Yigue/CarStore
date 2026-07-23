@@ -52,7 +52,7 @@ public class CreateUserCommandTests
             "John",
             "Doe",
             "+5491112345678",
-            UserRole.Empleado);
+            Guid.NewGuid());
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -76,7 +76,7 @@ public class CreateUserCommandTests
         var handler = CreateHandler(context, tenantService: mockTenantService.Object);
 
         // Create first user
-        var firstUser = new User(dealerId, "duplicate@example.com", "First", "User", "hash1");
+        var firstUser = new User(dealerId, "duplicate@example.com", "First", "User", "hash1", Guid.NewGuid());
         context.Users.Add(firstUser);
         await context.SaveChangesAsync();
 
@@ -86,7 +86,7 @@ public class CreateUserCommandTests
             "Second",
             "User",
             null,
-            UserRole.Empleado);
+            Guid.NewGuid());
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -106,7 +106,7 @@ public class CreateUserCommandTests
             "No",
             "Phone",
             null,
-            UserRole.Empleado);
+            Guid.NewGuid());
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -133,10 +133,10 @@ public class CreateUserCommandTests
             "Shared",
             "Email",
             null,
-            UserRole.Empleado);
+            Guid.NewGuid());
 
         // Create user in different dealer
-        var differentDealerUser = new User(dealerId2, "shared@example.com", "Other", "Dealer", "hash2");
+        var differentDealerUser = new User(dealerId2, "shared@example.com", "Other", "Dealer", "hash2", Guid.NewGuid());
         context.Users.Add(differentDealerUser);
         await context.SaveChangesAsync();
 
@@ -157,7 +157,7 @@ public class CreateUserCommandTests
             "  John  ",
             "  Doe  ",
             null,
-            UserRole.Empleado);
+            Guid.NewGuid());
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -180,7 +180,7 @@ public class CreateUserCommandTests
             "Test",
             "User",
             null,
-            UserRole.Empleado);
+            Guid.NewGuid());
 
         var result = await handler.Handle(command, CancellationToken.None);
 

@@ -41,7 +41,7 @@ public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserReq
             .When(x => x.Phone is not null);
 
         RuleFor(x => x.Role)
-            .Must(role => Enum.TryParse<UserRole>(role, true, out _))
+            .Must(role => Guid.TryParse(role, out _))
             .WithMessage("Role must be a valid value: Admin, Empleado, Cliente, Invitado");
     }
 }

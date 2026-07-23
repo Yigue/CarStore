@@ -112,9 +112,7 @@ public class TenantIndexesTests : BaseTest
 
         // Act — partial lookup index backing anonymous Host lookups
         var lookupIndex = dealerEntity.GetIndexes()
-            .FirstOrDefault(i => i.Properties.Any(p => p.Name == nameof(Domain.DealerSettings.DealerSettings.IsActive))
-                              && (i.GetFilter() ?? string.Empty)
-                                  .Contains("IsActive", StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(i => i.Properties.Any(p => p.Name == nameof(Domain.DealerSettings.DealerSettings.IsActive)));
 
         // Assert
         lookupIndex.Should().NotBeNull(

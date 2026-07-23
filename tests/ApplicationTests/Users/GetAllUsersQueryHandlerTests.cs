@@ -25,10 +25,10 @@ public class GetAllUsersQueryHandlerTests
         var now = DateTime.UtcNow;
 
         // Create users with different last names
-        context.Users.Add(new User(dealerId, "alice@test.com", "Alice", "Johnson", "hash1"));
-        context.Users.Add(new User(dealerId, "bob@test.com", "Bob", "Brown", "hash2"));
-        context.Users.Add(new User(dealerId, "carol@test.com", "Carol", "Anderson", "hash3"));
-        context.Users.Add(new User(dealerId, "dave@test.com", "Dave", "Williams", "hash4"));
+        context.Users.Add(new User(dealerId, "alice@test.com", "Alice", "Johnson", "hash1", Guid.NewGuid()));
+        context.Users.Add(new User(dealerId, "bob@test.com", "Bob", "Brown", "hash2", Guid.NewGuid()));
+        context.Users.Add(new User(dealerId, "carol@test.com", "Carol", "Anderson", "hash3", Guid.NewGuid()));
+        context.Users.Add(new User(dealerId, "dave@test.com", "Dave", "Williams", "hash4", Guid.NewGuid()));
 
         await context.SaveChangesAsync();
     }
@@ -106,9 +106,9 @@ public class GetAllUsersQueryHandlerTests
         var dealerId = Guid.NewGuid();
 
         // Create users with same last name, different first names
-        context.Users.Add(new User(dealerId, "a@test.com", "Aaron", "Smith", "hash1"));
-        context.Users.Add(new User(dealerId, "b@test.com", "Barbara", "Smith", "hash2"));
-        context.Users.Add(new User(dealerId, "c@test.com", "Brian", "Smith", "hash3"));
+        context.Users.Add(new User(dealerId, "a@test.com", "Aaron", "Smith", "hash1", Guid.NewGuid()));
+        context.Users.Add(new User(dealerId, "b@test.com", "Barbara", "Smith", "hash2", Guid.NewGuid()));
+        context.Users.Add(new User(dealerId, "c@test.com", "Brian", "Smith", "hash3", Guid.NewGuid()));
         await context.SaveChangesAsync();
 
         var handler = new GetAllUsersQueryHandler(context);

@@ -46,7 +46,7 @@ public class DeleteUserCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "delete@example.com", "To", "Delete", "hash", UserRole.Empleado);
+        var user = new User(dealerId, "delete@example.com", "To", "Delete", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -109,7 +109,7 @@ public class DeleteUserCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId1);
 
-        var user = new User(dealerId2, "other@example.com", "Other", "Dealer", "hash");
+        var user = new User(dealerId2, "other@example.com", "Other", "Dealer", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -131,7 +131,7 @@ public class DeleteUserCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "soft@example.com", "Soft", "Delete", "hash");
+        var user = new User(dealerId, "soft@example.com", "Soft", "Delete", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 

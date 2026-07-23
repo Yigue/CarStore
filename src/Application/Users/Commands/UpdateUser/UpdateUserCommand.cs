@@ -8,6 +8,6 @@ public sealed record UpdateUserCommand(
     string FirstName,
     string LastName,
     string? Phone,
-    UserRole Role,
+    Guid RoleId,
     bool IsActive
 ) : ICommand<Guid>;

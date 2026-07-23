@@ -161,6 +161,8 @@ public sealed class DealerSettings : Entity
     public DateTime? SuspendedAt { get; private set; }
     public string? SuspendReason { get; private set; }
 
+    public string? StripeCustomerId { get; private set; }
+
     /// <summary>
     /// Postgres xmin concurrency token. Populated by EF Core (Npgsql) from the
     /// xmin system column. Zero on non-Postgres providers (InMemory/SQLite).
@@ -264,6 +266,15 @@ public sealed class DealerSettings : Entity
         UpdatedAt = reactivatedAt;
 
         Raise(new DealerReactivatedDomainEvent(Id, reactivatedAt));
+    }
+
+    public void SetStripeCustomerId(string stripeCustomerId)
+    {
+        if (string.IsNullOrWhiteSpace(stripeCustomerId))
+            throw new DomainException("StripeCustomerId cannot be empty");
+            
+        StripeCustomerId = stripeCustomerId;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     /// <summary>

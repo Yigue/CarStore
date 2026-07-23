@@ -24,7 +24,7 @@ public sealed class SendPaymentFailedEmailHandler : INotificationHandler<Subscri
     public async Task Handle(SubscriptionPaymentFailedDomainEvent notification, CancellationToken cancellationToken)
     {
         var adminUser = await _context.Users
-            .Where(u => u.DealerId == notification.DealerId && u.Role == UserRole.Admin)
+            .Where(u => u.DealerId == notification.DealerId && u.RoleId != Guid.Empty)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (adminUser == null)

@@ -40,7 +40,8 @@ public class UpdateUserCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "original@example.com", "Original", "Name", "hash", UserRole.Empleado);
+        var roleId = Guid.NewGuid();
+        var user = new User(dealerId, "original@example.com", "Original", "Name", "hash", roleId);
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -51,7 +52,7 @@ public class UpdateUserCommandTests
             "Updated",
             "Name",
             "+5491112345678",
-            UserRole.Admin,
+            Guid.NewGuid(),
             true);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -63,7 +64,7 @@ public class UpdateUserCommandTests
         updatedUser!.FirstName.Should().Be("Updated");
         updatedUser.LastName.Should().Be("Name");
         updatedUser.Phone.Should().Be("+5491112345678");
-        updatedUser.Role.Should().Be(UserRole.Admin);
+        updatedUser.RoleId.Should().NotBe(roleId);
         updatedUser.IsActive.Should().BeTrue();
     }
 
@@ -78,7 +79,7 @@ public class UpdateUserCommandTests
             "Name",
             "LastName",
             null,
-            UserRole.Empleado,
+            Guid.NewGuid(),
             true);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -95,7 +96,7 @@ public class UpdateUserCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "deactivate@example.com", "Active", "User", "hash", UserRole.Empleado);
+        var user = new User(dealerId, "deactivate@example.com", "Active", "User", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -106,7 +107,7 @@ public class UpdateUserCommandTests
             "Active",
             "User",
             null,
-            UserRole.Empleado,
+            Guid.NewGuid(),
             false);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -124,7 +125,7 @@ public class UpdateUserCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "inactive@example.com", "Inactive", "User", "hash", UserRole.Empleado);
+        var user = new User(dealerId, "inactive@example.com", "Inactive", "User", "hash", Guid.NewGuid());
         user.Deactivate();
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -136,7 +137,7 @@ public class UpdateUserCommandTests
             "Inactive",
             "User",
             null,
-            UserRole.Empleado,
+            Guid.NewGuid(),
             true);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -154,7 +155,7 @@ public class UpdateUserCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "phone@example.com", "Has", "Phone", "hash", UserRole.Empleado);
+        var user = new User(dealerId, "phone@example.com", "Has", "Phone", "hash", Guid.NewGuid());
         user.UpdatePhone("+5491112345678");
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -166,7 +167,7 @@ public class UpdateUserCommandTests
             "Has",
             "Phone",
             null,
-            UserRole.Empleado,
+            Guid.NewGuid(),
             true);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -187,7 +188,7 @@ public class UpdateUserCommandTests
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId1);
 
         // User belongs to dealer2
-        var user = new User(dealerId2, "other@example.com", "Other", "Dealer", "hash", UserRole.Empleado);
+        var user = new User(dealerId2, "other@example.com", "Other", "Dealer", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -198,7 +199,7 @@ public class UpdateUserCommandTests
             "Hacked",
             "Name",
             null,
-            UserRole.Admin,
+            Guid.NewGuid(),
             true);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -215,7 +216,7 @@ public class UpdateUserCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "trim@example.com", "Original", "Name", "hash");
+        var user = new User(dealerId, "trim@example.com", "Original", "Name", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -226,7 +227,7 @@ public class UpdateUserCommandTests
             "  John  ",
             "  Doe  ",
             null,
-            UserRole.Empleado,
+            Guid.NewGuid(),
             true);
 
         var result = await handler.Handle(command, CancellationToken.None);

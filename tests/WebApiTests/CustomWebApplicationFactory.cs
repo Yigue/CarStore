@@ -1,4 +1,5 @@
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Billing;
 using Application.Abstractions.Data;
 using Infrastructure.Database;
 using Infrastructure.Database.SeedData;
@@ -85,6 +86,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // Swap the real MinIO-backed storage for the in-memory fake.
             services.RemoveAll<IStorageService>();
             services.AddSingleton<IStorageService>(Storage);
+
+            // Mock Stripe to avoid real API calls and Exceptions
+            services.RemoveAll<ISubscriptionGateway>();
+            services.AddSingleton<ISubscriptionGateway, FakeSubscriptionGateway>();
         });
     }
 

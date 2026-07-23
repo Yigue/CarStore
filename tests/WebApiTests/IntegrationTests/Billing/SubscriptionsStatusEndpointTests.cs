@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Application.Billing.Queries.GetSubscriptionStatus;
 using Domain.Billing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace WebApiTests.IntegrationTests.Billing;
@@ -24,11 +25,19 @@ public class SubscriptionsStatusEndpointTests
         
         var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
         
-        var subscription = DealerSubscription.Create(dealerId, null, null, "plan_123");
-        subscription.Activate("sub_123", DateTime.UtcNow, DateTime.UtcNow.AddMonths(1));
-        subscription.Suspend();
+        var subscription = await dbContext.DealerSubscriptions.FirstOrDefaultAsync(s => s.DealerId == dealerId);
+        if (subscription != null)
+        {
+            subscription.Suspend();
+        }
+        else
+        {
+            subscription = DealerSubscription.Create(dealerId, null, null, "plan_123");
+            subscription.Activate("sub_123", DateTime.UtcNow, DateTime.UtcNow.AddMonths(1));
+            subscription.Suspend();
+            dbContext.DealerSubscriptions.Add(subscription);
+        }
 
-        dbContext.DealerSubscriptions.Add(subscription);
         await dbContext.SaveChangesAsync();
         
         // Act

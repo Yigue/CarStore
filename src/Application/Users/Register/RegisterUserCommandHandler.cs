@@ -40,7 +40,8 @@ internal sealed class RegisterUserCommandHandler(
             command.Email,
             command.FirstName,
             command.LastName,
-            passwordHasher.Hash(command.Password));
+            passwordHasher.Hash(command.Password),
+            Guid.Empty);
 
         context.Users.Add(user);
 

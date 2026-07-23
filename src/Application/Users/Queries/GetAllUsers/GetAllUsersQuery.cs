@@ -7,6 +7,6 @@ public sealed record GetAllUsersQuery(
     int Page = 1,
     int PageSize = 20,
     string? Search = null,
-    UserRole? Role = null,
+    Guid? RoleId = null,
     bool? IsActive = null
 ) : IQuery<PaginatedUsersResponse>;

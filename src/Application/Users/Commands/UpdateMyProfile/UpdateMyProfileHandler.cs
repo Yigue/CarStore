@@ -47,7 +47,7 @@ internal sealed class UpdateMyProfileCommandHandler(
             FirstName = user.FirstName,
             LastName = user.LastName,
             Phone = user.Phone,
-            Role = user.Role,
+            RoleId = user.RoleId,
             IsActive = user.IsActive,
             CreatedAt = user.CreatedAt
         });

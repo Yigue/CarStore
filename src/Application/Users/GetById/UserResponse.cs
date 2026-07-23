@@ -14,7 +14,7 @@ public sealed record UserResponse
 
     public string? Phone { get; init; }
 
-    public UserRole Role { get; init; }
+    public Guid RoleId { get; init; }
 
     public bool IsActive { get; init; }
 

@@ -24,7 +24,7 @@ internal sealed class UpdateUser : IEndpoint
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            if (!Enum.TryParse<UserRole>(request.Role, true, out var role))
+            if (!Guid.TryParse(request.Role, out var role))
             {
                 return Results.BadRequest(new { error = "Role must be a valid value: Admin, Empleado, Cliente, Invitado" });
             }

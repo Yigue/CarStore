@@ -51,7 +51,7 @@ public class UserNotificationServiceTests
         // Arrange
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
-        var user = new User(dealerId, "user@test.com", "Ada", "Lovelace", "hash");
+        var user = new User(dealerId, "user@test.com", "Ada", "Lovelace", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
         var seededUser = await context.Users.FirstAsync();
@@ -87,7 +87,7 @@ public class UserNotificationServiceTests
         // Arrange
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
-        var user = new User(dealerId, "fail@test.com", "Test", "User", "hash");
+        var user = new User(dealerId, "fail@test.com", "Test", "User", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
         var seededUser = await context.Users.FirstAsync();
@@ -119,7 +119,7 @@ public class UserNotificationServiceTests
         // Arrange
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
-        var user = new User(dealerId, "error@test.com", "Error", "User", "hash");
+        var user = new User(dealerId, "error@test.com", "Error", "User", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
         var seededUser = await context.Users.FirstAsync();

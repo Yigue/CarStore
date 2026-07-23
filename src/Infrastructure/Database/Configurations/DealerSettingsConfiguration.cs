@@ -136,10 +136,5 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
             .HasDatabaseName("ux_dealer_settings_slug")
             .IsUnique()
             .HasFilter("slug IS NOT NULL");
-
-        builder.HasIndex(s => new { s.HostName, s.IsActive })
-            .HasDatabaseName("ix_dealer_settings_host_name_active_lookup")
-            .IsUnique(false)
-            .HasFilter("is_active = true");
     }
 }

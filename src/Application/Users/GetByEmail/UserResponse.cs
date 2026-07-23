@@ -12,5 +12,5 @@ public sealed record UserResponse
 
     public string LastName { get; init; }
 
-    public UserRole Role { get; init; }
+    public Guid RoleId { get; init; }
 }

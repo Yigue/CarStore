@@ -22,7 +22,7 @@ internal sealed class AssignRoleCommandHandler(
             return Result.Failure<Guid>(UserErrors.NotFound(command.UserId));
         }
 
-        user.UpdateRole(command.Role);
+        user.UpdateRole(command.RoleId);
 
         await context.SaveChangesAsync(cancellationToken);
 

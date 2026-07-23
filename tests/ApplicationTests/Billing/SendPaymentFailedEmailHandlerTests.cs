@@ -36,7 +36,7 @@ public class SendPaymentFailedEmailHandlerTests
     {
         // Arrange
         var dealerId = Guid.NewGuid();
-        var adminUser = new User(dealerId, "admin@dealer.com", "John", "Doe", "hash", UserRole.Admin);
+        var adminUser = new User(dealerId, "admin@dealer.com", "John", "Doe", "hash", Guid.NewGuid());
         _dbContext.Users.Add(adminUser);
         await _dbContext.SaveChangesAsync();
 

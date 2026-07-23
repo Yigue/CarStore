@@ -28,9 +28,9 @@ internal sealed class GetAllUsersQueryHandler(
                 u.Email.Value.ToLower().Contains(searchLower));
         }
 
-        if (query.Role.HasValue)
+        if (query.RoleId.HasValue)
         {
-            usersQuery = usersQuery.Where(u => u.Role == query.Role.Value);
+            usersQuery = usersQuery.Where(u => u.RoleId == query.RoleId.Value);
         }
 
         if (query.IsActive.HasValue)
@@ -51,7 +51,7 @@ internal sealed class GetAllUsersQueryHandler(
                 u.FirstName,
                 u.LastName,
                 u.Phone,
-                u.Role.ToString(),
+                u.RoleId.ToString(),
                 u.IsActive,
                 u.CreatedAt))
             .ToListAsync(cancellationToken);

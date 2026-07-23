@@ -9,5 +9,5 @@ public sealed record CreateUserCommand(
     string FirstName,
     string LastName,
     string? Phone,
-    UserRole Role
+    Guid RoleId
 ) : ICommand<Guid>;

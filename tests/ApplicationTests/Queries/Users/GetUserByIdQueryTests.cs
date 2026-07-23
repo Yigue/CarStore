@@ -40,7 +40,8 @@ public class GetUserByIdQueryTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "user@example.com", "John", "Doe", "hash", UserRole.Empleado);
+        var roleId = Guid.NewGuid();
+        var user = new User(dealerId, "user@example.com", "John", "Doe", "hash", roleId);
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -55,7 +56,7 @@ public class GetUserByIdQueryTests
         result.Value.Email.Should().Be("user@example.com");
         result.Value.FirstName.Should().Be("John");
         result.Value.LastName.Should().Be("Doe");
-        result.Value.Role.Should().Be(UserRole.Empleado);
+        result.Value.RoleId.Should().Be(roleId);
     }
 
     [Fact]
@@ -81,7 +82,7 @@ public class GetUserByIdQueryTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId1);
 
-        var user = new User(dealerId2, "other@example.com", "Other", "Dealer", "hash");
+        var user = new User(dealerId2, "other@example.com", "Other", "Dealer", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -102,7 +103,7 @@ public class GetUserByIdQueryTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "perm@example.com", "Perm", "User", "hash", UserRole.Empleado);
+        var user = new User(dealerId, "perm@example.com", "Perm", "User", "hash", Guid.NewGuid());
         user.AddPermission("users:read");
         user.AddPermission("users:write");
         context.Users.Add(user);
@@ -126,7 +127,7 @@ public class GetUserByIdQueryTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "phone@example.com", "Phone", "User", "hash");
+        var user = new User(dealerId, "phone@example.com", "Phone", "User", "hash", Guid.NewGuid());
         user.UpdatePhone("+5491112345678");
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -148,7 +149,7 @@ public class GetUserByIdQueryTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "inactive@example.com", "Inactive", "User", "hash", UserRole.Empleado);
+        var user = new User(dealerId, "inactive@example.com", "Inactive", "User", "hash", Guid.NewGuid());
         user.Deactivate();
         context.Users.Add(user);
         await context.SaveChangesAsync();

@@ -22,7 +22,7 @@ public class TokenProviderTests
         }).Build();
 
         var provider = new TokenProvider(configuration);
-                var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "test@example.com", "Test", "User", "hash");
+                var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "test@example.com", "Test", "User", "hash", Guid.NewGuid());
 
         string token = provider.Create(user);
 
@@ -47,7 +47,7 @@ public class TokenProviderTests
         }).Build();
 
         var provider = new TokenProvider(configuration);
-                var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "test@example.com", "Test", "User", "hash");
+                var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "test@example.com", "Test", "User", "hash", Guid.NewGuid());
 
         Action act = () => provider.Create(user);
 

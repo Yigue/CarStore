@@ -48,6 +48,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<TransactionCategory> TransactionCategories { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<UserPermission> UserPermissions { get; set; }
+    public DbSet<Role> Roles { get; set; }
+    public DbSet<RolePermission> RolePermissions { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
     public DbSet<CarImage> CarImages { get; set; }
@@ -86,9 +88,19 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
                 .Property(s => s.RowVersion)
                 .HasColumnName("xmin")
                 .HasColumnType("xid")
-                .ValueGeneratedOnAddOrUpdate()
-                .IsConcurrencyToken();
+                .IsConcurrencyToken()
+                .ValueGeneratedOnAddOrUpdate();
         }
+
+        var isActiveFilter = Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite" 
+            ? "\"IsActive\" = 1" 
+            : "is_active = true";
+
+        modelBuilder.Entity<DealerSettingsEntity>()
+            .HasIndex(s => new { s.HostName, s.IsActive })
+            .HasDatabaseName("ix_dealer_settings_host_name_active_lookup")
+            .IsUnique(false)
+            .HasFilter(isActiveFilter);
 
         // Ignorar DealerId en entidades compartidas (catálogo)
         modelBuilder.Entity<Marca>().Ignore(x => x.DealerId);

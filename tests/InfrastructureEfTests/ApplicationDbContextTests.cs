@@ -48,6 +48,7 @@ public class ApplicationDbContextTests
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(connection)
+            .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 

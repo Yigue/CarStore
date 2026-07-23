@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.Data;
+using Application.Abstractions.Data;
 using Infrastructure.Caching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -32,9 +32,31 @@ internal sealed class PermissionProvider
             return cachedPermissions;
         }
 
-        string[] permissions = await _context.UserPermissions
-            .Where(x => x.UserId == userId)
-            .Select(x => x.Permission)
+        // First find the user's role ID, then find all permissions for that role.
+        var roleId = await _context.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.RoleId)
+            .FirstOrDefaultAsync();
+
+        if (roleId == Guid.Empty)
+        {
+            var userPermissions = await _context.UserPermissions
+                .Where(up => up.UserId == userId)
+                .Select(up => up.Permission)
+                .ToArrayAsync();
+                
+            var userPermSet = userPermissions.ToHashSet();
+            if (userPermSet.Count > 0)
+            {
+                await _cacheService.SetAsync(cacheKey, userPermSet, CacheTTL.Permissions);
+                _logger.LogDebug("UserPermissions loaded from DB and cached for user {UserId}. Count: {Count}", userId, userPermSet.Count);
+            }
+            return userPermSet;
+        }
+
+        string[] permissions = await _context.RolePermissions
+            .Where(rp => rp.RoleId == roleId)
+            .Select(rp => rp.Permission)
             .ToArrayAsync();
 
         var permissionsSet = permissions.ToHashSet();

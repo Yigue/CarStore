@@ -53,6 +53,7 @@ public class GetAppointmentsQueryHandlerTests
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(connection)
+            .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
@@ -101,7 +102,7 @@ public class GetAppointmentsQueryHandlerTests
         await context.SaveChangesAsync();
 
         // A User to act as agent (AgentId required by Appointment.Create)
-        var agent = new User(TestDealerId, "agent@test.com", "Agent", "One", "hash", UserRole.Admin);
+        var agent = new User(TestDealerId, "agent@test.com", "Agent", "One", "hash", Guid.NewGuid());
         context.Users.Add(agent);
         await context.SaveChangesAsync();
 
@@ -158,6 +159,7 @@ public class GetAppointmentsQueryHandlerTests
         string colVehicle = useSnakeCase ? "vehicle_id" : "VehicleId";
         string colClient = useSnakeCase ? "client_id" : "ClientId";
         string colAgent = useSnakeCase ? "agent_id" : "AgentId";
+        string colLead = useSnakeCase ? "lead_id" : "LeadId";
         string colStart = useSnakeCase ? "start_date_time" : "StartDateTime";
         string colEnd = useSnakeCase ? "end_date_time" : "EndDateTime";
         string colType = useSnakeCase ? "type" : "Type";
@@ -174,7 +176,7 @@ public class GetAppointmentsQueryHandlerTests
         {
             insertCmd.CommandText = $@"
                 INSERT INTO ""{appointmentsTable}""
-                    (""{colId}"", ""{colDealer}"", ""{colVehicle}"", ""{colClient}"", ""AgentId"", ""LeadId"",
+                    (""{colId}"", ""{colDealer}"", ""{colVehicle}"", ""{colClient}"", ""{colAgent}"", ""{colLead}"",
                      ""{colStart}"", ""{colEnd}"", ""{colType}"", ""{colNotes}"", ""{colCreated}"")
                 VALUES
                     ($id, $dealer, $vehicle, $client, $agent, NULL,

@@ -40,7 +40,25 @@ internal sealed class LoginUserCommandHandler(
             return Result.Failure<string>(UserErrors.InvalidPassword);
         }
 
-        string token = tokenProvider.Create(user);
+        string roleName = "Cliente";
+        if (user.RoleId != Guid.Empty)
+        {
+            var role = await context.Roles
+                .AsNoTracking()
+                .IgnoreQueryFilters()
+                .SingleOrDefaultAsync(r => r.Id == user.RoleId, cancellationToken);
+                
+            if (role != null)
+            {
+                roleName = role.Name;
+            }
+        }
+        else
+        {
+            roleName = "SuperAdmin";
+        }
+
+        string token = tokenProvider.Create(user, roleName);
 
         return token;
     }

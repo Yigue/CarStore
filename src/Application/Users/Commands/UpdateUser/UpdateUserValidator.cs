@@ -25,8 +25,8 @@ internal sealed class UpdateUserValidator : AbstractValidator<UpdateUserCommand>
             .WithMessage("El teléfono no puede exceder 20 caracteres")
             .When(c => c.Phone is not null);
 
-        RuleFor(c => c.Role)
-            .IsInEnum()
+        RuleFor(c => c.RoleId)
+            .NotEmpty()
             .WithMessage("El rol debe ser válido");
     }
 }

@@ -63,7 +63,7 @@ public sealed class SubscriptionGuardMiddleware
             var cache = context.RequestServices.GetRequiredService<ISubscriptionStatusCache>();
             var status = await cache.GetAsync(dealerId, context.RequestAborted);
             
-            if (status == SubscriptionStatus.Suspended || status == SubscriptionStatus.Cancelled)
+            if (status != SubscriptionStatus.Active && status != SubscriptionStatus.Trialing)
             {
                 context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
                 context.Response.ContentType = "application/json";

@@ -31,6 +31,8 @@ public class PermissionAuthorizationHandlerTests : IDisposable
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(_connection)
+            .UseSnakeCaseNamingConvention()
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         var mockPublisher = new Mock<MediatR.IPublisher>();
@@ -71,12 +73,14 @@ public class PermissionAuthorizationHandlerTests : IDisposable
         var permission = "cars:read";
         var requirement = new PermissionRequirement(permission);
         
-        // Agregar usuario y permiso a la base real (Sqlite in-memory)
-        var userEntity = new Domain.Users.User(Guid.NewGuid(), "test@example.com", "Test", "User", "hashedPassword");
+        var dealerId = Guid.NewGuid();
+        var role = new Domain.Users.Role(dealerId, "Admin", "Admin Role");
+        role.AddPermission(permission);
+        _context.Roles.Add(role);
+
+        var userEntity = new Domain.Users.User(dealerId, "test@example.com", "Test", "User", "hashedPassword", role.Id);
         var userId = userEntity.Id;
-        
         _context.Users.Add(userEntity);
-        _context.UserPermissions.Add(new Domain.Users.UserPermission(userId, permission));
         await _context.SaveChangesAsync();
 
         var handler = CreateHandler();

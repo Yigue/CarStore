@@ -27,11 +27,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PasswordHash)
             .IsRequired();
 
-        // Persistir Role como string para legibilidad en DB
-        // y evitar problemas al renumerar el enum.
-        builder.Property(u => u.Role)
-            .HasConversion<string>()
-            .HasMaxLength(20)
+        builder.Property(u => u.RoleId)
             .IsRequired();
 
         builder.Property(u => u.IsActive)

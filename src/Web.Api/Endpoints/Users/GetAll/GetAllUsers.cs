@@ -21,8 +21,8 @@ public sealed class GetAllUsers : IEndpoint
             CancellationToken cancellationToken) =>
         {
             // Parse role if provided
-            Domain.Users.UserRole? roleFilter = null;
-            if (!string.IsNullOrWhiteSpace(role) && Enum.TryParse<Domain.Users.UserRole>(role, true, out var parsedRole))
+            Guid? roleFilter = null;
+            if (!string.IsNullOrWhiteSpace(role) && Guid.TryParse(role, out var parsedRole))
             {
                 roleFilter = parsedRole;
             }

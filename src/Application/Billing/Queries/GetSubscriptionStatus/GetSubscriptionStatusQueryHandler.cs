@@ -32,7 +32,7 @@ internal sealed class GetSubscriptionStatusQueryHandler : IQueryHandler<GetSubsc
     {
         var subscription = await _repository.GetByDealerIdAsync(request.DealerId, cancellationToken);
 
-        string status = subscription?.Status.ToString() ?? SubscriptionStatus.Trialing.ToString();
+        string status = subscription?.Status.ToString() ?? SubscriptionStatus.PastDue.ToString();
         DateTime? trialEndsAt = subscription?.TrialEndsAt ?? DateTime.UtcNow.AddDays(14);
         DateTime currentPeriodEnd = subscription?.CurrentPeriodEnd ?? DateTime.UtcNow.AddDays(14);
         string planName = "SaaS Monthly Plan";
@@ -44,7 +44,7 @@ internal sealed class GetSubscriptionStatusQueryHandler : IQueryHandler<GetSubsc
             subscription.Status == SubscriptionStatus.PastDue)
         {
             var adminUser = await _context.Users
-                .Where(u => u.DealerId == request.DealerId && u.Role == UserRole.Admin)
+                .Where(u => u.DealerId == request.DealerId && u.RoleId != Guid.Empty)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (adminUser == null)

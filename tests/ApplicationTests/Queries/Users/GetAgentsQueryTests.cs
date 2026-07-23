@@ -32,17 +32,19 @@ public class GetAgentsQueryTests
     }
 
     [Fact]
-    public async Task Handle_ReturnsOnlyActiveAdminAndEmpleadoUsers()
+    public async Task Handle_ReturnsOnlyActiveUsers()
     {
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
 
-        context.Users.Add(new User(dealerId, "admin@example.com", "Admin", "One", "hash1", UserRole.Admin));
-        context.Users.Add(new User(dealerId, "empleado@example.com", "Empleado", "Two", "hash2", UserRole.Empleado));
-        context.Users.Add(new User(dealerId, "cliente@example.com", "Cliente", "Three", "hash3", UserRole.Cliente));
-        context.Users.Add(new User(dealerId, "invitado@example.com", "Invitado", "Four", "hash4", UserRole.Invitado));
+        var role1 = new Role(dealerId, "Admin", "Desc");
+        var role2 = new Role(dealerId, "Empleado", "Desc");
+        context.Roles.Add(role1);
+        context.Roles.Add(role2);
+        context.Users.Add(new User(dealerId, "admin@example.com", "Admin", "One", "hash1", role1.Id));
+        context.Users.Add(new User(dealerId, "empleado@example.com", "Empleado", "Two", "hash2", role2.Id));
 
-        var inactiveEmpleado = new User(dealerId, "inactive@example.com", "Inactive", "Five", "hash5", UserRole.Empleado);
+        var inactiveEmpleado = new User(dealerId, "inactive@example.com", "Inactive", "Five", "hash5", Guid.NewGuid());
         inactiveEmpleado.Deactivate();
         context.Users.Add(inactiveEmpleado);
 
@@ -64,8 +66,12 @@ public class GetAgentsQueryTests
         var dealerId1 = Guid.NewGuid();
         var dealerId2 = Guid.NewGuid();
 
-        context.Users.Add(new User(dealerId1, "own@example.com", "Own", "Tenant", "hash1", UserRole.Empleado));
-        context.Users.Add(new User(dealerId2, "other@example.com", "Other", "Tenant", "hash2", UserRole.Empleado));
+        var role1 = new Role(dealerId1, "Admin", "Desc");
+        var role2 = new Role(dealerId2, "Admin", "Desc");
+        context.Roles.Add(role1);
+        context.Roles.Add(role2);
+        context.Users.Add(new User(dealerId1, "own@example.com", "Own", "Tenant", "hash1", role1.Id));
+        context.Users.Add(new User(dealerId2, "other@example.com", "Other", "Tenant", "hash2", role2.Id));
         await context.SaveChangesAsync();
 
         var handler = CreateHandler(context, dealerId1);
@@ -83,7 +89,9 @@ public class GetAgentsQueryTests
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
 
-        context.Users.Add(new User(dealerId, "empleado@example.com", "Empleado", "User", "hash1", UserRole.Empleado));
+        var role = new Role(dealerId, "Empleado", "Desc");
+        context.Roles.Add(role);
+        context.Users.Add(new User(dealerId, "empleado@example.com", "Empleado", "User", "hash1", role.Id));
         context.Users.Add(User.CreateSuperAdmin("super@example.com", "Super", "Admin", "hash2"));
         await context.SaveChangesAsync();
 
@@ -102,8 +110,12 @@ public class GetAgentsQueryTests
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
 
-        context.Users.Add(new User(dealerId, "b@example.com", "Bob", "Brown", "hash1", UserRole.Admin));
-        context.Users.Add(new User(dealerId, "a@example.com", "Alice", "Anderson", "hash2", UserRole.Empleado));
+        var role1 = new Role(dealerId, "Admin", "Desc");
+        var role2 = new Role(dealerId, "Empleado", "Desc");
+        context.Roles.Add(role1);
+        context.Roles.Add(role2);
+        context.Users.Add(new User(dealerId, "b@example.com", "Bob", "Brown", "hash1", role1.Id));
+        context.Users.Add(new User(dealerId, "a@example.com", "Alice", "Anderson", "hash2", role2.Id));
         await context.SaveChangesAsync();
 
         var handler = CreateHandler(context, dealerId);

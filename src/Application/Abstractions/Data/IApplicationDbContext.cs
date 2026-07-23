@@ -30,6 +30,8 @@ public interface IApplicationDbContext
     DbSet<TransactionCategory> TransactionCategories { get; }
     DbSet<User> Users { get; }
     DbSet<UserPermission> UserPermissions { get; }
+    DbSet<Role> Roles { get; }
+    DbSet<RolePermission> RolePermissions { get; }
     DbSet<PasswordResetToken> PasswordResetTokens { get; }
     DbSet<OutboxMessage> OutboxMessages { get; }
     DbSet<CarImage> CarImages { get; }

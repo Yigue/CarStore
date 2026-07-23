@@ -44,8 +44,11 @@ public class ProvisionDealerCommandHandlerTests
         var publisher = new Mock<MediatR.IPublisher>();
         publisher.Setup(p => p.Publish(It.IsAny<MediatR.INotification>(), It.IsAny<CancellationToken>()))
                  .Returns(Task.CompletedTask);
+        var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
+        gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("https://checkout.stripe.com/123");
 
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object);
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object);
         var command = ValidCommand();
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -54,6 +57,7 @@ public class ProvisionDealerCommandHandlerTests
         result.Value.DealerId.Should().NotBe(Guid.Empty);
         result.Value.AdminUserId.Should().NotBe(Guid.Empty);
         result.Value.Subdomain.Should().Be("automotors");
+        result.Value.CheckoutUrl.Should().Be("https://checkout.stripe.com/123");
 
         var settings = await context.DealerSettings
             .IgnoreQueryFilters()
@@ -66,7 +70,7 @@ public class ProvisionDealerCommandHandlerTests
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == result.Value.AdminUserId);
         user.Should().NotBeNull();
-        user!.Role.Should().Be(UserRole.Admin);
+        user!.RoleId.Should().NotBeEmpty();
         user.DealerId.Should().Be(result.Value.DealerId);
         user.Email.Value.Should().Be("admin@automotors.com");
     }
@@ -78,7 +82,9 @@ public class ProvisionDealerCommandHandlerTests
         var publisher = new Mock<MediatR.IPublisher>();
         publisher.Setup(p => p.Publish(It.IsAny<MediatR.INotification>(), It.IsAny<CancellationToken>()))
                  .Returns(Task.CompletedTask);
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object);
+        var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
+        gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object);
 
         var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -104,7 +110,9 @@ public class ProvisionDealerCommandHandlerTests
         var hasher = new Mock<IPasswordHasher>();
         hasher.Setup(h => h.Hash(It.IsAny<string>())).Throws(new InvalidOperationException("hash failed"));
 
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object);
+        var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
+        gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object);
 
         var act = async () => await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -122,7 +130,9 @@ public class ProvisionDealerCommandHandlerTests
         var publisher = new Mock<MediatR.IPublisher>();
         publisher.Setup(p => p.Publish(It.IsAny<MediatR.INotification>(), It.IsAny<CancellationToken>()))
                  .Returns(Task.CompletedTask);
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object);
+        var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
+        gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object);
 
         var result = await handler.Handle(ValidCommand("acme"), CancellationToken.None);
 
@@ -149,7 +159,9 @@ public class ProvisionDealerCommandHandlerTests
         var hasher = new Mock<IPasswordHasher>();
         hasher.Setup(h => h.Hash(It.IsAny<string>())).Throws(new InvalidOperationException("boom"));
 
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object);
+        var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
+        gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object);
 
         try { await handler.Handle(ValidCommand(), CancellationToken.None); }
         catch (InvalidOperationException) { /* expected */ }
@@ -167,7 +179,9 @@ public class ProvisionDealerCommandHandlerTests
         var publisher = new Mock<MediatR.IPublisher>();
         publisher.Setup(p => p.Publish(It.IsAny<MediatR.INotification>(), It.IsAny<CancellationToken>()))
                  .Returns(Task.CompletedTask);
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object);
+        var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
+        gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object);
 
         var result = await handler.Handle(ValidCommand("AuToMoToRs"), CancellationToken.None);
 

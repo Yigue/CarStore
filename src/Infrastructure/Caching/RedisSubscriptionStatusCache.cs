@@ -30,6 +30,7 @@ internal sealed class RedisSubscriptionStatusCache : ISubscriptionStatusCache
         {
             if (Enum.TryParse<SubscriptionStatus>(cached, out var status))
             {
+                Console.WriteLine($"[RedisCache] Cache HIT for {dealerId}. Status: {status}");
                 return status;
             }
         }
@@ -37,9 +38,12 @@ internal sealed class RedisSubscriptionStatusCache : ISubscriptionStatusCache
         var subscription = await _repository.GetByDealerIdAsync(dealerId, ct);
         if (subscription != null)
         {
+            Console.WriteLine($"[RedisCache] Cache MISS for {dealerId}. Fetched from DB. Status: {subscription.Status}");
             await SetAsync(dealerId, subscription.Status, TimeSpan.FromSeconds(300), ct);
             return subscription.Status;
         }
+
+        Console.WriteLine($"[RedisCache] Cache MISS for {dealerId}. Not found in DB.");
 
         return null;
     }

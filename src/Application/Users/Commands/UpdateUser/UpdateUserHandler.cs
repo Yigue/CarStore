@@ -34,7 +34,7 @@ internal sealed class UpdateUserCommandHandler(
             user.UpdatePhone(null);
         }
 
-        user.UpdateRole(command.Role);
+        user.UpdateRole(command.RoleId);
 
         if (command.IsActive && !user.IsActive)
         {

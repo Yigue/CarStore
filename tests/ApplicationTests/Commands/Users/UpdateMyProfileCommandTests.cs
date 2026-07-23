@@ -44,7 +44,7 @@ public class UpdateMyProfileCommandTests
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
 
-        var user = new User(dealerId, "self@example.com", "Original", "Name", "hash", UserRole.Empleado);
+        var user = new User(dealerId, "self@example.com", "Original", "Name", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -71,7 +71,8 @@ public class UpdateMyProfileCommandTests
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
 
-        var user = new User(dealerId, "unchanged@example.com", "Original", "Name", "hash", UserRole.Admin);
+        var roleId = Guid.NewGuid();
+        var user = new User(dealerId, "unchanged@example.com", "Original", "Name", "hash", roleId);
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -85,7 +86,7 @@ public class UpdateMyProfileCommandTests
 
         var updatedUser = await context.Users.FirstOrDefaultAsync(u => u.Id == user.Id);
         updatedUser!.Email.Value.Should().Be("unchanged@example.com");
-        updatedUser.Role.Should().Be(UserRole.Admin);
+        updatedUser.RoleId.Should().Be(roleId);
     }
 
     [Fact]
@@ -110,7 +111,7 @@ public class UpdateMyProfileCommandTests
         var dealerId1 = Guid.NewGuid();
         var dealerId2 = Guid.NewGuid();
 
-        var user = new User(dealerId2, "other@example.com", "Other", "Dealer", "hash", UserRole.Empleado);
+        var user = new User(dealerId2, "other@example.com", "Other", "Dealer", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -130,7 +131,7 @@ public class UpdateMyProfileCommandTests
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
 
-        var user = new User(dealerId, "trim@example.com", "Original", "Name", "hash");
+        var user = new User(dealerId, "trim@example.com", "Original", "Name", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -152,7 +153,7 @@ public class UpdateMyProfileCommandTests
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
 
-        var user = new User(dealerId, "phone@example.com", "Has", "Phone", "hash");
+        var user = new User(dealerId, "phone@example.com", "Has", "Phone", "hash", Guid.NewGuid());
         user.UpdatePhone("+5491112345678");
         context.Users.Add(user);
         await context.SaveChangesAsync();

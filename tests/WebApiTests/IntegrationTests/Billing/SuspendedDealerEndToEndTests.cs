@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Threading.Tasks;
 using Domain.Billing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace WebApiTests.IntegrationTests.Billing;
@@ -23,12 +24,26 @@ public class SuspendedDealerEndToEndTests
         
         var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
         
-        var subscription = DealerSubscription.Create(dealerId, null, null, "plan_123");
-        subscription.Activate("sub_123", DateTime.UtcNow, DateTime.UtcNow.AddMonths(1));
-        subscription.Suspend();
+        var subscription = await dbContext.DealerSubscriptions.FirstOrDefaultAsync(s => s.DealerId == dealerId);
+        if (subscription != null)
+        {
+            subscription.Suspend();
+        }
+        else
+        {
+            subscription = DealerSubscription.Create(dealerId, null, null, "plan_123");
+            subscription.Activate("sub_123", DateTime.UtcNow, DateTime.UtcNow.AddMonths(1));
+            subscription.Suspend();
+            dbContext.DealerSubscriptions.Add(subscription);
+        }
 
-        dbContext.DealerSubscriptions.Add(subscription);
         await dbContext.SaveChangesAsync();
+
+        // SIMULATE OUTBOX PROCESSING: The test doesn't run the Quartz background worker that
+        // normally processes the SubscriptionSuspendedDomainEvent. To ensure the test passes,
+        // we manually invalidate the cache, just like SubscriptionCacheInvalidator would.
+        var cache = scope.ServiceProvider.GetRequiredService<Application.Abstractions.Billing.ISubscriptionStatusCache>();
+        await cache.InvalidateAsync(dealerId);
         
         // Act on protected endpoint
         var protectedResponse = await client.GetAsync("/api/v1/clients");

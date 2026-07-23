@@ -24,7 +24,7 @@ internal sealed class GetUserByIdQueryHandler(
                 LastName = u.LastName,
                 Email = u.Email,
                 Phone = u.Phone,
-                Role = u.Role,
+                RoleId = u.RoleId,
                 IsActive = u.IsActive,
                 CreatedAt = u.CreatedAt,
                 Permissions = u.Permissions.Select(p => p.Permission).ToList()

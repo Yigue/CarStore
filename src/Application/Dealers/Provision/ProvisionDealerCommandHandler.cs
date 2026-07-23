@@ -1,4 +1,5 @@
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Billing;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.DealerSettings;
@@ -36,7 +37,8 @@ internal sealed class ProvisionDealerCommandHandler(
     IApplicationDbContext context,
     DbContext dbContext,
     IPasswordHasher passwordHasher,
-    IPublisher publisher)
+    IPublisher publisher,
+    ISubscriptionGateway subscriptionGateway)
     : ICommandHandler<ProvisionDealerCommand, ProvisionDealerResponse>
 {
     private const string DashboardBaseUrl = "carstore.com";
@@ -59,6 +61,7 @@ internal sealed class ProvisionDealerCommandHandler(
         try
         {
             var dealerId = Guid.NewGuid();
+            var stripeCustomerId = await subscriptionGateway.CreateCustomerAsync(dealerId, command.AdminEmail, cancellationToken);
 
             var settings = new DealerSettingsEntity(
                 id: dealerId,
@@ -68,7 +71,33 @@ internal sealed class ProvisionDealerCommandHandler(
                 notificationsEnabled: true,
                 hostName: subdomain);
 
+            settings.SetStripeCustomerId(stripeCustomerId);
+
             context.DealerSettings.Add(settings);
+
+            var adminRole = new Role(dealerId, "Admin", "Administrador del Sistema");
+            var defaultPermissions = new[]
+            {
+                "cars:read", "cars:create", "cars:update", "cars:delete",
+                "clients:read", "clients:write", "clients:delete",
+                "sales:read", "sales:create", "sales:update", "sales:delete",
+                "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
+                "financial:read", "financial:create", "financial:update", "financial:delete",
+                "users:read", "users:create", "users:access", "CanManageUsers", "CanManageRoles",
+                "CanManageSettings",
+                "leads:read", "leads:create", "leads:update", "leads:delete",
+                "leads:write", "leads:archive",
+                "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
+                "admin:backfill",
+                "webhooks:manage"
+            };
+
+            foreach (var permission in defaultPermissions)
+            {
+                adminRole.AddPermission(permission);
+            }
+
+            context.Roles.Add(adminRole);
 
             var user = new User(
                 dealerId,
@@ -76,7 +105,7 @@ internal sealed class ProvisionDealerCommandHandler(
                 command.AdminFirstName,
                 command.AdminLastName,
                 passwordHasher.Hash(command.AdminPassword),
-                UserRole.Admin);
+                adminRole.Id);
 
             context.Users.Add(user);
 
@@ -93,7 +122,9 @@ internal sealed class ProvisionDealerCommandHandler(
                 new DealerProvisionedDomainEvent(dealerId, user.Id, command.AdminEmail, subdomain, dashboardUrl),
                 cancellationToken);
 
-            return Result.Success(new ProvisionDealerResponse(dealerId, user.Id, subdomain));
+            var checkoutUrl = await subscriptionGateway.CreateCheckoutSessionAsync(dealerId, command.AdminEmail, cancellationToken);
+
+            return Result.Success(new ProvisionDealerResponse(dealerId, user.Id, subdomain, checkoutUrl));
         }
         catch (DbUpdateException ex) when (IsHostNameUniqueViolation(ex))
         {

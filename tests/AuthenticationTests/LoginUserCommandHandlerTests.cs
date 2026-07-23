@@ -25,7 +25,7 @@ public class LoginUserCommandHandlerTests
     public async Task Handle_ReturnsFailure_WhenPasswordIsInvalid()
     {
         await using var context = CreateContext();
-        var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "user@test.com", "John", "Doe", "hash");
+        var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "user@test.com", "John", "Doe", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -39,21 +39,21 @@ public class LoginUserCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Be(UserErrors.InvalidPassword);
-        tokenProvider.Verify(t => t.Create(It.IsAny<User>()), Times.Never);
+        tokenProvider.Verify(t => t.Create(It.IsAny<User>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
     public async Task Handle_ReturnsToken_WhenCredentialsValid()
     {
         await using var context = CreateContext();
-        var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "user@test.com", "John", "Doe", "hash");
+        var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "user@test.com", "John", "Doe", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
         var passwordHasher = new Mock<IPasswordHasher>();
         passwordHasher.Setup(p => p.Verify("correct", "hash")).Returns(true);
         var tokenProvider = new Mock<ITokenProvider>();
-        tokenProvider.Setup(t => t.Create(It.IsAny<User>())).Returns("token");
+        tokenProvider.Setup(t => t.Create(It.IsAny<User>(), It.IsAny<string>())).Returns("token");
 
         var handler = new LoginUserCommandHandler(context, passwordHasher.Object, tokenProvider.Object);
 
@@ -61,6 +61,6 @@ public class LoginUserCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Be("token");
-        tokenProvider.Verify(t => t.Create(It.IsAny<User>()), Times.Once);
+        tokenProvider.Verify(t => t.Create(It.IsAny<User>(), It.IsAny<string>()), Times.Once);
     }
 }

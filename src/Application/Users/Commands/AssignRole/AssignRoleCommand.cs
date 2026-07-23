@@ -5,5 +5,5 @@ namespace Application.Users.Commands.AssignRole;
 
 public sealed record AssignRoleCommand(
     Guid UserId,
-    UserRole Role
+    Guid RoleId
 ) : ICommand<Guid>;

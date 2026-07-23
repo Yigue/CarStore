@@ -26,11 +26,19 @@ public class DebugStatusEndpoint
         
         var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
         
-        var subscription = DealerSubscription.Create(dealerId, null, null, "plan_123");
-        subscription.Activate("sub_123", DateTime.UtcNow, DateTime.UtcNow.AddMonths(1));
-        subscription.Suspend();
+        var subscription = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(dbContext.DealerSubscriptions, s => s.DealerId == dealerId);
+        if (subscription != null)
+        {
+            subscription.Suspend();
+        }
+        else
+        {
+            subscription = DealerSubscription.Create(dealerId, null, null, "plan_123");
+            subscription.Activate("sub_123", DateTime.UtcNow, DateTime.UtcNow.AddMonths(1));
+            subscription.Suspend();
+            dbContext.DealerSubscriptions.Add(subscription);
+        }
 
-        dbContext.DealerSubscriptions.Add(subscription);
         await dbContext.SaveChangesAsync();
         
         var statusResponse = await client.GetAsync("/api/v1/subscriptions/status");

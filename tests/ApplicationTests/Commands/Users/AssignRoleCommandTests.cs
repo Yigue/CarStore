@@ -40,13 +40,14 @@ public class AssignRoleCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "assign@example.com", "Assign", "Role", "hash", UserRole.Empleado);
+        var newRoleId = Guid.NewGuid();
+        var user = new User(dealerId, "assign@example.com", "Assign", "Role", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
         var handler = CreateHandler(context, mockTenantService.Object);
 
-        var command = new AssignRoleCommand(user.Id, UserRole.Admin);
+        var command = new AssignRoleCommand(user.Id, newRoleId);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -54,7 +55,7 @@ public class AssignRoleCommandTests
         result.Value.Should().Be(user.Id);
 
         var updatedUser = await context.Users.FirstOrDefaultAsync(u => u.Id == user.Id);
-        updatedUser!.Role.Should().Be(UserRole.Admin);
+        updatedUser!.RoleId.Should().Be(newRoleId);
     }
 
     [Fact]
@@ -63,7 +64,7 @@ public class AssignRoleCommandTests
         using var context = CreateContext();
         var handler = CreateHandler(context);
 
-        var command = new AssignRoleCommand(Guid.NewGuid(), UserRole.Admin);
+        var command = new AssignRoleCommand(Guid.NewGuid(), Guid.NewGuid());
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -81,13 +82,13 @@ public class AssignRoleCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId1);
 
-        var user = new User(dealerId2, "other@example.com", "Other", "Dealer", "hash", UserRole.Empleado);
+        var user = new User(dealerId2, "other@example.com", "Other", "Dealer", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
         var handler = CreateHandler(context, mockTenantService.Object);
 
-        var command = new AssignRoleCommand(user.Id, UserRole.Admin);
+        var command = new AssignRoleCommand(user.Id, Guid.NewGuid());
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -103,32 +104,30 @@ public class AssignRoleCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "samerole@example.com", "Same", "Role", "hash", UserRole.Empleado);
+        var roleId = Guid.NewGuid();
+        var user = new User(dealerId, "samerole@example.com", "Same", "Role", "hash", roleId);
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
         var handler = CreateHandler(context, mockTenantService.Object);
 
-        var command = new AssignRoleCommand(user.Id, UserRole.Empleado);
+        var command = new AssignRoleCommand(user.Id, roleId);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData(UserRole.Admin)]
-    [InlineData(UserRole.Empleado)]
-    [InlineData(UserRole.Cliente)]
-    [InlineData(UserRole.Invitado)]
-    public async Task Handle_AllRoles_UpdatesCorrectly(UserRole newRole)
+    [Fact]
+    public async Task Handle_AllRoles_UpdatesCorrectly()
     {
+        var newRole = Guid.NewGuid();
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, $"role{newRole}@example.com", "Role", "Test", "hash", UserRole.Empleado);
+        var user = new User(dealerId, $"role{newRole}@example.com", "Role", "Test", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -140,6 +139,6 @@ public class AssignRoleCommandTests
 
         result.IsSuccess.Should().BeTrue();
         var updatedUser = await context.Users.FirstOrDefaultAsync(u => u.Id == user.Id);
-        updatedUser!.Role.Should().Be(newRole);
+        updatedUser!.RoleId.Should().Be(newRole);
     }
 }

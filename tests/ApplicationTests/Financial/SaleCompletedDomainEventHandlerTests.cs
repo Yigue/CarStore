@@ -69,7 +69,7 @@ public class SaleCompletedDomainEventHandlerTests
             TestDealerId, "John", "Doe", "DNI001", "john@test.com", "555", "Addr", DateTime.UtcNow);
         context.Clients.Add(client);
 
-        var agent = new User(TestDealerId, "agent@test.com", "Agent", "One", "hash", UserRole.Admin);
+        var agent = new User(TestDealerId, "agent@test.com", "Agent", "One", "hash", Guid.NewGuid());
         context.Users.Add(agent);
 
         context.SaveChanges();

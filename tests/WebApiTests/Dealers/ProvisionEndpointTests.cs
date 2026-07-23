@@ -53,7 +53,7 @@ public class ProvisionEndpointTests
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == body.AdminUserId);
         user.Should().NotBeNull();
-        user!.Role.Should().Be(UserRole.Admin);
+        user!.RoleId.Should().NotBeEmpty();
         user.DealerId.Should().Be(body.DealerId);
     }
 

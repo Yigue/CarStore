@@ -35,7 +35,7 @@ internal sealed class CreateUserCommandHandler(
             command.FirstName.Trim(),
             command.LastName.Trim(),
             passwordHasher.Hash(command.Password),
-            command.Role);
+            command.RoleId);
 
         // Set phone if provided
         if (!string.IsNullOrWhiteSpace(command.Phone))

@@ -6,4 +6,5 @@ namespace Application.Dealers.Provision;
 public sealed record ProvisionDealerResponse(
     Guid DealerId,
     Guid AdminUserId,
-    string Subdomain);
+    string Subdomain,
+    string CheckoutUrl);
