@@ -41,7 +41,9 @@ internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
             UpdatedAt = quote.UpdatedAt,
             CarBrand = quote.Car.Marca.Nombre,
             CarModel = quote.Car.Modelo.Nombre,
-            ClientName = quote.Client != null ? $"{quote.Client.FirstName} {quote.Client.LastName}" : (quote.Lead != null ? quote.Lead.ClientName : "Desconocido")
+            ClientName = quote.Client != null ? $"{quote.Client.FirstName} {quote.Client.LastName}" : (quote.Lead != null ? quote.Lead.ClientName : "Desconocido"),
+            OriginLeadId = quote.Client != null ? quote.Client.OriginLeadId : null,
+            ConvertedClientId = quote.Lead != null ? quote.Lead.ConvertedClientId : null
         };
 
         return response;
