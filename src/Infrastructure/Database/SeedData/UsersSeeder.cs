@@ -13,15 +13,9 @@ namespace Infrastructure.Database.SeedData;
 /// </summary>
 internal static class UsersSeeder
 {
-    /// <summary>
-    /// Default development DealerId. Must match the dealer seeded in DealersSeeder (or used in dev data).
-    /// </summary>
     private static readonly Guid DefaultDealerId =
         Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-    /// <summary>
-    /// Seedea el usuario administrador por defecto.
-    /// </summary>
     public static async Task SeedAsync(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
@@ -31,18 +25,14 @@ internal static class UsersSeeder
     {
         const string adminEmail = "admin@carstore.com";
 
-        // Read DealerId from configuration, fallback to default development value
         var dealerIdConfig = configuration["AdminSeedDealerId"];
         var dealerId = !string.IsNullOrEmpty(dealerIdConfig) && Guid.TryParse(dealerIdConfig, out var parsedDealerId)
             ? parsedDealerId
             : DefaultDealerId;
 
-        // Read password from configuration (environment variable ADMIN_SEED_PASSWORD)
         string adminPassword = configuration["ADMIN_SEED_PASSWORD"] ?? "Admin123!";
-
         if (string.IsNullOrWhiteSpace(adminPassword))
         {
-            // This case is now less likely but good to keep as fallback
             adminPassword = GenerateRandomPassword();
             logger.LogWarning(
                 "ADMIN_SEED_PASSWORD not configured. Generated random admin password: {Password}. " +
@@ -50,42 +40,9 @@ internal static class UsersSeeder
                 adminPassword);
         }
 
-        // Verificar si ya existe el usuario admin (bypass tenant filter for seeding)
-        var admin = context.Users
-            .IgnoreQueryFilters()
-            .FirstOrDefault(u => u.Email == adminEmail);
-
-        if (admin is null)
-        {
-            // Hash de la contraseÃ±a
-            var passwordHash = passwordHasher.Hash(adminPassword);
-
-            // Crear usuario admin with valid DealerId
-            admin = new User(
-                dealerId,
-                adminEmail,
-                "Admin",
-                "User",
-                passwordHash,
-                UserRole.Admin);
-
-            context.Users.Add(admin);
-            await context.SaveChangesAsync(cancellationToken);
-        }
-        else if (admin.Role != UserRole.Admin)
-        {
-            // Self-heal: earlier seeds created the admin with the default Cliente
-            // role, which left the frontend (role-gated nav) treating admin as a
-            // client. Correct it idempotently on every startup.
-            admin.UpdateRole(UserRole.Admin);
-            await context.SaveChangesAsync(cancellationToken);
-        }
-
-        // Seeder de permisos para el admin (bypass tenant filter for seeding)
-        var permissions = new List<string>
+        var adminRole = await SeedRoleAsync(context, dealerId, "Admin", "Administrador del Sistema", new[]
         {
             "cars:read", "cars:create", "cars:update", "cars:delete",
-            // clients:create and clients:update removed in DropLegacyCRMPermissions migration (PR3)
             "clients:read", "clients:write", "clients:delete",
             "sales:read", "sales:create", "sales:update", "sales:delete",
             "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
@@ -97,25 +54,22 @@ internal static class UsersSeeder
             "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
             "admin:backfill",
             "webhooks:manage"
-        };
+        }, cancellationToken);
 
-        // Reconcile: add any permissions the admin is missing. Self-heals when new
-        // permissions are introduced (e.g. appointments) without a fresh re-seed,
-        // since the all-or-nothing guard used to skip existing admins entirely.
-        var existingPermissions = context.UserPermissions
+        var admin = context.Users
             .IgnoreQueryFilters()
-            .Where(p => p.UserId == admin.Id)
-            .Select(p => p.Permission)
-            .ToHashSet();
+            .FirstOrDefault(u => u.Email == adminEmail);
 
-        var missingPermissions = permissions.Where(p => !existingPermissions.Contains(p)).ToList();
-        if (missingPermissions.Count > 0)
+        if (admin is null)
         {
-            foreach (var permission in missingPermissions)
-            {
-                context.UserPermissions.Add(new UserPermission(admin.Id, permission));
-            }
-
+            var passwordHash = passwordHasher.Hash(adminPassword);
+            admin = new User(dealerId, adminEmail, "Admin", "User", passwordHash, adminRole.Id);
+            context.Users.Add(admin);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        else if (admin.RoleId != adminRole.Id)
+        {
+            admin.UpdateRole(adminRole.Id);
             await context.SaveChangesAsync(cancellationToken);
         }
 
@@ -123,10 +77,54 @@ internal static class UsersSeeder
         await SeedSuperAdminAsync(context, passwordHasher, configuration, logger, cancellationToken);
     }
 
-    /// <summary>
-    /// Seeds a default Empleado (staff) user with a read-focused permission set so that
-    /// non-admin roles are functional out of the box (spec: rbac).
-    /// </summary>
+    private static async Task<Role> SeedRoleAsync(
+        IApplicationDbContext context, 
+        Guid dealerId, 
+        string roleName, 
+        string description, 
+        string[] permissions,
+        CancellationToken cancellationToken)
+    {
+        var role = await context.Roles
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(r => r.DealerId == dealerId && r.Name == roleName, cancellationToken);
+
+        if (role == null)
+        {
+            role = new Role(dealerId, roleName, description);
+            foreach (var permission in permissions)
+            {
+                role.AddPermission(permission);
+            }
+            context.Roles.Add(role);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        else
+        {
+            var existingPermissions = await context.RolePermissions
+                .IgnoreQueryFilters()
+                .Where(rp => rp.RoleId == role.Id)
+                .Select(rp => rp.Permission)
+                .ToListAsync(cancellationToken);
+
+            bool added = false;
+            foreach (var permission in permissions)
+            {
+                if (!existingPermissions.Contains(permission))
+                {
+                    role.AddPermission(permission);
+                    added = true;
+                }
+            }
+            if (added)
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        return role;
+    }
+
     private static async Task SeedEmpleadoAsync(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
@@ -137,6 +135,22 @@ internal static class UsersSeeder
         const string empleadoEmail = "empleado@carstore.com";
         string empleadoPassword = configuration["EMPLEADO_SEED_PASSWORD"] ?? "Empleado123!";
 
+        // REQ-QT-RBAC-001: Cotizaciones is Admin-only by default (Etapa 3) —
+        // "quotes:read"/"quotes:create" removed from the Empleado seed. This
+        // only affects fresh seeds / new dealers: SeedRoleAsync only adds
+        // missing permissions on re-seed, it never revokes existing grants
+        // (ADR-8, accepted risk — see design.md §2).
+        var empleadoRole = await SeedRoleAsync(context, dealerId, "Empleado", "Empleado Demo", new[]
+        {
+            "cars:read",
+            "clients:read",
+            "sales:read",
+            "sales:create",
+            "sales:update",
+            "leads:read",
+            "appointments:read"
+        }, cancellationToken);
+
         var empleado = context.Users
             .IgnoreQueryFilters()
             .FirstOrDefault(u => u.Email == empleadoEmail);
@@ -144,56 +158,17 @@ internal static class UsersSeeder
         if (empleado is null)
         {
             var passwordHash = passwordHasher.Hash(empleadoPassword);
-            empleado = new User(dealerId, empleadoEmail, "Empleado", "Demo", passwordHash, UserRole.Empleado);
+            empleado = new User(dealerId, empleadoEmail, "Empleado", "Demo", passwordHash, empleadoRole.Id);
             context.Users.Add(empleado);
             await context.SaveChangesAsync(cancellationToken);
         }
-        else if (empleado.Role != UserRole.Empleado)
+        else if (empleado.RoleId != empleadoRole.Id)
         {
-            // Self-heal stale Cliente role (see admin note above).
-            empleado.UpdateRole(UserRole.Empleado);
-            await context.SaveChangesAsync(cancellationToken);
-        }
-
-        var empleadoPermissions = new List<string>
-        {
-            "cars:read",
-            "clients:read",
-            "sales:read",
-            "sales:create",
-            "sales:update",
-            "quotes:read",
-            "quotes:create",
-            "leads:read",
-            "appointments:read"
-        };
-
-        // Reconcile: add any permissions the empleado is missing. Self-heals when new
-        // permissions are introduced (e.g. sales:create/sales:update) without a fresh
-        // re-seed, since the all-or-nothing guard used to skip existing empleados entirely.
-        var existingEmpleadoPermissions = context.UserPermissions
-            .IgnoreQueryFilters()
-            .Where(p => p.UserId == empleado.Id)
-            .Select(p => p.Permission)
-            .ToHashSet();
-
-        var missingEmpleadoPermissions = empleadoPermissions.Where(p => !existingEmpleadoPermissions.Contains(p)).ToList();
-        if (missingEmpleadoPermissions.Count > 0)
-        {
-            foreach (var permission in missingEmpleadoPermissions)
-            {
-                context.UserPermissions.Add(new UserPermission(empleado.Id, permission));
-            }
-
+            empleado.UpdateRole(empleadoRole.Id);
             await context.SaveChangesAsync(cancellationToken);
         }
     }
 
-    /// <summary>
-    /// Seeds the platform SuperAdmin user for development / testing.
-    /// SuperAdmin always has DealerId = Guid.Empty (no tenant scope).
-    /// In production the first SuperAdmin is provisioned via manual SQL (see docs/operations/super-admin-seed.sql).
-    /// </summary>
     private static async Task SeedSuperAdminAsync(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
@@ -211,24 +186,17 @@ internal static class UsersSeeder
         if (superAdmin is null)
         {
             var passwordHash = passwordHasher.Hash(superAdminPassword);
-
-            // SuperAdmin has DealerId = Guid.Empty by contract (ADR-1).
-            // We bypass SetDealer() by creating via the factory method which skips the
-            // non-empty invariant — SuperAdmin is a platform-level user, not tenant-scoped.
             superAdmin = User.CreateSuperAdmin(superAdminEmail, "Super", "Admin", passwordHash);
-
             context.Users.Add(superAdmin);
             await context.SaveChangesAsync(cancellationToken);
             logger.LogInformation("SuperAdmin seeded with email {Email}", superAdminEmail);
         }
-        else if (superAdmin.Role != UserRole.SuperAdmin)
+        else if (superAdmin.RoleId != Guid.Empty)
         {
-            // Self-heal: correct the role if it was accidentally set to something else.
-            superAdmin.UpdateRole(UserRole.SuperAdmin);
+            superAdmin.UpdateRole(Guid.Empty);
             await context.SaveChangesAsync(cancellationToken);
         }
 
-        // Invariant: SuperAdmin must have DealerId = Guid.Empty
         if (superAdmin.DealerId != Guid.Empty)
         {
             logger.LogError(
@@ -237,7 +205,6 @@ internal static class UsersSeeder
                 superAdmin.Id, superAdmin.DealerId);
         }
 
-        // Grant all platform:* permissions
         var platformPermissions = new List<string>
         {
             "platform:dealers:read",
@@ -275,20 +242,16 @@ internal static class UsersSeeder
         RandomNumberGenerator.Fill(randomBytes);
 
         char[] password = new char[length];
-
-        // Ensure at least one of each required character type
         password[0] = uppercase[randomBytes[0] % uppercase.Length];
         password[1] = lowercase[randomBytes[1] % lowercase.Length];
         password[2] = digits[randomBytes[2] % digits.Length];
         password[3] = special[randomBytes[3] % special.Length];
 
-        // Fill the rest randomly
         for (int i = 4; i < length; i++)
         {
             password[i] = allChars[randomBytes[i] % allChars.Length];
         }
 
-        // Shuffle using Fisher-Yates
         Span<byte> shuffleBytes = stackalloc byte[length];
         RandomNumberGenerator.Fill(shuffleBytes);
         for (int i = length - 1; i > 0; i--)
@@ -300,4 +263,3 @@ internal static class UsersSeeder
         return new string(password);
     }
 }
-

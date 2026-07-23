@@ -22,10 +22,10 @@ public class SeederPermissionsTests
             .IgnoreQueryFilters()
             .FirstAsync(u => u.Email == email);
 
-        return await context.UserPermissions
+        return await context.RolePermissions
             .IgnoreQueryFilters()
-            .Where(p => p.UserId == user.Id)
-            .Select(p => p.Permission)
+            .Where(rp => rp.RoleId == user.RoleId)
+            .Select(rp => rp.Permission)
             .ToArrayAsync();
     }
 
@@ -50,9 +50,22 @@ public class SeederPermissionsTests
 
         permissions.Should().Contain(new[]
         {
-            "cars:read", "clients:read", "sales:read", "quotes:read",
-            "leads:read", "appointments:read", "quotes:create"
+            "cars:read", "clients:read", "sales:read",
+            "leads:read", "appointments:read"
         });
+    }
+
+    [Fact]
+    public async Task EmpleadoSeed_DoesNotIncludeQuotesPermissions()
+    {
+        // REQ-QT-RBAC-001: Cotizaciones is Admin-only by default (Etapa 3) — the
+        // Empleado default seed no longer grants quotes:read/quotes:create.
+        await using var factory = new CustomWebApplicationFactory();
+        factory.SeedDatabase();
+
+        var permissions = await PermissionsForAsync(factory, "empleado@carstore.com");
+
+        permissions.Should().NotContain(new[] { "quotes:read", "quotes:create" });
     }
 
     [Fact]
@@ -91,13 +104,13 @@ public class SeederPermissionsTests
 
             // Simulate a database seeded before sales:create/sales:update existed by
             // stripping them (and a couple of other permissions) down to a partial set.
-            var toRemove = await context.UserPermissions
+            var toRemove = await context.RolePermissions
                 .IgnoreQueryFilters()
-                .Where(p => p.UserId == empleado.Id
-                    && (p.Permission == "sales:create" || p.Permission == "sales:update" || p.Permission == "leads:read"))
+                .Where(rp => rp.RoleId == empleado.RoleId
+                    && (rp.Permission == "sales:create" || rp.Permission == "sales:update" || rp.Permission == "leads:read"))
                 .ToListAsync();
 
-            context.UserPermissions.RemoveRange(toRemove);
+            context.RolePermissions.RemoveRange(toRemove);
             await context.SaveChangesAsync();
         }
 
@@ -112,7 +125,7 @@ public class SeederPermissionsTests
         reconciledPermissions.Should().Contain(new[]
         {
             "cars:read", "clients:read", "sales:read", "sales:create", "sales:update",
-            "quotes:read", "quotes:create", "leads:read", "appointments:read"
+            "leads:read", "appointments:read"
         });
 
         // No duplicates were inserted for permissions that were never removed.
