@@ -66,13 +66,19 @@ internal sealed class CreateQuoteCommandHandler(
         }
         else if (command.LeadId is { } leadId)
         {
-            // IgnoreQueryFilters: the default LeadConfiguration query filter hides
-            // Archivado leads entirely. We need to still resolve them here so the
-            // gate below can return the precise LeadNotQuotable error instead of a
-            // misleading NotFound for a lead that does exist but is archived.
+            // IgnoreQueryFilters: bypasses LeadConfiguration's Archivado-hiding filter
+            // so the gate below can return the precise LeadNotQuotable error instead
+            // of a misleading NotFound for a lead that exists but is archived.
+            // IMPORTANT: IgnoreQueryFilters() also strips the tenant (DealerId) query
+            // filter defined on Lead, so the DealerId check below is NOT optional —
+            // without it, a leadId belonging to another dealer would resolve
+            // successfully and get linked into a persisted Quote (cross-tenant leak,
+            // see verify-report crm-cotizaciones-etapa3 CRITICAL-1).
             lead = await context.Leads
                 .IgnoreQueryFilters()
-                .SingleOrDefaultAsync(l => l.Id == leadId, cancellationToken);
+                .SingleOrDefaultAsync(
+                    l => l.Id == leadId && l.DealerId == tenantService.DealerId,
+                    cancellationToken);
 
             if (lead is null)
             {

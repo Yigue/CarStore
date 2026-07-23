@@ -60,9 +60,9 @@ public class CreateQuoteCommandHandlerTests
         return client;
     }
 
-    private static async Task<Lead> SeedLeadAsync(TestApplicationDbContext context, LeadStatus status)
+    private static async Task<Lead> SeedLeadAsync(TestApplicationDbContext context, LeadStatus status, Guid? dealerId = null)
     {
-        var lead = Lead.Create(DealerId, "John Doe", "john@test.com", "555", LeadSource.Web, DateTime.UtcNow);
+        var lead = Lead.Create(dealerId ?? DealerId, "John Doe", "john@test.com", "555", LeadSource.Web, DateTime.UtcNow);
         if (status != LeadStatus.Nuevo)
         {
             lead.ForceStatus(status);
@@ -167,5 +167,29 @@ public class CreateQuoteCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         var persistedCar = await context.Cars.SingleAsync(c => c.Id == car.Id);
         persistedCar.ServiceCar.Should().Be(StatusServiceCar.Reservado);
+    }
+
+    // Regression for CRITICAL-1 (verify-report crm-cotizaciones-etapa3): the Lead
+    // lookup used .IgnoreQueryFilters() to bypass the (in production, dead)
+    // Archivado-hiding filter, but that call ALSO strips the tenant filter, so a
+    // leadId belonging to another dealer resolved successfully and got linked into
+    // a persisted Quote. The fix scopes the query to the current tenant explicitly,
+    // independent of which EF Core global query filter is actually active.
+    [Fact]
+    public async Task Handle_Should_ReturnLeadNotFound_WhenLeadBelongsToDifferentDealer()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var otherDealerId = Guid.NewGuid();
+        var foreignLead = await SeedLeadAsync(context, LeadStatus.Negociacion, otherDealerId);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+
+        var result = await handler.Handle(BuildCommand(car.Id, null, foreignLead.Id), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(LeadErrors.NotFound(foreignLead.Id));
+        (await context.Quotes.AnyAsync()).Should().BeFalse();
+        var persistedCar = await context.Cars.SingleAsync(c => c.Id == car.Id);
+        persistedCar.ServiceCar.Should().Be(StatusServiceCar.Disponible);
     }
 }
