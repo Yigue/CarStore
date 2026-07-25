@@ -136,17 +136,18 @@ internal static class UsersSeeder
         string empleadoPassword = configuration["EMPLEADO_SEED_PASSWORD"] ?? "Empleado123!";
 
         // REQ-QT-RBAC-001: Cotizaciones is Admin-only by default (Etapa 3) —
-        // "quotes:read"/"quotes:create" removed from the Empleado seed. This
-        // only affects fresh seeds / new dealers: SeedRoleAsync only adds
+        // "quotes:read"/"quotes:create" removed from the Empleado seed.
+        // REQ-SL-RBAC-001: Sales edit/delete is Admin-only by default —
+        // "sales:update" removed from the Empleado seed (sales-lifecycle-hardening).
+        // Both only affect fresh seeds / new dealers: SeedRoleAsync only adds
         // missing permissions on re-seed, it never revokes existing grants
-        // (ADR-8, accepted risk — see design.md §2).
+        // (ADR-8/ADR-9, accepted risk — see design.md §2).
         var empleadoRole = await SeedRoleAsync(context, dealerId, "Empleado", "Empleado Demo", new[]
         {
             "cars:read",
             "clients:read",
             "sales:read",
             "sales:create",
-            "sales:update",
             "leads:read",
             "appointments:read"
         }, cancellationToken);

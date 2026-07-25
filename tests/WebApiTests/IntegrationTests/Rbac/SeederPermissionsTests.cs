@@ -69,17 +69,19 @@ public class SeederPermissionsTests
     }
 
     [Fact]
-    public async Task EmpleadoSeed_CanCreateAndUpdateSales_But_NotDelete()
+    public async Task EmpleadoSeed_CanCreateSales_But_NotUpdateOrDelete()
     {
-        // Bug 4: Empleado must be able to perform sales CRUD (create/update) it was
-        // previously missing, while deletion stays admin-only.
+        // REQ-SL-RBAC-001 (sales-lifecycle-hardening, Slice B): Empleado keeps
+        // sales:create, but edit/delete are Admin-only by default — sales:update
+        // was removed from the Empleado seed alongside the already-absent
+        // sales:delete.
         await using var factory = new CustomWebApplicationFactory();
         factory.SeedDatabase();
 
         var permissions = await PermissionsForAsync(factory, "empleado@carstore.com");
 
-        permissions.Should().Contain(new[] { "sales:create", "sales:update" });
-        permissions.Should().NotContain("sales:delete");
+        permissions.Should().Contain("sales:create");
+        permissions.Should().NotContain(new[] { "sales:update", "sales:delete" });
     }
 
     [Fact]
@@ -87,10 +89,12 @@ public class SeederPermissionsTests
     {
         // The Empleado seeder used to be all-or-nothing: if the user already had ANY
         // permission row, the whole block was skipped, so newly added permissions
-        // (e.g. sales:create/sales:update) never reached databases seeded before
-        // those permissions existed. This proves the reconcile fix: an existing
-        // empleado with a partial permission set gains the missing ones on re-seed,
-        // without losing the ones it already had.
+        // (e.g. sales:create) never reached databases seeded before those
+        // permissions existed. This proves the reconcile fix: an existing empleado
+        // with a partial permission set gains the missing ones on re-seed, without
+        // losing the ones it already had. (sales:update is intentionally excluded
+        // from this simulation — REQ-SL-RBAC-001 removed it from the seed array,
+        // so it is no longer expected to be reconciled back in.)
         await using var factory = new CustomWebApplicationFactory();
         factory.SeedDatabase();
 
@@ -102,12 +106,12 @@ public class SeederPermissionsTests
                 .IgnoreQueryFilters()
                 .FirstAsync(u => u.Email == "empleado@carstore.com");
 
-            // Simulate a database seeded before sales:create/sales:update existed by
-            // stripping them (and a couple of other permissions) down to a partial set.
+            // Simulate a database seeded before sales:create existed by stripping it
+            // (and a couple of other permissions) down to a partial set.
             var toRemove = await context.RolePermissions
                 .IgnoreQueryFilters()
                 .Where(rp => rp.RoleId == empleado.RoleId
-                    && (rp.Permission == "sales:create" || rp.Permission == "sales:update" || rp.Permission == "leads:read"))
+                    && (rp.Permission == "sales:create" || rp.Permission == "leads:read"))
                 .ToListAsync();
 
             context.RolePermissions.RemoveRange(toRemove);
@@ -115,7 +119,7 @@ public class SeederPermissionsTests
         }
 
         var partialPermissions = await PermissionsForAsync(factory, "empleado@carstore.com");
-        partialPermissions.Should().NotContain(new[] { "sales:create", "sales:update", "leads:read" });
+        partialPermissions.Should().NotContain(new[] { "sales:create", "leads:read" });
 
         // Re-seed: reconcile must add back only the missing permissions.
         factory.SeedDatabase();
@@ -124,9 +128,10 @@ public class SeederPermissionsTests
 
         reconciledPermissions.Should().Contain(new[]
         {
-            "cars:read", "clients:read", "sales:read", "sales:create", "sales:update",
+            "cars:read", "clients:read", "sales:read", "sales:create",
             "leads:read", "appointments:read"
         });
+        reconciledPermissions.Should().NotContain("sales:update");
 
         // No duplicates were inserted for permissions that were never removed.
         reconciledPermissions.Should().OnlyHaveUniqueItems();
