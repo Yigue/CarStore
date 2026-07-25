@@ -33,5 +33,17 @@ public static class SalesErrors
     public static Error CannotDeleteCompleted(Guid saleId) => Error.Conflict(
         "Sales.CannotDeleteCompleted",
         $"The sale with Id = '{saleId}' cannot be deleted because it is Completed. Completed sales have a linked financial transaction.");
+
+    public static Error QuoteNotFound(Guid quoteId) => Error.NotFound(
+        "Sales.QuoteNotFound",
+        $"The quote with Id = '{quoteId}' referenced by this sale was not found.");
+
+    public static Error QuoteNotAccepted(Guid quoteId) => Error.Problem(
+        "Sales.QuoteNotAccepted",
+        $"The quote with Id = '{quoteId}' cannot be converted into a sale because it is not Accepted.");
+
+    public static Error QuoteMismatch(Guid quoteId) => Error.Problem(
+        "Sales.QuoteMismatch",
+        $"The car or client of this sale does not match the accepted quote with Id = '{quoteId}'.");
 }
 

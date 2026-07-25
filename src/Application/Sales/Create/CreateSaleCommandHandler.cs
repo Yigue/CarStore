@@ -7,6 +7,7 @@ using Domain.Cars.Events;
 using Domain.Clients;
 using Domain.Clients.Attributes;
 using Domain.Quotes;
+using Domain.Quotes.Attributes;
 using Domain.Sales;
 using Domain.Sales.Attributes;
 using Domain.Sales.Events;
@@ -49,6 +50,38 @@ internal sealed class CreateSaleCommandHandler(
             if (alreadyConverted)
             {
                 return Result.Failure<Guid>(SalesErrors.AlreadyConvertedFromQuote(quoteId));
+            }
+
+            // REQ-SL-QCASCADE-001: a supplied QuoteId must reference an Accepted quote whose
+            // car and party (client or lead) match this command. Tenant-scoped by the default
+            // query filter, consistent with the rest of this handler.
+            Quote? quote = await context.Quotes
+                .FirstOrDefaultAsync(q => q.Id == quoteId, cancellationToken);
+
+            if (quote is null)
+            {
+                return Result.Failure<Guid>(SalesErrors.QuoteNotFound(quoteId));
+            }
+
+            if (quote.Status != QuoteStatus.Accepted)
+            {
+                return Result.Failure<Guid>(SalesErrors.QuoteNotAccepted(quoteId));
+            }
+
+            if (quote.CarId != command.CarId)
+            {
+                return Result.Failure<Guid>(SalesErrors.QuoteMismatch(quoteId));
+            }
+
+            // Party consistency: a client-linked quote must match the sale's client; a
+            // lead-linked quote (client created at conversion time) matches on the lead instead.
+            bool partyMatches = quote.ClientId is { } qClientId
+                ? qClientId == command.ClientId
+                : quote.LeadId == command.LeadId;
+
+            if (!partyMatches)
+            {
+                return Result.Failure<Guid>(SalesErrors.QuoteMismatch(quoteId));
             }
         }
 
