@@ -24,13 +24,15 @@ public class TokenProviderTests
         var provider = new TokenProvider(configuration);
                 var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "test@example.com", "Test", "User", "hash", Guid.NewGuid());
 
-        string token = provider.Create(user);
+        string token = provider.Create(user, "empleado");
 
         var handler = new JsonWebTokenHandler();
         var jwt = handler.ReadJsonWebToken(token);
 
         jwt.Subject.Should().Be(user.Id.ToString());
         jwt.Claims.First(c => c.Type == Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Email).Value.Should().Be(user.Email);
+        jwt.Claims.First(c => c.Type == "role").Value.Should().Be("empleado");
+        jwt.Claims.First(c => c.Type == "dealer_id").Value.Should().Be(user.DealerId.ToString());
         jwt.Issuer.Should().Be("issuer");
         jwt.Audiences.Should().Contain("audience");
         jwt.ValidTo.Should().BeCloseTo(DateTime.UtcNow.AddMinutes(60), TimeSpan.FromMinutes(1));
@@ -49,7 +51,7 @@ public class TokenProviderTests
         var provider = new TokenProvider(configuration);
                 var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "test@example.com", "Test", "User", "hash", Guid.NewGuid());
 
-        Action act = () => provider.Create(user);
+        Action act = () => provider.Create(user, "empleado");
 
         act.Should().Throw<ArgumentNullException>();
     }
