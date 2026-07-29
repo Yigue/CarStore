@@ -23,6 +23,14 @@ public class SetCoverImageCommandHandlerTests
         return new TestApplicationDbContext(options);
     }
 
+    private static int _plateCounter;
+
+    // LicensePlate only accepts Argentine formats; a GUID fragment is rejected with
+    // "Invalid license plate format". Use the ABC1234 variant (3 letters + 4 digits)
+    // and a counter so each car in a run still gets a distinct patente.
+    private static string NextPatente() =>
+        $"ABC{Interlocked.Increment(ref _plateCounter) % 10000:D4}";
+
     private static Car CreateTestCar(Guid dealerId)
     {
         var marca = new Marca("Test");
@@ -40,7 +48,7 @@ public class SetCoverImageCommandHandlerTests
             2000,
             0,
             2024,
-            $"T{Guid.NewGuid().ToString().Substring(0, 5)}", // unique patente
+            NextPatente(),
             "Test car",
             25000m,
             DateTime.UtcNow
