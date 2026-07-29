@@ -48,10 +48,30 @@ internal static class BrandsSeeder
     private static readonly Guid S10Id     = new("4a1b2c3d-0003-0003-0003-000000000004");
     private static readonly Guid MalibuId  = new("4a1b2c3d-0003-0003-0003-000000000005");
     // Volkswagen
-    private static readonly Guid GolId     = new("4a1b2c3d-0004-0004-0004-000000000001");
-    private static readonly Guid PoloId    = new("4a1b2c3d-0004-0004-0004-000000000002");
-    private static readonly Guid TiguanId  = new("4a1b2c3d-0004-0004-0004-000000000003");
-    private static readonly Guid AmarokId  = new("4a1b2c3d-0004-0004-0004-000000000004");
+    public static readonly Guid GolId     = new("4a1b2c3d-0004-0004-0004-000000000001");
+    public static readonly Guid PoloId    = new("4a1b2c3d-0004-0004-0004-000000000002");
+    public static readonly Guid TiguanId  = new("4a1b2c3d-0004-0004-0004-000000000003");
+    public static readonly Guid AmarokId  = new("4a1b2c3d-0004-0004-0004-000000000004");
+    // Honda
+    public static readonly Guid CivicId   = new("4a1b2c3d-0005-0005-0005-000000000001");
+    public static readonly Guid HrvId     = new("4a1b2c3d-0005-0005-0005-000000000002");
+    public static readonly Guid CrvId     = new("4a1b2c3d-0005-0005-0005-000000000003");
+    public static readonly Guid FitId     = new("4a1b2c3d-0005-0005-0005-000000000004");
+    // Fiat
+    public static readonly Guid CronosId  = new("4a1b2c3d-0006-0006-0006-000000000001");
+    public static readonly Guid ArgoId    = new("4a1b2c3d-0006-0006-0006-000000000002");
+    public static readonly Guid ToroId    = new("4a1b2c3d-0006-0006-0006-000000000003");
+    public static readonly Guid MobiId    = new("4a1b2c3d-0006-0006-0006-000000000004");
+    // Renault
+    public static readonly Guid SanderoId = new("4a1b2c3d-0007-0007-0007-000000000001");
+    public static readonly Guid KangooId  = new("4a1b2c3d-0007-0007-0007-000000000002");
+    public static readonly Guid DusterId  = new("4a1b2c3d-0007-0007-0007-000000000003");
+    public static readonly Guid LoganId   = new("4a1b2c3d-0007-0007-0007-000000000004");
+    // Peugeot
+    public static readonly Guid Peugeot208Id  = new("4a1b2c3d-0008-0008-0008-000000000001");
+    public static readonly Guid Peugeot2008Id = new("4a1b2c3d-0008-0008-0008-000000000002");
+    public static readonly Guid Peugeot308Id  = new("4a1b2c3d-0008-0008-0008-000000000003");
+    public static readonly Guid PartnerId    = new("4a1b2c3d-0008-0008-0008-000000000004");
 
     public static async Task SeedAsync(
         IApplicationDbContext context,
@@ -101,9 +121,30 @@ internal static class BrandsSeeder
             Modelo.WithId(PoloId,    "Polo",    VolkswagenId),
             Modelo.WithId(TiguanId,  "Tiguan",  VolkswagenId),
             Modelo.WithId(AmarokId,  "Amarok",  VolkswagenId),
+            // Honda
+            Modelo.WithId(CivicId,   "Civic",   HondaId),
+            Modelo.WithId(HrvId,     "HR-V",    HondaId),
+            Modelo.WithId(CrvId,     "CR-V",    HondaId),
+            Modelo.WithId(FitId,     "Fit",     HondaId),
+            // Fiat
+            Modelo.WithId(CronosId,  "Cronos",  FiatId),
+            Modelo.WithId(ArgoId,    "Argo",    FiatId),
+            Modelo.WithId(ToroId,    "Toro",    FiatId),
+            Modelo.WithId(MobiId,    "Mobi",    FiatId),
+            // Renault
+            Modelo.WithId(SanderoId, "Sandero", RenaultId),
+            Modelo.WithId(KangooId,  "Kangoo",  RenaultId),
+            Modelo.WithId(DusterId,  "Duster",  RenaultId),
+            Modelo.WithId(LoganId,   "Logan",   RenaultId),
+            // Peugeot
+            Modelo.WithId(Peugeot208Id,  "208",     PeugeotId),
+            Modelo.WithId(Peugeot2008Id, "2008",    PeugeotId),
+            Modelo.WithId(Peugeot308Id,  "308",     PeugeotId),
+            Modelo.WithId(PartnerId,     "Partner", PeugeotId),
         };
 
         context.Modelo.AddRange(modelos);
         await context.SaveChangesAsync(cancellationToken);
     }
+
 }
