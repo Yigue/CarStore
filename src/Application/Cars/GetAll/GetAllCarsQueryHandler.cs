@@ -65,7 +65,9 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, ISto
                 car.Price.Amount,
                 car.CreatedAt,
                 car.UpdatedAt,
-                imageResponses
+                imageResponses,
+                car.Featured,
+                car.PurchaseCost?.Amount
             ));
         }
 

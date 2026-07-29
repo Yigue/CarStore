@@ -64,7 +64,9 @@ internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context, ISto
             car.Price.Amount,
             car.CreatedAt,
             car.UpdatedAt,
-            imageResponses
+            imageResponses,
+            car.Featured,
+            car.PurchaseCost?.Amount
         );
 
         return response;

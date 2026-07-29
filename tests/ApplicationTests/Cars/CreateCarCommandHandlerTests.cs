@@ -107,4 +107,58 @@ public class CreateCarCommandHandlerTests
         result.Error.Should().Be(CarErrors.AtributesInvalid());
         context.Cars.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task Handle_Should_CreateSecondCar_WhenCacheReturnsDetachedGraph()
+    {
+        using var context = CreateContext();
+        var dateProvider = new FakeDateTimeProvider { UtcNow = new DateTime(2024, 1, 1) };
+        var marca = new Marca("Toyota");
+        var modelo = new Modelo("Corolla", marca.Id);
+        context.Marca.Add(marca);
+        context.Modelo.Add(modelo);
+        await context.SaveChangesAsync();
+
+        // Simulate a warm cache where the service returns detached instances (new objects with same IDs)
+        var cachedMarca = Marca.WithId(marca.Id, "Toyota");
+        var cachedModelo = Modelo.WithId(modelo.Id, "Corolla", marca.Id);
+        cachedModelo.Marca = cachedMarca;
+
+        var mockBrandService = new Mock<ICachedBrandService>();
+        mockBrandService.Setup(s => s.GetByIdAsync(marca.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(cachedMarca);
+
+        var mockModelService = new Mock<ICachedModelService>();
+        mockModelService.Setup(s => s.GetByIdAsync(modelo.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(cachedModelo);
+
+        var mockTenantService = new Mock<ICurrentTenantService>();
+        mockTenantService.Setup(t => t.DealerId).Returns(Guid.NewGuid());
+
+        // Pre-attach the original marca to force identity collision if the handler attaches the detached graph
+        context.Marca.Attach(marca);
+
+        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object);
+
+        var command = new CreateCarCommand(
+            marca.Id,
+            modelo.Id,
+            Color.Blue,
+            TypeCar.Sedan,
+            StatusCar.New,
+            StatusServiceCar.Disponible,
+            4,
+            5,
+            2000,
+            0,
+            2024,
+            "XYZ789",
+            "Second car",
+            25000m);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        context.Cars.Should().ContainSingle(c => c.Id == result.Value);
+    }
 }

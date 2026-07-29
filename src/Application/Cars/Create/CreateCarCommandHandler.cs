@@ -8,7 +8,6 @@ using Domain.Cars.Events;
 using Domain.Users;
 using Application.Abstractions.Caching;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SharedKernel;
 
 namespace Application.Cars.Create;
@@ -51,6 +50,8 @@ internal sealed class CreateCarCommandHandler(
             return Result.Failure<Guid>(CarErrors.AtributesInvalid());
         }
 
+        marca = await context.Marca.SingleAsync(m => m.Id == command.Marca, cancellationToken);
+        modelo = await context.Modelo.SingleAsync(m => m.Id == command.Modelo, cancellationToken);
 
         var car = new Car(
             tenantService.DealerId,

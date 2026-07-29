@@ -1,4 +1,4 @@
-﻿using Domain.Cars.Attributes;
+using Domain.Cars.Attributes;
 using Domain.Cars;
 using System.Diagnostics.CodeAnalysis;
 
@@ -22,7 +22,9 @@ public sealed record CarsResponses(
     decimal Precio,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    List<CarImageResponse> Images
+    List<CarImageResponse> Images,
+    bool Featured,
+    decimal? PurchaseCost
 );
 
 [SuppressMessage("Design", "CA1054:Los parámetros URI deben ser de tipo System.Uri", Justification = "Se usa string para simplificar")]
