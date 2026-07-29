@@ -18,7 +18,8 @@ public sealed class UpdateFinancialCommandValidator : AbstractValidator<UpdateFi
 
         RuleFor(x => x.Amount)
             .NotEmpty().WithMessage("El monto es requerido")
-            .GreaterThan(0).WithMessage("El monto debe ser mayor que cero");
+            .GreaterThan(0).WithMessage("El monto debe ser mayor que cero")
+            .LessThanOrEqualTo(999_999_999_999.99m).WithMessage("El monto no puede exceder 999.999.999.999,99");
 
         RuleFor(x => x.Description)
             .NotEmpty().WithMessage("La descripción es requerida")
