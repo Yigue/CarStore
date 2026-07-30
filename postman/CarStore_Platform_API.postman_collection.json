@@ -6,10 +6,26 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
-    { "key": "platformToken", "value": "", "type": "string" },
-    { "key": "dealerId", "value": "", "type": "string" },
-    { "key": "dealerETag", "value": "", "type": "string" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "platformToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dealerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dealerETag",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
@@ -36,15 +52,27 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n    \"email\": \"ops@carstore.io\",\n    \"password\": \"Ops123!\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/users/login",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "users", "login"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "login"
+          ]
         }
       },
       "description": "Log in as the seeded SuperAdmin user. Saves the JWT to 'platformToken'."
@@ -76,12 +104,21 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{platformToken}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{platformToken}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/platform/dealers",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "platform", "dealers"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "platform",
+            "dealers"
+          ]
         }
       },
       "description": "Returns all dealers across all tenants, ordered by createdAt desc.\nRequires permission: platform:dealers:read.\n\nThe response includes an 'eTag' field per dealer (xmin row version).\nSave it before calling suspend/activate."
@@ -107,8 +144,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{platformToken}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{platformToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -116,8 +159,16 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/platform/dealers/{{dealerId}}/suspend",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "platform", "dealers", "{{dealerId}}", "suspend"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "platform",
+            "dealers",
+            "{{dealerId}}",
+            "suspend"
+          ]
         }
       },
       "description": "Soft-suspends a dealer. Sets IsActive=false.\nRequires permission: platform:dealers:suspend.\n\nBody fields:\n- reason (string, required, max 500 chars)\n- eTag (string, required) — from the 'eTag' field in GET /dealers response\n\nErrors:\n- 400: empty reason\n- 404: dealer not found\n- 412: ETag mismatch (stale — re-GET dealers to refresh)"
@@ -141,8 +192,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{platformToken}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{platformToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -150,8 +207,16 @@
         },
         "url": {
           "raw": "{{baseUrl}}/api/platform/dealers/{{dealerId}}/activate",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "platform", "dealers", "{{dealerId}}", "activate"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "platform",
+            "dealers",
+            "{{dealerId}}",
+            "activate"
+          ]
         }
       },
       "description": "Reactivates a suspended dealer. Idempotent — already-active returns 200.\nRequires permission: platform:dealers:activate.\n\nBody fields:\n- eTag (string, required) — from the 'eTag' field in GET /dealers response\n\nErrors:\n- 404: dealer not found\n- 412: ETag mismatch (stale — re-GET dealers to refresh)"
@@ -182,15 +247,111 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{platformToken}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{platformToken}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/platform/metrics",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "platform", "metrics"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "platform",
+            "metrics"
+          ]
         }
       },
       "description": "Returns aggregated platform metrics.\nRequires permission: platform:metrics:read.\n\nNote: mrr.isStub is always true until saas-subscription-payments is implemented.\nmrr.stubReason contains the grep-findable string 'Requires saas-subscription-payments'."
+    },
+    {
+      "name": "Search Clients",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/clients/search?q=Juan",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "clients",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "Juan"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get All Appointments",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/appointments?from=2026-01-01&to=2026-12-31",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "appointments"
+          ],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-01-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-12-31"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Hostname",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/dealer-settings/hostname",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "dealer-settings",
+            "hostname"
+          ]
+        }
+      }
     }
   ]
 }

@@ -4,4 +4,4 @@ using SharedKernel;
 
 namespace Application.Modelos.GetByMarca;
 
-public sealed record GetModelosByMarcaQuery(Guid MarcaId) : IQuery<List<Modelo>>;
+public sealed record GetModelosByMarcaQuery(Guid MarcaId) : IQuery<List<Application.Abstractions.Caching.ModeloCacheDto>>;

@@ -25,10 +25,10 @@ internal sealed class CachedModelService : ICachedModelService
         _logger = logger;
     }
 
-    public async Task<Modelo?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<ModeloCacheDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.ModelById(id);
-        var cached = await _cacheService.GetAsync<Modelo>(cacheKey, cancellationToken);
+        var cached = await _cacheService.GetAsync<ModeloCacheDto>(cacheKey, cancellationToken);
         
         if (cached != null)
         {
@@ -41,16 +41,18 @@ internal sealed class CachedModelService : ICachedModelService
 
         if (modelo != null)
         {
-            await _cacheService.SetAsync(cacheKey, modelo, CacheTTL.Models, cancellationToken);
+            var dto = new ModeloCacheDto { Id = modelo.Id, Nombre = modelo.Nombre, MarcaId = modelo.MarcaId };
+            await _cacheService.SetAsync(cacheKey, dto, CacheTTL.Models, cancellationToken);
+            return dto;
         }
 
-        return modelo;
+        return null;
     }
 
-    public async Task<List<Modelo>> GetByBrandIdAsync(Guid brandId, CancellationToken cancellationToken = default)
+    public async Task<List<ModeloCacheDto>> GetByBrandIdAsync(Guid brandId, CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.ModelsByBrand(brandId);
-        var cached = await _cacheService.GetAsync<List<Modelo>>(cacheKey, cancellationToken);
+        var cached = await _cacheService.GetAsync<List<ModeloCacheDto>>(cacheKey, cancellationToken);
         
         if (cached != null)
         {
@@ -62,18 +64,20 @@ internal sealed class CachedModelService : ICachedModelService
             .Where(m => m.MarcaId == brandId)
             .ToListAsync(cancellationToken);
 
-        if (modelos.Any())
+        var dtos = modelos.Select(m => new ModeloCacheDto { Id = m.Id, Nombre = m.Nombre, MarcaId = m.MarcaId }).ToList();
+
+        if (dtos.Any())
         {
-            await _cacheService.SetAsync(cacheKey, modelos, CacheTTL.Models, cancellationToken);
+            await _cacheService.SetAsync(cacheKey, dtos, CacheTTL.Models, cancellationToken);
         }
 
-        return modelos;
+        return dtos;
     }
 
-    public async Task<List<Modelo>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<List<ModeloCacheDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.AllModels();
-        var cached = await _cacheService.GetAsync<List<Modelo>>(cacheKey, cancellationToken);
+        var cached = await _cacheService.GetAsync<List<ModeloCacheDto>>(cacheKey, cancellationToken);
         
         if (cached != null)
         {
@@ -84,12 +88,14 @@ internal sealed class CachedModelService : ICachedModelService
             .Include(m => m.Marca)
             .ToListAsync(cancellationToken);
 
-        if (modelos.Any())
+        var dtos = modelos.Select(m => new ModeloCacheDto { Id = m.Id, Nombre = m.Nombre, MarcaId = m.MarcaId }).ToList();
+
+        if (dtos.Any())
         {
-            await _cacheService.SetAsync(cacheKey, modelos, CacheTTL.Models, cancellationToken);
+            await _cacheService.SetAsync(cacheKey, dtos, CacheTTL.Models, cancellationToken);
         }
 
-        return modelos;
+        return dtos;
     }
 
     public async Task InvalidateCacheAsync(CancellationToken cancellationToken = default)

@@ -18,7 +18,7 @@ public sealed class SearchClients : IEndpoint
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            var query = new SearchClientsQuery { SearchTerm = q ?? string.Empty };
+            var query = new SearchClientsQuery { SearchTerm = q };
             var result = await sender.Send(query, cancellationToken);
 
             return result.Match(

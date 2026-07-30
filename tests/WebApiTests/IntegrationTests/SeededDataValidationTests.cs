@@ -38,14 +38,14 @@ public class SeededDataValidationTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
-    public async Task SeededData_ShouldContainSeventeenModels()
+    public async Task SeededData_ShouldContainThirtyThreeModels()
     {
         using var scope = _factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var models = await context.Modelo.IgnoreQueryFilters().ToListAsync();
 
-        models.Should().HaveCount(17);
+        models.Should().HaveCount(33);
         models.Should().Contain(m => m.Nombre == "Corolla");
         models.Should().Contain(m => m.Nombre == "Fiesta");
         models.Should().Contain(m => m.Nombre == "Cruze");

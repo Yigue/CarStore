@@ -35,11 +35,11 @@ public class CreateCarCommandHandlerTests
 
         var mockBrandService = new Mock<ICachedBrandService>();
         mockBrandService.Setup(s => s.GetByIdAsync(marca.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(marca);
+            .ReturnsAsync(new Application.Abstractions.Caching.MarcaCacheDto { Id = marca.Id, Nombre = marca.Nombre });
 
         var mockModelService = new Mock<ICachedModelService>();
         mockModelService.Setup(s => s.GetByIdAsync(modelo.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(modelo);
+            .ReturnsAsync(new Application.Abstractions.Caching.ModeloCacheDto { Id = modelo.Id, Nombre = modelo.Nombre, MarcaId = modelo.MarcaId });
 
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(t => t.DealerId).Returns(Guid.NewGuid());
@@ -76,7 +76,7 @@ public class CreateCarCommandHandlerTests
         
         var mockBrandService = new Mock<ICachedBrandService>();
         mockBrandService.Setup(s => s.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Marca?)null); // Brand not found
+            .ReturnsAsync((Application.Abstractions.Caching.MarcaCacheDto?)null); // Brand not found
 
         var mockModelService = new Mock<ICachedModelService>();
 
@@ -126,11 +126,11 @@ public class CreateCarCommandHandlerTests
 
         var mockBrandService = new Mock<ICachedBrandService>();
         mockBrandService.Setup(s => s.GetByIdAsync(marca.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(cachedMarca);
+            .ReturnsAsync(new Application.Abstractions.Caching.MarcaCacheDto { Id = cachedMarca.Id, Nombre = cachedMarca.Nombre });
 
         var mockModelService = new Mock<ICachedModelService>();
         mockModelService.Setup(s => s.GetByIdAsync(modelo.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(cachedModelo);
+            .ReturnsAsync(new Application.Abstractions.Caching.ModeloCacheDto { Id = cachedModelo.Id, Nombre = cachedModelo.Nombre, MarcaId = cachedModelo.MarcaId });
 
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(t => t.DealerId).Returns(Guid.NewGuid());

@@ -68,7 +68,9 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
-        if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
+        var isSqlite = Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite";
+
+        if (!isSqlite)
         {
             modelBuilder.HasDefaultSchema(Schemas.Default);
 
@@ -92,15 +94,15 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
                 .ValueGeneratedOnAddOrUpdate();
         }
 
-        var isActiveFilter = Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite" 
-            ? "\"IsActive\" = 1" 
-            : "is_active = true";
-
-        modelBuilder.Entity<DealerSettingsEntity>()
+        var indexBuilder = modelBuilder.Entity<DealerSettingsEntity>()
             .HasIndex(s => new { s.HostName, s.IsActive })
             .HasDatabaseName("ix_dealer_settings_host_name_active_lookup")
-            .IsUnique(false)
-            .HasFilter(isActiveFilter);
+            .IsUnique(false);
+            
+        if (!isSqlite)
+        {
+            indexBuilder.HasFilter("is_active = true");
+        }
 
         // Ignorar DealerId en entidades compartidas (catálogo)
         modelBuilder.Entity<Marca>().Ignore(x => x.DealerId);

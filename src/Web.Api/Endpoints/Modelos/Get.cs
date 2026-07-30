@@ -17,7 +17,7 @@ public sealed class Get : IEndpoint
 
     private static async Task<IResult> Handler(ISender sender, CancellationToken cancellationToken)
     {
-        Result<List<Domain.Cars.Attributes.Modelo>> result = await sender.Send(new GetModelosQuery(), cancellationToken);
+        Result<List<Application.Abstractions.Caching.ModeloCacheDto>> result = await sender.Send(new GetModelosQuery(), cancellationToken);
 
         return result.Match(
             modelos => Results.Ok(modelos.Select(m => new { id = m.Id, nombre = m.Nombre, marcaId = m.MarcaId })),

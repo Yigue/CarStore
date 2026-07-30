@@ -13,11 +13,11 @@ public sealed class GetTopClients : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("clients/top", async (
-            [FromQuery] int limit,
+            [FromQuery] int? limit,
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetTopClientsQuery { Limit = limit };
+            var query = new GetTopClientsQuery { Limit = limit ?? 10 };
             var result = await sender.Send(query, cancellationToken);
 
             return result.Match(

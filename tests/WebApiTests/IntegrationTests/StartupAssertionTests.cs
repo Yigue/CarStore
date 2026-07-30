@@ -55,6 +55,9 @@ public sealed class StartupAssertionTests
                         ["Storage:Minio:SecretKey"] = "minioadmin123",
                         ["Storage:Minio:BucketName"] = "cars",
 
+                        // Disable subscription enforcement so it doesn't fail on missing WebhookSecret
+                        ["FeatureFlags:SubscriptionEnforcement"] = "false",
+
                         // Redis: empty → uses in-memory cache fallback.
                         ["ConnectionStrings:Redis"] = ""
                     });
@@ -68,5 +71,74 @@ public sealed class StartupAssertionTests
         act.Should().Throw<Exception>()
             .And.Message.Should().Contain("DevFallbackDealerId",
                 because: "Program.cs must reject DevFallbackDealerId in non-Development environments");
+    }
+
+    [Fact]
+    public void Host_WithStripeSecretKeyButNoPriceId_ThrowsValidationException()
+    {
+        Environment.SetEnvironmentVariable("Stripe__SecretKey", "sk_test_123");
+        Environment.SetEnvironmentVariable("Stripe__PriceId", ""); // Explicitly missing
+
+        try
+        {
+            var factory = new WebApplicationFactory<Program>()
+                .WithWebHostBuilder(builder =>
+                {
+                    builder.UseEnvironment("Production");
+                    builder.ConfigureAppConfiguration((_, config) =>
+                    {
+                        config.AddInMemoryCollection(new Dictionary<string, string?>
+                        {
+                            ["FeatureFlags:SubscriptionEnforcement"] = "false",
+                            ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
+                            ["UseInMemoryDatabase"] = "true",
+                            ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
+                            ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
+                            ["Storage:Minio:AccessKey"] = "minioadmin",
+                            ["Storage:Minio:SecretKey"] = "minioadmin123",
+                            ["Storage:Minio:BucketName"] = "cars"
+                        });
+                    });
+                });
+
+            var act = () => factory.CreateClient();
+
+            act.Should().Throw<Microsoft.Extensions.Options.OptionsValidationException>()
+                .And.Message.Should().Contain("PriceId");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("Stripe__SecretKey", null);
+            Environment.SetEnvironmentVariable("Stripe__PriceId", null);
+        }
+    }
+
+    [Fact]
+    public void Host_WithNoStripeSection_BootsClean()
+    {
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Production");
+                builder.ConfigureAppConfiguration((_, config) =>
+                {
+                    config.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        // No Stripe settings
+                        ["FeatureFlags:SubscriptionEnforcement"] = "false",
+                        ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
+                        ["UseInMemoryDatabase"] = "true",
+                        ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
+                        ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
+                        ["Storage:Minio:AccessKey"] = "minioadmin",
+                        ["Storage:Minio:SecretKey"] = "minioadmin123",
+                        ["Storage:Minio:BucketName"] = "cars"
+                    });
+                });
+            });
+
+        var act = () => factory.CreateClient();
+
+        act.Should().NotThrow();
     }
 }

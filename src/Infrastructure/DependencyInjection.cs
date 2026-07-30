@@ -63,14 +63,19 @@ public static class DependencyInjection
 
     private static IServiceCollection AddBilling(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddOptions<StripeOptions>()
+        var stripe = services.AddOptions<StripeOptions>()
             .BindConfiguration(StripeOptions.SectionName)
             .ValidateDataAnnotations();
 
-        var secretKey = configuration["Stripe:SecretKey"];
-        if (!string.IsNullOrWhiteSpace(secretKey))
+        var billingEnabled = !string.IsNullOrWhiteSpace(configuration["Stripe:SecretKey"]);
+        if (billingEnabled)
         {
-            services.AddSingleton<IStripeClient>(new StripeClient(secretKey));
+            stripe.ValidateOnStart();
+        }
+
+        if (billingEnabled)
+        {
+            services.AddSingleton<IStripeClient>(new StripeClient(configuration["Stripe:SecretKey"]));
             services.AddScoped<ISubscriptionGateway, StripeSubscriptionGateway>();
         }
         else

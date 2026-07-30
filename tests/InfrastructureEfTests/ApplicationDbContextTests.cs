@@ -238,4 +238,36 @@ public class ApplicationDbContextTests
         transactionCols.Should().Contain(c => c.Equals("categoryid", StringComparison.OrdinalIgnoreCase) || c.Equals("category_id", StringComparison.OrdinalIgnoreCase));
         transactionCols.Should().Contain(c => c.Equals("amount", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public async Task EnsureCreated_CreatesAllTables_InSqlite()
+    {
+        var (context, connection) = await CreateContextAsync();
+        await using var _ = context;
+        await using var __ = connection;
+
+        var expectedTables = context.Model.GetEntityTypes()
+            .Select(t => t.GetTableName())
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Distinct()
+            .ToList();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table';";
+        using var reader = await cmd.ExecuteReaderAsync();
+        var actualTables = new List<string>();
+        while (await reader.ReadAsync())
+        {
+            actualTables.Add(reader.GetString(0));
+        }
+
+        // The test explicitly requires that every table defined in the model is created in SQLite.
+        // It's known that 'cars' might be missing due to active-index filters, so we assert its presence explicitly to guarantee failure if the bug is present.
+        foreach (var expected in expectedTables)
+        {
+            actualTables.Should().Contain(expected, $"Table {expected} should be created in SQLite");
+        }
+        
+        actualTables.Should().Contain("cars", "The 'cars' table is expected to be created in SQLite");
+    }
 }

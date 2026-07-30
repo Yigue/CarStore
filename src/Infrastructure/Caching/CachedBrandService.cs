@@ -25,10 +25,10 @@ internal sealed class CachedBrandService : ICachedBrandService
         _logger = logger;
     }
 
-    public async Task<Marca?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<MarcaCacheDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.BrandById(id);
-        var cached = await _cacheService.GetAsync<Marca>(cacheKey, cancellationToken);
+        var cached = await _cacheService.GetAsync<MarcaCacheDto>(cacheKey, cancellationToken);
         
         if (cached != null)
         {
@@ -40,16 +40,18 @@ internal sealed class CachedBrandService : ICachedBrandService
 
         if (marca != null)
         {
-            await _cacheService.SetAsync(cacheKey, marca, CacheTTL.Brands, cancellationToken);
+            var dto = new MarcaCacheDto { Id = marca.Id, Nombre = marca.Nombre };
+            await _cacheService.SetAsync(cacheKey, dto, CacheTTL.Brands, cancellationToken);
+            return dto;
         }
 
-        return marca;
+        return null;
     }
 
-    public async Task<Marca?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
+    public async Task<MarcaCacheDto?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.BrandByName(name);
-        var cached = await _cacheService.GetAsync<Marca>(cacheKey, cancellationToken);
+        var cached = await _cacheService.GetAsync<MarcaCacheDto>(cacheKey, cancellationToken);
         
         if (cached != null)
         {
@@ -61,16 +63,18 @@ internal sealed class CachedBrandService : ICachedBrandService
 
         if (marca != null)
         {
-            await _cacheService.SetAsync(cacheKey, marca, CacheTTL.Brands, cancellationToken);
+            var dto = new MarcaCacheDto { Id = marca.Id, Nombre = marca.Nombre };
+            await _cacheService.SetAsync(cacheKey, dto, CacheTTL.Brands, cancellationToken);
+            return dto;
         }
 
-        return marca;
+        return null;
     }
 
-    public async Task<List<Marca>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<List<MarcaCacheDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.AllBrands();
-        var cached = await _cacheService.GetAsync<List<Marca>>(cacheKey, cancellationToken);
+        var cached = await _cacheService.GetAsync<List<MarcaCacheDto>>(cacheKey, cancellationToken);
         
         if (cached != null)
         {
@@ -80,12 +84,14 @@ internal sealed class CachedBrandService : ICachedBrandService
         var marcas = await _context.Marca
             .ToListAsync(cancellationToken);
 
-        if (marcas.Any())
+        var dtos = marcas.Select(m => new MarcaCacheDto { Id = m.Id, Nombre = m.Nombre }).ToList();
+
+        if (dtos.Any())
         {
-            await _cacheService.SetAsync(cacheKey, marcas, CacheTTL.Brands, cancellationToken);
+            await _cacheService.SetAsync(cacheKey, dtos, CacheTTL.Brands, cancellationToken);
         }
 
-        return marcas;
+        return dtos;
     }
 
     public async Task InvalidateCacheAsync(CancellationToken cancellationToken = default)

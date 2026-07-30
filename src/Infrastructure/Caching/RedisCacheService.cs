@@ -59,7 +59,8 @@ internal sealed class RedisCacheService : ICacheService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error setting value in cache for key: {Key}", key);
+            _logger.LogError(ex, "Error setting value in cache for key: {Key}", key);
+            System.Diagnostics.Activity.Current?.AddTag("cache.set_error", true);
             // No lanzar excepción, solo loggear. El sistema debe funcionar sin caché
         }
     }

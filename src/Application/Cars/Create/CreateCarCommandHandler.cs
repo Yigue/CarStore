@@ -35,23 +35,23 @@ internal sealed class CreateCarCommandHandler(
         }
 
         // Usar servicio de caché para obtener marca
-        Marca? marca = await cachedBrandService.GetByIdAsync(command.Marca, cancellationToken);
+        var marcaDto = await cachedBrandService.GetByIdAsync(command.Marca, cancellationToken);
 
-        if (marca is null)
+        if (marcaDto is null)
         {
             return Result.Failure<Guid>(CarErrors.AtributesInvalid());
         }
  
         // Usar servicio de caché para obtener modelo
-        Modelo? modelo = await cachedModelService.GetByIdAsync(command.Modelo, cancellationToken);  
+        var modeloDto = await cachedModelService.GetByIdAsync(command.Modelo, cancellationToken);  
 
-        if (modelo is null)
+        if (modeloDto is null)
         {
             return Result.Failure<Guid>(CarErrors.AtributesInvalid());
         }
 
-        marca = await context.Marca.SingleAsync(m => m.Id == command.Marca, cancellationToken);
-        modelo = await context.Modelo.SingleAsync(m => m.Id == command.Modelo, cancellationToken);
+        var marca = await context.Marca.SingleAsync(m => m.Id == command.Marca, cancellationToken);
+        var modelo = await context.Modelo.SingleAsync(m => m.Id == command.Modelo, cancellationToken);
 
         var car = new Car(
             tenantService.DealerId,

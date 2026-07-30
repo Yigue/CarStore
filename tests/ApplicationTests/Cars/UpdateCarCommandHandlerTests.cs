@@ -74,11 +74,11 @@ public class UpdateCarCommandHandlerTests
 
         var brandService = new Mock<ICachedBrandService>();
         brandService.Setup(s => s.GetByIdAsync(marcaId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(detachedMarca);
+            .ReturnsAsync(new Application.Abstractions.Caching.MarcaCacheDto { Id = detachedMarca.Id, Nombre = detachedMarca.Nombre });
 
         var modelService = new Mock<ICachedModelService>();
         modelService.Setup(s => s.GetByIdAsync(modeloId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(detachedModelo);
+            .ReturnsAsync(new Application.Abstractions.Caching.ModeloCacheDto { Id = detachedModelo.Id, Nombre = detachedModelo.Nombre, MarcaId = detachedModelo.MarcaId });
 
         await using var ctx = new TestApplicationDbContext(Options(db), dealerId);
         var handler = new UpdateCarCommandHandler(

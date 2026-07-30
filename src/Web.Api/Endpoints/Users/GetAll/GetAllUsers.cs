@@ -12,8 +12,8 @@ public sealed class GetAllUsers : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("users", async (
-            int page,
-            int pageSize,
+            int? page,
+            int? pageSize,
             string? search,
             string? role,
             bool? isActive,
@@ -27,7 +27,7 @@ public sealed class GetAllUsers : IEndpoint
                 roleFilter = parsedRole;
             }
 
-            var query = new GetAllUsersQuery(page, pageSize, search, roleFilter, isActive);
+            var query = new GetAllUsersQuery(page ?? 1, pageSize ?? 20, search, roleFilter, isActive);
 
             var result = await sender.Send(query, cancellationToken);
 

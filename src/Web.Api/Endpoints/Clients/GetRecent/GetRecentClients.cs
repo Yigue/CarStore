@@ -14,11 +14,11 @@ public sealed class GetRecentClients : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("clients/recent", async (
-            [FromQuery] int limit,
+            [FromQuery] int? limit,
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetRecentClientsQuery { Limit = limit };
+            var query = new GetRecentClientsQuery { Limit = limit ?? 10 };
             var result = await sender.Send(query, cancellationToken);
 
             return result.Match(
