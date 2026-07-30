@@ -14,5 +14,7 @@ public sealed record AppointmentDto(
     DateTime End,
     AppointmentType Type,
     string TypeDisplay,
+    AppointmentStatus Status,
+    string StatusDisplay,
     string? Notes,
     DateTime CreatedAt);

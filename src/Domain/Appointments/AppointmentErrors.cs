@@ -15,4 +15,8 @@ public static class AppointmentErrors
     public static readonly Error InvalidTimeRange = Error.Problem(
         "Appointments.InvalidTimeRange",
         "La hora de fin debe ser posterior a la hora de inicio.");
+
+    public static Error InvalidStatusTransition(AppointmentStatus from, AppointmentStatus to) => Error.Problem(
+        "Appointments.InvalidStatusTransition",
+        $"No se puede cambiar el estado del turno de {from} a {to}.");
 }

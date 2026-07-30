@@ -19,6 +19,7 @@ public sealed class Appointment : Entity
     public DateTime StartDateTime { get; private set; }
     public DateTime EndDateTime { get; private set; }
     public AppointmentType Type { get; private set; }
+    public AppointmentStatus Status { get; private set; } = AppointmentStatus.Scheduled;
     public string? Notes { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
@@ -56,6 +57,7 @@ public sealed class Appointment : Entity
         appointment.StartDateTime = start;
         appointment.EndDateTime = end;
         appointment.Type = type;
+        appointment.Status = AppointmentStatus.Scheduled;
         appointment.Notes = notes;
         appointment.CreatedAt = createdAtUtc;
 
@@ -90,5 +92,29 @@ public sealed class Appointment : Entity
 
         ClientId = clientId;
         LeadId = null;
+    }
+
+    private void EnsureScheduled()
+    {
+        if (Status != AppointmentStatus.Scheduled)
+            throw new DomainException($"No se puede modificar un turno en estado {Status}");
+    }
+
+    public void Complete()
+    {
+        EnsureScheduled();
+        Status = AppointmentStatus.Completed;
+    }
+
+    public void Cancel()
+    {
+        EnsureScheduled();
+        Status = AppointmentStatus.Cancelled;
+    }
+
+    public void MarkNoShow()
+    {
+        EnsureScheduled();
+        Status = AppointmentStatus.NoShow;
     }
 }

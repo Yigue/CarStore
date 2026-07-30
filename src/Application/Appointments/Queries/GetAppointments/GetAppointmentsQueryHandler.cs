@@ -67,6 +67,8 @@ internal sealed class GetAppointmentsQueryHandler(
                 a.EndDateTime,
                 a.Type,
                 a.Type.ToString(),
+                a.Status,
+                a.Status.ToString(),
                 a.Notes,
                 a.CreatedAt))
             .ToListAsync(cancellationToken);

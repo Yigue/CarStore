@@ -34,6 +34,12 @@ internal sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appoin
             .HasMaxLength(30)
             .IsRequired();
 
+        builder.Property(a => a.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired()
+            .HasDefaultValue(AppointmentStatus.Scheduled);
+
         builder.Property(a => a.Notes)
             .HasMaxLength(2000);
 
