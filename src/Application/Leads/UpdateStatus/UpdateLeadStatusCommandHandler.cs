@@ -20,7 +20,9 @@ internal sealed class UpdateLeadStatusCommandHandler(
 
         try
         {
-            lead.UpdateStatus(command.NewStatus, command.Notes, command.LossReason);
+            // NewStatus is guaranteed non-null here — UpdateLeadStatusCommandValidator's NotNull
+            // rule runs in ValidationPipelineBehavior before the handler is ever invoked.
+            lead.UpdateStatus(command.NewStatus!.Value, command.Notes, command.LossReason);
         }
         catch (DomainException ex)
         {

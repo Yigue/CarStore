@@ -8,7 +8,10 @@ namespace Web.Api.Endpoints.Leads;
 
 internal sealed class UpdateStatus : IEndpoint
 {
-    public sealed record Request(LeadStatus NewStatus, string? Notes = null, LeadLossReason? LossReason = null);
+    // qa-p1-integridad D2: NewStatus is nullable so an omitted value binds to null instead of
+    // silently defaulting to LeadStatus.Nuevo (member 0). UpdateLeadStatusCommandValidator's
+    // NotNull rule rejects the omission with a typed 400 before the handler ever sees it.
+    public sealed record Request(LeadStatus? NewStatus, string? Notes = null, LeadLossReason? LossReason = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -25,7 +28,6 @@ internal sealed class UpdateStatus : IEndpoint
         .WithName("UpdateLeadStatus")
         .Produces(StatusCodes.Status204NoContent)
         .ProducesValidationProblem()
-        .ProducesProblem(StatusCodes.Status404NotFound)
-        .ProducesProblem(StatusCodes.Status500InternalServerError);
+        .ProducesProblem(StatusCodes.Status404NotFound);
     }
 }
