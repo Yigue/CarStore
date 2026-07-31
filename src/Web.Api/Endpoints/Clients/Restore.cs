@@ -14,7 +14,7 @@ internal sealed class Restore : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("clients/{id}/restore", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+        app.MapPost("clients/{id:guid}/restore", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new RestoreClientCommand(id);
 

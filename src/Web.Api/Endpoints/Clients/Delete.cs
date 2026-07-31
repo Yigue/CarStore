@@ -9,7 +9,7 @@ internal sealed class Delete : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapDelete("clients/{id}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+        app.MapDelete("clients/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new SoftDeleteClientCommand(id);
 

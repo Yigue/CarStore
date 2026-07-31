@@ -10,7 +10,7 @@ public sealed class GetByMarca : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapGet("modelos/marca/{marcaId}", Handler)
+        app.MapGet("modelos/marca/{marcaId:guid}", Handler)
             .WithTags(Tags.Modelos)
             .AllowAnonymous();
     }

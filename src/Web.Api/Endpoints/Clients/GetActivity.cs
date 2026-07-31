@@ -9,7 +9,7 @@ internal sealed class GetActivity : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapGet("clients/{id}/activity",
+        app.MapGet("clients/{id:guid}/activity",
             async (Guid id, ISender sender, CancellationToken cancellationToken, int page = 1, int pageSize = 50) =>
             {
                 var query = new GetActivityQuery(id, page, pageSize);

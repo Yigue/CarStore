@@ -11,7 +11,7 @@ internal sealed class SetPrimaryImage : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPut("cars/{carId}/images/{imageId}/make-primary", async (
+        app.MapPut("cars/{carId:guid}/images/{imageId:guid}/make-primary", async (
             Guid carId,
             Guid imageId,
             ISender sender,

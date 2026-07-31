@@ -45,12 +45,12 @@ public static class CustomResults
         static string GetType(ErrorType errorType) =>
             errorType switch
             {
-                ErrorType.Validation => "https://tools.ietf.org/html/rfc7231#section-6.5.1",
-                ErrorType.Problem => "https://tools.ietf.org/html/rfc7231#section-6.5.1",
-                ErrorType.NotFound => "https://tools.ietf.org/html/rfc7231#section-6.5.4",
-                ErrorType.Conflict => "https://tools.ietf.org/html/rfc7231#section-6.5.8",
-                ErrorType.Forbidden => "https://tools.ietf.org/html/rfc7231#section-6.5.3",
-                _ => "https://tools.ietf.org/html/rfc7231#section-6.6.1"
+                ErrorType.Validation => ProblemTypes.BadRequest,
+                ErrorType.Problem => ProblemTypes.BadRequest,
+                ErrorType.NotFound => ProblemTypes.NotFound,
+                ErrorType.Conflict => ProblemTypes.Conflict,
+                ErrorType.Forbidden => ProblemTypes.Forbidden,
+                _ => ProblemTypes.ServerError
             };
 
         static int GetStatusCode(ErrorType errorType) =>

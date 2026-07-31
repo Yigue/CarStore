@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using Web.Api.Infrastructure;
 using Asp.Versioning;
 
@@ -26,6 +27,14 @@ public static class DependencyInjection
 
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
+
+        // qa-p1-integridad D1: RouteHandlerOptions.ThrowOnBadRequest was never configured, so it
+        // silently defaulted to true only in Development and false everywhere else — one
+        // environment threw into GlobalExceptionHandler (rewritten to a bare 500), the other wrote
+        // its own bodiless 400 that bypassed the handler entirely. Forcing it true converges both
+        // environments onto the same throw-then-handle path, so GlobalExceptionHandler's new
+        // BadHttpRequestException/JsonException arms produce one consistent ProblemDetails 400.
+        services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 
         return services;
     }

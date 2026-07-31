@@ -13,7 +13,7 @@ internal sealed class UpdateNotes : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPut("clients/{id}/notes",
+        app.MapPut("clients/{id:guid}/notes",
             async (Guid id, Request request, ISender sender, ClaimsPrincipal principal, CancellationToken cancellationToken) =>
             {
                 Guid? actorId = Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var parsed)

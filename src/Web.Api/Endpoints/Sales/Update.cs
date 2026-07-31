@@ -22,7 +22,7 @@ internal sealed class Update : IEndpoint
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPut("sales/{id}", async (Guid id, Request request, ISender sender, CancellationToken cancellationToken) =>
+        app.MapPut("sales/{id:guid}", async (Guid id, Request request, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new UpdateSaleCommand(
                 id,
