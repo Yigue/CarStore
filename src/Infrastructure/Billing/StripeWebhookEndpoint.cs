@@ -67,10 +67,23 @@ public static class StripeWebhookEndpoint
                 logger.LogWarning(ex, "Stripe signature verification failed.");
                 return Results.BadRequest("Invalid signature.");
             }
+            catch (Newtonsoft.Json.JsonException ex)
+            {
+                // qa-p1-integridad PR8 (D8): Stripe.net's EventUtility parses the payload with
+                // Newtonsoft.Json internally (not System.Text.Json, which is what the global
+                // handler's own JsonException arm from PR1 targets — a different exception type
+                // in a different namespace). A signature can be valid over a body that still
+                // fails to parse as a Stripe event; that must be a 400, not a 500.
+                logger.LogWarning(ex, "Failed to parse Stripe webhook payload.");
+                return Results.BadRequest("Invalid payload.");
+            }
             catch (Exception ex)
             {
+                // qa-p1-integridad PR8 (D8): this endpoint is AllowAnonymous — never return
+                // ex.ToString() (stack trace, internal type/file names) to an unauthenticated
+                // caller. The full exception is still logged server-side above.
                 logger.LogError(ex, "Error processing Stripe webhook.");
-                return Results.Problem(ex.ToString());
+                return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
             }
         })
         .AllowAnonymous()
