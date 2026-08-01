@@ -89,7 +89,9 @@ internal sealed class ProvisionDealerCommandHandler(
                 "leads:write", "leads:archive",
                 "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
                 "admin:backfill",
-                "webhooks:manage"
+                "webhooks:manage",
+                // qa-p1-integridad PR6 (D7): grant at both seed sites — see UsersSeeder.cs.
+                "documents:read", "documents:create"
             };
 
             foreach (var permission in defaultPermissions)

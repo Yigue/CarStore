@@ -53,7 +53,10 @@ internal static class UsersSeeder
             "leads:write", "leads:archive",
             "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
             "admin:backfill",
-            "webhooks:manage"
+            "webhooks:manage",
+            // qa-p1-integridad PR6 (D7): granted by no role anywhere until now —
+            // GET /documents/{id}/download-url has been 403 for every seeded user since it shipped.
+            "documents:read", "documents:create"
         }, cancellationToken);
 
         var admin = context.Users
@@ -149,7 +152,11 @@ internal static class UsersSeeder
             "sales:read",
             "sales:create",
             "leads:read",
-            "appointments:read"
+            "appointments:read",
+            // qa-p1-integridad PR6 (D7): Empleado uploads/downloads documents in normal
+            // operation — must not be silently 403'd once PR7 requires the permission.
+            "documents:read",
+            "documents:create"
         }, cancellationToken);
 
         var empleado = context.Users
