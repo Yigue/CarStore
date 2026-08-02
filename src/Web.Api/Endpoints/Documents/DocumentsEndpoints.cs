@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Web.Api.Endpoints;
+using Web.Api.Extensions;
+using Web.Api.Infrastructure;
 
 namespace Web.Api.Endpoints.Documents;
 
@@ -45,12 +47,12 @@ public class DocumentEndpoints : IEndpoint
 
         var result = await sender.Send(command, cancellationToken);
 
-        if (result.IsSuccess)
-        {
-            return Results.Ok(new { DocumentId = result.Value });
-        }
-
-        return Results.BadRequest(result.Error);
+        // D7 Slice 13 (finding 10): Results.BadRequest(result.Error) squashed every
+        // failure — including NotFound — to 400. result.Match(..., CustomResults.Problem)
+        // lets a NotFound Result actually reach the wire as 404.
+        return result.Match(
+            id => Results.Ok(new { DocumentId = id }),
+            CustomResults.Problem);
     }
 
     private static async Task<IResult> VerifyDocument(
@@ -61,9 +63,9 @@ public class DocumentEndpoints : IEndpoint
         var command = new VerifyDocumentCommand(id);
         var result = await sender.Send(command, cancellationToken);
 
-        return result.IsSuccess
-            ? Results.Ok()
-            : Results.BadRequest(result.Error);
+        return result.Match(
+            () => Results.Ok(),
+            CustomResults.Problem);
     }
 
     private static async Task<IResult> GetClientDocuments(
@@ -74,12 +76,9 @@ public class DocumentEndpoints : IEndpoint
         var query = new GetClientDocumentsQuery(clientId);
         var result = await sender.Send(query, cancellationToken);
 
-        if (result.IsSuccess)
-        {
-            return Results.Ok(result.Value);
-        }
-
-        return Results.BadRequest(result.Error);
+        return result.Match(
+            Results.Ok,
+            CustomResults.Problem);
     }
 }
 
