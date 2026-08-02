@@ -71,7 +71,10 @@ public class CommandConstructionTests : BaseTest
         (Path.Combine("Clients", "Update.cs"), 16),
         (Path.Combine("DealerSettings", "Update.cs"), 32),
         (Path.Combine("DealerSettings", "UpdateVisual.cs"), 23),
-        (Path.Combine("Documents", "DocumentsEndpoints.cs"), 39),
+        // Line shifted 39 -> 45 by qa-p1-integridad PR7 (Slice 13/14): the call site itself
+        // (positional string args mapping 1:1 to UploadDocumentCommand's declared order, no
+        // Subscribe.cs-style swap) is unchanged — only lines added above it in the same file.
+        (Path.Combine("Documents", "DocumentsEndpoints.cs"), 45),
         (Path.Combine("Financial", "Create.cs"), 29),
         (Path.Combine("Financial", "Update.cs"), 31),
         (Path.Combine("Leads", "Create.cs"), 23),

@@ -22,9 +22,13 @@ public class DocumentEndpoints : IEndpoint
             .WithTags("Documents")
             .RequireAuthorization();
 
+        // D7 (qa-p1-integridad PR7, Slice 14): documents:create/documents:read shipped and
+        // were verified live in PR6 (Slice 11.5) before this requirement was added —
+        // otherwise this trades one 403 for another (finding 2).
         group.MapPost("/upload", UploadDocument)
             .WithName("UploadDocument")
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .HasPermission(Permissions.DocumentsCreate);
 
         group.MapPost("/{id:guid}/verify", VerifyDocument)
             .WithName("VerifyDocument");
