@@ -69,10 +69,16 @@ public class TransactionConfiguration : IEntityTypeConfiguration<FinancialTransa
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // D3 (qa-p1-integridad PR2): the three sibling FKs above are already Restrict.
+        // Category defaulted to EF's Cascade (IsRequired + no OnDelete), so deleting a
+        // referenced category silently destroyed every transaction that referenced it.
+        // The schema is the enforcer; DeleteCategoryCommandHandler's guard exists to make
+        // the common case return a typed 409 instead of a raw 23503.
         builder.HasOne(t => t.Category)
             .WithMany()
             .HasForeignKey(t => t.CategoryId)
-            .IsRequired();
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Configuración explícita de propiedades de navegación
         builder.Navigation(t => t.Category).AutoInclude();
