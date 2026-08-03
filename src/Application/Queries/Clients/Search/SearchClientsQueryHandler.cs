@@ -38,29 +38,24 @@ internal sealed class SearchClientsQueryHandler
             .Include(c => c.Sales)
             .AsQueryable();
 
+        // NOTE (qa-p0-blockers C1, 2026-08-03): see the matching note in
+        // GetAllClientsQueryHandler.Handle -- EF.Functions.Collate(..., "und-u-ks-primary")
+        // cannot back a substring search against real Postgres; nondeterministic ICU
+        // collations do not support LIKE (confirmed live against postgres:17-alpine:
+        // "0A000: nondeterministic collations are not supported for LIKE"). This full-table
+        // load is a known, flagged (sdd-verify CRITICAL C1) performance regression pending a
+        // design decision that supersedes D1.
+        List<Client> clients = await dbQuery.ToListAsync(cancellationToken);
+
         if (searchTerm != string.Empty)
         {
-            bool isInMemory = _context is DbContext dbContext && dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
-
-            if (isInMemory)
-            {
-                var normalizedSearch = RemoveAccents(searchTerm).ToLowerInvariant();
-                dbQuery = dbQuery.Where(c => 
-                    RemoveAccents(c.FirstName + " " + c.LastName).ToLower().Contains(normalizedSearch) ||
-                    (emailTerm != null && c.Email == emailTerm));
-            }
-            else
-            {
-                var normalizedSearch = RemoveAccents(searchTerm);
-                dbQuery = dbQuery.Where(c => 
-                    EF.Functions.Collate(c.FirstName + " " + c.LastName, "und-u-ks-primary").Contains(normalizedSearch) ||
-                    (emailTerm != null && c.Email == emailTerm));
-            }
+            var normalizedSearch = RemoveAccents(searchTerm).ToLowerInvariant();
+            clients = clients.Where(c =>
+                RemoveAccents(c.FirstName + " " + c.LastName).ToLowerInvariant().Contains(normalizedSearch) ||
+                (emailTerm != null && c.Email == emailTerm)).ToList();
         }
 
-        List<Client> clients = await dbQuery
-            .Take(50)
-            .ToListAsync(cancellationToken);
+        clients = clients.Take(50).ToList();
 
         IEnumerable<ClientResponse> responses = clients.Select(ClientResponseMapper.Map);
         return Result.Success<IEnumerable<ClientResponse>>(responses);
