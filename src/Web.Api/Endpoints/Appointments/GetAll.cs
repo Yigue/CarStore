@@ -13,7 +13,7 @@ internal sealed class GetAll : IEndpoint
         app.MapGet("appointments",
             async ([FromQuery] DateTime from, [FromQuery] DateTime to, ISender sender, CancellationToken ct) =>
             {
-                var query = new GetAppointmentsQuery(from, to);
+                var query = new GetAppointmentsQuery(from.ToUtc(), to.ToUtc());
                 Result<IReadOnlyList<AppointmentDto>> result = await sender.Send(query, ct);
                 return result.Match(
                     list => Results.Ok(list),
@@ -22,7 +22,6 @@ internal sealed class GetAll : IEndpoint
         .HasPermission(Permissions.AppointmentsRead)
         .WithTags(Tags.Appointments)
         .WithName("GetAppointments")
-        .Produces<IReadOnlyList<AppointmentDto>>(StatusCodes.Status200OK)
-        .ProducesProblem(StatusCodes.Status500InternalServerError);
+        .Produces<IReadOnlyList<AppointmentDto>>(StatusCodes.Status200OK);
     }
 }

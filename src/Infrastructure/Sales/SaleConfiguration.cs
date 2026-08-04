@@ -65,5 +65,10 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
             .HasForeignKey(s => s.LeadId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired(false);
+
+        builder.HasIndex(s => s.CarId)
+            .IsUnique()
+            .HasDatabaseName("ux_sales_one_completed_per_car")
+            .HasFilter("status = 'Completed'");
     }
 }

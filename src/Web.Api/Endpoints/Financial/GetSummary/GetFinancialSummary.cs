@@ -17,7 +17,7 @@ public sealed class GetFinancialSummary : IEndpoint
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            var result = await sender.Send(new GetFinancialSummaryQuery(from, to), cancellationToken);
+            var result = await sender.Send(new GetFinancialSummaryQuery(from?.ToUtc(), to?.ToUtc()), cancellationToken);
 
             return result.Match(
                 data => Results.Ok(data),

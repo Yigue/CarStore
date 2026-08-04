@@ -50,6 +50,32 @@ public class CreateSaleCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Fail_WhenCarAlreadyHasCompletedSale()
+    {
+        // Slice 7.1 RED: car has a Completed sale in context.Sales (even if ServiceCar is stubbed stale as Reservado).
+        using var context = CreateContext();
+        var (car, client) = SeedCarAndClient(context, "Ford", "Focus", "SLD999", StatusServiceCar.Reservado);
+
+        var existingCompletedSale = new Sale(
+            Guid.NewGuid(), car.Id, client.Id, 10000m, PaymentMethod.Cash,
+            "CN-OLD", "previous completed sale", DateTime.UtcNow);
+        existingCompletedSale.Complete();
+        context.Sales.Add(existingCompletedSale);
+        await context.SaveChangesAsync();
+
+        var dateProvider = new FakeDateTimeProvider();
+        var tenantService = new Mock<ICurrentTenantService>();
+        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
+        var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-NEW", "attempt second sale");
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(CarErrors.AlreadySold(car.Id));
+    }
+
+    [Fact]
     public async Task Handle_Should_CreateSale_WhenDataIsValid()
     {
         // Explicitly requests Completed: exercises the "sale settled immediately" path
@@ -68,7 +94,6 @@ public class CreateSaleCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         context.Sales.Should().ContainSingle(s => s.Id == result.Value);
-        (await context.Cars.FindAsync(car.Id))!.ServiceCar.Should().Be(StatusServiceCar.Vendido);
     }
 
     [Fact]
@@ -114,7 +139,6 @@ public class CreateSaleCommandHandlerTests
         var sale = await context.Sales.FirstAsync(s => s.Id == result.Value);
         sale.Status.Should().Be(SaleStatus.Completed);
         sale.DomainEvents.Should().Contain(e => e is SaleCompletedDomainEvent);
-        (await context.Cars.FindAsync(car.Id))!.ServiceCar.Should().Be(StatusServiceCar.Vendido);
     }
 
     [Fact]

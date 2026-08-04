@@ -132,13 +132,13 @@ internal static class DevDataSeeder
         // 6. Leads
         if (!await context.Leads.IgnoreQueryFilters().AnyAsync(cancellationToken))
         {
-            var cars = await context.Cars.ToListAsync(cancellationToken);
-            var toyota = cars.First(c => c.Patente == "AB123CD");
-            var hilux = cars.First(c => c.Patente == "AB456EF");
+            var cars = await context.Cars.IgnoreQueryFilters().ToListAsync(cancellationToken);
+            var toyota = cars.FirstOrDefault(c => c.Patente == "AB123CD") ?? cars.FirstOrDefault();
+            var hilux = cars.FirstOrDefault(c => c.Patente == "AB456EF") ?? cars.Skip(1).FirstOrDefault() ?? toyota;
 
-            var lead1 = Lead.Create(DefaultDealerId, "Roberto Sanchez", "roberto@email.com", "+54 11 9999-8888", LeadSource.Portal, DateTime.UtcNow.AddDays(-2), toyota.Id);
+            var lead1 = Lead.Create(DefaultDealerId, "Roberto Sanchez", "roberto@email.com", "+54 11 9999-8888", LeadSource.Portal, DateTime.UtcNow.AddDays(-2), toyota?.Id);
             
-            var lead2 = Lead.Create(DefaultDealerId, "Laura Gomez", "laura.g@email.com", "+54 11 7777-6666", LeadSource.Otro, DateTime.UtcNow.AddDays(-3), hilux.Id);
+            var lead2 = Lead.Create(DefaultDealerId, "Laura Gomez", "laura.g@email.com", "+54 11 7777-6666", LeadSource.Otro, DateTime.UtcNow.AddDays(-3), hilux?.Id);
             lead2.UpdateStatus(LeadStatus.Contactado, "Interesada en Hilux para trabajo en campo.");
 
             var lead3 = Lead.Create(DefaultDealerId, "Diego Maradona", "diego@email.com", "+54 11 1010-1010", LeadSource.Web, DateTime.UtcNow.AddDays(-5));
@@ -150,16 +150,44 @@ internal static class DevDataSeeder
         // 7. Suscripciones (Mock for Tests/Dev)
         if (!await context.DealerSubscriptions.IgnoreQueryFilters().AnyAsync(cancellationToken))
         {
-            var subscription = Domain.Billing.DealerSubscription.Create(
-                DefaultDealerId,
-                "cus_mock",
-                "sub_mock",
-                "plan_mock");
-            
-            // Set it to Active to avoid 402 Payment Required in API tests.
-            subscription.Activate("sub_mock", DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(30));
+            var defaultSub = SubscriptionStateSeed.CreateSeededSubscription(DefaultDealerId, Domain.Billing.SubscriptionStatus.Active);
+            context.DealerSubscriptions.Add(defaultSub);
 
-            context.DealerSubscriptions.Add(subscription);
+            foreach (var item in SubscriptionStateSeed.AdditionalDealers)
+            {
+                if (context is ApplicationDbContext db)
+                {
+                    if (!await db.DealerSettings.IgnoreQueryFilters().AnyAsync(s => s.DealerId == item.DealerId, cancellationToken))
+                    {
+                        var slug = item.Email.Split('@')[0].Replace('.', '-');
+                        var settings = new Domain.DealerSettings.DealerSettings(
+                            dealerId: item.DealerId,
+                            dealerName: item.DealerName,
+                            contactEmail: item.Email,
+                            notificationsEnabled: true,
+                            hostName: $"{slug}.localhost",
+                            slug: slug);
+                        db.DealerSettings.Add(settings);
+                    }
+                }
+
+                var role = await context.Roles.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.DealerId == item.DealerId && r.Name == "Admin", cancellationToken);
+                if (role is null)
+                {
+                    role = new Domain.Users.Role(item.DealerId, "Admin", "Administrador del Sistema");
+                    context.Roles.Add(role);
+                }
+
+                if (!await context.Users.IgnoreQueryFilters().AnyAsync(u => u.Email == item.Email, cancellationToken))
+                {
+                    var user = new Domain.Users.User(item.DealerId, item.Email, "Admin", item.DealerName, "hash_mock", role.Id);
+                    context.Users.Add(user);
+                }
+
+                var sub = SubscriptionStateSeed.CreateSeededSubscription(item.DealerId, item.Status);
+                context.DealerSubscriptions.Add(sub);
+            }
+
             await context.SaveChangesAsync(cancellationToken);
         }
     }

@@ -134,4 +134,64 @@ public class SubscriptionGuardMiddlewareTests
         Assert.True(nextCalled);
         cacheMock.Verify(c => c.GetAsync(It.IsAny<Guid>(), default), Times.Never);
     }
+
+    [Fact]
+    public async Task InvokeAsync_NoSubscriptionRow_CallsNext()
+    {
+        var dealerId = Guid.NewGuid();
+        var cacheMock = new Mock<ISubscriptionStatusCache>();
+        cacheMock.Setup(c => c.GetAsync(dealerId, default)).ReturnsAsync((SubscriptionStatus?)null);
+
+        var services = new ServiceCollection();
+        services.AddScoped(_ => cacheMock.Object);
+
+        var context = new DefaultHttpContext
+        {
+            RequestServices = services.BuildServiceProvider()
+        };
+        context.Items["Tenant.DealerId"] = dealerId;
+        context.Request.Path = "/api/v1/some-endpoint";
+
+        var nextCalled = false;
+        var middleware = new SubscriptionGuardMiddleware(innerContext =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(context);
+
+        Assert.True(nextCalled);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_CancelledDealer_Returns402()
+    {
+        var dealerId = Guid.NewGuid();
+        var cacheMock = new Mock<ISubscriptionStatusCache>();
+        cacheMock.Setup(c => c.GetAsync(dealerId, default)).ReturnsAsync(SubscriptionStatus.Cancelled);
+
+        var services = new ServiceCollection();
+        services.AddScoped(_ => cacheMock.Object);
+
+        var context = new DefaultHttpContext
+        {
+            RequestServices = services.BuildServiceProvider(),
+            Response = { Body = new MemoryStream() }
+        };
+        context.Items["Tenant.DealerId"] = dealerId;
+        context.Request.Path = "/api/v1/some-endpoint";
+
+        var nextCalled = false;
+        var middleware = new SubscriptionGuardMiddleware(innerContext =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(context);
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status402PaymentRequired, context.Response.StatusCode);
+    }
 }

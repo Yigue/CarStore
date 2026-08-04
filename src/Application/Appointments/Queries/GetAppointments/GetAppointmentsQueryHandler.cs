@@ -40,19 +40,20 @@ internal sealed class GetAppointmentsQueryHandler(
                 on car.ModeloId equals modelo.Id into modeloJoin
             from modelo in modeloJoin.DefaultIfEmpty()
             join client in context.Clients.IgnoreQueryFilters().AsNoTracking()
-                on a.ClientId equals (Guid?)client.Id into clientJoin
+                on a.ClientId equals client.Id into clientJoin
             from client in clientJoin.DefaultIfEmpty()
             join lead in context.Leads.IgnoreQueryFilters().AsNoTracking()
-                on a.LeadId equals (Guid?)lead.Id into leadJoin
+                on a.LeadId equals lead.Id into leadJoin
             from lead in leadJoin.DefaultIfEmpty()
             join agent in context.Users.IgnoreQueryFilters().AsNoTracking()
                 on a.AgentId equals agent.Id into agentJoin
             from agent in agentJoin.DefaultIfEmpty()
             orderby a.StartDateTime
-            select new AppointmentDto(
+            select new
+            {
                 a.Id,
                 a.VehicleId,
-                car != null
+                CarTitle = car != null
                     ? ((marca != null ? marca.Nombre : "")
                         + " "
                         + (modelo != null ? modelo.Nombre : "")
@@ -60,19 +61,36 @@ internal sealed class GetAppointmentsQueryHandler(
                         + car.Anio).Trim()
                     : null,
                 a.ClientId,
-                client != null ? (client.FirstName + " " + client.LastName) : (lead != null ? lead.ClientName : null),
+                ClientName = client != null ? (client.FirstName + " " + client.LastName) : (lead != null ? lead.ClientName : null),
                 a.AgentId,
-                agent != null ? (agent.FirstName + " " + agent.LastName) : null,
+                AgentName = agent != null ? (agent.FirstName + " " + agent.LastName) : null,
                 a.StartDateTime,
                 a.EndDateTime,
                 a.Type,
-                a.Type.ToString(),
                 a.Status,
-                a.Status.ToString(),
                 a.Notes,
-                a.CreatedAt))
+                a.CreatedAt
+            })
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<AppointmentDto>>(rows);
+        var dtos = rows.Select(r => new AppointmentDto(
+            r.Id,
+            r.VehicleId,
+            r.CarTitle,
+            r.ClientId,
+            r.ClientName,
+            r.AgentId,
+            r.AgentName,
+            r.StartDateTime,
+            r.EndDateTime,
+            r.Type,
+            r.Type.ToString(),
+            r.Status,
+            r.Status.ToString(),
+            r.Notes,
+            r.CreatedAt))
+            .ToList();
+
+        return Result.Success<IReadOnlyList<AppointmentDto>>(dtos);
     }
 }

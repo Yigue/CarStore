@@ -22,25 +22,15 @@ internal sealed class MinioStorageService : IStorageService
     private readonly ILogger<MinioStorageService> _logger;
 
     public MinioStorageService(
+        IMinioClient client,
         IOptions<MinioOptions> options,
         ILogger<MinioStorageService> logger)
     {
+        _client = client;
         _options = options.Value;
         _logger = logger;
 
-        Uri internalEndpoint = PresignedUrlRewriter.NormalizeEndpoint(_options.InternalEndpoint);
         _publicEndpoint = PresignedUrlRewriter.NormalizeEndpoint(_options.PublicEndpoint);
-
-        string endpoint = internalEndpoint.IsDefaultPort
-            ? internalEndpoint.Host
-            : $"{internalEndpoint.Host}:{internalEndpoint.Port}";
-
-        _client = new MinioClient()
-            .WithEndpoint(endpoint)
-            .WithCredentials(_options.AccessKey, _options.SecretKey)
-            .WithRegion(_options.Region)
-            .WithSSL(_options.UseSsl)
-            .Build();
     }
 
     public async Task<string> UploadFileAsync(

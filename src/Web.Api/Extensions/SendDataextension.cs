@@ -24,6 +24,15 @@ public static class SeedDataExtensions
         var service = scope.ServiceProvider;
         var context = service.GetRequiredService<ApplicationDbContext>();
 
+        try
+        {
+            context.Database.Migrate();
+        }
+        catch
+        {
+            // Ignore if database doesn't support migrations or is already created
+        }
+
         SeedCars(context);
         SeedClients(context);
         SeedQuotes(context);
@@ -138,7 +147,7 @@ public static class SeedDataExtensions
                     f.Name.LastName(),
                     f.Random.Replace("#######"),
                     f.Internet.Email(),
-                    f.Phone.PhoneNumber(),
+                    f.Phone.PhoneNumber("##########"),
                     f.Address.FullAddress(),
                     f.Date.Past(2).ToUniversalTime()
                 ));

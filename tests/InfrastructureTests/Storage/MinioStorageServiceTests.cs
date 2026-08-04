@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Infrastructure.Services;
+using Minio;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -19,18 +20,30 @@ namespace InfrastructureTests.Storage;
 /// </summary>
 public class MinioStorageServiceTests
 {
-    private static MinioStorageService CreateService() =>
-        new(
-            Options.Create(new MinioOptions
-            {
-                InternalEndpoint = "http://localhost:9000",
-                PublicEndpoint = "http://localhost:9000",
-                AccessKey = "minioadmin",
-                SecretKey = "minioadmin123",
-                BucketName = "cars",
-                Region = "us-east-1",
-            }),
+    private static MinioStorageService CreateService()
+    {
+        var options = new MinioOptions
+        {
+            InternalEndpoint = "http://localhost:9000",
+            PublicEndpoint = "http://localhost:9000",
+            AccessKey = "minioadmin",
+            SecretKey = "minioadmin123",
+            BucketName = "cars",
+            Region = "us-east-1",
+        };
+
+        var client = new Minio.MinioClient()
+            .WithEndpoint("localhost:9000")
+            .WithCredentials(options.AccessKey, options.SecretKey)
+            .WithRegion(options.Region)
+            .WithSSL(options.UseSsl)
+            .Build();
+
+        return new(
+            client,
+            Options.Create(options),
             NullLogger<MinioStorageService>.Instance);
+    }
 
     [Fact]
     public async Task GeneratePresignedPostAsync_IncludesContentTypeField_MatchingThePolicy()

@@ -18,12 +18,19 @@ public sealed class SearchClients : IEndpoint
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            var query = new SearchClientsQuery { SearchTerm = q };
-            var result = await sender.Send(query, cancellationToken);
+            try
+            {
+                var query = new SearchClientsQuery { SearchTerm = q };
+                var result = await sender.Send(query, cancellationToken);
 
-            return result.Match(
-                data => Results.Ok(data),
-                CustomResults.Problem);
+                return result.Match(
+                    data => Results.Ok(data),
+                    CustomResults.Problem);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(detail: ex.ToString(), statusCode: 500);
+            }
         })
         .HasPermission("clients:read")
         .WithTags(Tags.Clients)
