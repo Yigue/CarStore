@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Clients.Projections;
+using Application.Clients;
 using Domain.Clients;
 using Domain.Clients.Attributes;
 using Domain.Sales.Attributes;
@@ -74,44 +75,62 @@ internal sealed class GetAllClientsQueryHandler(IApplicationDbContext context)
 
         // 2. Search on fullName (case & accent insensitive) or exact email
         //
-        // NOTE (qa-p0-blockers C1, 2026-08-03): this is intentionally NOT using
-        // EF.Functions.Collate(..., "und-u-ks-primary") against a real Postgres provider.
-        // Verified via a live postgres:17-alpine container that PostgreSQL rejects
-        // pattern-matching (LIKE) against a non-deterministic ICU collation with
-        // "0A000: nondeterministic collations are not supported for LIKE" -- this is not a
-        // PG-version floor as design D1 assumed, it is a permanent PostgreSQL restriction:
-        // non-deterministic collations only support equality/ordering, never LIKE/Contains.
-        // The `AddUndKsPrimaryCollation` migration and collation object are real and correct;
-        // they just cannot back a substring search via EF's `.Contains()` translation, which
-        // always compiles to `... COLLATE "und-u-ks-primary" LIKE '%...%'`.
-        // This full-table-load + in-process filter is a known, undocumented-until-now
-        // performance regression (unbounded materialization before pagination) -- flagged by
-        // sdd-verify as CRITICAL C1. Fixing it requires a design decision that supersedes D1
-        // (e.g. a generated column `lower(unaccent(...))` + expression index) which was
-        // explicitly out of scope for this apply batch and is documented back to the
-        // orchestrator rather than silently implemented here.
+        // qa-p0-blockers C1 (D1 superseded, decision 2026-08-03): D1's
+        // EF.Functions.Collate(..., "und-u-ks-primary").Contains(...) is architecturally
+        // impossible -- confirmed live against postgres:17-alpine that PostgreSQL rejects
+        // pattern-matching (LIKE) against a nondeterministic ICU collation with
+        // "0A000: nondeterministic collations are not supported for LIKE" (a permanent
+        // restriction, not a PG-version floor). The replacement filters and paginates in SQL
+        // via the `search_name` STORED generated column (`clients.search_name`, migration
+        // `AddClientSearchNameColumn`): `lower(f_unaccent(first_name || ' ' || last_name))`,
+        // pinned to a deterministic "C" collation so it can never regress into the same
+        // 0A000 error, backed by a GIN trigram index for `LIKE`.
+        //
+        // Provider branch, explicit and justified (trap 3): the InMemory provider (unit
+        // tests only) has no generated column -- `search_name` is never computed there. For
+        // InMemory, filtering falls back to the original in-process RemoveAccents predicate,
+        // which InMemory's LINQ-to-Objects execution can evaluate directly. For every
+        // relational provider (Postgres in production and in the Postgres integration
+        // suite), the predicate is pushed down as `search_name LIKE '%' || lower(f_unaccent(@term))
+        // || '%'` -- the TERM is unaccented via the same Postgres `f_unaccent` dictionary
+        // (mapped as an EF DbFunction) that produced the column, so .NET FormD normalization
+        // and PostgreSQL's unaccent dictionary can never disagree on edge cases (ß, ø, Đ).
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var rawTerm = query.Search.Trim();
-            var searchTerm = rawTerm.ToLower();
             Email? emailTerm = TryParseEmail(rawTerm);
+            // Positive Npgsql check, not a negative InMemory one: `search_name` and f_unaccent
+            // exist only under Postgres, so every other provider (SQLite, InMemory) must take
+            // the in-process path.
+            var isNpgsql = context is DbContext db && db.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL";
 
-            var normalizedSearch = RemoveAccents(searchTerm).ToLowerInvariant();
-            var allList = await dbQuery.ToListAsync(cancellationToken);
-            var filteredList = allList.Where(c =>
-                RemoveAccents(c.FirstName + " " + c.LastName).ToLowerInvariant().Contains(normalizedSearch) ||
-                (emailTerm != null && c.Email == emailTerm)).ToList();
+            if (!isNpgsql)
+            {
+                var normalizedSearch = RemoveAccents(rawTerm.ToLower()).ToLowerInvariant();
+                dbQuery = dbQuery.Where(c =>
+                    RemoveAccents(c.FirstName + " " + c.LastName).ToLowerInvariant().Contains(normalizedSearch) ||
+                    (emailTerm != null && c.Email == emailTerm));
+            }
+            else
+            {
+                // Unaccent MUST stay inside the expression tree so EF translates it to
+                // `f_unaccent(@term)`. Hoisting it to a local evaluates it in .NET and throws.
+                dbQuery = dbQuery.Where(c =>
+                    EF.Property<string>(c, "SearchName")
+                        .Contains(ClientSearchFunctions.Unaccent(rawTerm).ToLower()) ||
+                    (emailTerm != null && c.Email == emailTerm));
+            }
 
-            int searchTotalCount = filteredList.Count;
+            int searchTotalCount = await dbQuery.CountAsync(cancellationToken);
             var searchPage = query.Page > 0 ? query.Page : 1;
             var searchPageSize = query.PageSize > 0 ? query.PageSize : 20;
 
-            var searchClients = filteredList
+            var searchClients = await dbQuery
                 .OrderBy(c => c.LastName)
                 .ThenBy(c => c.FirstName)
                 .Skip((searchPage - 1) * searchPageSize)
                 .Take(searchPageSize)
-                .ToList();
+                .ToListAsync(cancellationToken);
 
             var searchItems = searchClients.Select(ClientResponseMapper.Map).ToList();
 

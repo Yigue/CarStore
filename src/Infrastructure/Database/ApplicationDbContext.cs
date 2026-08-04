@@ -74,6 +74,44 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             modelBuilder.HasDefaultSchema(Schemas.Default);
 
+            // qa-p0-blockers C1 (D1 superseded, 2026-08-03): map the Postgres-only
+            // public.f_unaccent(text) SQL wrapper (created by the AddClientSearchNameColumn
+            // migration) so LINQ predicates can unaccent the search TERM in the database,
+            // matching the same dictionary that produced the stored search_name column.
+            // Postgres-only: the function does not exist under SQLite's EnsureCreated() path.
+            modelBuilder.HasDbFunction(
+                    typeof(Application.Clients.ClientSearchFunctions)
+                        .GetMethod(nameof(Application.Clients.ClientSearchFunctions.Unaccent))!)
+                .HasName("f_unaccent")
+                .HasSchema("public");
+
+            // qa-p0-blockers C1: accent/case-insensitive client search is served by a STORED
+            // generated column instead of a nondeterministic ICU collation, because
+            // nondeterministic collations never support LIKE in PostgreSQL (confirmed live:
+            // "0A000: nondeterministic collations are not supported for LIKE").
+            //
+            // Collation-propagation trap: a generated column derives its collation from its
+            // source expression unless pinned. FirstName/LastName carry no explicit collation
+            // today, but pinning "C" guarantees a deterministic one regardless, so this column
+            // can never silently regress into the same 0A000 error.
+            //
+            // Postgres-only, hence configured here and not in ClientConfiguration: both the
+            // f_unaccent(...) computed SQL and the "C" collation are unknown to SQLite.
+            modelBuilder.Entity<Client>()
+                .Property<string>("SearchName")
+                .HasColumnName("search_name")
+                .HasColumnType("text")
+                .UseCollation("C")
+                .HasComputedColumnSql(
+                    "lower(f_unaccent(first_name || ' ' || last_name))",
+                    stored: true);
+
+            modelBuilder.Entity<Client>()
+                .HasIndex("SearchName")
+                .HasDatabaseName("ix_clients_search_name_trgm")
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
+
             // REQ-VMS-7: partial UNIQUE index "one cover per car" (Postgres only — the filter
             // SQL is not portable to SQLite's EnsureCreated()).
             modelBuilder.Entity<CarImage>()

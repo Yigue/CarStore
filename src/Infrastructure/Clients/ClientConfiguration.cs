@@ -3,6 +3,7 @@ using Domain.Clients.Attributes;
 using Infrastructure.Persistence.Configurations.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace Infrastructure.Persistence.Configurations.Clients;
 
@@ -93,5 +94,11 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.HasMany(c => c.Sales)
             .WithOne(s => s.Client)
             .HasForeignKey(s => s.ClientId);
+
+        // qa-p0-blockers C1: the `search_name` STORED generated column and its GIN trgm index
+        // are Postgres-only and are configured in ApplicationDbContext.OnModelCreating, inside
+        // the existing `if (!isSqlite)` block. They cannot live here: this configuration is
+        // applied via ApplyConfigurationsFromAssembly for every provider, and both the
+        // `f_unaccent(...)` computed SQL and the "C" collation are unknown to SQLite.
     }
 }

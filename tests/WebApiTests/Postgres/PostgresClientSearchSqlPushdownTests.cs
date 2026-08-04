@@ -1,46 +1,34 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using Application.Clients.GetAll;
 using FluentAssertions;
 using Xunit;
 
 namespace WebApiTests.Postgres;
 
 /// <summary>
-/// qa-p0-blockers C1 regression guard: intended to prove accent-insensitive client search executes
-/// in the database via the `und-u-ks-primary` collation and that pagination/filtering are pushed
-/// down to SQL, instead of an unbounded full-table load followed by in-process C# filtering.
+/// qa-p0-blockers C1 regression guard: proves accent-insensitive client search executes in the
+/// database via the `search_name` STORED generated column (D1 superseded, decision 2026-08-03) and
+/// that filtering/pagination are pushed down to SQL, instead of an unbounded full-table load
+/// followed by in-process C# filtering.
 ///
-/// BLOCKED (2026-08-03): both cases are currently <see cref="Fact.Skip"/>ped. Restoring
-/// <c>EF.Functions.Collate(c.FirstName + " " + c.LastName, "und-u-ks-primary").Contains(...)</c>
-/// against a live postgres:17-alpine container reproduces a real PostgreSQL error:
-/// "0A000: nondeterministic collations are not supported for LIKE". This is not the PG-version
-/// floor design D1 assumed ("non-deterministic collations only support LIKE/pattern matching from
-/// PostgreSQL 17") -- it is a permanent PostgreSQL restriction: non-deterministic ICU collations
-/// only support equality/ordering, never pattern matching, at any version. EF's `.Contains()`
-/// against a `EF.Functions.Collate(...)` expression always compiles to
-/// `... COLLATE "und-u-ks-primary" LIKE '%...%'`, so this architecture cannot back a substring
-/// search, full stop. Fixing the underlying C1 performance regression (unbounded
-/// materialization before pagination in both handlers) needs a design decision that supersedes
-/// D1 -- e.g. the fallback design.md itself already floats: a `STORED` generated column
-/// `lower(unaccent(first_name || ' ' || last_name))` + expression index, dropping the ICU
-/// collation requirement for substring search. That is out of scope for this apply batch and is
-/// reported back to the orchestrator instead of silently implemented. Un-skip these once a
-/// design amendment lands.
+/// History: these two cases were originally <see cref="Fact.Skip"/>ped because the D1-mandated
+/// approach -- <c>EF.Functions.Collate(c.FirstName + " " + c.LastName, "und-u-ks-primary").Contains(...)</c>
+/// -- reproduces a real, permanent PostgreSQL error against a live postgres:17-alpine container:
+/// "0A000: nondeterministic collations are not supported for LIKE" (nondeterministic ICU collations
+/// only ever support equality/ordering, never pattern matching, at any version). The replacement
+/// design filters via `search_name = lower(f_unaccent(first_name || ' ' || last_name))`, a STORED
+/// generated column pinned to a deterministic "C" collation and backed by a GIN trigram index, so
+/// `LIKE` works and these assertions are satisfiable for real.
 /// </summary>
 [Collection("PostgresCollection")]
 [Trait("Category", "Postgres")]
 public class PostgresClientSearchSqlPushdownTests : IAsyncLifetime
 {
-    private const string BlockedReason =
-        "BLOCKED by qa-p0-blockers C1 architecture conflict: nondeterministic ICU collations do " +
-        "not support LIKE in PostgreSQL (confirmed live against postgres:17-alpine: \"0A000: " +
-        "nondeterministic collations are not supported for LIKE\"), so EF.Functions.Collate(...)" +
-        ".Contains(...) can never satisfy this assertion. Needs a design decision superseding D1 " +
-        "(e.g. generated column + unaccent) before this can be un-skipped.";
-
     private readonly PostgresWebApplicationFactory _factory;
 
     public PostgresClientSearchSqlPushdownTests(PostgresFixture fixture)
@@ -76,8 +64,8 @@ public class PostgresClientSearchSqlPushdownTests : IAsyncLifetime
 
     private sealed record LoginResponse(string Token);
 
-    [Fact(Skip = BlockedReason)]
-    public async Task SearchClients_ShouldExecuteCollationAndLimitInDatabase()
+    [Fact]
+    public async Task SearchClients_ShouldExecuteSearchNameFilterAndLimitInDatabase()
     {
         var token = await GetAdminTokenAsync();
         var client = _factory.CreateClient();
@@ -96,9 +84,10 @@ public class PostgresClientSearchSqlPushdownTests : IAsyncLifetime
         commands.Should().NotBeEmpty();
 
         commands.Should().Contain(
-            sql => sql.Contains("und-u-ks-primary", StringComparison.OrdinalIgnoreCase),
-            because: "the accent-insensitive match must be evaluated by Postgres via the provisioned " +
-                     "collation, not reproduced in application memory after a full-table load");
+            sql => sql.Contains("search_name", StringComparison.OrdinalIgnoreCase),
+            because: "the accent-insensitive match must be evaluated by Postgres via the " +
+                     "search_name generated column, not reproduced in application memory after " +
+                     "a full-table load");
 
         commands.Should().Contain(
             sql => sql.Contains("LIMIT", StringComparison.OrdinalIgnoreCase),
@@ -106,8 +95,8 @@ public class PostgresClientSearchSqlPushdownTests : IAsyncLifetime
                      "in-memory List<Client> after loading every matching row");
     }
 
-    [Fact(Skip = BlockedReason)]
-    public async Task GetAllClients_WithSearch_ShouldExecuteCollationAndPaginationInDatabase()
+    [Fact]
+    public async Task GetAllClients_WithSearch_ShouldExecuteSearchNameFilterAndPaginationInDatabase()
     {
         var token = await GetAdminTokenAsync();
         var client = _factory.CreateClient();
@@ -126,14 +115,43 @@ public class PostgresClientSearchSqlPushdownTests : IAsyncLifetime
         commands.Should().NotBeEmpty();
 
         commands.Should().Contain(
-            sql => sql.Contains("und-u-ks-primary", StringComparison.OrdinalIgnoreCase),
-            because: "the search filter must be evaluated by Postgres via the provisioned collation, " +
-                     "not reproduced in application memory after a full-table load");
+            sql => sql.Contains("search_name", StringComparison.OrdinalIgnoreCase),
+            because: "the search filter must be evaluated by Postgres via the search_name generated " +
+                     "column, not reproduced in application memory after a full-table load");
 
         commands.Should().Contain(
             sql => sql.Contains("LIMIT", StringComparison.OrdinalIgnoreCase)
                    && sql.Contains("OFFSET", StringComparison.OrdinalIgnoreCase),
             because: "pagination must be applied by the database (LIMIT/OFFSET translated from " +
                      "Skip/Take), not by paginating an in-memory list after loading every matching row");
+    }
+
+    [Fact]
+    public async Task SearchClients_TermUnaccentedInDatabase_MatchesStoredAccentedName()
+    {
+        // Trap 1/2 regression guard: "jose" (no diacritics) must match a stored "José" via the
+        // search_name generated column, and the TERM itself must be unaccented in SQL
+        // (f_unaccent), not in .NET -- proving both the collation-propagation trap (search_name
+        // is queryable with LIKE at all) and the term/column symmetry trap (the term-side
+        // f_unaccent call appears in the generated SQL) are actually closed, not just documented.
+        var token = await GetAdminTokenAsync();
+        var client = _factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        _factory.CommandInterceptor.Clear();
+
+        var response = await client.GetAsync("/api/v1/clients/search?q=jose");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var clients = await response.Content.ReadFromJsonAsync<List<ClientResponse>>(IntegrationTestHelpers.JsonOptions);
+        clients.Should().Contain(c => c.FirstName == "José");
+
+        var commands = _factory.CommandInterceptor.CommandTexts;
+        commands.Should().Contain(
+            sql => sql.Contains("f_unaccent", StringComparison.OrdinalIgnoreCase),
+            because: "the search TERM must be unaccented via the same Postgres f_unaccent " +
+                     "dictionary that produced the stored search_name column (term/column " +
+                     "symmetry), not via .NET FormD normalization which disagrees with Postgres " +
+                     "unaccent on some characters");
     }
 }
