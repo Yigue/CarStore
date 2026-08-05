@@ -23,7 +23,6 @@ namespace Infrastructure.Migrations
                     start_date_time = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     end_date_time = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     type = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
-                    status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false, defaultValue: "Scheduled"),
                     notes = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     dealer_id = table.Column<Guid>(type: "uuid", nullable: false)
