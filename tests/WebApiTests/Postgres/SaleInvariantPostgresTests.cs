@@ -47,7 +47,7 @@ public class SaleInvariantPostgresTests : IAsyncLifetime
         var car = new Car(
             dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New,
             StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2022,
-            "PAT" + Guid.NewGuid().ToString("N")[..5], "desc", 10000m, DateTime.UtcNow);
+            "AA" + Random.Shared.Next(100, 999) + "CC", "desc", 10000m, DateTime.UtcNow);
         db.Cars.Add(car);
 
         var client = new Client(

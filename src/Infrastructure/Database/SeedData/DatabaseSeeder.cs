@@ -45,7 +45,7 @@ public static class DatabaseSeeder
         }
 
         // 4. DevData (Clients, Cars, Sales, Quotes, Leads, Subscriptions)
-        await DevDataSeeder.SeedAsync(context, cancellationToken);
+        await DevDataSeeder.SeedAsync(context, passwordHasher, configuration, cancellationToken);
 
         // Guardar todos los cambios
         await context.SaveChangesAsync(cancellationToken);

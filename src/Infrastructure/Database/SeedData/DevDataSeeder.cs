@@ -1,3 +1,4 @@
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Domain.Cars;
 using Domain.Cars.Attributes;
@@ -10,6 +11,7 @@ using Domain.Sales;
 using Domain.Sales.Attributes;
 using Domain.Shared.ValueObjects;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,7 +27,11 @@ internal static class DevDataSeeder
 {
     private static readonly Guid DefaultDealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-    public static async Task SeedAsync(IApplicationDbContext context, CancellationToken cancellationToken = default)
+    public static async Task SeedAsync(
+        IApplicationDbContext context,
+        IPasswordHasher passwordHasher,
+        IConfiguration configuration,
+        CancellationToken cancellationToken = default)
     {
         // 1. Clientes
         if (!await context.Clients.IgnoreQueryFilters().AnyAsync(cancellationToken))
@@ -153,6 +159,10 @@ internal static class DevDataSeeder
             var defaultSub = SubscriptionStateSeed.CreateSeededSubscription(DefaultDealerId, Domain.Billing.SubscriptionStatus.Active);
             context.DealerSubscriptions.Add(defaultSub);
 
+            // Same key and default as UsersSeeder uses for the primary dealer admin, so every
+            // seeded admin shares one known dev credential.
+            string seededAdminPassword = configuration["ADMIN_SEED_PASSWORD"] ?? "Admin123!";
+
             foreach (var item in SubscriptionStateSeed.AdditionalDealers)
             {
                 if (context is ApplicationDbContext db)
@@ -180,7 +190,12 @@ internal static class DevDataSeeder
 
                 if (!await context.Users.IgnoreQueryFilters().AnyAsync(u => u.Email == item.Email, cancellationToken))
                 {
-                    var user = new Domain.Users.User(item.DealerId, item.Email, "Admin", item.DealerName, "hash_mock", role.Id);
+                    // Must be a real IPasswordHasher.Hash() output. A literal placeholder is not
+                    // just unusable, it is unverifiable: PasswordHasher.Verify() splits the stored
+                    // value on '-' and hex-decodes both halves, so a non-hash string throws on
+                    // every login attempt instead of returning false.
+                    var passwordHash = passwordHasher.Hash(seededAdminPassword);
+                    var user = new Domain.Users.User(item.DealerId, item.Email, "Admin", item.DealerName, passwordHash, role.Id);
                     context.Users.Add(user);
                 }
 

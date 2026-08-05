@@ -53,7 +53,7 @@ public class SaleCompletedCarStatusHandlerPostgresTests : IAsyncLifetime
         var car = new Car(
             dealerId, marca, modelo, Color.Blue, TypeCar.Sedan, StatusCar.New,
             StatusServiceCar.Disponible, 4, 5, 2000, 1000, 2023,
-            "PAT" + Guid.NewGuid().ToString("N")[..5], "desc", 15000m, DateTime.UtcNow);
+            "AA" + Random.Shared.Next(100, 999) + "BB", "desc", 15000m, DateTime.UtcNow);
         db.Cars.Add(car);
 
         await db.SaveChangesAsync();

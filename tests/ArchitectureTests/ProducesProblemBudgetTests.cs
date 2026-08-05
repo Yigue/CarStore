@@ -10,7 +10,7 @@ namespace ArchitectureTests;
 
 public class ProducesProblemBudgetTests : BaseTest
 {
-    private const int FrozenBudget = 108;
+    private const int FrozenBudget = 106;
 
     [Fact]
     public void ProducesProblem500_DeclarationCount_MatchesFrozenBudget()
