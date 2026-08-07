@@ -18,9 +18,18 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, ISto
             .Include(c => c.Modelo)
             .Include(c => c.Images);
 
+        Result<IOrderedQueryable<Car>> ordering = CarSortOrder.Apply(carsQuery, query.SortBy, query.SortOrder);
+
+        if (ordering.IsFailure)
+        {
+            return Result.Failure<PaginatedResult<CarsResponses>>(ordering.Error);
+        }
+
         var totalCount = await carsQuery.CountAsync(cancellationToken);
 
-        var cars = await carsQuery
+        // Sort is applied to the whole set before Skip/Take, so page N holds the Nth
+        // slice of the sorted inventory rather than a re-ordered arbitrary page.
+        var cars = await ordering.Value
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToListAsync(cancellationToken);
@@ -55,6 +64,8 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, ISto
                 car.CarType,
                 car.CarStatus,
                 car.ServiceCar,
+                car.FuelType,
+                car.Transmission,
                 car.CantidadPuertas,
                 car.CantidadAsientos,
                 car.Cilindrada,

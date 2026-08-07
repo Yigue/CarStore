@@ -12,6 +12,8 @@ public sealed record CarsResponses(
     TypeCar Type,
     StatusCar Status,
     StatusServiceCar ServiceStatus,
+    FuelType FuelType,
+    Transmission Transmission,
     int Puertas,
     int Asientos,
     int Cilindrada,
