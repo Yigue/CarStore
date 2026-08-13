@@ -1,4 +1,5 @@
 using Application.Abstractions.Messaging;
+using Domain.Cars.Attributes;
 
 namespace Application.Cars.Search;
 
@@ -21,6 +22,20 @@ public class SearchCarsQuery : IQuery<SearchCarsResult>
     public int PageSize { get; set; } = 10;
 }
 
+/// <summary>
+/// A search result row.
+///
+/// <para>
+/// Status, ServiceStatus, Featured, FuelType, Transmission, Color and CarType
+/// are here because the catalog needs them and the aggregate has always carried
+/// them. Without them the frontend adapter had nothing to read and filled the
+/// gaps with constants (<c>Featured=false</c>, <c>ServiceStatus=Disponible</c>),
+/// which silently broke everything built on top: the featured strip could never
+/// match a vehicle, and inventory counters derived from search results reported
+/// every car as available. A field the UI needs belongs on the payload, not in a
+/// default on the other side of the wire.
+/// </para>
+/// </summary>
 public class CarDto
 {
     public Guid Id { get; set; }
@@ -32,6 +47,16 @@ public class CarDto
     public string ImagenPrincipal { get; set; }
     public int CantidadPuertas { get; set; }
     public int Kilometraje { get; set; }
+    public int CantidadAsientos { get; set; }
+    public int Cilindrada { get; set; }
+    public Color Color { get; set; }
+    public TypeCar CarType { get; set; }
+    public StatusCar Status { get; set; }
+    public StatusServiceCar ServiceStatus { get; set; }
+    public FuelType FuelType { get; set; }
+    public Transmission Transmission { get; set; }
+    public bool Featured { get; set; }
+    public string Patente { get; set; }
 }
 
 public class SearchCarsResult
