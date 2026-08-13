@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Cars.GetAll;
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Storage;
 using Domain.Cars;
 using Domain.Cars.Attributes;
@@ -87,8 +88,13 @@ public class GetAllCarsSortingTests
         return (context, cheap, mid, expensive);
     }
 
-    private static GetAllCarsQueryHandler CreateHandler(TestApplicationDbContext context) =>
-        new(context, new Mock<IStorageService>().Object);
+    /// <summary>Admin: estos tests miran el ORDEN, no quién ve el costo.</summary>
+    private static GetAllCarsQueryHandler CreateHandler(TestApplicationDbContext context)
+    {
+        var adminContext = new Mock<IUserContext>();
+        adminContext.Setup(x => x.IsAdmin).Returns(true);
+        return new GetAllCarsQueryHandler(context, new Mock<IStorageService>().Object, adminContext.Object);
+    }
 
     [Fact]
     public async Task Handle_Should_SortByPriceAscending_WhenSortOrderIsAsc()

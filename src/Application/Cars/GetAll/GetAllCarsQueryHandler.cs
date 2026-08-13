@@ -1,3 +1,4 @@
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
@@ -7,7 +8,7 @@ using SharedKernel;
 
 namespace Application.Cars.GetAll;
 
-internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, IStorageService storage)
+internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, IStorageService storage, IUserContext userContext)
     : IQueryHandler<GetAllCarsQuery, PaginatedResult<CarsResponses>>
 {
     public async Task<Result<PaginatedResult<CarsResponses>>> Handle(GetAllCarsQuery query, CancellationToken cancellationToken)
@@ -78,7 +79,11 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, ISto
                 car.UpdatedAt,
                 imageResponses,
                 car.Featured,
-                car.PurchaseCost?.Amount
+                // El costo de compra es el margen de la concesionaria. El
+                // endpoint ya exige cars:read, pero eso lo tiene también un
+                // vendedor: sólo el admin ve el costo. La misma regla que
+                // VehicleForm aplica al guardar, ahora también al leer.
+                userContext.IsAdmin ? car.PurchaseCost?.Amount : null
             ));
         }
 

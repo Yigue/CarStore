@@ -174,8 +174,7 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
                 ServiceStatus = c.ServiceCar,
                 FuelType = c.FuelType,
                 Transmission = c.Transmission,
-                Featured = c.Featured,
-                Patente = c.Patente?.Value ?? string.Empty
+                Featured = c.Featured
             });
         }
 

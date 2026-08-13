@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Cars.GetById;
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Storage;
 using Domain.Cars;
 using Domain.Cars.Attributes;
@@ -57,7 +58,12 @@ public class GetCarByIdQueryHandlerTests
         await context.SaveChangesAsync();
 
         var mockStorage = new Mock<IStorageService>();
-        var handler = new GetCarByIdQueryHandler(context, mockStorage.Object);
+        // Estos tests verifican la PROYECCIÓN, no la autorización: un contexto de
+        // admin para que PurchaseCost llegue al DTO. El caso no-admin (costo en
+        // null) tiene su propio test.
+        var adminContext = new Mock<IUserContext>();
+        adminContext.Setup(x => x.IsAdmin).Returns(true);
+        var handler = new GetCarByIdQueryHandler(context, mockStorage.Object, adminContext.Object);
 
         var result = await handler.Handle(new GetCarByIdQuery(car.Id), CancellationToken.None);
 
@@ -101,7 +107,12 @@ public class GetCarByIdQueryHandlerTests
         await context.SaveChangesAsync();
 
         var mockStorage = new Mock<IStorageService>();
-        var handler = new GetCarByIdQueryHandler(context, mockStorage.Object);
+        // Estos tests verifican la PROYECCIÓN, no la autorización: un contexto de
+        // admin para que PurchaseCost llegue al DTO. El caso no-admin (costo en
+        // null) tiene su propio test.
+        var adminContext = new Mock<IUserContext>();
+        adminContext.Setup(x => x.IsAdmin).Returns(true);
+        var handler = new GetCarByIdQueryHandler(context, mockStorage.Object, adminContext.Object);
 
         var result = await handler.Handle(new GetCarByIdQuery(car.Id), CancellationToken.None);
 

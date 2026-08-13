@@ -56,7 +56,12 @@ public class CarDto
     public FuelType FuelType { get; set; }
     public Transmission Transmission { get; set; }
     public bool Featured { get; set; }
-    public string Patente { get; set; }
+
+    // Patente NO va acá. `cars/search` es AllowAnonymous (es el buscador del
+    // catálogo público) y la patente identifica un vehículo concreto: cruzada
+    // con registros públicos llega al titular. El catálogo no la muestra, así
+    // que no hay razón para publicarla. El dashboard la obtiene por GET /cars,
+    // que sí exige cars:read.
 }
 
 public class SearchCarsResult

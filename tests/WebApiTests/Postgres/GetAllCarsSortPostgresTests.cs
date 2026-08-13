@@ -133,13 +133,36 @@ public class GetAllCarsSortPostgresTests : IAsyncLifetime
         _expensiveId = expensive.Id;
     }
 
+    /// <summary>
+    /// GET /cars exige `cars:read` desde que dejó de ser anónimo: su payload
+    /// incluye patente y costo de compra, que no son públicos.
+    /// </summary>
+    private async Task<HttpClient> CreateAuthenticatedClientAsync()
+    {
+        var client = _factory.CreateClient();
+
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/v1/users/login",
+            new { Email = "admin@carstore.com", Password = "Admin123!" },
+            IntegrationTestHelpers.JsonOptions);
+        loginResponse.EnsureSuccessStatusCode();
+
+        var login = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>(IntegrationTestHelpers.JsonOptions);
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", login!.Token);
+
+        return client;
+    }
+
+    private sealed record LoginResponse(string Token);
+
     private sealed record CarRow(Guid Id, string Patente, decimal Precio, string FuelType, string Transmission);
 
     private sealed record CarsPage(List<CarRow> Items, int TotalCount, int Page, int PageSize);
 
     private async Task<CarsPage> GetCarsAsync(string queryString)
     {
-        var client = _factory.CreateClient();
+        var client = await CreateAuthenticatedClientAsync();
         var response = await client.GetAsync(new Uri($"/api/v1/cars?{queryString}", UriKind.Relative));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<CarsPage>(IntegrationTestHelpers.JsonOptions))!;
@@ -201,7 +224,7 @@ public class GetAllCarsSortPostgresTests : IAsyncLifetime
     [InlineData("updatedAt")]
     public async Task EverySupportedSortField_Should_Return200_OnPostgres(string sortBy)
     {
-        var client = _factory.CreateClient();
+        var client = await CreateAuthenticatedClientAsync();
         var response = await client.GetAsync(new Uri($"/api/v1/cars?sortBy={sortBy}&sortOrder=asc", UriKind.Relative));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -210,7 +233,7 @@ public class GetAllCarsSortPostgresTests : IAsyncLifetime
     [Fact]
     public async Task UnknownSortField_Should_Return400_InsteadOfSilently200()
     {
-        var client = _factory.CreateClient();
+        var client = await CreateAuthenticatedClientAsync();
         var response = await client.GetAsync(new Uri("/api/v1/cars?sortBy=NotARealField", UriKind.Relative));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -221,16 +244,31 @@ public class GetAllCarsSortPostgresTests : IAsyncLifetime
     [Fact]
     public async Task UnknownSortOrder_Should_Return400()
     {
-        var client = _factory.CreateClient();
+        var client = await CreateAuthenticatedClientAsync();
         var response = await client.GetAsync(new Uri("/api/v1/cars?sortBy=price&sortOrder=sideways", UriKind.Relative));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    /// <summary>
+    /// Guarda la regresión de seguridad: el endpoint fue `AllowAnonymous` y su
+    /// payload lleva `Patente` y `PurchaseCost`. Un `curl` sin token devolvía la
+    /// patente de todo el parque. Si alguien vuelve a abrirlo, esto falla.
+    /// </summary>
+    [Fact]
+    public async Task WithoutAToken_Should_Reject_BecauseThePayloadCarriesPlateAndCost()
+    {
+        var anonymous = _factory.CreateClient();
+
+        var response = await anonymous.GetAsync(new Uri("/api/v1/cars", UriKind.Relative));
+
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
+    }
+
     [Fact]
     public async Task NoSortParameters_Should_StillReturn200()
     {
-        var client = _factory.CreateClient();
+        var client = await CreateAuthenticatedClientAsync();
         var response = await client.GetAsync(new Uri("/api/v1/cars", UriKind.Relative));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

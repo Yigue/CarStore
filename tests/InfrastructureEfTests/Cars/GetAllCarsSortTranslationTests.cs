@@ -1,3 +1,4 @@
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
 using Application.Cars.GetAll;
@@ -120,8 +121,15 @@ public class GetAllCarsSortTranslationTests
         return (context, connection, cheap.Id, mid.Id, expensive.Id);
     }
 
+    /// <summary>Sin Moq en este proyecto; admin porque acá se mira la traducción a SQL.</summary>
+    private sealed class AdminUserContext : IUserContext
+    {
+        public Guid UserId => Guid.Empty;
+        public bool IsAdmin => true;
+    }
+
     private static GetAllCarsQueryHandler CreateHandler(ApplicationDbContext context) =>
-        new(context, new UnusedStorageService());
+        new(context, new UnusedStorageService(), new AdminUserContext());
 
     /// <summary>
     /// Every whitelisted field except price must survive translation. A field that only
