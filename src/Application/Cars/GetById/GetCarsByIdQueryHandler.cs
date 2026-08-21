@@ -59,7 +59,11 @@ internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context, ISto
             car.Cilindrada,
             car.Kilometraje,
             car.Anio,
-            car.Patente.Value,
+            // La patente identifica un vehículo físico concreto y este endpoint
+            // es AllowAnonymous, así que viajaba a cualquiera que pidiera el id
+            // — y el catálogo público la metía además en el título de compartir.
+            // Se corta en "logueado", no en "admin": un vendedor la necesita.
+            userContext.IsAuthenticated ? car.Patente.Value : null,
             car.Descripcion,
             car.Price.Amount,
             car.CreatedAt,

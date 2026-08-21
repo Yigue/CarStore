@@ -29,18 +29,59 @@ internal sealed class GetAllClientsQueryHandler(IApplicationDbContext context)
             .AsQueryable();
 
         // 1. Advanced Filters
-        if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<ClientStatus>(query.Status, true, out var statusVal))
+        //
+        // El parse y la presencia van en condiciones SEPARADAS a propósito. Antes
+        // eran una sola:
+        //
+        //     if (!IsNullOrWhiteSpace(query.Status) && Enum.TryParse(..., out var v))
+        //         dbQuery = dbQuery.Where(...);
+        //
+        // y cuando el TryParse fallaba el if entero daba falso, así que no se
+        // aplicaba NINGÚN filtro y la respuesta era el conjunto completo con un
+        // 200. Verificado contra la API: sin filtro 5 filas, ?status=Active 4
+        // filas, ?status=NOT_A_STATUS otra vez 5. Pedir un subconjunto y recibir
+        // todo es la peor respuesta posible — el llamador cree que filtró y opera
+        // sobre el universo entero. Un valor inválido ahora es 400.
+        //
+        // `leads` ya se comportaba bien porque declara `LeadStatus?` y el model
+        // binding rechaza el valor solo; acá los parámetros son `string?`, así que
+        // la validación tiene que ser explícita.
+        if (!string.IsNullOrWhiteSpace(query.Status))
         {
+            if (!Enum.TryParse<ClientStatus>(query.Status, true, out var statusVal))
+            {
+                return Result.Failure<PaginatedResult<ClientResponse>>(
+                    Error.Validation(
+                        "Clients.InvalidStatus",
+                        $"'{query.Status}' no es un estado de cliente válido. Valores admitidos: {string.Join(", ", Enum.GetNames<ClientStatus>())}."));
+            }
+
             dbQuery = dbQuery.Where(c => c.Status == statusVal);
         }
 
-        if (!string.IsNullOrWhiteSpace(query.Type) && Enum.TryParse<ClientType>(query.Type, true, out var typeVal))
+        if (!string.IsNullOrWhiteSpace(query.Type))
         {
+            if (!Enum.TryParse<ClientType>(query.Type, true, out var typeVal))
+            {
+                return Result.Failure<PaginatedResult<ClientResponse>>(
+                    Error.Validation(
+                        "Clients.InvalidType",
+                        $"'{query.Type}' no es un tipo de cliente válido. Valores admitidos: {string.Join(", ", Enum.GetNames<ClientType>())}."));
+            }
+
             dbQuery = dbQuery.Where(c => c.Type == typeVal);
         }
 
-        if (!string.IsNullOrWhiteSpace(query.Source) && Enum.TryParse<AcquisitionSource>(query.Source, true, out var sourceVal))
+        if (!string.IsNullOrWhiteSpace(query.Source))
         {
+            if (!Enum.TryParse<AcquisitionSource>(query.Source, true, out var sourceVal))
+            {
+                return Result.Failure<PaginatedResult<ClientResponse>>(
+                    Error.Validation(
+                        "Clients.InvalidSource",
+                        $"'{query.Source}' no es una fuente de adquisición válida. Valores admitidos: {string.Join(", ", Enum.GetNames<AcquisitionSource>())}."));
+            }
+
             dbQuery = dbQuery.Where(c => c.AcquisitionSource == sourceVal);
         }
 

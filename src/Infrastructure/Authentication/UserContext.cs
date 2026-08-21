@@ -31,4 +31,14 @@ internal sealed class UserContext : IUserContext
             _httpContextAccessor.HttpContext?.User?.FindFirst("role")?.Value,
             "Admin",
             StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether authentication actually succeeded for this request. On an
+    /// <c>AllowAnonymous</c> endpoint the pipeline still populates
+    /// <c>HttpContext.User</c> with an unauthenticated principal, so the
+    /// presence of <c>User</c> proves nothing — <c>Identity.IsAuthenticated</c>
+    /// is what distinguishes a verified caller from a visitor.
+    /// </summary>
+    public bool IsAuthenticated =>
+        _httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated == true;
 }
