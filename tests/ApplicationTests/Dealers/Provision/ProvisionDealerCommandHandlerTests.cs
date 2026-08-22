@@ -48,7 +48,7 @@ public class ProvisionDealerCommandHandlerTests
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
         gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("https://checkout.stripe.com/123");
 
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object);
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
         var command = ValidCommand();
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -84,7 +84,7 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object);
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
 
         var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -112,7 +112,7 @@ public class ProvisionDealerCommandHandlerTests
 
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object);
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
 
         var act = async () => await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -132,7 +132,7 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object);
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
 
         var result = await handler.Handle(ValidCommand("acme"), CancellationToken.None);
 
@@ -161,7 +161,7 @@ public class ProvisionDealerCommandHandlerTests
 
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object);
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
 
         try { await handler.Handle(ValidCommand(), CancellationToken.None); }
         catch (InvalidOperationException) { /* expected */ }
@@ -181,7 +181,7 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object);
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
 
         var result = await handler.Handle(ValidCommand("AuToMoToRs"), CancellationToken.None);
 
@@ -191,5 +191,36 @@ public class ProvisionDealerCommandHandlerTests
             .IgnoreQueryFilters()
             .FirstAsync(s => s.DealerId == result.Value.DealerId);
         settings.HostName.Should().Be("automotors");
+    }
+
+    [Fact]
+    public async Task Handle_ShouldSucceedWithNullCheckoutUrl_WhenStripeGatewayThrows()
+    {
+        using var context = CreateContext();
+        var publisher = new Mock<MediatR.IPublisher>();
+        publisher.Setup(p => p.Publish(It.IsAny<MediatR.INotification>(), It.IsAny<CancellationToken>()))
+                 .Returns(Task.CompletedTask);
+
+        var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
+        gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+               .ThrowsAsync(new System.Net.Http.HttpRequestException("Stripe is unreachable"));
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+               .ThrowsAsync(new System.Net.Http.HttpRequestException("Stripe is unreachable"));
+
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
+
+        var result = await handler.Handle(ValidCommand("resilient"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.CheckoutUrl.Should().BeNull();
+
+        var settingsCount = await context.DealerSettings.IgnoreQueryFilters().CountAsync(s => s.HostName == "resilient");
+        settingsCount.Should().Be(1);
+
+        var userCount = await context.Users.IgnoreQueryFilters().CountAsync(u => u.Email.Value == "admin@automotors.com");
+        userCount.Should().Be(1);
+
+        var roleCount = await context.Roles.IgnoreQueryFilters().CountAsync(r => r.DealerId == result.Value.DealerId);
+        roleCount.Should().Be(1);
     }
 }

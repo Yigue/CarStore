@@ -165,7 +165,16 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
                 Descripcion = c.Descripcion ?? string.Empty,
                 ImagenPrincipal = await GetPrimaryImageUrl(c, cancellationToken),
                 CantidadPuertas = c.CantidadPuertas,
-                Kilometraje = c.Kilometraje
+                Kilometraje = c.Kilometraje,
+                CantidadAsientos = c.CantidadAsientos,
+                Cilindrada = c.Cilindrada,
+                Color = c.Color,
+                CarType = c.CarType,
+                Status = c.CarStatus,
+                ServiceStatus = c.ServiceCar,
+                FuelType = c.FuelType,
+                Transmission = c.Transmission,
+                Featured = c.Featured
             });
         }
 

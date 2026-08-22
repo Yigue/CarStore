@@ -76,7 +76,10 @@ public sealed class CorsProductionConfigurationTests
                             ["Storage:Minio:AccessKey"] = "minioadmin",
                             ["Storage:Minio:SecretKey"] = "minioadmin123",
                             ["Storage:Minio:BucketName"] = "cars",
-                            ["ConnectionStrings:Redis"] = ""
+                            ["ConnectionStrings:Redis"] = "",
+                            ["Stripe:Enabled"] = "false",
+                            ["Stripe:WebhookSecret"] = "whsec_dummy",
+                            ["FeatureFlags:SubscriptionEnforcement"] = "false"
                         });
                     });
 

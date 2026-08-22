@@ -49,8 +49,8 @@ internal sealed class Export : IEndpoint
                 type,
                 source,
                 assignedAgentId,
-                createdFrom,
-                createdTo);
+                createdFrom?.ToUtc(),
+                createdTo?.ToUtc());
 
             Result<byte[]> result = await sender.Send(query, cancellationToken);
 

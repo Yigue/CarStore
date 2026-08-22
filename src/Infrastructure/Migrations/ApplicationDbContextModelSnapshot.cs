@@ -63,6 +63,14 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("start_date_time");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Scheduled")
+                        .HasColumnName("status");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -577,6 +585,13 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("phone");
 
+                    b.Property<string>("SearchName")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("search_name")
+                        .HasComputedColumnSql("lower(f_unaccent(first_name || ' ' || last_name))", true)
+                        .UseCollation("C");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -611,6 +626,12 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("OriginLeadId")
                         .HasDatabaseName("ix_clients_origin_lead_id");
+
+                    b.HasIndex("SearchName")
+                        .HasDatabaseName("ix_clients_search_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchName"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("SearchName"), new[] { "gin_trgm_ops" });
 
                     b.ToTable("clients", "public");
                 });
@@ -1199,7 +1220,9 @@ namespace Infrastructure.Migrations
                         .HasName("pk_sales");
 
                     b.HasIndex("CarId")
-                        .HasDatabaseName("ix_sales_car_id");
+                        .IsUnique()
+                        .HasDatabaseName("ux_sales_one_completed_per_car")
+                        .HasFilter("status = 'Completed'");
 
                     b.HasIndex("ClientId")
                         .HasDatabaseName("ix_sales_client_id");
@@ -1780,7 +1803,7 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Financial.Attributes.TransactionCategory", "Category")
                         .WithMany()
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_transactions_transaction_categories_category_id");
 

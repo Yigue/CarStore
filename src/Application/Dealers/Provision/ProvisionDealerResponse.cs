@@ -7,4 +7,4 @@ public sealed record ProvisionDealerResponse(
     Guid DealerId,
     Guid AdminUserId,
     string Subdomain,
-    string CheckoutUrl);
+    string? CheckoutUrl);

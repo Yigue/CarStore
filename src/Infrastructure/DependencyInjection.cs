@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Minio;
 using Stripe;
 using Application.Abstractions.Billing;
 using Infrastructure.Billing;
@@ -64,17 +65,13 @@ public static class DependencyInjection
     private static IServiceCollection AddBilling(this IServiceCollection services, IConfiguration configuration)
     {
         var stripe = services.AddOptions<StripeOptions>()
-            .BindConfiguration(StripeOptions.SectionName)
-            .ValidateDataAnnotations();
+            .BindConfiguration(StripeOptions.SectionName);
 
-        var billingEnabled = !string.IsNullOrWhiteSpace(configuration["Stripe:SecretKey"]);
+        var billingEnabled = configuration.GetValue<bool?>("Stripe:Enabled") ?? !string.IsNullOrWhiteSpace(configuration["Stripe:SecretKey"]);
         if (billingEnabled)
         {
+            stripe.ValidateDataAnnotations();
             stripe.ValidateOnStart();
-        }
-
-        if (billingEnabled)
-        {
             services.AddSingleton<IStripeClient>(new StripeClient(configuration["Stripe:SecretKey"]));
             services.AddScoped<ISubscriptionGateway, StripeSubscriptionGateway>();
         }
@@ -126,6 +123,21 @@ public static class DependencyInjection
             .BindConfiguration(MinioOptions.SectionName)
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddSingleton<Minio.IMinioClient>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<MinioOptions>>().Value;
+            Uri internalEndpoint = Services.Internal.PresignedUrlRewriter.NormalizeEndpoint(options.InternalEndpoint);
+            string endpoint = internalEndpoint.IsDefaultPort
+                ? internalEndpoint.Host
+                : $"{internalEndpoint.Host}:{internalEndpoint.Port}";
+
+            return new Minio.MinioClient()
+                .WithEndpoint(endpoint)
+                .WithCredentials(options.AccessKey, options.SecretKey)
+                .WithRegion(options.Region)
+                .WithSSL(options.UseSsl)
+                .Build();
+        });
         services.AddScoped<IStorageService, MinioStorageService>();
 
         // PHASE-3: Blob storage. Defaults to NoOpBlobStorageService (logs + synthetic

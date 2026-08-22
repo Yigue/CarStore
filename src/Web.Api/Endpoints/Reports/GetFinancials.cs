@@ -28,14 +28,8 @@ internal sealed class GetFinancials : IEndpoint
                 return Results.BadRequest(new { error = "MISSING_DATE_RANGE" });
             }
 
-            // REQ-FIN-REPORT-001: FinancialTransaction.TransactionDate is mapped by EF Core
-            // convention to PostgreSQL `timestamp without time zone` (no explicit Configuration
-            // file exists for this aggregate). ASP.NET model-binds ISO strings with a trailing
-            // `Z` as DateTimeKind.Utc. Npgsql 6+ refuses to compare a DateTime(Utc) against
-            // a `timestamp without time zone` column → InvalidCastException → 500.
-            // Strip the Kind so EF binds cleanly to the convention-mapped column.
-            parsedFrom = DateTime.SpecifyKind(parsedFrom, DateTimeKind.Unspecified);
-            parsedTo = DateTime.SpecifyKind(parsedTo, DateTimeKind.Unspecified);
+            parsedFrom = parsedFrom.ToUtc();
+            parsedTo = parsedTo.ToUtc();
 
             ReportGroupBy grouping;
             if (string.IsNullOrWhiteSpace(groupBy))
@@ -65,7 +59,6 @@ internal sealed class GetFinancials : IEndpoint
         .HasPermission("financial:read")
         .WithTags(Tags.Reports)
         .WithName("GetFinancialReport")
-        .Produces<FinancialReportDto>(StatusCodes.Status200OK)
-        .ProducesProblem(StatusCodes.Status500InternalServerError);
+        .Produces<FinancialReportDto>(StatusCodes.Status200OK);
     }
 }

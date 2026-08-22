@@ -30,8 +30,22 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     public const string AdminDealerId = "11111111-1111-1111-1111-111111111111";
 
-    public CustomWebApplicationFactory()
+    /// <summary>
+    /// ASPNETCORE_ENVIRONMENT the host boots under. Defaults to "Testing" (existing behavior for
+    /// every pre-existing caller). qa-p1-integridad PR1 (D1) needs "Development" and "Production"
+    /// hosts side by side to prove <c>RouteHandlerOptions.ThrowOnBadRequest</c> convergence — see
+    /// <c>IntegrationTests/ErrorContract/GlobalHandlerConvergenceTests.cs</c>.
+    /// </summary>
+    private readonly string _environment;
+
+    public CustomWebApplicationFactory() : this("Testing")
     {
+    }
+
+    internal CustomWebApplicationFactory(string environment)
+    {
+        _environment = environment;
+
         // Crear conexión compartida para Sqlite en memoria
         _connection = new SqliteConnection("Filename=:memory:");
         _connection.Open();
@@ -60,7 +74,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("Stripe__WebhookSecret", "whsec_mock");
         Environment.SetEnvironmentVariable("Stripe__PriceId", "price_mock");
 
-        builder.UseEnvironment("Testing");
+        builder.UseEnvironment(_environment);
 
         builder.ConfigureTestServices(services =>
         {

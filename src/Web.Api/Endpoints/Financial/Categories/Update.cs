@@ -13,7 +13,7 @@ public sealed class Update : IEndpoint
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPut("financial/categories/{id}", Handler)
+        app.MapPut("financial/categories/{id:guid}", Handler)
             .WithTags(Tags.Financial)
             .HasPermission("financial:update");
     }

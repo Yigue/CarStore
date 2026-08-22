@@ -5,6 +5,6 @@ namespace Application.Leads.UpdateStatus;
 
 public sealed record UpdateLeadStatusCommand(
     Guid LeadId,
-    LeadStatus NewStatus,
+    LeadStatus? NewStatus,
     string? Notes = null,
     LeadLossReason? LossReason = null) : ICommand;

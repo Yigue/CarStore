@@ -10,7 +10,7 @@ internal sealed class GetImageWithSas : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapGet("cars/{imageId}/url", async (
+        app.MapGet("cars/{imageId:guid}/url", async (
             [FromRoute] Guid imageId,
             IApplicationDbContext context,
             IBlobStorageService blobStorage,

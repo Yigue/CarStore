@@ -8,6 +8,7 @@ using Domain.Users;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 using DealerSettingsEntity = Domain.DealerSettings.DealerSettings;
 
@@ -38,7 +39,8 @@ internal sealed class ProvisionDealerCommandHandler(
     DbContext dbContext,
     IPasswordHasher passwordHasher,
     IPublisher publisher,
-    ISubscriptionGateway subscriptionGateway)
+    ISubscriptionGateway subscriptionGateway,
+    ILogger<ProvisionDealerCommandHandler> logger)
     : ICommandHandler<ProvisionDealerCommand, ProvisionDealerResponse>
 {
     private const string DashboardBaseUrl = "carstore.com";
@@ -50,6 +52,17 @@ internal sealed class ProvisionDealerCommandHandler(
         // REQ: subdomain must be stored lowercase (TenantResolutionMiddleware
         // matches lowercase against the Host header).
         var subdomain = command.Subdomain.Trim().ToLowerInvariant();
+        var dealerId = Guid.NewGuid();
+
+        string? stripeCustomerId = null;
+        try
+        {
+            stripeCustomerId = await subscriptionGateway.CreateCustomerAsync(dealerId, command.AdminEmail, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to create Stripe customer for dealer {DealerId}", dealerId);
+        }
 
         // In-memory DB providers (used by unit tests) don't support transactions.
         // Relational providers do, and EF SaveChanges is already per-call atomic —
@@ -58,11 +71,10 @@ internal sealed class ProvisionDealerCommandHandler(
             ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
             : null;
 
+        User user;
+
         try
         {
-            var dealerId = Guid.NewGuid();
-            var stripeCustomerId = await subscriptionGateway.CreateCustomerAsync(dealerId, command.AdminEmail, cancellationToken);
-
             var settings = new DealerSettingsEntity(
                 id: dealerId,
                 dealerId: dealerId,
@@ -71,7 +83,10 @@ internal sealed class ProvisionDealerCommandHandler(
                 notificationsEnabled: true,
                 hostName: subdomain);
 
-            settings.SetStripeCustomerId(stripeCustomerId);
+            if (stripeCustomerId is not null)
+            {
+                settings.SetStripeCustomerId(stripeCustomerId);
+            }
 
             context.DealerSettings.Add(settings);
 
@@ -89,7 +104,9 @@ internal sealed class ProvisionDealerCommandHandler(
                 "leads:write", "leads:archive",
                 "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
                 "admin:backfill",
-                "webhooks:manage"
+                "webhooks:manage",
+                // qa-p1-integridad PR6 (D7): grant at both seed sites — see UsersSeeder.cs.
+                "documents:read", "documents:create"
             };
 
             foreach (var permission in defaultPermissions)
@@ -99,7 +116,7 @@ internal sealed class ProvisionDealerCommandHandler(
 
             context.Roles.Add(adminRole);
 
-            var user = new User(
+            user = new User(
                 dealerId,
                 command.AdminEmail,
                 command.AdminFirstName,
@@ -115,16 +132,6 @@ internal sealed class ProvisionDealerCommandHandler(
             {
                 await transaction.CommitAsync(cancellationToken);
             }
-
-            var dashboardUrl = $"https://{subdomain}.{DashboardBaseUrl}/dashboard";
-
-            await publisher.Publish(
-                new DealerProvisionedDomainEvent(dealerId, user.Id, command.AdminEmail, subdomain, dashboardUrl),
-                cancellationToken);
-
-            var checkoutUrl = await subscriptionGateway.CreateCheckoutSessionAsync(dealerId, command.AdminEmail, cancellationToken);
-
-            return Result.Success(new ProvisionDealerResponse(dealerId, user.Id, subdomain, checkoutUrl));
         }
         catch (DbUpdateException ex) when (IsHostNameUniqueViolation(ex))
         {
@@ -152,6 +159,24 @@ internal sealed class ProvisionDealerCommandHandler(
                 await transaction.DisposeAsync();
             }
         }
+
+        var dashboardUrl = $"https://{subdomain}.{DashboardBaseUrl}/dashboard";
+
+        await publisher.Publish(
+            new DealerProvisionedDomainEvent(dealerId, user.Id, command.AdminEmail, subdomain, dashboardUrl),
+            cancellationToken);
+
+        string? checkoutUrl = null;
+        try
+        {
+            checkoutUrl = await subscriptionGateway.CreateCheckoutSessionAsync(dealerId, command.AdminEmail, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to create Stripe checkout session for dealer {DealerId}", dealerId);
+        }
+
+        return Result.Success(new ProvisionDealerResponse(dealerId, user.Id, subdomain, checkoutUrl));
     }
 
     /// <summary>

@@ -33,7 +33,7 @@ internal sealed class Update : IEndpoint
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPut("cars/{id}", async (Guid id, Request request, ISender sender, CancellationToken cancellationToken) =>
+        app.MapPut("cars/{id:guid}", async (Guid id, Request request, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new UpdateCarCommand(
                 id,

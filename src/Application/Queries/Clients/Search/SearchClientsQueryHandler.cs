@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Clients;
 using Application.Clients.GetAll;
 using Application.Clients.Projections;
 using Domain.Clients;
@@ -29,8 +30,6 @@ internal sealed class SearchClientsQueryHandler
         CancellationToken cancellationToken)
     {
         var rawTerm = query.SearchTerm ?? string.Empty;
-        var searchTerm = rawTerm.ToLower();
-
         Email? emailTerm = TryParseEmail(rawTerm);
 
         var dbQuery = _context.Clients
@@ -38,27 +37,38 @@ internal sealed class SearchClientsQueryHandler
             .Include(c => c.Sales)
             .AsQueryable();
 
-        if (searchTerm != string.Empty)
+        // qa-p0-blockers C1 (D1 superseded, decision 2026-08-03): see the matching note in
+        // GetAllClientsQueryHandler.Handle for the full rationale. Filtering and the 50-row
+        // cap now execute in SQL via the `search_name` STORED generated column instead of an
+        // unbounded full-table load followed by in-process filtering.
+        if (rawTerm != string.Empty)
         {
-            bool isInMemory = _context is DbContext dbContext && dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+            // Positive Npgsql check, not a negative InMemory one: `search_name` and f_unaccent
+            // exist only under Postgres, so every other provider (SQLite, InMemory) must take
+            // the in-process path.
+            var isNpgsql = _context is DbContext db && db.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL";
 
-            if (isInMemory)
+            if (!isNpgsql)
             {
-                var normalizedSearch = RemoveAccents(searchTerm).ToLowerInvariant();
-                dbQuery = dbQuery.Where(c => 
-                    RemoveAccents(c.FirstName + " " + c.LastName).ToLower().Contains(normalizedSearch) ||
+                var normalizedSearch = RemoveAccents(rawTerm.ToLower()).ToLowerInvariant();
+                dbQuery = dbQuery.Where(c =>
+                    RemoveAccents(c.FirstName + " " + c.LastName).ToLowerInvariant().Contains(normalizedSearch) ||
                     (emailTerm != null && c.Email == emailTerm));
             }
             else
             {
-                var normalizedSearch = RemoveAccents(searchTerm);
-                dbQuery = dbQuery.Where(c => 
-                    EF.Functions.Collate(c.FirstName + " " + c.LastName, "und-u-ks-primary").Contains(normalizedSearch) ||
+                // Unaccent MUST stay inside the expression tree so EF translates it to
+                // `f_unaccent(@term)`. Hoisting it to a local evaluates it in .NET and throws.
+                dbQuery = dbQuery.Where(c =>
+                    EF.Property<string>(c, "SearchName")
+                        .Contains(ClientSearchFunctions.Unaccent(rawTerm).ToLower()) ||
                     (emailTerm != null && c.Email == emailTerm));
             }
         }
 
         List<Client> clients = await dbQuery
+            .OrderBy(c => c.LastName)
+            .ThenBy(c => c.FirstName)
             .Take(50)
             .ToListAsync(cancellationToken);
 

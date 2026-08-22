@@ -10,7 +10,7 @@ internal sealed class Delete : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapDelete("sales/{id}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+        app.MapDelete("sales/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new DeleteSaleCommand(id);
 

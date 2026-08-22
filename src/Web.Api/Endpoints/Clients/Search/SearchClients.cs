@@ -18,6 +18,10 @@ public sealed class SearchClients : IEndpoint
             ISender sender,
             CancellationToken cancellationToken) =>
         {
+            // No local catch-all: it bypassed GlobalExceptionHandler and returned
+            // ex.ToString() — full stack trace and internal paths — to the caller.
+            // Unhandled exceptions belong to GlobalExceptionHandler, which logs the
+            // detail server-side and answers with an opaque 500 ProblemDetails.
             var query = new SearchClientsQuery { SearchTerm = q };
             var result = await sender.Send(query, cancellationToken);
 

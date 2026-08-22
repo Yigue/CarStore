@@ -16,7 +16,7 @@ public sealed record CarGetByIdResponse(
     int Cilindrada,
     int Kilometraje,
     int Anio,
-    string Patente,
+    string? Patente,
     string Description,
     decimal Precio,
     DateTime CreatedAt,

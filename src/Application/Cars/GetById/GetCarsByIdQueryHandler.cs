@@ -10,7 +10,7 @@ using SharedKernel;
 
 namespace Application.Cars.GetById;
 
-internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context, IStorageService storage)
+internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context, IStorageService storage, IUserContext userContext)
     : IQueryHandler<GetCarByIdQuery, CarGetByIdResponse>
 {
     public async Task<Result<CarGetByIdResponse>> Handle(GetCarByIdQuery query, CancellationToken cancellationToken)
@@ -59,14 +59,22 @@ internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context, ISto
             car.Cilindrada,
             car.Kilometraje,
             car.Anio,
-            car.Patente.Value,
+            // La patente identifica un vehículo físico concreto y este endpoint
+            // es AllowAnonymous, así que viajaba a cualquiera que pidiera el id
+            // — y el catálogo público la metía además en el título de compartir.
+            // Se corta en "logueado", no en "admin": un vendedor la necesita.
+            userContext.IsAuthenticated ? car.Patente.Value : null,
             car.Descripcion,
             car.Price.Amount,
             car.CreatedAt,
             car.UpdatedAt,
             imageResponses,
             car.Featured,
-            car.PurchaseCost?.Amount
+            // Este endpoint es AllowAnonymous porque lo usa la ficha del catálogo
+            // público. PurchaseCost es el costo de compra: el margen de la
+            // concesionaria, no un dato del vehículo. Sólo un admin lo ve; para
+            // cualquier otro — incluido el visitante anónimo — viaja como null.
+            userContext.IsAdmin ? car.PurchaseCost?.Amount : null
         );
 
         return response;

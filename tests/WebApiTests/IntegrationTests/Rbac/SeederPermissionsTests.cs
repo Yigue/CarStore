@@ -85,6 +85,34 @@ public class SeederPermissionsTests
     }
 
     [Fact]
+    public async Task AdminSeed_IncludesDocumentPermissions()
+    {
+        // qa-p1-integridad PR6, Slice 11 (D7, REQ: document-upload-lifecycle "Upload Requires The
+        // Same Permission As Read"). documents:read/documents:create were granted by no role
+        // anywhere — GET /documents/{id}/download-url has been 403 for every seeded user since it
+        // shipped. Fails today: UsersSeeder.cs's Admin permission array lists neither.
+        await using var factory = new CustomWebApplicationFactory();
+        factory.SeedDatabase();
+
+        var permissions = await PermissionsForAsync(factory, "admin@carstore.com");
+
+        permissions.Should().Contain(new[] { "documents:read", "documents:create" });
+    }
+
+    [Fact]
+    public async Task EmpleadoSeed_IncludesDocumentPermissions()
+    {
+        // Empleado uploads/downloads documents in normal operation (design.md D7 step 1) — must
+        // not be left silently 403'd once the permission requirement (PR7) ships.
+        await using var factory = new CustomWebApplicationFactory();
+        factory.SeedDatabase();
+
+        var permissions = await PermissionsForAsync(factory, "empleado@carstore.com");
+
+        permissions.Should().Contain(new[] { "documents:read", "documents:create" });
+    }
+
+    [Fact]
     public async Task EmpleadoSeed_ReconcilesMissingPermissions_OnExistingUser()
     {
         // The Empleado seeder used to be all-or-nothing: if the user already had ANY

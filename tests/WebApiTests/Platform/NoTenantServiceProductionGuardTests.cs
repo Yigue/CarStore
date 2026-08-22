@@ -61,6 +61,9 @@ public class NoTenantServiceProductionGuardTests
             Environment.SetEnvironmentVariable("Storage__Minio__AccessKey", "minioadmin");
             Environment.SetEnvironmentVariable("Storage__Minio__SecretKey", "minioadmin123");
             Environment.SetEnvironmentVariable("Storage__Minio__BucketName", "cars");
+            Environment.SetEnvironmentVariable("Stripe__SecretKey", "sk_test_dummy");
+            Environment.SetEnvironmentVariable("Stripe__PriceId", "price_dummy");
+            Environment.SetEnvironmentVariable("Stripe__WebhookSecret", "whsec_dummy");
 
             // Production environment triggers NoTenantServiceProductionGuard registration.
             builder.UseEnvironment("Production");

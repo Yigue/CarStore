@@ -22,14 +22,18 @@ internal sealed class Subscribe : IEndpoint
                 return Results.BadRequest(new { error = "Email no es válido." });
             }
 
+            // qa-p1-integridad D6: named arguments — CreateClientCommand's positional order
+            // (FirstName, LastName, DNI, Email, Phone, Address, Type, ...) previously landed the
+            // subscriber's email in DNI and the literal "N/A" in Email, so new Email("N/A") always
+            // threw. See tests/ArchitectureTests/CommandConstructionTests.cs for the ratchet.
             var command = new CreateClientCommand(
-                "Newsletter",
-                "Suscriptor",
-                request.Email,
-                "N/A",
-                "Suscripto via Web",
-                $"NL-{Guid.NewGuid().ToString()[..8]}",
-                ClientType.Individual); // Newsletter subscribers default to Individual
+                FirstName: "Newsletter",
+                LastName: "Suscriptor",
+                DNI: $"NL-{Guid.NewGuid().ToString()[..8]}",
+                Email: request.Email,
+                Phone: "N/A",
+                Address: "Suscripto via Web",
+                Type: ClientType.Individual); // Newsletter subscribers default to Individual
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

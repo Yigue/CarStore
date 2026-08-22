@@ -163,6 +163,44 @@ public class StripeWebhookEndpointTests
         outboxMsg.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Webhook_WithValidSignatureButMalformedJsonBody_Returns400WithoutStackTrace()
+    {
+        // qa-p1-integridad PR8, Slice 16 (D8, REQ: api-error-contract "Forged Stripe Webhook
+        // Signature Is Rejected Deliberately" — the sibling defect this PR fixes). A signature
+        // computed over a genuinely malformed JSON body passes signature verification, so
+        // EventUtility.ConstructEvent throws while parsing — today that lands in the generic
+        // catch (Exception ex) => Results.Problem(ex.ToString()), dumping a full stack trace to
+        // an AllowAnonymous, unauthenticated caller. Fails today: 500 with the exception's
+        // ToString() (type name, message, stack frames) in the response body.
+        await using var factory = new CustomWebApplicationFactory();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await dbContext.Database.EnsureCreatedAsync();
+        }
+
+        var client = CreateTestClient(factory);
+
+        const string malformedPayload = "{ this is not valid json at all";
+        var signature = CreateSignature(malformedPayload, TestWebhookSecret);
+        var request = new HttpRequestMessage(HttpMethod.Post, "/webhooks/stripe");
+        request.Content = new StringContent(malformedPayload, Encoding.UTF8, "application/json");
+        request.Headers.Add("Stripe-Signature", signature);
+
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            $"a malformed JSON body must be rejected with 400 via a local JsonException arm, not surfaced as a " +
+            $"generic 500 (actual status {response.StatusCode}, body: {body})");
+        body.Should().NotContain("StackTrace",
+            "the response body must never carry an exception dump to an unauthenticated caller");
+        body.Should().NotContain("   at ",
+            "the response body must not contain stack frame lines (e.g. '   at Namespace.Type.Method(...)')");
+    }
+
     private static string CreateSignature(string payload, string secret)
     {
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();

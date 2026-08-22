@@ -10,7 +10,7 @@ public sealed class Delete : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapDelete("financial/categories/{id}", Handler)
+        app.MapDelete("financial/categories/{id:guid}", Handler)
             .WithTags(Tags.Financial)
             .HasPermission("financial:delete");
     }

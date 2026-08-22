@@ -32,6 +32,14 @@ internal sealed class CreateSaleCommandHandler(
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
         }        
+        // Validate car does not already have a completed sale in Sales records.
+        bool hasCompletedSale = await context.Sales
+            .AnyAsync(s => s.CarId == command.CarId && s.Status == SaleStatus.Completed, cancellationToken);
+        if (hasCompletedSale)
+        {
+            return Result.Failure<Guid>(CarErrors.AlreadySold(command.CarId));
+        }
+
         // Validate car is available (only check ServiceCar, as CarStatus is about condition, not availability).
         // D-1: un vehículo Reservado (tomado por la cotización que se está convirtiendo) también es vendible.
         if (car.ServiceCar != StatusServiceCar.Disponible && car.ServiceCar != StatusServiceCar.Reservado)
@@ -119,12 +127,9 @@ internal sealed class CreateSaleCommandHandler(
 
         if (requestedStatus == SaleStatus.Completed)
         {
-            // Update car status using domain method
-            car.MarkAsSold(dateTimeProvider.UtcNow);
-
             context.Sales.Add(sale);
 
-            // Complete the sale to trigger financial transaction
+            // Complete the sale to trigger financial transaction and domain events
             sale.Complete();
         }
         else

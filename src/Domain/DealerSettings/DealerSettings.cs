@@ -268,10 +268,10 @@ public sealed class DealerSettings : Entity
         Raise(new DealerReactivatedDomainEvent(Id, reactivatedAt));
     }
 
-    public void SetStripeCustomerId(string stripeCustomerId)
+    public void SetStripeCustomerId(string? stripeCustomerId)
     {
         if (string.IsNullOrWhiteSpace(stripeCustomerId))
-            throw new DomainException("StripeCustomerId cannot be empty");
+            return;
             
         StripeCustomerId = stripeCustomerId;
         UpdatedAt = DateTime.UtcNow;

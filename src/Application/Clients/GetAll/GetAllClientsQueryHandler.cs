@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Clients.Projections;
+using Application.Clients;
 using Domain.Clients;
 using Domain.Clients.Attributes;
 using Domain.Sales.Attributes;
@@ -28,18 +29,59 @@ internal sealed class GetAllClientsQueryHandler(IApplicationDbContext context)
             .AsQueryable();
 
         // 1. Advanced Filters
-        if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<ClientStatus>(query.Status, true, out var statusVal))
+        //
+        // El parse y la presencia van en condiciones SEPARADAS a propósito. Antes
+        // eran una sola:
+        //
+        //     if (!IsNullOrWhiteSpace(query.Status) && Enum.TryParse(..., out var v))
+        //         dbQuery = dbQuery.Where(...);
+        //
+        // y cuando el TryParse fallaba el if entero daba falso, así que no se
+        // aplicaba NINGÚN filtro y la respuesta era el conjunto completo con un
+        // 200. Verificado contra la API: sin filtro 5 filas, ?status=Active 4
+        // filas, ?status=NOT_A_STATUS otra vez 5. Pedir un subconjunto y recibir
+        // todo es la peor respuesta posible — el llamador cree que filtró y opera
+        // sobre el universo entero. Un valor inválido ahora es 400.
+        //
+        // `leads` ya se comportaba bien porque declara `LeadStatus?` y el model
+        // binding rechaza el valor solo; acá los parámetros son `string?`, así que
+        // la validación tiene que ser explícita.
+        if (!string.IsNullOrWhiteSpace(query.Status))
         {
+            if (!Enum.TryParse<ClientStatus>(query.Status, true, out var statusVal))
+            {
+                return Result.Failure<PaginatedResult<ClientResponse>>(
+                    Error.Validation(
+                        "Clients.InvalidStatus",
+                        $"'{query.Status}' no es un estado de cliente válido. Valores admitidos: {string.Join(", ", Enum.GetNames<ClientStatus>())}."));
+            }
+
             dbQuery = dbQuery.Where(c => c.Status == statusVal);
         }
 
-        if (!string.IsNullOrWhiteSpace(query.Type) && Enum.TryParse<ClientType>(query.Type, true, out var typeVal))
+        if (!string.IsNullOrWhiteSpace(query.Type))
         {
+            if (!Enum.TryParse<ClientType>(query.Type, true, out var typeVal))
+            {
+                return Result.Failure<PaginatedResult<ClientResponse>>(
+                    Error.Validation(
+                        "Clients.InvalidType",
+                        $"'{query.Type}' no es un tipo de cliente válido. Valores admitidos: {string.Join(", ", Enum.GetNames<ClientType>())}."));
+            }
+
             dbQuery = dbQuery.Where(c => c.Type == typeVal);
         }
 
-        if (!string.IsNullOrWhiteSpace(query.Source) && Enum.TryParse<AcquisitionSource>(query.Source, true, out var sourceVal))
+        if (!string.IsNullOrWhiteSpace(query.Source))
         {
+            if (!Enum.TryParse<AcquisitionSource>(query.Source, true, out var sourceVal))
+            {
+                return Result.Failure<PaginatedResult<ClientResponse>>(
+                    Error.Validation(
+                        "Clients.InvalidSource",
+                        $"'{query.Source}' no es una fuente de adquisición válida. Valores admitidos: {string.Join(", ", Enum.GetNames<AcquisitionSource>())}."));
+            }
+
             dbQuery = dbQuery.Where(c => c.AcquisitionSource == sourceVal);
         }
 
@@ -73,28 +115,73 @@ internal sealed class GetAllClientsQueryHandler(IApplicationDbContext context)
         }
 
         // 2. Search on fullName (case & accent insensitive) or exact email
+        //
+        // qa-p0-blockers C1 (D1 superseded, decision 2026-08-03): D1's
+        // EF.Functions.Collate(..., "und-u-ks-primary").Contains(...) is architecturally
+        // impossible -- confirmed live against postgres:17-alpine that PostgreSQL rejects
+        // pattern-matching (LIKE) against a nondeterministic ICU collation with
+        // "0A000: nondeterministic collations are not supported for LIKE" (a permanent
+        // restriction, not a PG-version floor). The replacement filters and paginates in SQL
+        // via the `search_name` STORED generated column (`clients.search_name`, migration
+        // `AddClientSearchNameColumn`): `lower(f_unaccent(first_name || ' ' || last_name))`,
+        // pinned to a deterministic "C" collation so it can never regress into the same
+        // 0A000 error, backed by a GIN trigram index for `LIKE`.
+        //
+        // Provider branch, explicit and justified (trap 3): the InMemory provider (unit
+        // tests only) has no generated column -- `search_name` is never computed there. For
+        // InMemory, filtering falls back to the original in-process RemoveAccents predicate,
+        // which InMemory's LINQ-to-Objects execution can evaluate directly. For every
+        // relational provider (Postgres in production and in the Postgres integration
+        // suite), the predicate is pushed down as `search_name LIKE '%' || lower(f_unaccent(@term))
+        // || '%'` -- the TERM is unaccented via the same Postgres `f_unaccent` dictionary
+        // (mapped as an EF DbFunction) that produced the column, so .NET FormD normalization
+        // and PostgreSQL's unaccent dictionary can never disagree on edge cases (ß, ø, Đ).
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var rawTerm = query.Search.Trim();
-            var searchTerm = rawTerm.ToLower();
             Email? emailTerm = TryParseEmail(rawTerm);
+            // Positive Npgsql check, not a negative InMemory one: `search_name` and f_unaccent
+            // exist only under Postgres, so every other provider (SQLite, InMemory) must take
+            // the in-process path.
+            var isNpgsql = context is DbContext db && db.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL";
 
-            bool isInMemory = context is DbContext dbContext && dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
-
-            if (isInMemory)
+            if (!isNpgsql)
             {
-                var normalizedSearch = RemoveAccents(searchTerm).ToLowerInvariant();
-                dbQuery = dbQuery.Where(c => 
-                    RemoveAccents(c.FirstName + " " + c.LastName).ToLower().Contains(normalizedSearch) ||
+                var normalizedSearch = RemoveAccents(rawTerm.ToLower()).ToLowerInvariant();
+                dbQuery = dbQuery.Where(c =>
+                    RemoveAccents(c.FirstName + " " + c.LastName).ToLowerInvariant().Contains(normalizedSearch) ||
                     (emailTerm != null && c.Email == emailTerm));
             }
             else
             {
-                var normalizedSearch = RemoveAccents(searchTerm);
-                dbQuery = dbQuery.Where(c => 
-                    EF.Functions.Collate(c.FirstName + " " + c.LastName, "und-u-ks-primary").Contains(normalizedSearch) ||
+                // Unaccent MUST stay inside the expression tree so EF translates it to
+                // `f_unaccent(@term)`. Hoisting it to a local evaluates it in .NET and throws.
+                dbQuery = dbQuery.Where(c =>
+                    EF.Property<string>(c, "SearchName")
+                        .Contains(ClientSearchFunctions.Unaccent(rawTerm).ToLower()) ||
                     (emailTerm != null && c.Email == emailTerm));
             }
+
+            int searchTotalCount = await dbQuery.CountAsync(cancellationToken);
+            var searchPage = query.Page > 0 ? query.Page : 1;
+            var searchPageSize = query.PageSize > 0 ? query.PageSize : 20;
+
+            var searchClients = await dbQuery
+                .OrderBy(c => c.LastName)
+                .ThenBy(c => c.FirstName)
+                .Skip((searchPage - 1) * searchPageSize)
+                .Take(searchPageSize)
+                .ToListAsync(cancellationToken);
+
+            var searchItems = searchClients.Select(ClientResponseMapper.Map).ToList();
+
+            var searchPaginatedResult = new PaginatedResult<ClientResponse>(
+                searchItems,
+                searchTotalCount,
+                searchPage,
+                searchPageSize);
+
+            return Result.Success(searchPaginatedResult);
         }
 
         int totalCount = await dbQuery.CountAsync(cancellationToken);

@@ -31,20 +31,21 @@ public static class DatabaseSeeder
         // already exists (the Marca guard below would otherwise skip it).
         await UsersSeeder.SeedAsync(context, passwordHasher, configuration, logger, cancellationToken);
 
-        // Verificar si ya hay datos seedeados
-        if (await context.Marca.AnyAsync(cancellationToken))
+        // 2. Reference data (Brands & Categories)
+        if (!await context.Marca.AnyAsync(cancellationToken))
         {
-            return; // Ya seedeado, no duplicar
+            await BrandsSeeder.SeedAsync(context, cancellationToken);
+            await TransactionCategoriesSeeder.SeedAsync(context, cancellationToken);
         }
 
-        // Ejecutar seeders en orden
-        await BrandsSeeder.SeedAsync(context, cancellationToken);
-        await TransactionCategoriesSeeder.SeedAsync(context, cancellationToken);
+        // 3. DealerSettings
         if (context is ApplicationDbContext dbContext)
         {
             await DealerSettingsSeeder.SeedAsync(dbContext, cancellationToken);
         }
-        await DevDataSeeder.SeedAsync(context, cancellationToken);
+
+        // 4. DevData (Clients, Cars, Sales, Quotes, Leads, Subscriptions)
+        await DevDataSeeder.SeedAsync(context, passwordHasher, configuration, cancellationToken);
 
         // Guardar todos los cambios
         await context.SaveChangesAsync(cancellationToken);
