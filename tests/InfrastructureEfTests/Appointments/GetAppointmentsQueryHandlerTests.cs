@@ -227,4 +227,81 @@ public class GetAppointmentsQueryHandlerTests
         orphanRow.VehicleName.Should().BeNull(
             "when the car row doesn't exist, the LEFT JOIN returns null and VehicleName should be null");
     }
+
+    /// <summary>
+    /// A lead-linked appointment must carry its LeadId to the client.
+    ///
+    /// CreateAppointmentCommandValidator enforces `ClientId.HasValue ^ LeadId.HasValue`, so an
+    /// appointment against a Lead is not an edge case — it is half of every valid appointment.
+    /// The projection carried ClientId but not LeadId, so those rows arrived with both ids null.
+    /// The name still rendered (ClientName falls back to the lead's), which is exactly why the
+    /// gap was invisible: the row looked right and simply had nowhere to navigate to. The
+    /// frontend's own AppointmentDto already declared `leadId`, so the field was typed and
+    /// permanently undefined.
+    /// </summary>
+    [Fact]
+    public async Task Handle_Should_ProjectLeadId_ForLeadLinkedAppointments()
+    {
+        var (context, connection) = await CreateContextAsync();
+        await using var _ = context;
+        await using var __ = connection;
+
+        var marca = new Marca("Toyota");
+        var modelo = new Modelo("Corolla", marca.Id);
+        context.Marca.Add(marca);
+        context.Modelo.Add(modelo);
+        await context.SaveChangesAsync();
+
+        var car = new Car(
+            TestDealerId, marca, modelo,
+            Color.Black, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible,
+            4, 5, 1600, 1000, 2022, "LDA001", "desc", 20000m, DateTime.UtcNow);
+        context.Cars.Add(car);
+
+        var agent = new User(TestDealerId, "agent2@test.com", "Agent", "Two", "hash", Guid.NewGuid());
+        context.Users.Add(agent);
+
+        var client = new Client(TestDealerId, "Jane", "Roe", "DNI002", "jane@test.com", "555", "Addr", DateTime.UtcNow);
+        context.Clients.Add(client);
+
+        var lead = Domain.Leads.Lead.Create(
+            TestDealerId, "Carlos Lead", "carlos@test.com", "555-0100",
+            Domain.Leads.LeadSource.Web, DateTime.UtcNow);
+        lead.ClearDomainEvents();
+        context.Leads.Add(lead);
+        await context.SaveChangesAsync();
+
+        var from = DateTime.UtcNow.AddHours(-1);
+        var to = DateTime.UtcNow.AddHours(3);
+
+        // Exactly one of ClientId / LeadId, per the create validator.
+        var leadAppt = Appointment.Create(
+            TestDealerId, car.Id, null, lead.Id, agent.Id,
+            DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30),
+            AppointmentType.TestDrive, "lead appointment", DateTime.UtcNow);
+        leadAppt.ClearDomainEvents();
+
+        var clientAppt = Appointment.Create(
+            TestDealerId, car.Id, client.Id, null, agent.Id,
+            DateTime.UtcNow.AddHours(1), DateTime.UtcNow.AddHours(1).AddMinutes(30),
+            AppointmentType.TestDrive, "client appointment", DateTime.UtcNow);
+        clientAppt.ClearDomainEvents();
+
+        context.Appointments.AddRange(leadAppt, clientAppt);
+        await context.SaveChangesAsync();
+
+        var handler = new GetAppointmentsQueryHandler(context, new FakeCurrentTenantService());
+        var result = await handler.Handle(new GetAppointmentsQuery(from, to), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+
+        var leadRow = result.Value.Single(r => r.Id == leadAppt.Id);
+        leadRow.LeadId.Should().Be(lead.Id, "a lead-linked appointment must expose the lead it came from");
+        leadRow.ClientId.Should().BeNull();
+        leadRow.ClientName.Should().Be("Carlos Lead", "the name falls back to the lead's — this part already worked");
+
+        var clientRow = result.Value.Single(r => r.Id == clientAppt.Id);
+        clientRow.LeadId.Should().BeNull("a client-linked appointment has no lead");
+        clientRow.ClientId.Should().Be(client.Id);
+    }
 }

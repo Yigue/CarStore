@@ -61,6 +61,7 @@ internal sealed class GetAppointmentsQueryHandler(
                         + car.Anio).Trim()
                     : null,
                 a.ClientId,
+                a.LeadId,
                 ClientName = client != null ? (client.FirstName + " " + client.LastName) : (lead != null ? lead.ClientName : null),
                 a.AgentId,
                 AgentName = agent != null ? (agent.FirstName + " " + agent.LastName) : null,
@@ -78,6 +79,7 @@ internal sealed class GetAppointmentsQueryHandler(
             r.VehicleId,
             r.CarTitle,
             r.ClientId,
+            r.LeadId,
             r.ClientName,
             r.AgentId,
             r.AgentName,
