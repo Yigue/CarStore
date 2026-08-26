@@ -11,6 +11,8 @@ public sealed record CarGetByIdResponse(
     TypeCar Type,
     StatusCar Status,
     StatusServiceCar ServiceStatus,
+    FuelType FuelType,
+    Transmission Transmission,
     int Puertas,
     int Asientos,
     int Cilindrada,
