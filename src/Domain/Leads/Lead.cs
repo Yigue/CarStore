@@ -43,8 +43,13 @@ public sealed class Lead : Entity
     {
         if (string.IsNullOrWhiteSpace(clientName))
             throw new DomainException("ClientName cannot be empty");
-        if (string.IsNullOrWhiteSpace(phone))
-            throw new DomainException("Phone cannot be empty");
+
+        // Phone is deliberately optional. The domain's minimum is a way to reach the person, and
+        // Email — a non-nullable value object that validates on construction — already guarantees
+        // it. Public web enquiries are the main source of leads and all three forms treat the
+        // phone as optional, so demanding it here would reject exactly the traffic this aggregate
+        // exists to capture. Requiring a phone is a use-case policy, and it still lives in
+        // CreateLeadCommandValidator for the dashboard's manual intake.
 
         var lead = new Lead();
         lead.SetDealer(dealerId);

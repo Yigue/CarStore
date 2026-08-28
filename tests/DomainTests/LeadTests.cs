@@ -27,6 +27,47 @@ public class LeadTests
         lead.Status.Should().Be(LeadStatus.Nuevo);
     }
 
+    /// <summary>
+    /// A web enquiry is the main way leads enter the system, and all three public forms treat the
+    /// phone as optional — ContactFormComponent even labels it "Teléfono (Opcional)" — so they
+    /// post an empty string. The domain's minimum is a way to reach the person, and Email is a
+    /// non-nullable value object that already validates on construction, so it carries that
+    /// guarantee alone.
+    ///
+    /// Requiring a phone stays a use-case policy rather than a domain invariant: the dashboard's
+    /// manual intake still enforces it in CreateLeadCommandValidator.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_ShouldAllowEmptyPhone_WhenTheLeadCameFromAWebEnquiry(string phone)
+    {
+        var lead = Lead.Create(
+            Guid.NewGuid(),
+            _faker.Name.FullName(),
+            _faker.Internet.Email(),
+            phone,
+            LeadSource.Web,
+            DateTime.UtcNow);
+
+        lead.Status.Should().Be(LeadStatus.Nuevo);
+        lead.Email.Should().NotBeNull("email is the contact channel that replaces the phone");
+    }
+
+    [Fact]
+    public void Create_ShouldStillRejectAnEmptyClientName()
+    {
+        Action act = () => Lead.Create(
+            Guid.NewGuid(),
+            "  ",
+            _faker.Internet.Email(),
+            _faker.Phone.PhoneNumber(),
+            LeadSource.Web,
+            DateTime.UtcNow);
+
+        act.Should().Throw<DomainException>();
+    }
+
     [Fact]
     public void Create_ShouldSetInterestedVehicleId_WhenProvided()
     {
