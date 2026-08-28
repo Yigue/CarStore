@@ -2,6 +2,17 @@ using FluentValidation;
 
 namespace Application.Cars.Create;
 
+/// <summary>
+/// Every rule carries its own <c>WithMessage</c>.
+/// <para>
+/// FluentValidation applies a chained <c>.WithMessage()</c> to the <b>last</b> validator in the
+/// chain only. Four fields here were written as <c>.NotEmpty().MaximumLength(n).WithMessage(...)</c>,
+/// so the message covered the length rule and the far more common empty-field case fell through to
+/// FluentValidation's English default. Leaving a required description blank produced
+/// "'Descripcion' must not be empty." instead of the Spanish message sitting right there in the
+/// source — which is exactly what a reviewer reading this file would never notice.
+/// </para>
+/// </summary>
 internal sealed class CreateCarCommandValidator : AbstractValidator<CreateCarCommand>
 {
     public CreateCarCommandValidator()
@@ -16,10 +27,18 @@ internal sealed class CreateCarCommandValidator : AbstractValidator<CreateCarCom
         RuleFor(x => x.CantidadAsientos).GreaterThanOrEqualTo(1).WithMessage("El campo cantidad de asientos debe ser mayor o igual a 1");
         RuleFor(x => x.Cilindrada).GreaterThanOrEqualTo(1).WithMessage("El campo cilindrada debe ser mayor o igual a 1");
         RuleFor(x => x.Kilometraje).GreaterThanOrEqualTo(0).WithMessage("El campo kilometraje debe ser mayor o igual a 0");
-        RuleFor(x => x.Patente).NotEmpty().MaximumLength(10).WithMessage("El campo patente es requerido y debe tener un maximo de 10 caracteres");
-        RuleFor(x => x.Anio).NotEmpty().GreaterThan(0).LessThanOrEqualTo(DateTime.Now.Year).WithMessage("El anio debe ser valido y no puede ser mayor al anio actual");
-        RuleFor(x => x.Descripcion).NotEmpty().MaximumLength(255).WithMessage("El campo descripcion es requerido y debe tener un maximo de 255 caracteres");
-        RuleFor(x => x.Price).NotEmpty().GreaterThan(0).WithMessage("El campo precio es requerido y debe ser mayor a 0");
+
+        RuleFor(x => x.Patente).NotEmpty().WithMessage("El campo patente es requerido");
+        RuleFor(x => x.Patente).MaximumLength(10).WithMessage("El campo patente debe tener un maximo de 10 caracteres");
+
+        RuleFor(x => x.Anio).NotEmpty().WithMessage("El campo anio es requerido");
+        RuleFor(x => x.Anio).GreaterThan(0).WithMessage("El anio debe ser mayor a 0");
+        RuleFor(x => x.Anio).LessThanOrEqualTo(DateTime.Now.Year).WithMessage("El anio debe ser valido y no puede ser mayor al anio actual");
+
+        RuleFor(x => x.Descripcion).NotEmpty().WithMessage("El campo descripcion es requerido");
+        RuleFor(x => x.Descripcion).MaximumLength(255).WithMessage("El campo descripcion debe tener un maximo de 255 caracteres");
+
+        RuleFor(x => x.Price).NotEmpty().WithMessage("El campo precio es requerido");
+        RuleFor(x => x.Price).GreaterThan(0).WithMessage("El campo precio debe ser mayor a 0");
     }
 }
-
