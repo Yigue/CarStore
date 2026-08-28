@@ -158,6 +158,23 @@ public sealed class Quote : Entity, ISoftDeletable
     }
 
     /// <summary>
+    /// Re-points this quote to a lead — the mirror of <see cref="AssignClient"/>. Used by the
+    /// inquiry-clients backfill, which rebuilds the lead that a web enquiry should have created
+    /// in the first place and moves that enquiry's quote onto it. Clears the client reference to
+    /// keep the "exactly one party" invariant.
+    /// </summary>
+    public void AssignLead(Guid leadId)
+    {
+        if (leadId == Guid.Empty)
+            throw new DomainException("LeadId cannot be empty when assigning a quote to a lead");
+
+        LeadId = leadId;
+        Lead = null;
+        ClientId = null;
+        Client = null;
+    }
+
+    /// <summary>
     /// Logically deletes the quote. The row is retained and excluded from default queries via
     /// the EF Core global query filter; this is an idempotent operation.
     /// </summary>
