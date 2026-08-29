@@ -19,4 +19,13 @@ public static class LeadErrors
     public static readonly Error InvalidAgent = Error.Problem(
         "Leads.InvalidAgent",
         "El agente asignado no es válido.");
+
+    /// <summary>
+    /// Ganado means the deal closed, and a closed deal has a sale behind it. Without this the
+    /// stage was reachable with nothing to show for it, and "won" leads accumulated that no
+    /// report could reconcile against revenue.
+    /// </summary>
+    public static readonly Error WonRequiresSale = Error.Problem(
+        "Leads.WonRequiresSale",
+        "Para marcar el lead como Ganado primero registrá la venta.");
 }
