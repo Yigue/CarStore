@@ -99,14 +99,20 @@ public class ConvertLeadToClientCommandHandlerTests
         result.IsFailure.Should().BeTrue();
     }
 
-    // Phase 4 RED: ConvertLead → LeadStatus.Ganado
+    // REQ-2.3 supersedes the earlier "Phase 4" requirement that conversion advance the lead to
+    // Ganado. That rule made this handler the fourth writer of a stage it could not justify: a
+    // person can be registered as a client for reasons that have nothing to do with having
+    // bought, and every one of those conversions closed a deal with no sale behind it. Ganado now
+    // follows a sale and nothing else (REQ-2.1). The assertion below is the old one inverted, on
+    // purpose — it is what would catch the ForceStatus being put back.
 
     [Fact]
-    public async Task Handle_ShouldAdvanceLeadToGanado_OnSuccessfulConversion()
+    public async Task Handle_ShouldLeaveTheStageAlone_OnSuccessfulConversion()
     {
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
         var lead = Lead.Create(dealerId, "Pedro Ramirez", "pedro@test.com", "5556667", LeadSource.Web, DateTime.UtcNow);
+        lead.ForceStatus(LeadStatus.Negociacion);
         context.Leads.Add(lead);
         await context.SaveChangesAsync();
 
@@ -119,7 +125,9 @@ public class ConvertLeadToClientCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
 
         var updatedLead = await context.Leads.FindAsync(lead.Id);
-        updatedLead!.Status.Should().Be(LeadStatus.Ganado, "converting a lead must advance its status to Ganado");
+        updatedLead!.Status.Should().Be(
+            LeadStatus.Negociacion,
+            "creating the client record says nothing about whether the deal closed; only a sale moves the lead to Ganado");
     }
 
     [Fact]
@@ -137,7 +145,7 @@ public class ConvertLeadToClientCommandHandlerTests
         var handler = new ConvertLeadToClientCommandHandler(context, dateProvider);
         var command = new ConvertLeadToClientCommand(lead.Id, "33444555", "Calle Falsa 123", ClientType.Individual);
 
-        // Must not throw; idempotent with UpdateLeadStatusFromQuoteHandler
+        // Converting a lead that a sale already closed must neither throw nor drag it backwards.
         var act = async () => await handler.Handle(command, CancellationToken.None);
         await act.Should().NotThrowAsync();
 

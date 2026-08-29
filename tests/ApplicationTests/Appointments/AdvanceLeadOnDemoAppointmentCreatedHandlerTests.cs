@@ -11,7 +11,7 @@ namespace Application.UnitTests.Appointments;
 /// <summary>
 /// Demo appointment automation (priority item 2): a TestDrive appointment linked to a Lead
 /// should auto-advance that lead to LeadStatus.Demostracion, mirroring the system-driven
-/// ForceStatus pattern used by UpdateLeadStatusFromQuoteHandler.
+/// ForceStatus pattern used by AdvanceLeadOnQuoteCreatedHandler.
 /// </summary>
 public class AdvanceLeadOnDemoAppointmentCreatedHandlerTests
 {

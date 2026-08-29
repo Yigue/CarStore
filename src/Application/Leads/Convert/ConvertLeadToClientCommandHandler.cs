@@ -62,8 +62,11 @@ internal sealed class ConvertLeadToClientCommandHandler(
 
         lead.MarkConverted(targetClient.Id);
 
-        if (lead.Status != LeadStatus.Ganado)
-            lead.ForceStatus(LeadStatus.Ganado);
+        // REQ-2.3: the stage is deliberately left alone. Creating the client record and closing
+        // the deal are two different facts, and this command only knows the first one — a person
+        // being registered as a client says nothing about whether they bought. Ganado follows a
+        // sale (REQ-2.1); ArchitectureTests.SinglePathToWonTests holds that line, so restoring a
+        // ForceStatus here will fail the build rather than quietly re-open the fourth path.
 
         // Carry the lead's history over to the client so the relationship is preserved:
         // every quote/appointment created while it was a lead now belongs to the client.

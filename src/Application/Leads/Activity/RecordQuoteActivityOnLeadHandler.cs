@@ -35,10 +35,11 @@ internal sealed class RecordQuoteActivityOnLeadHandler(
         RecordAsync(
             notification.QuoteId,
             LeadActivityType.QuoteAccepted,
-            // Accepting a quote force-advances the lead to Ganado (UpdateLeadStatusFromQuoteHandler),
-            // skipping the sequential rules the board enforces. Saying so here is what turns that
-            // jump from something that looks like a bug into something the agent can follow.
-            "Cotización aceptada — el lead pasa a Ganado automáticamente",
+            // REQ-2.2: acceptance no longer closes the deal. The lead was already moved to
+            // Negociación when the quote was raised (AdvanceLeadOnQuoteCreatedHandler), and it
+            // stays there until a sale is registered — so the entry has to name the step the
+            // agent still owes rather than announce a stage change that no longer happens.
+            "Cotización aceptada — registrá la venta para cerrar el lead",
             cancellationToken);
 
     public Task Handle(QuoteRejectedDomainEvent notification, CancellationToken cancellationToken) =>

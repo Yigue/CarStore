@@ -58,13 +58,18 @@ public class LeadsJsonShapeIntegrationTests
     }
 
     /// <summary>
-    /// Phase 6 integration test: POST /leads/{id}/convert → 201
-    /// + lead status becomes Ganado
-    /// + client is created with camelCase keys (id, dni, address) and correct persisted values.
-    /// RED before Phases 3 + 4 fixes; GREEN after.
+    /// POST /leads/{id}/convert → 201, the client is created with camelCase keys (id, dni,
+    /// address) and correct persisted values, and the lead's stage is left where it was.
+    ///
+    /// <para>
+    /// REQ-2.3 supersedes this test's original expectation that conversion advance the lead to
+    /// Ganado. Registering someone as a client is not the same fact as closing a deal, and the
+    /// old rule let this endpoint report won deals with no sale behind them. The stage assertion
+    /// below is the old one inverted, on purpose.
+    /// </para>
     /// </summary>
     [Fact]
-    public async Task ConvertLead_AdvancesLeadToGanado_AndCreatesClientWithCamelCaseShape()
+    public async Task ConvertLead_LeavesTheStageAlone_AndCreatesClientWithCamelCaseShape()
     {
         // Arrange
         await using var factory = new CustomWebApplicationFactory();
@@ -104,7 +109,9 @@ public class LeadsJsonShapeIntegrationTests
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var updatedLead = await db.Leads.FindAsync(leadId);
-            updatedLead!.Status.Should().Be(LeadStatus.Ganado, "lead must be Ganado after conversion");
+            updatedLead!.Status.Should().Be(
+                LeadStatus.Nuevo,
+                "conversion creates the client record and nothing else; only a sale moves the lead to Ganado");
         }
 
         // Verify client JSON shape: GET /api/v1/clients/{clientId}

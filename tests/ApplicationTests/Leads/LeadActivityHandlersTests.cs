@@ -156,8 +156,14 @@ public class LeadActivityHandlersTests
         entry.RelatedEntityId.Should().Be(quote.Id);
     }
 
+    /// <summary>
+    /// REQ-2.2 supersedes the earlier expectation that this entry announce a jump to Ganado.
+    /// Acceptance stopped closing the deal, so an entry still saying it did would be the timeline
+    /// telling the agent the work is finished while the sale is not even recorded. What the entry
+    /// owes now is the next step.
+    /// </summary>
     [Fact]
-    public async Task QuoteAcceptance_Should_ExplainTheAutomaticJumpToGanado()
+    public async Task QuoteAcceptance_Should_NameTheStepStillOwed()
     {
         using var context = CreateContext();
         Lead lead = await SeedLeadAsync(context);
@@ -171,8 +177,13 @@ public class LeadActivityHandlersTests
         await QuoteHandler(context).Handle(
             new QuoteAcceptedDomainEvent(quote.Id), CancellationToken.None);
 
-        (await context.LeadActivities.SingleAsync())
-            .Description.Should().Contain("Ganado");
+        LeadActivity entry = await context.LeadActivities.SingleAsync();
+        entry.Description.Should().Contain(
+            "registrá la venta",
+            "the timeline must point at the sale that is still missing");
+        entry.Description.Should().NotContain(
+            "Ganado",
+            "announcing a stage the lead did not reach is worse than saying nothing");
     }
 
     /// <summary>A quote raised before enquiries created leads hangs off a client instead.</summary>

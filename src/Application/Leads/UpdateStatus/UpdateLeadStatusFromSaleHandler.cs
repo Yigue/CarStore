@@ -7,10 +7,16 @@ using Microsoft.EntityFrameworkCore;
 namespace Application.Leads.UpdateStatus;
 
 /// <summary>
-/// Mirrors <see cref="UpdateLeadStatusFromQuoteHandler"/>: when a sale is created for a
-/// lead-originated deal, the lead auto-advances to <see cref="LeadStatus.Ganado"/>.
-/// Fires even while the sale is still Pending — a created sale is a strong enough signal
-/// that the lead converted (same timing the quote-acceptance flow already uses).
+/// When a sale is created for a lead-originated deal, the lead advances to
+/// <see cref="LeadStatus.Ganado"/>. Fires even while the sale is still Pending — a created sale
+/// is a strong enough signal that the lead converted.
+///
+/// <para>
+/// REQ-2.1: this is one of only two places allowed to write that stage, and the automatic one.
+/// Quote acceptance used to be a third; it closed deals with no sale behind them, which is what
+/// made the won-deal count and the revenue figures disagree.
+/// <c>ArchitectureTests.SinglePathToWonTests</c> enforces the list.
+/// </para>
 /// </summary>
 internal sealed class UpdateLeadStatusFromSaleHandler(IApplicationDbContext context)
     : INotificationHandler<SaleCreatedDomainEvent>

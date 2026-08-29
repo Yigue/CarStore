@@ -12,7 +12,7 @@ namespace Application.Appointments.EventHandlers;
 /// Demo appointment automation: when a <see cref="AppointmentType.TestDrive"/> appointment
 /// is created for a Lead, auto-advance that lead to <see cref="LeadStatus.Demostracion"/>.
 /// Mirrors the system-driven transition pattern in
-/// <c>Application.Leads.UpdateStatus.UpdateLeadStatusFromQuoteHandler</c>: uses
+/// <c>Application.Leads.UpdateStatus.AdvanceLeadOnQuoteCreatedHandler</c>: uses
 /// <see cref="Lead.ForceStatus"/> to bypass the sequential UI-enforcement rules
 /// (e.g. the "Demostracion requires InterestedVehicleId" guard in
 /// <see cref="Lead.UpdateStatus"/>), while still respecting the Ganado no-regression
