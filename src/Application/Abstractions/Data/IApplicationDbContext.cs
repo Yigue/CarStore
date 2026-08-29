@@ -38,6 +38,8 @@ public interface IApplicationDbContext
     DbSet<ReconditioningTask> ReconditioningTasks { get; }
     DbSet<DealerSettingsEntity> DealerSettings { get; }
     DbSet<Lead> Leads { get; }
+
+    DbSet<LeadActivity> LeadActivities { get; }
     DbSet<Domain.Documents.Document> Documents { get; }
     DbSet<Appointment> Appointments { get; }
     DbSet<BackfillAudit> BackfillAudits { get; }

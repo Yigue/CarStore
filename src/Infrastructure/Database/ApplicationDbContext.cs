@@ -56,6 +56,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<ReconditioningTask> ReconditioningTasks { get; set; }
     public DbSet<DealerSettingsEntity> DealerSettings { get; set; }
     public DbSet<Lead> Leads { get; set; }
+    public DbSet<LeadActivity> LeadActivities { get; set; }
     public DbSet<Domain.Documents.Document> Documents { get; set; }
     public DbSet<Appointment> Appointments { get; set; }
     public DbSet<BackfillAudit> BackfillAudits { get; set; }
@@ -175,6 +176,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<DealerSettingsEntity>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Lead>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<LeadActivity>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.Documents.Document>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
