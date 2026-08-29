@@ -53,8 +53,13 @@ internal sealed class CreateInquiryCommandHandler(
             return Result.Failure<Guid>(Error.Validation("Email.Invalid", ex.Message));
         }
 
+        // This endpoint is AllowAnonymous, so no tenant is resolved and the global query filter
+        // on Client is disabled for the whole request (ApplicationDbContext: `!HasTenant || ...`).
+        // Scope by DealerId explicitly or this lookup reaches into every other dealership:
+        // it would attach one tenant's client to another tenant's quote, and a buyer registered
+        // at two dealerships would match twice and make SingleOrDefault throw a 500.
         var client = await context.Clients
-            .SingleOrDefaultAsync(c => c.Email == inquiryEmail, cancellationToken);
+            .FirstOrDefaultAsync(c => c.Email == inquiryEmail && c.DealerId == dealerId, cancellationToken);
 
         if (client is null)
         {
