@@ -168,4 +168,54 @@ public class GetCarByIdQueryHandlerTests
             result.Value.Patente.Should().BeNull();
         }
     }
+
+    /// <summary>
+    /// The public vehicle page renders "Combustible" and "Transmisión" from this endpoint.
+    /// Both columns are persisted on Car and projected by the search endpoint, but the detail
+    /// DTO omitted them, so the page fell back to "N/A" on every correctly-loaded vehicle.
+    /// </summary>
+    [Fact]
+    public async Task Handle_Should_ProjectFuelTypeAndTransmission()
+    {
+        using var context = CreateContext();
+        var marca = new Marca("Renault");
+        var modelo = new Modelo("Kangoo", marca.Id);
+        context.Marca.Add(marca);
+        context.Modelo.Add(modelo);
+
+        var car = new Car(
+            Guid.NewGuid(),
+            marca,
+            modelo,
+            Color.White,
+            TypeCar.Minivan,
+            StatusCar.Used,
+            StatusServiceCar.Disponible,
+            5,
+            5,
+            1600,
+            42000,
+            2022,
+            "FUE001",
+            "Diesel van",
+            18000m,
+            DateTime.UtcNow,
+            FuelType.Diesel,
+            false,
+            Transmission.Automatic,
+            null);
+        context.Cars.Add(car);
+        await context.SaveChangesAsync();
+
+        var handler = new GetCarByIdQueryHandler(
+            context,
+            new Mock<IStorageService>().Object,
+            new Mock<IUserContext>().Object);
+
+        var result = await handler.Handle(new GetCarByIdQuery(car.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.FuelType.Should().Be(FuelType.Diesel);
+        result.Value.Transmission.Should().Be(Transmission.Automatic);
+    }
 }
