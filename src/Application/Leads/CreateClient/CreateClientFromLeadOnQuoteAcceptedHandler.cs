@@ -26,9 +26,16 @@ internal sealed class CreateClientFromLeadOnQuoteAcceptedHandler(
             // REQ-CRM-DEDUP-001 / ADR-4: check ConvertedClientId first (set when Negociación
             // already auto-created a Prospect Client for this lead); fall back to the legacy
             // email-match only when it is null.
+            //
+            // That fallback scopes by DealerId explicitly. This handler runs from the outbox, and
+            // ProcessOutboxMessagesJob dispatches with no HTTP context, so HasTenant is false and
+            // the global query filters are disabled for the whole of this method — the normal
+            // state here, not an edge case. Unscoped, it matches clients of other dealerships,
+            // and one buyer shopping at several agencies is ordinary.
             var existingClient = lead.ConvertedClientId is { } convertedClientId
                 ? await context.Clients.FirstOrDefaultAsync(c => c.Id == convertedClientId, cancellationToken)
-                : await context.Clients.FirstOrDefaultAsync(c => c.Email == lead.Email, cancellationToken);
+                : await context.Clients.FirstOrDefaultAsync(
+                    c => c.Email == lead.Email && c.DealerId == lead.DealerId, cancellationToken);
 
             Client targetClient;
 

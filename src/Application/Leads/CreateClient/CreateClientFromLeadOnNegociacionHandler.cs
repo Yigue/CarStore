@@ -54,9 +54,16 @@ internal sealed class CreateClientFromLeadOnNegociacionHandler(
         }
 
         // Negociacion: find-or-create, ConvertedClientId first (ADR-4), then email fallback.
+        //
+        // The email fallback scopes by DealerId explicitly. This handler runs from the outbox, and
+        // ProcessOutboxMessagesJob dispatches with no HTTP context, so HasTenant is false and every
+        // global query filter is disabled for the whole of this method — that is the normal state
+        // here, not an edge case. Unscoped, the fallback reaches into every other dealership, and
+        // sharing an email across agencies is ordinary: a buyer shops around.
         Client? target = lead.ConvertedClientId is { } convertedClientId
             ? await context.Clients.FirstOrDefaultAsync(c => c.Id == convertedClientId, cancellationToken)
-            : await context.Clients.FirstOrDefaultAsync(c => c.Email == lead.Email, cancellationToken);
+            : await context.Clients.FirstOrDefaultAsync(
+                c => c.Email == lead.Email && c.DealerId == lead.DealerId, cancellationToken);
 
         if (target is null)
         {
