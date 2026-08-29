@@ -52,9 +52,28 @@ internal sealed class GetActivityQueryHandler(IApplicationDbContext context)
             .OrderByDescending(m => m.OccurredOnUtc)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
-            .Select(m => new ActivityEntry(m.Id, m.Type, m.OccurredOnUtc))
+            .Select(m => new
+            {
+                m.Id,
+                m.Type,
+                m.AggregateId,
+                m.AggregateType,
+                m.OccurredOnUtc,
+            })
             .ToListAsync(cancellationToken);
 
-        return Result.Success(new ClientActivityResponse(items, totalCount));
+        // The sentence is composed here rather than in the projection: EF cannot translate a
+        // dictionary lookup into SQL, and doing it in memory over one page is free.
+        List<ActivityEntry> entries = items
+            .Select(m => new ActivityEntry(
+                m.Id,
+                m.Type,
+                ClientActivityDescriptions.For(m.Type),
+                m.AggregateId,
+                m.AggregateType,
+                m.OccurredOnUtc))
+            .ToList();
+
+        return Result.Success(new ClientActivityResponse(entries, totalCount));
     }
 }

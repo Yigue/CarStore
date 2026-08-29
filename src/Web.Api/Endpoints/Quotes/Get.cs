@@ -11,10 +11,12 @@ internal sealed class Get : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("quotes", async (
+            Guid? clientId,
+            Guid? leadId,
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetQuotesQuery();
+            var query = new GetQuotesQuery(clientId, leadId);
 
             Result<List<QuoteResponse>> result = await sender.Send(query, cancellationToken);
 

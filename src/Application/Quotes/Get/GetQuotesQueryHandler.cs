@@ -10,7 +10,24 @@ internal sealed class GetQuotesQueryHandler(IApplicationDbContext context)
 {
     public async Task<Result<List<QuoteResponse>>> Handle(GetQuotesQuery query, CancellationToken cancellationToken)
     {
-        List<QuoteResponse> quotes = await context.Quotes
+        IQueryable<Domain.Quotes.Quote> source = context.Quotes;
+
+        if (query.ClientId is { } clientId)
+        {
+            // A quote raised before enquiries created leads hangs off the client directly; one
+            // raised after hangs off the lead the client was converted from. Both are this
+            // client's history, so match either.
+            source = source.Where(q =>
+                q.ClientId == clientId
+                || (q.Lead != null && q.Lead.ConvertedClientId == clientId));
+        }
+
+        if (query.LeadId is { } leadId)
+        {
+            source = source.Where(q => q.LeadId == leadId);
+        }
+
+        List<QuoteResponse> quotes = await source
             .Include(q => q.Car)
                 .ThenInclude(c => c.Marca)
             .Include(q => q.Car)
