@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Leads.UpdateStatus;
+using Domain.Appointments;
 using Domain.Clients;
 using Domain.Clients.Attributes;
 using Domain.Leads;
@@ -12,9 +13,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Application.UnitTests.Leads;
 
 /// <summary>
-/// Ganado means the deal closed. Reaching it with nothing behind it produced "won" leads that no
-/// revenue report could reconcile, and made the board's confirmation dialog a formality: the stage
-/// had already changed by the time it appeared, so cancelling changed nothing.
+/// A stage names something that happened, so it cannot be reached before that thing exists.
+/// Demostración needs a booked appointment, Negociación a quote, Ganado a sale.
+///
+/// Without these rules a cancelled form left the lead filed under an event nobody could find —
+/// negotiating with no number on the table, or demoing a car nobody scheduled — because the stage
+/// had already changed by the time the form appeared.
 /// </summary>
 public class UpdateLeadStatusWonRequiresSaleTests
 {
@@ -121,6 +125,87 @@ public class UpdateLeadStatusWonRequiresSaleTests
         lead.Status.Should().Be(LeadStatus.Ganado);
     }
 
+    // ─── Demostración needs its appointment ───────────────────────────────────
+
+    private static async Task<Lead> SeedLeadInContactadoAsync(TestApplicationDbContext context)
+    {
+        var lead = Lead.Create(
+            DealerId, "Ana Fernandez", "ana@test.com", "1", LeadSource.Web, DateTime.UtcNow);
+        lead.LinkVehicle(Guid.NewGuid());
+        lead.UpdateStatus(LeadStatus.Contactado, "primer contacto");
+
+        context.Leads.Add(lead);
+        await context.SaveChangesAsync();
+        return lead;
+    }
+
+    [Fact]
+    public async Task Handle_Should_Refuse_Demostracion_WhenNoAppointmentIsBooked()
+    {
+        using var context = CreateContext();
+        Lead lead = await SeedLeadInContactadoAsync(context);
+
+        var result = await new UpdateLeadStatusCommandHandler(context).Handle(
+            new UpdateLeadStatusCommand(lead.Id, LeadStatus.Demostracion, null, null),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Leads.DemoRequiresAppointment");
+
+        (await context.Leads.SingleAsync()).Status.Should().Be(
+            LeadStatus.Contactado, "abandoning the appointment form must leave the lead put");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Allow_Demostracion_WhenAnAppointmentExists()
+    {
+        using var context = CreateContext();
+        Lead lead = await SeedLeadInContactadoAsync(context);
+
+        context.Appointments.Add(Appointment.Create(
+            dealerId: DealerId,
+            vehicleId: Guid.NewGuid(),
+            clientId: null,
+            leadId: lead.Id,
+            agentId: Guid.NewGuid(),
+            start: DateTime.UtcNow.AddDays(1),
+            end: DateTime.UtcNow.AddDays(1).AddHours(1),
+            type: AppointmentType.TestDrive,
+            notes: null,
+            createdAtUtc: DateTime.UtcNow));
+        await context.SaveChangesAsync();
+
+        var result = await new UpdateLeadStatusCommandHandler(context).Handle(
+            new UpdateLeadStatusCommand(lead.Id, LeadStatus.Demostracion, null, null),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    // ─── Negociación needs its quote ──────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_Should_Refuse_Negociacion_WhenNoQuoteExists()
+    {
+        using var context = CreateContext();
+        Lead lead = await SeedLeadInContactadoAsync(context);
+        lead.UpdateStatus(LeadStatus.Demostracion, null);
+        await context.SaveChangesAsync();
+
+        var result = await new UpdateLeadStatusCommandHandler(context).Handle(
+            new UpdateLeadStatusCommand(lead.Id, LeadStatus.Negociacion, null, null),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Leads.NegotiationRequiresQuote");
+
+        (await context.Leads.SingleAsync()).Status.Should().Be(LeadStatus.Demostracion);
+    }
+
+    /// <summary>
+    /// Contactado carries its requirement — notes — in the request itself, so it is reachable
+    /// without any external record and must stay that way.
+    /// </summary>
     [Fact]
     public async Task Handle_Should_NotAffectOtherTransitions()
     {
