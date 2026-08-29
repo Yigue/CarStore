@@ -79,7 +79,14 @@ public static class StripeWebhookProcessor
                         var subscription = await repo.GetByStripeCustomerIdAsync(invoice.CustomerId, ct);
                         if (subscription != null)
                         {
-                            subscription.MarkPastDue();
+                            if (subscription.Status == SubscriptionStatus.PastDue)
+                            {
+                                subscription.Suspend();
+                            }
+                            else if (subscription.Status == SubscriptionStatus.Active || subscription.Status == SubscriptionStatus.Trialing)
+                            {
+                                subscription.MarkPastDue();
+                            }
                             repo.Update(subscription);
                         }
                     }
@@ -93,7 +100,10 @@ public static class StripeWebhookProcessor
                         var subscription = await repo.GetByStripeCustomerIdAsync(stripeSub.CustomerId, ct);
                         if (subscription != null)
                         {
-                            subscription.Suspend();
+                            if (subscription.Status != SubscriptionStatus.Cancelled)
+                            {
+                                subscription.Suspend();
+                            }
                             repo.Update(subscription);
                         }
                     }

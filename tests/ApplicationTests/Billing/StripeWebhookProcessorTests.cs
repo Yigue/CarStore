@@ -99,6 +99,37 @@ public class StripeWebhookProcessorTests
     }
 
     [Fact]
+    public async Task Handle_InvoicePaymentFailed_WhenAlreadyPastDue_SuspendsSubscription()
+    {
+        var dealerId = Guid.NewGuid();
+        var subscription = DealerSubscription.Create(dealerId, "cus_123", "sub_123", "price_123");
+        subscription.Activate("sub_123", DateTime.UtcNow, DateTime.UtcNow.AddMonths(1));
+        subscription.MarkPastDue();
+
+        var rawJson = @"{
+            ""id"": ""evt_124_2"",
+            ""type"": ""invoice.payment_failed"",
+            ""data"": {
+                ""object"": {
+                    ""customer"": ""cus_123"",
+                    ""subscription"": ""sub_123""
+                }
+            }
+        }";
+
+        _repositoryMock.Setup(r => r.GetByStripeCustomerIdAsync("cus_123", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(subscription);
+
+        var command = new HandleStripeWebhookCommand("evt_124_2", "invoice.payment_failed", rawJson);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        subscription.Status.Should().Be(SubscriptionStatus.Suspended);
+        _repositoryMock.Verify(r => r.Update(subscription), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_CustomerSubscriptionDeleted_SuspendsSubscription()
     {
         var dealerId = Guid.NewGuid();

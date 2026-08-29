@@ -70,9 +70,6 @@ internal sealed class CreateClientFromLeadOnQuoteAcceptedHandler(
                 context.Clients.Add(targetClient);
             }
 
-            // ADR-2: activate inline — the client reference is already loaded here,
-            // deterministically (no race with the Negociación-stage creation handler).
-            targetClient.Activate();
 
             // Link the new client to the lead
             lead.MarkConverted(targetClient.Id);

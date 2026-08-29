@@ -130,7 +130,14 @@ internal sealed class HandleStripeWebhookCommandHandler : ICommandHandler<Handle
                     var subscription = await _repository.GetByStripeCustomerIdAsync(customerId, cancellationToken);
                     if (subscription != null)
                     {
-                        subscription.MarkPastDue();
+                        if (subscription.Status == SubscriptionStatus.PastDue)
+                        {
+                            subscription.Suspend();
+                        }
+                        else if (subscription.Status == SubscriptionStatus.Active || subscription.Status == SubscriptionStatus.Trialing)
+                        {
+                            subscription.MarkPastDue();
+                        }
                         _repository.Update(subscription);
                     }
                     break;
@@ -142,7 +149,10 @@ internal sealed class HandleStripeWebhookCommandHandler : ICommandHandler<Handle
                     var subscription = await _repository.GetByStripeCustomerIdAsync(customerId, cancellationToken);
                     if (subscription != null)
                     {
-                        subscription.Suspend();
+                        if (subscription.Status != SubscriptionStatus.Cancelled)
+                        {
+                            subscription.Suspend();
+                        }
                         _repository.Update(subscription);
                     }
                     break;

@@ -68,6 +68,26 @@ public class EmailServiceDiFactoryTests
     }
 
     [Fact]
+    public void PresentResendApiKey_ResolvesResendEmailService()
+    {
+        // Arrange — Email:Resend:ApiKey present
+        var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["UseInMemoryDatabase"] = "true",
+            ["Jwt:Secret"] = "supersecretkeysupersecretkeysupersecretkey",
+            ["Jwt:Issuer"] = "test",
+            ["Jwt:Audience"] = "test",
+            ["Email:Resend:ApiKey"] = "re_123456789"
+        });
+
+        // Act
+        var emailService = provider.GetRequiredService<IEmailService>();
+
+        // Assert
+        emailService.Should().BeOfType<ResendEmailService>();
+    }
+
+    [Fact]
     public async Task NoOp_SendEmailAsync_DoesNotThrow()
     {
         // Arrange

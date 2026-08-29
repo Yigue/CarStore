@@ -205,12 +205,26 @@ public static class DependencyInjection
             .BindConfiguration(EmailOptions.SectionName)
             .ValidateDataAnnotations();
 
+        services.AddOptions<ResendOptions>()
+            .BindConfiguration(ResendOptions.SectionName)
+            .ValidateDataAnnotations();
+
+        services.AddHttpClient<ResendEmailService>();
+
         services.AddScoped<Application.Abstractions.Messaging.IEmailService>(provider =>
         {
             var cfg = provider.GetRequiredService<IConfiguration>();
-            var host = cfg["Email:Smtp:Host"];
+            var providerName = cfg["Email:Provider"];
+            var resendApiKey = cfg["Email:Resend:ApiKey"] ?? cfg["Resend:ApiKey"];
+            var smtpHost = cfg["Email:Smtp:Host"];
 
-            if (!string.IsNullOrWhiteSpace(host))
+            if (string.Equals(providerName, "Resend", StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrWhiteSpace(resendApiKey) && string.IsNullOrEmpty(smtpHost)))
+            {
+                return provider.GetRequiredService<ResendEmailService>();
+            }
+
+            if (!string.IsNullOrWhiteSpace(smtpHost))
             {
                 return new SmtpEmailService(
                     provider.GetRequiredService<IOptions<EmailOptions>>(),

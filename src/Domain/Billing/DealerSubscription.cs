@@ -103,7 +103,7 @@ public sealed class DealerSubscription : Entity
             return;
         }
 
-        if (Status == SubscriptionStatus.Active || Status == SubscriptionStatus.PastDue)
+        if (Status == SubscriptionStatus.Active || Status == SubscriptionStatus.PastDue || Status == SubscriptionStatus.Trialing)
         {
             Status = SubscriptionStatus.Suspended;
             Raise(new SubscriptionSuspendedDomainEvent(Id, DealerId));

@@ -100,7 +100,7 @@ public class CreateClientFromLeadOnQuoteAcceptedHandlerTests
     }
 
     [Fact]
-    public async Task Handle_LeadAlreadyHasProspectClient_ReusesItAndActivates()
+    public async Task Handle_LeadAlreadyHasProspectClient_ReusesItWithoutActivating()
     {
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
@@ -128,7 +128,7 @@ public class CreateClientFromLeadOnQuoteAcceptedHandlerTests
 
         var reused = await context.Clients.SingleAsync();
         reused.Id.Should().Be(prospectClient.Id);
-        reused.Status.Should().Be(ClientStatus.Active, "reusing the Prospect Client must Activate() it (ADR-2)");
+        reused.Status.Should().Be(ClientStatus.Prospect, "accepting a quote does not activate the client; it remains Prospect until sale completed");
     }
 
     [Fact]
