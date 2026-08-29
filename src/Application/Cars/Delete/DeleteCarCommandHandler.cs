@@ -12,7 +12,8 @@ namespace Application.Cars.Delete;
 internal sealed class DeleteCarCommandHandler(
     IApplicationDbContext context,
     IStorageService storage,
-    ILogger<DeleteCarCommandHandler> logger)
+    ILogger<DeleteCarCommandHandler> logger,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<DeleteCarCommand>
 {
     public async Task<Result> Handle(DeleteCarCommand command, CancellationToken cancellationToken)
@@ -26,9 +27,30 @@ internal sealed class DeleteCarCommandHandler(
             return Result.Failure(CarErrors.NotFound(command.CarId));
         }
 
-        // REQ-VMS-5 / ADR-5: delete every MinIO blob BEFORE removing the Car. If any blob
-        // delete fails (non-404), abort — the DB delete never runs, so DB and storage stay
-        // consistent. DeleteFileAsync is idempotent (404 swallowed).
+        // Five foreign keys reference Car with DeleteBehavior.Restrict — Appointment,
+        // FinancialTransaction, Lead, Quote and Sale (pinned by CarReferenceDeleteBehaviorTests).
+        // Each is commercial history that outlives the unit, so the database refuses the DELETE.
+        // Discovering that by letting SaveChanges throw is what produced the original defect:
+        // the blobs were already gone by then, so the operator got a 500, kept the vehicle, and
+        // lost its photos. Ask first instead.
+        if (await IsReferencedAsync(car.Id, cancellationToken))
+        {
+            // Withdraw rather than destroy, and keep the blobs: the referencing lead or quote
+            // still renders this vehicle, and the row can be restored.
+            car.SoftDelete(dateTimeProvider.UtcNow);
+            await context.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation(
+                "Car {CarId} is referenced by commercial records; withdrawn from circulation " +
+                "instead of deleted. Its images were kept.",
+                car.Id);
+
+            return Result.Success();
+        }
+
+        // Nothing references it: the physical path REQ-VMS-5 / ADR-5 specifies still applies.
+        // Blobs go first so a storage failure aborts before the DB is touched, leaving storage
+        // and database consistent. DeleteFileAsync is idempotent (404 swallowed).
         var deletedKeys = new List<string>();
         foreach (CarImage image in car.Images.Where(i => i.ObjectKey is not null))
         {
@@ -66,4 +88,16 @@ internal sealed class DeleteCarCommandHandler(
 
         return Result.Success();
     }
+
+    /// <summary>
+    /// True when any Restrict-mapped dependent still points at this vehicle. Kept in sync with
+    /// <c>CarReferenceDeleteBehaviorTests.MustBlockDelete</c>: adding a blocking foreign key
+    /// without adding it here would reintroduce the constraint-violation-after-blob-delete bug.
+    /// </summary>
+    private async Task<bool> IsReferencedAsync(Guid carId, CancellationToken cancellationToken) =>
+        await context.Quotes.AnyAsync(q => q.CarId == carId, cancellationToken)
+        || await context.Sales.AnyAsync(s => s.CarId == carId, cancellationToken)
+        || await context.Leads.AnyAsync(l => l.InterestedVehicleId == carId, cancellationToken)
+        || await context.Appointments.AnyAsync(a => a.VehicleId == carId, cancellationToken)
+        || await context.Transactions.AnyAsync(t => t.CarId == carId, cancellationToken);
 }

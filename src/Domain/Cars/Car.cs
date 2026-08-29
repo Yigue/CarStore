@@ -35,6 +35,15 @@ public sealed class Car : Entity
     // It represents the cost the dealership paid for the unit and is the base for TCO.
     public Money? PurchaseCost { get; private set; }
 
+    /// <summary>
+    /// Withdrawn from circulation but still referenced by commercial history. Filtered out of
+    /// every query by the global filter in <c>ApplicationDbContext</c>, exactly like Client
+    /// and Quote. See <see cref="SoftDelete"/>.
+    /// </summary>
+    public bool IsDeleted { get; private set; }
+
+    public DateTime? DeletedAtUtc { get; private set; }
+
     private readonly List<ReconditioningTask> _reconditioningTasks = [];
     public IReadOnlyList<ReconditioningTask> ReconditioningTasks => _reconditioningTasks.AsReadOnly();
 
@@ -259,5 +268,49 @@ public sealed class Car : Entity
         }
 
         return total;
+    }
+
+    /// <summary>
+    /// Withdraws the vehicle from circulation without destroying it. Idempotent.
+    /// <para>
+    /// Five foreign keys — Appointment, FinancialTransaction, Lead, Quote and Sale — reference
+    /// a Car with <c>DeleteBehavior.Restrict</c>, because each of those rows is commercial
+    /// history that outlives the unit (see <c>CarReferenceDeleteBehaviorTests</c>). A vehicle
+    /// anyone has ever quoted therefore cannot be physically removed, and must not be: the row
+    /// is what a sale, a transaction or a lead still points at.
+    /// </para>
+    /// <para>
+    /// <see cref="DeleteCarCommandHandler"/> picks between this and physical deletion by
+    /// counting those references, so REQ-VMS-5 / ADR-5 still governs the clean case.
+    /// </para>
+    /// </summary>
+    public void SoftDelete(DateTime occurredAtUtc)
+    {
+        if (IsDeleted)
+        {
+            return;
+        }
+
+        IsDeleted = true;
+        DeletedAtUtc = occurredAtUtc;
+        UpdatedAt = occurredAtUtc;
+
+        Raise(new CarDeleteDomainEvent(Id));
+    }
+
+    /// <summary>
+    /// Returns a withdrawn vehicle to circulation. Idempotent — restoring a live vehicle is a
+    /// no-op rather than an error, so a retried request cannot fail spuriously.
+    /// </summary>
+    public void Restore(DateTime occurredAtUtc)
+    {
+        if (!IsDeleted)
+        {
+            return;
+        }
+
+        IsDeleted = false;
+        DeletedAtUtc = null;
+        UpdatedAt = occurredAtUtc;
     }
 }

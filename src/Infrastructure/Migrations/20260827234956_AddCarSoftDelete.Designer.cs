@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260827234956_AddCarSoftDelete")]
+    partial class AddCarSoftDelete
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1079,62 +1082,6 @@ namespace Infrastructure.Migrations
                     b.ToTable("leads", "public");
                 });
 
-            modelBuilder.Entity("Domain.Leads.LeadActivity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("ActorUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("actor_user_id");
-
-                    b.Property<Guid>("DealerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("dealer_id");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("description");
-
-                    b.Property<Guid>("LeadId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("lead_id");
-
-                    b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at_utc");
-
-                    b.Property<Guid?>("RelatedEntityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("related_entity_id");
-
-                    b.Property<string>("RelatedEntityType")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("related_entity_type");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("type");
-
-                    b.HasKey("Id")
-                        .HasName("pk_lead_activities");
-
-                    b.HasIndex("DealerId")
-                        .HasDatabaseName("ix_lead_activities_dealer_id");
-
-                    b.HasIndex("LeadId", "OccurredAtUtc")
-                        .HasDatabaseName("ix_lead_activities_lead_id_occurred_at_utc");
-
-                    b.ToTable("lead_activities", "public");
-                });
-
             modelBuilder.Entity("Domain.Quotes.Quote", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1905,16 +1852,6 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("InterestedVehicleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_leads_cars_interested_vehicle_id");
-                });
-
-            modelBuilder.Entity("Domain.Leads.LeadActivity", b =>
-                {
-                    b.HasOne("Domain.Leads.Lead", null)
-                        .WithMany()
-                        .HasForeignKey("LeadId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_lead_activities_leads_lead_id");
                 });
 
             modelBuilder.Entity("Domain.Quotes.Quote", b =>

@@ -161,8 +161,11 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         // evaluates DealerId at query time, not at model building time.
         // When HasTenant is false (migrations/background jobs), filters are not applied.
         
-        modelBuilder.Entity<Car>().HasQueryFilter(x => 
-            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        // Withdrawn vehicles stay in the table because Quote/Sale/Lead/Appointment/Transaction
+        // rows still reference them (DeleteCarCommandHandler), but they must vanish from the
+        // catalogue, the dashboard and every report — same contract as Client and Quote.
+        modelBuilder.Entity<Car>().HasQueryFilter(x =>
+            (!_tenantService.HasTenant || x.DealerId == _tenantService.DealerId) && !x.IsDeleted);
         modelBuilder.Entity<Client>().HasQueryFilter(x =>
             (!_tenantService.HasTenant || x.DealerId == _tenantService.DealerId) && !x.IsDeleted);
         modelBuilder.Entity<Quote>().HasQueryFilter(x =>
