@@ -49,6 +49,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<ReconditioningTask> ReconditioningTasks => Set<ReconditioningTask>();
     public DbSet<DealerSettingsEntity> DealerSettings => Set<DealerSettingsEntity>();
     public DbSet<Lead> Leads => Set<Lead>();
+    public DbSet<LeadActivity> LeadActivities => Set<LeadActivity>();
     public DbSet<Domain.Documents.Document> Documents => Set<Domain.Documents.Document>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<BackfillAudit> BackfillAudits => Set<BackfillAudit>();
