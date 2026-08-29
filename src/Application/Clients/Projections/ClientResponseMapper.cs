@@ -44,6 +44,7 @@ internal static class ClientResponseMapper
             client.ZipCode,
             client.Notes,
             client.AcquisitionSource?.ToString(),
+            client.OriginLeadId,
             client.AssignedAgentId,
             total,
             purchaseHistory,

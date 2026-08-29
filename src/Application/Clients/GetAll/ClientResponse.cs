@@ -19,6 +19,12 @@ public sealed record ClientResponse(
     string? ZipCode,
     string? Notes,
     string? AcquisitionSource,
+    /// <summary>
+    /// The lead this client was converted from, when there was one. Stored on Client since the
+    /// CRM funnel existed and exposed nowhere, so the detail screen could not link back to where
+    /// the customer actually came from.
+    /// </summary>
+    Guid? OriginLeadId,
     Guid? AssignedAgentId,
     decimal TotalSalesAmount,
     IReadOnlyList<PurchaseHistoryEntry> PurchaseHistory,
