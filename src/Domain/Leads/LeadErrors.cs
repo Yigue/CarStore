@@ -28,4 +28,21 @@ public static class LeadErrors
     public static readonly Error WonRequiresSale = Error.Problem(
         "Leads.WonRequiresSale",
         "Para marcar el lead como Ganado primero registrá la venta.");
+
+    /// <summary>
+    /// A stage names something that happened. Demostración without a booked appointment is a lead
+    /// filed under an event nobody scheduled, and the agent who opens it next has no idea whether
+    /// the demo exists.
+    /// </summary>
+    public static readonly Error DemoRequiresAppointment = Error.Problem(
+        "Leads.DemoRequiresAppointment",
+        "Para pasar el lead a Demostración primero agendá la cita.");
+
+    /// <summary>
+    /// Negotiating means there is a number on the table. Without a quote the stage records an
+    /// intention, not a fact, and the pipeline stops meaning anything.
+    /// </summary>
+    public static readonly Error NegotiationRequiresQuote = Error.Problem(
+        "Leads.NegotiationRequiresQuote",
+        "Para pasar el lead a Negociación primero generá la cotización.");
 }
