@@ -2,6 +2,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
 using Domain.Appointments;
+using Domain.Leads;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -50,6 +51,16 @@ internal sealed class CreateAppointmentCommandHandler(
                 dateTimeProvider.UtcNow);
 
             context.Appointments.Add(appointment);
+
+            if (command.LeadId is { } leadId && command.Type == AppointmentType.TestDrive)
+            {
+                Lead? lead = await context.Leads.FirstOrDefaultAsync(l => l.Id == leadId, cancellationToken);
+                if (lead is not null && (lead.Status == LeadStatus.Nuevo || lead.Status == LeadStatus.Contactado))
+                {
+                    lead.ForceStatus(LeadStatus.Demostracion);
+                }
+            }
+
             await context.SaveChangesAsync(cancellationToken);
 
             return Result.Success(appointment.Id);

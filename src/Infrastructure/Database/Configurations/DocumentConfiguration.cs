@@ -56,7 +56,17 @@ public sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasForeignKey(x => x.ClientId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // No navigation property: Document lives in its own aggregate and only needs the id.
+        // SetNull mirrors the client relationship — deleting a sale must not take the paperwork
+        // with it.
+        builder.HasOne<Domain.Sales.Sale>()
+            .WithMany()
+            .HasForeignKey(x => x.SaleId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
+
         builder.HasIndex(x => x.DealerId);
         builder.HasIndex(x => x.ClientId);
+        builder.HasIndex(x => x.SaleId);
     }
 }

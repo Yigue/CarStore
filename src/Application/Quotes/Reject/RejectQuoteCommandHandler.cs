@@ -19,12 +19,10 @@ internal sealed class RejectQuoteCommandHandler(
         if (quote is null)
             return Result.Failure(QuoteErrors.NotFound(command.QuoteId));
 
+        // Quote.Reject only accepts a Pending quote, and a Pending quote holds no reservation
+        // since the hold moved to acceptance. The car is deliberately left alone: releasing it
+        // here would free a unit that a competing ACCEPTED quote is holding.
         quote.Reject(command.Reason, dateTimeProvider.UtcNow);
-
-        // D-1: liberar la reserva del vehículo (idempotente si ya no estaba reservado).
-        var car = await context.Cars
-            .SingleOrDefaultAsync(c => c.Id == quote.CarId, cancellationToken);
-        car?.Release(dateTimeProvider.UtcNow);
 
         await context.SaveChangesAsync(cancellationToken);
 

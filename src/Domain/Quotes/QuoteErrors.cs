@@ -38,5 +38,15 @@ public static class QuoteErrors
     public static Error LeadNotQuotable(Guid leadId) => Error.Problem(
         "Quotes.LeadNotQuotable",
         $"The lead with Id = '{leadId}' cannot be quoted because it is Perdido or Archivado.");
+
+    /// <summary>
+    /// A car can carry as many competing offers as the market brings, but only one of them can
+    /// be accepted: acceptance is the moment the dealership commits the unit to a buyer.
+    /// Raised both when a second acceptance is attempted and when a new quote is raised for a
+    /// car that is already committed.
+    /// </summary>
+    public static Error CarAlreadyCommitted(Guid carId) => Error.Conflict(
+        "Quotes.CarAlreadyCommitted",
+        $"The car with Id = '{carId}' already has an accepted quote. Reject or expire it before committing the car again.");
 }
 

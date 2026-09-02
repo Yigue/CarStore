@@ -41,26 +41,27 @@ public class CreateQuoteCommandValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
-    // Phase 5: XOR invariant contract lock (expected GREEN)
+    // At least one party, and both is legitimate: a converted lead and the client it became
+    // are the same person, and the quote belongs to both sides of that record.
 
     [Fact]
-    public void Validate_ShouldFail_WhenBothClientIdAndLeadIdAreNull()
+    public void Validate_ShouldFail_WhenNeitherClientIdNorLeadIdIsProvided()
     {
         var command = ValidBaseCommand(clientId: null, leadId: null);
 
         var result = _validator.Validate(command);
 
-        result.IsValid.Should().BeFalse("a quote must reference exactly one party");
+        result.IsValid.Should().BeFalse("a quote must reference at least one party");
     }
 
     [Fact]
-    public void Validate_ShouldFail_WhenBothClientIdAndLeadIdAreProvided()
+    public void Validate_ShouldPass_WhenBothClientIdAndLeadIdAreProvided()
     {
         var command = ValidBaseCommand(clientId: Guid.NewGuid(), leadId: Guid.NewGuid());
 
         var result = _validator.Validate(command);
 
-        result.IsValid.Should().BeFalse("a quote cannot reference both a client and a lead");
+        result.IsValid.Should().BeTrue("a converted lead and its client are one person, not two parties");
     }
 
     [Fact]

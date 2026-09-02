@@ -223,4 +223,23 @@ public sealed class Client : Entity, ISoftDeletable
 
         return Result.Success();
     }
+
+    /// <summary>
+    /// Records the enquiry this client came from.
+    ///
+    /// <para>
+    /// Set in the constructor for a client created BY a conversion, but a conversion that
+    /// reuses a client that already existed had no way to stamp it — and every rule that walks
+    /// back from a client to its lead (the pipeline's quote and sale checks, the outbox's lead
+    /// resolution) then found nothing. Idempotent, and never overwrites an existing origin:
+    /// a person's first enquiry is the one that brought them in.
+    /// </para>
+    /// </summary>
+    public void LinkOriginLead(Guid leadId)
+    {
+        if (leadId == Guid.Empty)
+            throw new DomainException("LeadId cannot be empty when linking a client to its origin lead");
+
+        OriginLeadId ??= leadId;
+    }
 }

@@ -37,6 +37,7 @@ public class AdvanceLeadOnDemoAppointmentCreatedHandlerTests
         // the aggregate enforces, so tests exercise real reachable states.
         if (status is LeadStatus.Contactado or LeadStatus.Demostracion or LeadStatus.Negociacion or LeadStatus.Ganado)
         {
+            lead.AssignAgent(Guid.NewGuid());
             lead.UpdateStatus(LeadStatus.Contactado, "first contact");
         }
         if (status is LeadStatus.Demostracion or LeadStatus.Negociacion or LeadStatus.Ganado)

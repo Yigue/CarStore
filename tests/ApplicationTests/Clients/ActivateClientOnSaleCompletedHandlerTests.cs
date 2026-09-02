@@ -54,7 +54,7 @@ public class ActivateClientOnSaleCompletedHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             client.Id,
-            new Money(15000m, Currency.Usd),
+            new Money(15000m, "USD"),
             PaymentMethod.BankTransfer);
 
         await handler.Handle(@event, CancellationToken.None);
@@ -72,7 +72,7 @@ public class ActivateClientOnSaleCompletedHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             Guid.NewGuid(),
-            new Money(15000m, Currency.Usd),
+            new Money(15000m, "USD"),
             PaymentMethod.BankTransfer);
 
         var act = () => handler.Handle(@event, CancellationToken.None);
@@ -92,7 +92,7 @@ public class ActivateClientOnSaleCompletedHandlerTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             client.Id,
-            new Money(15000m, Currency.Usd),
+            new Money(15000m, "USD"),
             PaymentMethod.BankTransfer);
 
         await handler.Handle(@event, CancellationToken.None);

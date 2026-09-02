@@ -41,27 +41,30 @@ public sealed class Quote : Entity, ISoftDeletable
     {
         SetDealer(dealerId);
 
+        // At least one party. Both is legitimate and increasingly the normal case: a lead that
+        // has been converted IS a client, and the quote belongs to the person, not to whichever
+        // record the CRM happened to be showing when it was raised.
         if (client is null && lead is null)
             throw new DomainException("A quote must have either a Client or a Lead");
-        if (client is not null && lead is not null)
-            throw new DomainException("A quote cannot have both a Client and a Lead");
 
         if (validUntil <= date)
             throw new DomainException("ValidUntil must be in the future");
 
         Car = car;
         CarId = car.Id;
-        
+
         if (client is not null)
         {
             Client = client;
             ClientId = client.Id;
         }
-        else
+
+        if (lead is not null)
         {
             Lead = lead;
-            LeadId = lead!.Id;
+            LeadId = lead.Id;
         }
+
         
         ProposedPrice = new Money(proposedPrice);
         PaymentMethod = paymentMethod;
@@ -143,9 +146,16 @@ public sealed class Quote : Entity, ISoftDeletable
     }
     
     /// <summary>
-    /// Re-points this quote to a client (e.g. when its lead is converted). Enforces the
-    /// "exactly one party" invariant by clearing the lead reference so the quote does not
-    /// end up owned by both a lead and a client.
+    /// Attaches this quote to a client — what happens when its lead is converted.
+    ///
+    /// <para>
+    /// The lead reference is deliberately KEPT. Clearing it used to be required by an
+    /// "exactly one party" invariant, and it cost the deal its own history: converting a lead
+    /// erased the only direct link back to the enquiry, so every downstream rule had to
+    /// rediscover it through <c>Client.OriginLeadId</c> — and a lead whose quote was raised
+    /// after conversion ended up with no quote it could see, stuck one stage behind with the
+    /// board asking for a quote that already existed.
+    /// </para>
     /// </summary>
     public void AssignClient(Guid clientId)
     {
@@ -153,15 +163,14 @@ public sealed class Quote : Entity, ISoftDeletable
             throw new DomainException("ClientId cannot be empty when assigning a quote to a client");
 
         ClientId = clientId;
-        LeadId = null;
-        Lead = null;
     }
 
     /// <summary>
     /// Re-points this quote to a lead — the mirror of <see cref="AssignClient"/>. Used by the
     /// inquiry-clients backfill, which rebuilds the lead that a web enquiry should have created
     /// in the first place and moves that enquiry's quote onto it. Clears the client reference to
-    /// keep the "exactly one party" invariant.
+    /// keep the deal's history intact — the client reference, if any, is kept for the same
+    /// reason <see cref="AssignClient"/> keeps the lead.
     /// </summary>
     public void AssignLead(Guid leadId)
     {
@@ -170,8 +179,6 @@ public sealed class Quote : Entity, ISoftDeletable
 
         LeadId = leadId;
         Lead = null;
-        ClientId = null;
-        Client = null;
     }
 
     /// <summary>

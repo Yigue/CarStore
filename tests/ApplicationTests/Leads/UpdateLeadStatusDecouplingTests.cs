@@ -52,10 +52,13 @@ public class UpdateLeadStatusDecouplingTests
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
         var lead = Lead.Create(dealerId, "Carlos Perez", "carlos@test.com", "1112223", LeadSource.Web, DateTime.UtcNow);
+        lead.AssignAgent(Guid.NewGuid());
         context.Leads.Add(lead);
-        // Car is already reserved by another active quote — CreateQuoteCommandHandler must
-        // reject it with Cars.NotAvailable (409), independent of the lead's own transaction.
-        var car = CreateCar(context, dealerId, StatusServiceCar.Reservado);
+        // The car is already sold — CreateQuoteCommandHandler must reject it with
+        // Cars.NotAvailable (409), independent of the lead's own transaction. (Reservado no
+        // longer refuses a quote: a car can carry several competing offers, and only accepting
+        // one commits it. Vendido is what "this unit is gone" means now.)
+        var car = CreateCar(context, dealerId, StatusServiceCar.Vendido);
         await context.SaveChangesAsync();
 
         var updateHandler = new UpdateLeadStatusCommandHandler(context);
@@ -75,7 +78,7 @@ public class UpdateLeadStatusDecouplingTests
             new CreateQuoteCommand(car.Id, null, lead.Id, 100_000m, PaymentMethod.Contado, DateTime.UtcNow.AddDays(5), "c"),
             CancellationToken.None);
 
-        quoteResult.IsFailure.Should().BeTrue("the car is reserved — quote creation must fail with Cars.NotAvailable");
+        quoteResult.IsFailure.Should().BeTrue("the car is sold — quote creation must fail with Cars.NotAvailable");
 
         // The lead's committed status update must not be reverted by the downstream failure —
         // there is no shared transaction/unit-of-work between the two handlers.
@@ -91,6 +94,7 @@ public class UpdateLeadStatusDecouplingTests
         using var context = CreateContext();
         var dealerId = Guid.NewGuid();
         var lead = Lead.Create(dealerId, "Ana Lopez", "ana@test.com", "4445556", LeadSource.Web, DateTime.UtcNow);
+        lead.AssignAgent(Guid.NewGuid());
         context.Leads.Add(lead);
         await context.SaveChangesAsync();
 

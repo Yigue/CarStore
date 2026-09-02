@@ -102,8 +102,12 @@ public sealed class Lead : Entity
             throw new DomainException("Status transitions must be sequential — no stage skipping allowed.");
 
         // Transition-specific requirements
-        if (newStatus == LeadStatus.Contactado && string.IsNullOrWhiteSpace(notes))
-            throw new DomainException("Moving to Contactado requires notes documenting the first contact.");
+        // Contactado means a person owns this lead from here on. The gate used to be "notes were
+        // typed", which recorded that someone wrote something without ever saying who is
+        // responsible for the follow-up — leaving the lead ownerless in the one stage that
+        // implies an owner. Notes are still persisted below when supplied.
+        if (newStatus == LeadStatus.Contactado && AssignedAgentId is null)
+            throw new DomainException("Moving to Contactado requires an assigned agent to own the follow-up.");
 
         if (newStatus == LeadStatus.Demostracion && InterestedVehicleId is null)
             throw new DomainException("Moving to Demostracion requires a linked interested vehicle.");

@@ -150,8 +150,10 @@ public class CreateQuoteCommandHandlerTests
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
+        // Creating a quote is an offer, not a commitment. Reserving here is what made the second
+        // quote for the same car impossible; the reservation now happens on acceptance.
         var persistedCar = await context.Cars.SingleAsync(c => c.Id == car.Id);
-        persistedCar.ServiceCar.Should().Be(StatusServiceCar.Reservado);
+        persistedCar.ServiceCar.Should().Be(StatusServiceCar.Disponible);
     }
 
     [Fact]
@@ -166,7 +168,7 @@ public class CreateQuoteCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         var persistedCar = await context.Cars.SingleAsync(c => c.Id == car.Id);
-        persistedCar.ServiceCar.Should().Be(StatusServiceCar.Reservado);
+        persistedCar.ServiceCar.Should().Be(StatusServiceCar.Disponible);
     }
 
     // Regression for CRITICAL-1 (verify-report crm-cotizaciones-etapa3): the Lead
@@ -191,5 +193,158 @@ public class CreateQuoteCommandHandlerTests
         (await context.Quotes.AnyAsync()).Should().BeFalse();
         var persistedCar = await context.Cars.SingleAsync(c => c.Id == car.Id);
         persistedCar.ServiceCar.Should().Be(StatusServiceCar.Disponible);
+    }
+
+    // ── Several offers per car, one commitment ───────────────────────────────────────────────
+    //
+    // The old rule reserved the car the moment a quote was raised, so the second buyer asking
+    // for a price on the same unit got a 409 and the salesperson got a board they could not
+    // move. Competing offers are the normal case; what has to be exclusive is the acceptance.
+
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenCarAlreadyHasAPendingQuote()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var first = await SeedClientAsync(context, ClientStatus.Active);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+
+        var firstResult = await handler.Handle(BuildCommand(car.Id, first.Id, null), CancellationToken.None);
+        firstResult.IsSuccess.Should().BeTrue();
+
+        var secondClient = new Client(DealerId, "Ada", "Lovelace", "111", "ada@test.com", "222", "Addr", DateTime.UtcNow);
+        context.Clients.Add(secondClient);
+        await context.SaveChangesAsync();
+
+        var secondResult = await handler.Handle(BuildCommand(car.Id, secondClient.Id, null), CancellationToken.None);
+
+        secondResult.IsSuccess.Should().BeTrue();
+        (await context.Quotes.CountAsync(q => q.CarId == car.Id)).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenCarAlreadyHasAnAcceptedQuote()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var buyer = await SeedClientAsync(context, ClientStatus.Active);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+
+        var accepted = await handler.Handle(BuildCommand(car.Id, buyer.Id, null), CancellationToken.None);
+        var acceptedQuote = await context.Quotes.SingleAsync(q => q.Id == accepted.Value);
+        acceptedQuote.Accept(DateTime.UtcNow);
+        await context.SaveChangesAsync();
+
+        var latecomer = new Client(DealerId, "Grace", "Hopper", "333", "grace@test.com", "444", "Addr", DateTime.UtcNow);
+        context.Clients.Add(latecomer);
+        await context.SaveChangesAsync();
+
+        var result = await handler.Handle(BuildCommand(car.Id, latecomer.Id, null), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(QuoteErrors.CarAlreadyCommitted(car.Id));
+        (await context.Quotes.CountAsync(q => q.CarId == car.Id)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenCarIsSold()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        car.MarkAsSold(DateTime.UtcNow);
+        await context.SaveChangesAsync();
+
+        var client = await SeedClientAsync(context, ClientStatus.Active);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+
+        var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(CarErrors.NotAvailable(car.Id));
+        (await context.Quotes.AnyAsync()).Should().BeFalse();
+    }
+
+    // ── The lead behind the client (the "pepemujica" case) ────────────────────────────────────
+    //
+    // Convert a lead into a client, then raise the quote against the client, and the lead was
+    // left one stage behind: the handler only advanced a lead it had been handed directly, so
+    // the move depended on AdvanceLeadOnQuoteCreatedHandler running off the outbox — a Quartz
+    // job on a 10-second tick. The board refetched immediately, showed the lead unmoved, and
+    // the next drag opened the quote form again, asking for a quote that already existed.
+
+    [Fact]
+    public async Task Handle_Should_LinkTheOriginLead_WhenTheQuoteIsRaisedAgainstItsClient()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
+        var client = new Client(DealerId, "Pepe", "Mujica", "888", "pepe@test.com", "555", "Addr",
+            DateTime.UtcNow, ClientType.Individual, lead.Id);
+        context.Clients.Add(client);
+        lead.MarkConverted(client.Id);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var quote = await context.Quotes.SingleAsync(q => q.Id == result.Value);
+        quote.ClientId.Should().Be(client.Id);
+        quote.LeadId.Should().Be(lead.Id, "the deal keeps the enquiry it came from");
+    }
+
+    [Fact]
+    public async Task Handle_Should_AdvanceTheOriginLead_InTheSameTransaction()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
+        var client = new Client(DealerId, "Pepe", "Mujica", "888", "pepe@test.com", "555", "Addr",
+            DateTime.UtcNow, ClientType.Individual, lead.Id);
+        context.Clients.Add(client);
+        lead.MarkConverted(client.Id);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+
+        // Committed by this handler, not ten seconds later by a background job.
+        var persistedLead = await context.Leads.AsNoTracking().SingleAsync(l => l.Id == lead.Id);
+        persistedLead.Status.Should().Be(LeadStatus.Negociacion);
+    }
+
+    [Fact]
+    public async Task Handle_Should_LinkTheConvertedClient_WhenTheQuoteIsRaisedAgainstItsLead()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
+        var client = new Client(DealerId, "Pepe", "Mujica", "888", "pepe@test.com", "555", "Addr",
+            DateTime.UtcNow, ClientType.Individual, lead.Id);
+        context.Clients.Add(client);
+        lead.MarkConverted(client.Id);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var result = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var quote = await context.Quotes.SingleAsync(q => q.Id == result.Value);
+        quote.LeadId.Should().Be(lead.Id);
+        quote.ClientId.Should().Be(client.Id, "picking the lead should not lose the client it became");
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotDragAWonLeadBackwards()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var lead = await SeedLeadAsync(context, LeadStatus.Ganado);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+
+        await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
+
+        var persistedLead = await context.Leads.AsNoTracking().SingleAsync(l => l.Id == lead.Id);
+        persistedLead.Status.Should().Be(LeadStatus.Ganado);
     }
 }

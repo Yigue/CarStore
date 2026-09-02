@@ -25,22 +25,13 @@ public sealed class MarkExpiredQuotesJob(
             return;
         }
 
-        // D-1: liberar los vehículos reservados por las cotizaciones que expiran.
-        var carIds = expiredQuotes.Select(q => q.CarId).Distinct().ToList();
-        var carsById = (await context.Cars
-                .IgnoreQueryFilters()
-                .Where(c => carIds.Contains(c.Id))
-                .ToListAsync(jobContext.CancellationToken))
-            .ToDictionary(c => c.Id);
-
+        // Only Pending quotes expire, and a Pending quote holds no reservation — the hold moved
+        // to acceptance, so several offers can sit on one car at once. Releasing the car here
+        // would hand back a unit that a competing ACCEPTED quote is holding, days after the
+        // dealership committed it. Expiring an offer means the offer lapsed, nothing more.
         foreach (var quote in expiredQuotes)
         {
             quote.Expire(now);
-
-            if (carsById.TryGetValue(quote.CarId, out var car))
-            {
-                car.Release(now);
-            }
         }
 
         await context.SaveChangesAsync(jobContext.CancellationToken);

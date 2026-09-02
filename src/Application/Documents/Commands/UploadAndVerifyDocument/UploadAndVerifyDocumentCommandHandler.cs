@@ -91,7 +91,8 @@ internal sealed class UploadAndVerifyDocumentCommandHandler
             blobName: blobName,
             fileName: request.FileName,
             contentType: request.ContentType,
-            dealerId: _tenant.DealerId);
+            dealerId: _tenant.DealerId,
+            saleId: request.SaleId);
 
         document.MarkAsProcessing();
 

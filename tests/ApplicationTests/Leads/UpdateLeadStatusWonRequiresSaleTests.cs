@@ -38,6 +38,7 @@ public class UpdateLeadStatusWonRequiresSaleTests
         var lead = Lead.Create(
             DealerId, "Ana Fernandez", "ana@test.com", "1", LeadSource.Web, DateTime.UtcNow);
         lead.LinkVehicle(Guid.NewGuid());
+        lead.AssignAgent(Guid.NewGuid());
         lead.UpdateStatus(LeadStatus.Contactado, "primer contacto");
         lead.UpdateStatus(LeadStatus.Demostracion, null);
         lead.UpdateStatus(LeadStatus.Negociacion, null);
@@ -132,6 +133,7 @@ public class UpdateLeadStatusWonRequiresSaleTests
         var lead = Lead.Create(
             DealerId, "Ana Fernandez", "ana@test.com", "1", LeadSource.Web, DateTime.UtcNow);
         lead.LinkVehicle(Guid.NewGuid());
+        lead.AssignAgent(Guid.NewGuid());
         lead.UpdateStatus(LeadStatus.Contactado, "primer contacto");
 
         context.Leads.Add(lead);
@@ -212,6 +214,9 @@ public class UpdateLeadStatusWonRequiresSaleTests
         using var context = CreateContext();
         var lead = Lead.Create(
             DealerId, "Ana Fernandez", "ana@test.com", "1", LeadSource.Web, DateTime.UtcNow);
+        // Contactado carries its own requirement — an agent owning the follow-up — enforced in
+        // the aggregate, not by the artifact rules this class is about.
+        lead.AssignAgent(Guid.NewGuid());
         context.Leads.Add(lead);
         await context.SaveChangesAsync();
 

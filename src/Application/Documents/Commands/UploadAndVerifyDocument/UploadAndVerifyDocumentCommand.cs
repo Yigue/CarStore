@@ -15,4 +15,11 @@ public sealed record UploadAndVerifyDocumentCommand(
     Stream FileStream,
     string ContentType,
     string FileName,
-    Guid? ClientId) : ICommand<VerifyDocumentResultDto>;
+    Guid? ClientId,
+    /// <summary>
+    /// The sale this paperwork belongs to, when it is uploaded while closing a deal. Optional
+    /// and independent of <see cref="ClientId"/>: identity documents belong to the person, the
+    /// contract and transfer form belong to one transaction, and both used to pile up on the
+    /// client with nothing saying which purchase they were for.
+    /// </summary>
+    Guid? SaleId = null) : ICommand<VerifyDocumentResultDto>;

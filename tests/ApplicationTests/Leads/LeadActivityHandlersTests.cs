@@ -89,6 +89,7 @@ public class LeadActivityHandlersTests
     {
         using var context = CreateContext();
         Lead lead = await SeedLeadAsync(context);
+        lead.AssignAgent(Guid.NewGuid());
         lead.UpdateStatus(LeadStatus.Contactado, "contactado");
         lead.UpdateStatus(LeadStatus.Perdido, null, LeadLossReason.ComproEnOtra);
         await context.SaveChangesAsync();

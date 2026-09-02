@@ -1,5 +1,6 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Domain.Leads;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -18,6 +19,8 @@ internal sealed class GetLeadsQueryHandler(
 
         if (query.Status.HasValue)
             leadsQuery = leadsQuery.Where(l => l.Status == query.Status.Value);
+        else if (!query.IncludeArchived)
+            leadsQuery = leadsQuery.Where(l => l.Status != LeadStatus.Archivado);
 
         var dbResults = await (from l in leadsQuery
             join u in context.Users.IgnoreQueryFilters() on l.AssignedAgentId equals (Guid?)u.Id into agentJoin
@@ -43,7 +46,10 @@ internal sealed class GetLeadsQueryHandler(
                 l.LossReason,
                 l.Notes,
                 l.Source,
-                l.CreatedAt
+                l.CreatedAt,
+                HasQuote = context.Quotes.Any(q =>
+                    q.LeadId == l.Id
+                    || (l.ConvertedClientId != null && q.ClientId == l.ConvertedClientId))
             })
             .ToListAsync(cancellationToken);
 
@@ -62,7 +68,8 @@ internal sealed class GetLeadsQueryHandler(
             l.LossReason,
             l.Notes,
             l.Source.ToString(),
-            l.CreatedAt
+            l.CreatedAt,
+            l.HasQuote
         )).ToList();
 
         return Result.Success(results);

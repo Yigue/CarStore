@@ -7,6 +7,7 @@ using Domain.Clients;
 using Domain.Clients.Attributes;
 using Domain.Leads;
 using Domain.Quotes;
+using Domain.Quotes.Attributes;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -34,11 +35,23 @@ internal sealed class CreateQuoteCommandHandler(
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
         }
 
-        // D-1: solo se puede cotizar un vehículo Disponible. Si ya está reservado
-        // (por otra cotización activa) o vendido -> 409.
-        if (car.ServiceCar != StatusServiceCar.Disponible)
+        // A quote is an offer, not a commitment. Several buyers asking for a price on the same
+        // unit is the normal case, and the old rule — quote only a Disponible car, then reserve
+        // it — turned the first offer into an exclusive hold: the second buyer got a 409 and the
+        // salesperson got a board they could not move.
+        //
+        // Two things still make a car unquotable, and both mean the unit is genuinely gone:
+        if (car.ServiceCar == StatusServiceCar.Vendido)
         {
             return Result.Failure<Guid>(CarErrors.NotAvailable(command.CarId));
+        }
+
+        bool alreadyCommitted = await context.Quotes
+            .AnyAsync(q => q.CarId == command.CarId && q.Status == QuoteStatus.Accepted, cancellationToken);
+
+        if (alreadyCommitted)
+        {
+            return Result.Failure<Guid>(QuoteErrors.CarAlreadyCommitted(command.CarId));
         }
 
         // Resolve exactly one party: an existing client, or a lead (which lets the
@@ -91,12 +104,30 @@ internal sealed class CreateQuoteCommandHandler(
                 return Result.Failure<Guid>(QuoteErrors.LeadNotQuotable(lead.Id));
             }
         }
-        else
+
+        if (client is null && lead is null)
         {
             return Result.Failure<Guid>(new Error(
                 "Quotes.MissingParty",
                 "A quote must reference either a client or a lead.",
                 ErrorType.Validation));
+        }
+
+        // Resolve the OTHER half of the same person. A converted lead and the client it became
+        // are one party, and which of the two the operator happened to pick in the form should
+        // not decide what the quote remembers — or which pipeline rules can still see it.
+        if (lead is null && client is { OriginLeadId: { } originLeadId })
+        {
+            lead = await context.Leads
+                .IgnoreQueryFilters()
+                .SingleOrDefaultAsync(
+                    l => l.Id == originLeadId && l.DealerId == tenantService.DealerId,
+                    cancellationToken);
+        }
+        else if (client is null && lead is { ConvertedClientId: { } convertedClientId })
+        {
+            client = await context.Clients
+                .SingleOrDefaultAsync(c => c.Id == convertedClientId, cancellationToken);
         }
 
         var quote = new Quote(
@@ -112,8 +143,18 @@ internal sealed class CreateQuoteCommandHandler(
 
         context.Quotes.Add(quote);
 
-        // D-1: reservar el vehículo en la misma transacción que la cotización.
-        car.Reserve(dateTimeProvider.UtcNow);
+        // No reservation here on purpose. The car is committed when a quote is ACCEPTED
+        // (AcceptQuoteCommandHandler), which is the one moment that has to be exclusive.
+
+        // Advance the lead HERE, in this transaction. AdvanceLeadOnQuoteCreatedHandler does the
+        // same thing off the outbox, but that is a Quartz job on a ten-second tick: the board
+        // refetched right after the quote was saved, saw the lead unmoved, and the next drag
+        // opened the quote form again asking for a quote that already existed. The handler
+        // stays as an idempotent safety net — it guards on the same statuses.
+        if (lead is not null && lead.Status is LeadStatus.Nuevo or LeadStatus.Contactado or LeadStatus.Demostracion)
+        {
+            lead.ForceStatus(LeadStatus.Negociacion);
+        }
 
         await context.SaveChangesAsync(cancellationToken);
 

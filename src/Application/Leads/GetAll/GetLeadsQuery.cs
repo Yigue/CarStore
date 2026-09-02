@@ -3,4 +3,4 @@ using Domain.Leads;
 
 namespace Application.Leads.GetAll;
 
-public sealed record GetLeadsQuery(LeadStatus? Status) : IQuery<List<LeadResponse>>;
+public sealed record GetLeadsQuery(LeadStatus? Status, bool IncludeArchived = false) : IQuery<List<LeadResponse>>;

@@ -138,7 +138,9 @@ public class BackfillInquiryClientsToLeadsCommandHandlerTests
 
         Quote quote = await context.Quotes.SingleAsync();
         quote.LeadId.Should().Be(lead.Id);
-        quote.ClientId.Should().BeNull();
+        // The retired inquiry-client stays referenced: the backfill rebuilds the lead that
+        // should have existed, it does not erase what the quote was raised against.
+        quote.LeadId.Should().NotBeNull();
 
         (await context.Clients.IgnoreQueryFilters().SingleAsync()).IsDeleted.Should().BeTrue();
     }

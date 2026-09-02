@@ -10,6 +10,12 @@ namespace Application.Quotes.Get;
 /// the tab was a placeholder that answered the same thing whether or not any existed.
 /// </para>
 /// </summary>
+/// <param name="CarId">
+/// Narrows to every quote raised for one vehicle. Several buyers can hold competing offers on
+/// the same unit, so whoever is about to price it needs to see what the others were offered —
+/// otherwise the second quote is written blind against the first.
+/// </param>
 public sealed record GetQuotesQuery(
     Guid? ClientId = null,
-    Guid? LeadId = null) : IQuery<List<QuoteResponse>>;
+    Guid? LeadId = null,
+    Guid? CarId = null) : IQuery<List<QuoteResponse>>;

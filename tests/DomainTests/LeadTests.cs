@@ -121,6 +121,7 @@ public class LeadTests
     public void UpdateStatus_ShouldAllowSequentialForwardTransition()
     {
         var lead = CreateNewLead();
+        lead.AssignAgent(Guid.NewGuid());
 
         var act = () => lead.UpdateStatus(LeadStatus.Contactado, "First contact made");
 
@@ -139,21 +140,40 @@ public class LeadTests
             .WithMessage("*sequential*");
     }
 
+    // Contactado means a person owns this lead from here on. The gate used to be "notes were
+    // typed", which recorded that someone wrote something without ever saying who is
+    // responsible for the follow-up — leaving the lead ownerless in the one stage that implies
+    // an owner. Notes are still persisted when supplied; they just no longer stand in for
+    // accountability.
+
     [Fact]
-    public void UpdateStatus_ToContactado_ShouldRequireNotes()
+    public void UpdateStatus_ToContactado_ShouldRequireAnAssignedAgent()
     {
         var lead = CreateNewLead();
 
-        var act = () => lead.UpdateStatus(LeadStatus.Contactado, null);
+        var act = () => lead.UpdateStatus(LeadStatus.Contactado, "First contact made");
 
         act.Should().Throw<DomainException>()
-            .WithMessage("*notes*");
+            .WithMessage("*agent*");
+    }
+
+    [Fact]
+    public void UpdateStatus_ToContactado_ShouldNotRequireNotes()
+    {
+        var lead = CreateNewLead();
+        lead.AssignAgent(Guid.NewGuid());
+
+        var act = () => lead.UpdateStatus(LeadStatus.Contactado, null);
+
+        act.Should().NotThrow();
+        lead.Status.Should().Be(LeadStatus.Contactado);
     }
 
     [Fact]
     public void UpdateStatus_ToDemostracion_ShouldRequireVehicle()
     {
         var lead = CreateNewLead();
+        lead.AssignAgent(Guid.NewGuid());
         lead.UpdateStatus(LeadStatus.Contactado, "first contact");
 
         var act = () => lead.UpdateStatus(LeadStatus.Demostracion, null);
@@ -166,6 +186,7 @@ public class LeadTests
     public void UpdateStatus_ToDemostracion_ShouldSucceed_WhenVehicleLinked()
     {
         var lead = CreateNewLead();
+        lead.AssignAgent(Guid.NewGuid());
         lead.LinkVehicle(Guid.NewGuid());
         lead.UpdateStatus(LeadStatus.Contactado, "contacted");
 
@@ -178,6 +199,7 @@ public class LeadTests
     public void UpdateStatus_ToPerdido_ShouldRequireLossReason()
     {
         var lead = CreateNewLead();
+        lead.AssignAgent(Guid.NewGuid());
         lead.UpdateStatus(LeadStatus.Contactado, "contacted");
 
         var act = () => lead.UpdateStatus(LeadStatus.Perdido, null, null);
@@ -190,6 +212,7 @@ public class LeadTests
     public void UpdateStatus_ToPerdido_ShouldSucceed_WhenLossReasonProvided()
     {
         var lead = CreateNewLead();
+        lead.AssignAgent(Guid.NewGuid());
         lead.UpdateStatus(LeadStatus.Contactado, "contacted");
 
         var act = () => lead.UpdateStatus(LeadStatus.Perdido, null, LeadLossReason.Precio);
@@ -202,6 +225,7 @@ public class LeadTests
     public void UpdateStatus_ShouldThrow_WhenMovingBackward_FromGanado()
     {
         var lead = CreateNewLead();
+        lead.AssignAgent(Guid.NewGuid());
         lead.LinkVehicle(Guid.NewGuid());
         lead.UpdateStatus(LeadStatus.Contactado, "contacted");
         lead.UpdateStatus(LeadStatus.Demostracion, null);

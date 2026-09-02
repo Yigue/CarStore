@@ -37,6 +37,13 @@ public class UpdateStatusNullabilityTests
                 "555111",
                 Domain.Leads.LeadSource.Web,
                 DateTime.UtcNow);
+            // Contactado requires an owner, and this class exercises the nullability of
+            // newStatus rather than that rule — so give the lead an agent up front.
+            var agent = await db.Users
+                .IgnoreQueryFilters()
+                .FirstAsync(u => u.DealerId == Guid.Parse(CustomWebApplicationFactory.AdminDealerId));
+            lead.AssignAgent(agent.Id);
+
             db.Leads.Add(lead);
             await db.SaveChangesAsync();
             leadId = lead.Id;

@@ -27,6 +27,11 @@ internal sealed class GetQuotesQueryHandler(IApplicationDbContext context)
             source = source.Where(q => q.LeadId == leadId);
         }
 
+        if (query.CarId is { } carId)
+        {
+            source = source.Where(q => q.CarId == carId);
+        }
+
         List<QuoteResponse> quotes = await source
             .Include(q => q.Car)
                 .ThenInclude(c => c.Marca)

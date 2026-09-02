@@ -8,6 +8,18 @@ public sealed class Document : Entity
 {
     public Guid? ClientId { get; private set; }
     public Client? Client { get; private set; }
+
+    /// <summary>
+    /// The sale this document belongs to, when it was uploaded as part of closing a deal.
+    ///
+    /// <para>
+    /// A document used to hang off the client only, so paperwork that belongs to one specific
+    /// transaction — the signed contract, the transfer form, the invoice — piled up on the
+    /// person with nothing saying which purchase it was for. Nullable and independent of
+    /// <see cref="ClientId"/>: a document can belong to the client, to the sale, or to both.
+    /// </para>
+    /// </summary>
+    public Guid? SaleId { get; private set; }
     public DocumentType Type { get; private set; }
     public DocumentStatus OcrStatus { get; private set; }   // Named OcrStatus to match config
     public string BlobName { get; private set; }              // Named BlobName to match config
@@ -27,12 +39,14 @@ public sealed class Document : Entity
         string blobName,
         string fileName,
         string contentType,
-        Guid dealerId)
+        Guid dealerId,
+        Guid? saleId = null)
     {
         var doc = new Document
         {
             Id = Guid.NewGuid(),
             ClientId = clientId,
+            SaleId = saleId,
             Type = type,
             OcrStatus = DocumentStatus.Pending,
             BlobName = blobName,
@@ -111,6 +125,18 @@ public sealed class Document : Entity
     {
         get => BlobName;
         private set => BlobName = value;
+    }
+
+    /// <summary>
+    /// Attaches this document to a sale. Idempotent and non-destructive: the client link, if
+    /// any, is kept — the paperwork belongs to the person and to the transaction at once.
+    /// </summary>
+    public void AttachToSale(Guid saleId)
+    {
+        if (saleId == Guid.Empty)
+            throw new DomainException("SaleId cannot be empty when attaching a document to a sale");
+
+        SaleId = saleId;
     }
 }
 

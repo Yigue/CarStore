@@ -127,7 +127,8 @@ public class CreateClientFromLeadOnNegociacionHandlerTests
         var updatedQuote = await context.Quotes.FindAsync(quote.Id);
 
         updatedQuote!.ClientId.Should().Be(updatedLead!.ConvertedClientId);
-        updatedQuote.LeadId.Should().BeNull("AssignClient must clear LeadId to preserve the exactly-one-party invariant");
+        updatedQuote.LeadId.Should().Be(lead.Id,
+            "attaching the client keeps the enquiry the deal came from — the quote belongs to the person, not to one of the two records");
     }
 
     [Fact]

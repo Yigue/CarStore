@@ -74,11 +74,21 @@ public class DeleteQuoteCommandHandlerTests
         result.Error.Should().Be(QuoteErrors.NotFound(missingId));
     }
 
+    // ── Who actually holds the reservation ────────────────────────────────────────────────
+    //
+    // A Pending quote is an offer and holds nothing. The reservation belongs to the ACCEPTED
+    // quote. Releasing the car when a Pending quote goes away was harmless while only one quote
+    // per car could exist; now that several can, it would free a unit another buyer already
+    // committed to — the loser's withdrawal cancelling the winner's hold.
+
     [Fact]
-    public async Task Handle_Should_ReleaseCar_WhenDeletingPendingQuote()
+    public async Task Handle_Should_ReleaseCar_WhenDeletingAnAcceptedQuote()
     {
         using var context = CreateContext();
-        var (quote, car) = await SeedQuoteAsync(context, StatusServiceCar.Reservado);
+        var (quote, car) = await SeedQuoteAsync(
+            context,
+            StatusServiceCar.Reservado,
+            q => q.Accept(DateTime.UtcNow));
         var dateProvider = new FakeDateTimeProvider();
         var handler = new DeleteQuoteCommandHandler(context, dateProvider);
 
@@ -90,7 +100,24 @@ public class DeleteQuoteCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_NotReleaseCar_WhenQuoteNotPending()
+    public async Task Handle_Should_NotReleaseCar_WhenDeletingAPendingQuote()
+    {
+        // The car is Reservado because SOMEONE ELSE's quote was accepted. Deleting this losing
+        // offer must not hand the unit back to the floor.
+        using var context = CreateContext();
+        var (quote, car) = await SeedQuoteAsync(context, StatusServiceCar.Reservado);
+        var dateProvider = new FakeDateTimeProvider();
+        var handler = new DeleteQuoteCommandHandler(context, dateProvider);
+
+        var result = await handler.Handle(new DeleteQuoteCommand(quote.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var persistedCar = await context.Cars.SingleAsync(c => c.Id == car.Id);
+        persistedCar.ServiceCar.Should().Be(StatusServiceCar.Reservado);
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotReleaseCar_WhenQuoteWasRejected()
     {
         using var context = CreateContext();
         var (quote, car) = await SeedQuoteAsync(

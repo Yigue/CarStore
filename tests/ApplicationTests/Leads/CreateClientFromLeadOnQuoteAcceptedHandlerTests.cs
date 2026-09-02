@@ -68,7 +68,7 @@ public class CreateClientFromLeadOnQuoteAcceptedHandlerTests
 
         var updatedQuote = await context.Quotes.FindAsync(quote.Id);
         updatedQuote!.ClientId.Should().Be(client.Id);
-        updatedQuote.LeadId.Should().BeNull();
+        updatedQuote.LeadId.Should().NotBeNull("the quote keeps the enquiry it came from after conversion");
     }
 
     [Fact]

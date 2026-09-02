@@ -30,7 +30,8 @@ internal sealed class UpdateLeadStatusCommandHandler(
         // Deliberately scoped to this command, the user-driven path. Lead.ForceStatus stays free —
         // it is what the artifact's own handler calls to advance the lead once the appointment,
         // quote or sale is actually created, and that is the path the UI now takes.
-        Error? missingArtifact = await FindMissingArtifactAsync(lead.Id, command.NewStatus, cancellationToken);
+        Error? missingArtifact = await FindMissingArtifactAsync(
+            lead.Id, lead.AssignedAgentId is not null, command.NewStatus, cancellationToken);
         if (missingArtifact is not null)
         {
             return Result.Failure(missingArtifact);
@@ -52,15 +53,19 @@ internal sealed class UpdateLeadStatusCommandHandler(
     }
 
     /// <summary>
-    /// The error for the artifact this stage needs and does not have, or null when the transition
-    /// is allowed. Stages with no artifact requirement — Contactado, Perdido, Archivado — are
-    /// already guarded inside <see cref="Lead.UpdateStatus"/> by notes and loss reason.
+    /// The error for the thing this stage needs and does not have, or null when the transition
+    /// is allowed. Contactado's requirement is an owner rather than a record, but it belongs in
+    /// the same list: naming it here returns a code the UI can map to actionable copy, instead
+    /// of the raw DomainException text the catch above wraps as the generic Lead.DomainError.
     /// </summary>
     private async Task<Error?> FindMissingArtifactAsync(
         Guid leadId,
+        bool hasAssignedAgent,
         LeadStatus? newStatus,
         CancellationToken cancellationToken) => newStatus switch
     {
+        LeadStatus.Contactado when !hasAssignedAgent
+            => LeadErrors.RequiresAssignedAgent,
         LeadStatus.Demostracion when !await HasAppointmentAsync(leadId, cancellationToken)
             => LeadErrors.DemoRequiresAppointment,
         LeadStatus.Negociacion when !await HasQuoteAsync(leadId, cancellationToken)

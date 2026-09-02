@@ -69,7 +69,7 @@ public class ConvertLeadAcceptsTypeIntegrationTests
     }
 
     [Fact]
-    public async Task ConvertLead_EmitsExactlyOneGanadoEvent_InOutbox()
+    public async Task ConvertLead_EmitsNoGanadoEvent_InOutbox()
     {
         // Arrange
         await using var factory = new CustomWebApplicationFactory();
@@ -85,13 +85,17 @@ public class ConvertLeadAcceptsTypeIntegrationTests
         var response = await httpClient.PostAsJsonAsync($"/api/v1/leads/{leadId}/convert", payload, IntegrationTestHelpers.JsonOptions);
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        // Assert: exactly ONE LeadStatusChangedDomainEvent with NewStatus=Ganado in the outbox
-        // FOR THIS LEAD. Scoped by AggregateId==leadId per the test's documented intent
-        // ("per convert call" — i.e. this lead's own conversion emits exactly one event;
-        // it still catches the duplicate-emission bug this test guards against, since a
-        // double-emit on THIS lead would still yield count=2 for its own AggregateId).
-        // Unscoped, this assertion would also count unrelated Ganado leads seeded by
-        // DevDataSeeder (a legitimate dev fixture, not a bug) sharing the same in-memory DB.
+        // Assert: NO LeadStatusChangedDomainEvent with NewStatus=Ganado for this lead.
+        //
+        // This test used to demand exactly one, from back when converting a lead also closed the
+        // deal. REQ-2.3 removed that path on purpose — registering someone as a client says
+        // nothing about whether they bought — and ArchitectureTests.SinglePathToWonTests now
+        // fails the build if any handler other than the three sale-driven ones writes Ganado.
+        // The assertion was left behind and had been red ever since; inverting it is what makes
+        // it agree with the rule the codebase actually enforces.
+        //
+        // Scoped by AggregateId==leadId: unscoped, this would also count the Ganado lead
+        // DevDataSeeder creates (a legitimate fixture) in the same in-memory DB.
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
@@ -121,7 +125,7 @@ public class ConvertLeadAcceptsTypeIntegrationTests
             })
             .ToList();
 
-        ganadoEvents.Should().HaveCount(1,
-            "exactly one LeadStatusChangedDomainEvent with NewStatus=Ganado must be written to the outbox per convert call");
+        ganadoEvents.Should().BeEmpty(
+            "converting a lead into a client must not close the deal — Ganado follows a registered sale (REQ-2.3)");
     }
 }

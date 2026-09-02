@@ -24,10 +24,11 @@ internal sealed class DeleteQuoteCommandHandler(
         // query filter. This is an admin action and is allowed regardless of quote status.
         quote.Delete(dateTimeProvider.UtcNow);
 
-        // REQ-QT-LEAK-001: release the reservation only for Pending quotes — the only
-        // status that holds a live reservation. Mirrors RejectQuoteCommandHandler
-        // (idempotent via Car.Release).
-        if (quote.Status == QuoteStatus.Pending)
+        // Release only for an ACCEPTED quote — the only status that holds a live reservation
+        // since the hold moved from creation to acceptance. A Pending quote is one offer among
+        // several; releasing on its behalf would free a car another buyer already committed to.
+        // Idempotent via Car.Release, which no-ops on anything but Reservado.
+        if (quote.Status == QuoteStatus.Accepted)
         {
             var car = await context.Cars
                 .SingleOrDefaultAsync(c => c.Id == quote.CarId, cancellationToken);

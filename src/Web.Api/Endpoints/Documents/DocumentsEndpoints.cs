@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Application.Documents.Commands.UploadDocument;
 using Application.Documents.Commands.VerifyDocument;
 using Application.Documents.Queries.GetClientDocuments;
+using Application.Documents.Queries.GetSaleDocuments;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -35,6 +36,9 @@ public class DocumentEndpoints : IEndpoint
 
         group.MapGet("/client/{clientId:guid}", GetClientDocuments)
             .WithName("GetClientDocuments");
+
+        group.MapGet("/sale/{saleId:guid}", GetSaleDocuments)
+            .WithName("GetSaleDocuments");
     }
 
     private static async Task<IResult> UploadDocument(
@@ -43,11 +47,12 @@ public class DocumentEndpoints : IEndpoint
         CancellationToken cancellationToken)
     {
         var command = new UploadDocumentCommand(
-            request.ClientId,
-            request.Type,
-            request.Base64Content,
-            request.FileName,
-            request.ContentType);
+            ClientId: request.ClientId,
+            Type: request.Type,
+            Base64Content: request.Base64Content,
+            FileName: request.FileName,
+            ContentType: request.ContentType,
+            SaleId: request.SaleId);
 
         var result = await sender.Send(command, cancellationToken);
 
@@ -72,6 +77,19 @@ public class DocumentEndpoints : IEndpoint
             CustomResults.Problem);
     }
 
+    private static async Task<IResult> GetSaleDocuments(
+        Guid saleId,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var query = new GetSaleDocumentsQuery(saleId);
+        var result = await sender.Send(query, cancellationToken);
+
+        return result.Match(
+            Results.Ok,
+            CustomResults.Problem);
+    }
+
     private static async Task<IResult> GetClientDocuments(
         Guid clientId,
         ISender sender,
@@ -91,5 +109,6 @@ public sealed record UploadDocumentRequest(
     Domain.Documents.DocumentType Type,
     string Base64Content,
     string FileName,
-    string ContentType
+    string ContentType,
+    Guid? SaleId = null
 );

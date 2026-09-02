@@ -22,6 +22,7 @@ internal sealed class Upload : IEndpoint
             async (
                 IFormFile file,
                 [FromQuery] Guid? clientId,
+                [FromQuery] Guid? saleId,
                 ISender sender,
                 CancellationToken ct) =>
             {
@@ -40,7 +41,8 @@ internal sealed class Upload : IEndpoint
                     FileStream: stream,
                     ContentType: file.ContentType,
                     FileName: file.FileName,
-                    ClientId: clientId);
+                    ClientId: clientId,
+                    SaleId: saleId);
 
                 Result<VerifyDocumentResultDto> result = await sender.Send(command, ct);
 

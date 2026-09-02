@@ -41,6 +41,7 @@ public class SinglePathToWonTests
     {
         ["UpdateLeadStatusFromSaleHandler.cs"] = "observes SaleCompletedDomainEvent — the sale is the trigger",
         ["UpdateLeadStatusCommandHandler.cs"] = "refuses the command unless HasSaleAsync finds one",
+        ["CreateSaleCommandHandler.cs"] = "creates the sale",
     };
 
     /// <summary>Methods that write the stage. Reading it — a comparison — is always fine.</summary>

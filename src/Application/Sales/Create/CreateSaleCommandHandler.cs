@@ -6,6 +6,7 @@ using Domain.Cars.Attributes;
 using Domain.Cars.Events;
 using Domain.Clients;
 using Domain.Clients.Attributes;
+using Domain.Leads;
 using Domain.Quotes;
 using Domain.Quotes.Attributes;
 using Domain.Sales;
@@ -142,6 +143,15 @@ internal sealed class CreateSaleCommandHandler(
             if (car.ServiceCar == StatusServiceCar.Disponible)
             {
                 car.Reserve(dateTimeProvider.UtcNow);
+            }
+        }
+
+        if (command.LeadId is { } saleLeadId)
+        {
+            Lead? lead = await context.Leads.FirstOrDefaultAsync(l => l.Id == saleLeadId, cancellationToken);
+            if (lead is not null && lead.Status != LeadStatus.Ganado)
+            {
+                lead.ForceStatus(LeadStatus.Ganado);
             }
         }
 

@@ -26,9 +26,13 @@ internal sealed class ConvertLeadToClientCommandHandler(
         // Compare the Email value object directly (not .Value) so EF translates it
         // through the value converter — `c.Email.Value == ...` is not translatable
         // against the relational provider and throws at runtime.
+        // The email fallback is scoped to the lead's own dealership. Sharing an email address
+        // across dealerships is the normal case — one person shops at several — so an unscoped
+        // match would hand this lead another dealership's customer record.
         var existingClient = lead.ConvertedClientId is { } convertedClientId
             ? await context.Clients.FirstOrDefaultAsync(c => c.Id == convertedClientId, cancellationToken)
-            : await context.Clients.FirstOrDefaultAsync(c => c.Email == lead.Email, cancellationToken);
+            : await context.Clients.FirstOrDefaultAsync(
+                c => c.Email == lead.Email && c.DealerId == lead.DealerId, cancellationToken);
 
         Client targetClient;
 
@@ -59,6 +63,10 @@ internal sealed class ConvertLeadToClientCommandHandler(
 
         // ADR-2: activate inline — deterministic, the client reference is already loaded here.
         targetClient.Activate();
+
+        // A reused client is not born knowing where it came from. Without this, every rule that
+        // walks back from the client to its lead finds nothing.
+        targetClient.LinkOriginLead(lead.Id);
 
         lead.MarkConverted(targetClient.Id);
 

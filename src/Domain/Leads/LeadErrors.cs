@@ -45,4 +45,14 @@ public static class LeadErrors
     public static readonly Error NegotiationRequiresQuote = Error.Problem(
         "Leads.NegotiationRequiresQuote",
         "Para pasar el lead a Negociación primero generá la cotización.");
+
+    /// <summary>
+    /// Contactado means a person owns this lead from here on. The gate used to be "notes were
+    /// typed", which recorded that someone wrote something without ever saying who is
+    /// responsible for the follow-up — leaving the lead ownerless in the one stage that implies
+    /// an owner.
+    /// </summary>
+    public static readonly Error RequiresAssignedAgent = Error.Problem(
+        "Leads.RequiresAssignedAgent",
+        "Para pasar el lead a Contactado primero asigná un agente responsable.");
 }

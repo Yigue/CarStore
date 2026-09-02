@@ -145,7 +145,20 @@ internal static class DevDataSeeder
             var lead1 = Lead.Create(DefaultDealerId, "Roberto Sanchez", "roberto@email.com", "+54 11 9999-8888", LeadSource.Portal, DateTime.UtcNow.AddDays(-2), toyota?.Id);
             
             var lead2 = Lead.Create(DefaultDealerId, "Laura Gomez", "laura.g@email.com", "+54 11 7777-6666", LeadSource.Otro, DateTime.UtcNow.AddDays(-3), hilux?.Id);
-            lead2.UpdateStatus(LeadStatus.Contactado, "Interesada en Hilux para trabajo en campo.");
+
+            // Contactado requires an owner. UsersSeeder runs before this one (DatabaseSeeder),
+            // so there is someone to hand the follow-up to; if the dealership has no users yet
+            // the lead stays Nuevo rather than landing in a stage that implies an owner it
+            // does not have.
+            var seedAgent = await context.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.DealerId == DefaultDealerId, cancellationToken);
+
+            if (seedAgent is not null)
+            {
+                lead2.AssignAgent(seedAgent.Id);
+                lead2.UpdateStatus(LeadStatus.Contactado, "Interesada en Hilux para trabajo en campo.");
+            }
 
             var lead3 = Lead.Create(DefaultDealerId, "Diego Maradona", "diego@email.com", "+54 11 1010-1010", LeadSource.Web, DateTime.UtcNow.AddDays(-5));
             lead3.ForceStatus(LeadStatus.Ganado);

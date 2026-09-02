@@ -7,6 +7,7 @@ using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
 using Domain.Clients;
 using Domain.Documents;
+using Domain.Sales;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -56,6 +57,16 @@ internal sealed class UploadDocumentCommandHandler : IRequestHandler<UploadDocum
             return Result.Failure<Guid>(ClientErrors.NotFound(request.ClientId));
         }
 
+        if (request.SaleId is { } saleId)
+        {
+            var saleExists = await _context.Sales.AnyAsync(s => s.Id == saleId, ct);
+
+            if (!saleExists)
+            {
+                return Result.Failure<Guid>(SalesErrors.NotFound(saleId));
+            }
+        }
+
         using var stream = new MemoryStream(bytes);
 
         string objectKey = $"documents/{_tenant.DealerId}/{request.ClientId}/{Guid.NewGuid()}_{request.FileName}";
@@ -68,7 +79,8 @@ internal sealed class UploadDocumentCommandHandler : IRequestHandler<UploadDocum
             blobName: objectKey,
             fileName: request.FileName,
             contentType: request.ContentType,
-            dealerId: _tenant.DealerId);
+            dealerId: _tenant.DealerId,
+            saleId: request.SaleId);
 
         // Since OCR is ignored, we verify the document directly
         document.MarkAsVerified(new OcrExtractedData(

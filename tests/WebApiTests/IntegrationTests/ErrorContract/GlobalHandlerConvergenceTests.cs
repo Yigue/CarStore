@@ -110,9 +110,14 @@ public class GlobalHandlerConvergenceTests
         var (factory, client) = await CreateAuthenticatedHostAsync("Testing");
         await using var _ = factory;
 
-        // A fresh lead (Nuevo) moving to Contactado without notes fails Lead.UpdateStatus's
-        // "Moving to Contactado requires notes" guard, raising DomainException — mapped to 400
-        // by the handler's first, unchanged arm.
+        // A lead moving to Perdido without a loss reason fails Lead.UpdateStatus's guard,
+        // raising DomainException — mapped to 400 by the handler's first, unchanged arm.
+        //
+        // Perdido is used deliberately: it is the one transition the command handler does not
+        // pre-check, so the exception really does come from the aggregate. The Contactado path
+        // this test used to take is now caught earlier and returned as a typed
+        // Leads.RequiresAssignedAgent failure, which is also a 400 but proves nothing about
+        // exception mapping.
         Guid leadId;
         using (var scope = factory.Services.CreateScope())
         {
@@ -131,7 +136,7 @@ public class GlobalHandlerConvergenceTests
 
         var response = await client.PatchAsJsonAsync(
             $"/api/v1/leads/{leadId}/status",
-            new { NewStatus = "Contactado" });
+            new { NewStatus = "Perdido" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
             "DomainException must still map to 400 — unchanged regression guard");
