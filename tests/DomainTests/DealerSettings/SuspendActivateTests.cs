@@ -96,11 +96,31 @@ public class SuspendActivateTests
         dealer.Suspend("reason", Guid.NewGuid(), DateTime.UtcNow);
         dealer.ClearDomainEvents();
 
-        dealer.Activate();
+        dealer.Activate(Guid.NewGuid(), DateTime.UtcNow);
 
         dealer.IsActive.Should().BeTrue();
         dealer.SuspendedAt.Should().BeNull();
         dealer.SuspendReason.Should().BeNull();
+    }
+
+    [Fact]
+    public void Activate_WithActor_RaisesEventCarryingActorAndTimestamp()
+    {
+        var dealer = CreateDealer();
+        dealer.Suspend("reason", Guid.NewGuid(), DateTime.UtcNow);
+        dealer.ClearDomainEvents();
+        var actorId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dealer.Activate(actorId, now);
+
+        var ev = dealer.DomainEvents
+            .OfType<DealerReactivatedDomainEvent>()
+            .Should().ContainSingle().Subject;
+
+        ev.DealerId.Should().Be(dealer.Id);
+        ev.ActorId.Should().Be(actorId);
+        ev.ReactivatedAtUtc.Should().Be(now);
     }
 
     [Fact]
@@ -109,8 +129,9 @@ public class SuspendActivateTests
         var dealer = CreateDealer();
         dealer.Suspend("reason", Guid.NewGuid(), DateTime.UtcNow);
         dealer.ClearDomainEvents();
+        var actorId = Guid.NewGuid();
 
-        dealer.Activate();
+        dealer.Activate(actorId, DateTime.UtcNow);
 
         dealer.DomainEvents
             .OfType<DealerReactivatedDomainEvent>()
@@ -125,7 +146,7 @@ public class SuspendActivateTests
     {
         var dealer = CreateDealer();
 
-        dealer.Activate(); // already active
+        dealer.Activate(Guid.NewGuid(), DateTime.UtcNow); // already active
 
         dealer.IsActive.Should().BeTrue();
         dealer.DomainEvents.OfType<DealerReactivatedDomainEvent>().Should().BeEmpty();

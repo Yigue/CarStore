@@ -73,8 +73,9 @@ public class OutboxHandlerTenantScopeTests
         {
             string source = File.ReadAllText(file);
 
-            // Only the handlers that run off the outbox.
-            if (!source.Contains("INotificationHandler", StringComparison.Ordinal))
+            // Only the handlers and recorders that run off the outbox.
+            if (!source.Contains("INotificationHandler", StringComparison.Ordinal) &&
+                !Path.GetFileName(file).EndsWith("Recorder.cs", StringComparison.Ordinal))
             {
                 continue;
             }

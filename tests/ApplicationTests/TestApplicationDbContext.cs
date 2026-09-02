@@ -57,6 +57,12 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+    public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs => Set<Domain.Platform.PlatformAuditLogEntry>();
+
+    public void DetachEntity(object entity)
+    {
+        Entry(entity).State = EntityState.Detached;
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

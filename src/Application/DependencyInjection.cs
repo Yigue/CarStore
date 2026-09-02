@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.Behaviors;
+using Application.Abstractions.Behaviors;
 using Application.Leads.Activity;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +22,7 @@ public static class DependencyInjection
         // Shared write path for the lead timeline, injected into the notification handlers that
         // populate it. Scoped so it joins the same unit of work as the handler that uses it.
         services.AddScoped<LeadActivityRecorder>();
+        services.AddScoped<Application.Platform.AuditLogs.PlatformAuditLogRecorder>();
 
         return services;
     }

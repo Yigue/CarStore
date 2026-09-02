@@ -24,7 +24,7 @@ internal sealed class ActivateDealerCommandHandler(IApplicationDbContext context
         if (currentETag != command.ETag)
             return Result.Failure<PlatformDealerResponse>(PlatformErrors.ETagMismatch);
 
-        dealer.Activate();
+        dealer.Activate(command.ActorId, DateTime.UtcNow);
         await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(MapToResponse(dealer));

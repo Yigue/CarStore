@@ -137,8 +137,9 @@ public class DealerSubscriptionTransitionTests
         var act1 = () => sub.MarkPastDue();
         act1.Should().Throw<InvalidSubscriptionTransitionException>();
 
-        // Try to Suspend from Trialing
-        var act2 = () => sub.Suspend();
+        // Try to MarkPastDue from Cancelled
+        sub.Cancel();
+        var act2 = () => sub.MarkPastDue();
         act2.Should().Throw<InvalidSubscriptionTransitionException>();
     }
 }

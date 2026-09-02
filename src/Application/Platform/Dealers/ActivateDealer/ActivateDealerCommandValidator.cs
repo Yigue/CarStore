@@ -8,5 +8,6 @@ internal sealed class ActivateDealerCommandValidator : AbstractValidator<Activat
     {
         RuleFor(x => x.DealerId).NotEmpty();
         RuleFor(x => x.ETag).NotEmpty();
+        RuleFor(x => x.ActorId).NotEmpty();
     }
 }

@@ -254,18 +254,17 @@ public sealed class DealerSettings : Entity
     /// <summary>
     /// Reactivates the dealer. Idempotent: calling on an already-active dealer is a no-op.
     /// </summary>
-    public void Activate()
+    public void Activate(Guid actorId, DateTime utcNow)
     {
         if (IsActive)
             return; // idempotent
 
-        var reactivatedAt = DateTime.UtcNow;
         IsActive = true;
         SuspendedAt = null;
         SuspendReason = null;
-        UpdatedAt = reactivatedAt;
+        UpdatedAt = utcNow;
 
-        Raise(new DealerReactivatedDomainEvent(Id, reactivatedAt));
+        Raise(new DealerReactivatedDomainEvent(Id, actorId, utcNow));
     }
 
     public void SetStripeCustomerId(string? stripeCustomerId)

@@ -1,3 +1,4 @@
+using Application.Abstractions.Authentication;
 using Application.Platform.Common;
 using Application.Platform.Dealers.ActivateDealer;
 using MediatR;
@@ -15,12 +16,16 @@ internal sealed class ActivateDealer : IEndpoint
             async (
                 Guid dealerId,
                 HttpRequest httpRequest,
+                IUserContext userContext,
                 ISender sender,
                 CancellationToken ct) =>
             {
                 var eTag = httpRequest.Headers["If-Match"].FirstOrDefault() ?? string.Empty;
 
-                var command = new ActivateDealerCommand(dealerId, eTag);
+                var command = new ActivateDealerCommand(
+                    DealerId: dealerId,
+                    ETag: eTag,
+                    ActorId: userContext.UserId);
                 Result<PlatformDealerResponse> result = await sender.Send(command, ct);
 
                 return result.Match(

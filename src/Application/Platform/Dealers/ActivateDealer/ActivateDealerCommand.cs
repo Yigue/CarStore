@@ -5,4 +5,5 @@ namespace Application.Platform.Dealers.ActivateDealer;
 
 public sealed record ActivateDealerCommand(
     Guid DealerId,
-    string ETag) : ICommand<PlatformDealerResponse>;
+    string ETag,
+    Guid ActorId) : ICommand<PlatformDealerResponse>;

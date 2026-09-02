@@ -1,3 +1,4 @@
+using Application.Abstractions.Authentication;
 using Application.Platform.Common;
 using Application.Platform.Dealers.SuspendDealer;
 using MediatR;
@@ -22,13 +23,18 @@ internal sealed class SuspendDealer : IEndpoint
                 Guid dealerId,
                 [FromBody] Request request,
                 HttpRequest httpRequest,
+                IUserContext userContext,
                 ISender sender,
                 CancellationToken ct) =>
             {
                 // ETag is sent via If-Match header; fall back to empty string if absent.
                 var eTag = httpRequest.Headers["If-Match"].FirstOrDefault() ?? string.Empty;
 
-                var command = new SuspendDealerCommand(dealerId, request.Reason, eTag);
+                var command = new SuspendDealerCommand(
+                    DealerId: dealerId,
+                    Reason: request.Reason,
+                    ETag: eTag,
+                    ActorId: userContext.UserId);
                 Result<PlatformDealerResponse> result = await sender.Send(command, ct);
 
                 return result.Match(

@@ -9,5 +9,6 @@ internal sealed class SuspendDealerCommandValidator : AbstractValidator<SuspendD
         RuleFor(x => x.DealerId).NotEmpty();
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
         RuleFor(x => x.ETag).NotEmpty();
+        RuleFor(x => x.ActorId).NotEmpty();
     }
 }

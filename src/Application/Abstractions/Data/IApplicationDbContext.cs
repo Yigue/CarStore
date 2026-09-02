@@ -47,7 +47,9 @@ public interface IApplicationDbContext
     DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; }
     DbSet<WebhookSubscription> WebhookSubscriptions { get; }
     DbSet<WebhookDelivery> WebhookDeliveries { get; }
+    DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; }
 
+    void DetachEntity(object entity);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 

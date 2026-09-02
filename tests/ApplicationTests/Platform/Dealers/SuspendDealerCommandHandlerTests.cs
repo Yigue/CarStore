@@ -44,7 +44,7 @@ public class SuspendDealerCommandHandlerTests
         using var context = CreateContext();
         var dealer = SeedDealer(context);
 
-        var command = new SuspendDealerCommand(dealer.Id, "Non-payment", "v0");
+        var command = new SuspendDealerCommand(dealer.Id, "Non-payment", "v0", Guid.NewGuid());
         var handler = new SuspendDealerCommandHandler(context);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -60,7 +60,7 @@ public class SuspendDealerCommandHandlerTests
         using var context = CreateContext();
         var dealer = SeedDealer(context);
 
-        var command = new SuspendDealerCommand(dealer.Id, "", "v0");
+        var command = new SuspendDealerCommand(dealer.Id, "", "v0", Guid.NewGuid());
         var handler = new SuspendDealerCommandHandler(context);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -74,7 +74,7 @@ public class SuspendDealerCommandHandlerTests
     {
         using var context = CreateContext();
 
-        var command = new SuspendDealerCommand(Guid.NewGuid(), "reason", "v0");
+        var command = new SuspendDealerCommand(Guid.NewGuid(), "reason", "v0", Guid.NewGuid());
         var handler = new SuspendDealerCommandHandler(context);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -91,7 +91,7 @@ public class SuspendDealerCommandHandlerTests
         // RowVersion = 0 in InMemory, so ETag = "v0"
         // Send "v1" which doesn't match "v0" → 412
 
-        var command = new SuspendDealerCommand(dealer.Id, "reason", "v1");
+        var command = new SuspendDealerCommand(dealer.Id, "reason", "v1", Guid.NewGuid());
         var handler = new SuspendDealerCommandHandler(context);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -106,7 +106,7 @@ public class SuspendDealerCommandHandlerTests
         using var context = CreateContext();
         var dealer = SeedDealer(context, isActive: false);
 
-        var command = new SuspendDealerCommand(dealer.Id, "Second reason", "v0");
+        var command = new SuspendDealerCommand(dealer.Id, "Second reason", "v0", Guid.NewGuid());
         var handler = new SuspendDealerCommandHandler(context);
 
         var result = await handler.Handle(command, CancellationToken.None);

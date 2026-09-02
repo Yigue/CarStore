@@ -39,7 +39,7 @@ public class ActivateDealerCommandHandlerTests
         using var context = CreateContext();
         var dealer = SeedDealer(context, isActive: false);
 
-        var command = new ActivateDealerCommand(dealer.Id, "v0");
+        var command = new ActivateDealerCommand(dealer.Id, "v0", Guid.NewGuid());
         var handler = new ActivateDealerCommandHandler(context);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -56,7 +56,7 @@ public class ActivateDealerCommandHandlerTests
         using var context = CreateContext();
         var dealer = SeedDealer(context, isActive: true);
 
-        var command = new ActivateDealerCommand(dealer.Id, "v0");
+        var command = new ActivateDealerCommand(dealer.Id, "v0", Guid.NewGuid());
         var handler = new ActivateDealerCommandHandler(context);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -71,7 +71,7 @@ public class ActivateDealerCommandHandlerTests
         using var context = CreateContext();
         var dealer = SeedDealer(context, isActive: false);
 
-        var command = new ActivateDealerCommand(dealer.Id, "v999");
+        var command = new ActivateDealerCommand(dealer.Id, "v999", Guid.NewGuid());
         var handler = new ActivateDealerCommandHandler(context);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -85,12 +85,42 @@ public class ActivateDealerCommandHandlerTests
     {
         using var context = CreateContext();
 
-        var command = new ActivateDealerCommand(Guid.NewGuid(), "v0");
+        var command = new ActivateDealerCommand(Guid.NewGuid(), "v0", Guid.NewGuid());
         var handler = new ActivateDealerCommandHandler(context);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Type.Should().Be(SharedKernel.ErrorType.NotFound);
+    }
+
+    [Fact]
+    public void ActivateDealerCommandValidator_RejectsEmptyActorId()
+    {
+        var validator = new ActivateDealerCommandValidator();
+        var command = new ActivateDealerCommand(Guid.NewGuid(), "v0", Guid.Empty);
+
+        var result = validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(ActivateDealerCommand.ActorId));
+    }
+
+    [Fact]
+    public async Task ActivateDealerCommandHandler_PassesActorToDomain()
+    {
+        using var context = CreateContext();
+        var dealer = SeedDealer(context, isActive: false);
+        var actorId = Guid.NewGuid();
+
+        var command = new ActivateDealerCommand(dealer.Id, "v0", actorId);
+        var handler = new ActivateDealerCommandHandler(context);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var ev = dealer.DomainEvents.OfType<Domain.DealerSettings.Events.DealerReactivatedDomainEvent>().SingleOrDefault();
+        ev.Should().NotBeNull();
+        ev!.ActorId.Should().Be(actorId);
     }
 }

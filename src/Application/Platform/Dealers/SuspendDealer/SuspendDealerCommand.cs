@@ -7,4 +7,4 @@ public sealed record SuspendDealerCommand(
     Guid DealerId,
     string Reason,
     string ETag,
-    Guid ActorId = default) : ICommand<PlatformDealerResponse>;
+    Guid ActorId) : ICommand<PlatformDealerResponse>;

@@ -6,4 +6,5 @@ internal static class Permissions
     internal const string DealersSuspend = "platform:dealers:suspend";
     internal const string DealersActivate = "platform:dealers:activate";
     internal const string MetricsRead = "platform:metrics:read";
+    internal const string AuditLogsRead = "platform:audit-logs:read";
 }

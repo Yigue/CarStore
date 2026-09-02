@@ -64,6 +64,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
     public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; }
     public DbSet<WebhookDelivery> WebhookDeliveries { get; set; }
+    public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -204,6 +205,11 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         optionsBuilder.ConfigureWarnings(warnings =>
             warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)
                     .Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    }
+
+    public void DetachEntity(object entity)
+    {
+        Entry(entity).State = EntityState.Detached;
     }
 
     // Implement interface methods
