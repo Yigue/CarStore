@@ -20,6 +20,17 @@ public class SearchCarsQuery : IQuery<SearchCarsResult>
     public bool SortDescending { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 10;
+
+    /// <summary>
+    /// Narrows the result to units a buyer can still purchase.
+    ///
+    /// <para>
+    /// Opt-in on purpose. This query serves both the public catalogue — which must not advertise a
+    /// car that is already sold — and the dashboard's inventory, which has to show exactly that.
+    /// Defaulting it to true would silently empty the inventory screens.
+    /// </para>
+    /// </summary>
+    public bool OnlyPurchasable { get; set; }
 }
 
 /// <summary>

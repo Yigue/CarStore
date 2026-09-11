@@ -26,7 +26,7 @@ internal sealed class UpdateUser : IEndpoint
         {
             if (!Guid.TryParse(request.Role, out var role))
             {
-                return Results.BadRequest(new { error = "Role must be a valid value: Admin, Empleado, Cliente, Invitado" });
+                return Results.BadRequest(new { error = "Role must be the role identifier (a GUID). Call GET /api/v1/roles to list the roles available for this dealership." });
             }
 
             var command = new UpdateUserCommand(

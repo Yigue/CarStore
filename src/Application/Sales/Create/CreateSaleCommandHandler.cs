@@ -101,8 +101,12 @@ internal sealed class CreateSaleCommandHandler(
             return Result.Failure<Guid>(ClientErrors.NotFound(command.ClientId));
         }
         
-        // Validate client is active
-        if (client.Status != ClientStatus.Active)
+        // Reject only a client there is no deal to be had with. Selling is what TURNS a prospect
+        // into a client: the one created when a lead reaches Negociación is born Prospect, and
+        // Active is stamped by ActivateClientOnSaleCompletedHandler once a sale COMPLETES.
+        // Demanding Active here closed the circle — the first sale required the client to have
+        // already bought — and left every lead unable to reach Ganado from the board.
+        if (client.Status is ClientStatus.Lost or ClientStatus.Inactive)
         {
             return Result.Failure<Guid>(ClientErrors.Inactive(client.Id));
         }

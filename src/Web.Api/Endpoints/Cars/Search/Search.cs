@@ -31,7 +31,8 @@ internal sealed class Search : IEndpoint
                 SortBy = request.SortBy,
                 SortDescending = request.SortDescending ?? false,
                 Page = request.Page ?? 1,
-                PageSize = request.PageSize ?? 10
+                PageSize = request.PageSize ?? 10,
+                OnlyPurchasable = request.OnlyPurchasable ?? false
             };
 
             Result<SearchCarsResult> result = await sender.Send(query, cancellationToken);
@@ -64,4 +65,5 @@ public sealed record SearchCarsRequest(
     string? SortBy,
     bool? SortDescending,
     int? Page,
-    int? PageSize);
+    int? PageSize,
+    bool? OnlyPurchasable);

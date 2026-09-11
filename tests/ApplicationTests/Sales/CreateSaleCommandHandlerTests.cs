@@ -13,6 +13,7 @@ using Domain.Quotes;
 using Domain.Sales;
 using Domain.Sales.Attributes;
 using Domain.Sales.Events;
+using SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using QuotePaymentMethod = Domain.Quotes.Attributes.PaymentMethod;
@@ -501,5 +502,73 @@ public class CreateSaleCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         var sale = await context.Sales.FirstAsync(s => s.Id == result.Value);
         sale.SalespersonId.Should().BeNull();
+    }
+
+    // ── Con qué clientes se puede cerrar una venta ────────────────────────────────────────────
+    //
+    // La venta exigia ClientStatus.Active, y eso cerraba un ciclo sin salida: el cliente de un lead
+    // en Negociacion nace Prospect (CreateClientFromLeadOnNegociacionHandler), la venta pedia Active,
+    // y Active lo asigna ActivateClientOnSaleCompletedHandler DESPUES de completar una venta. Active
+    // significa "ya compro" — pedirlo antes de la primera venta es exigir que el negocio haya
+    // terminado para poder empezarlo.
+
+    private static async Task<Result<Guid>> SellToClientWithStatusAsync(
+        TestApplicationDbContext context,
+        Action<Client> mutateClient,
+        string patente)
+    {
+        var (car, client) = SeedCarAndClient(context, "Ford", "Ka", patente);
+        mutateClient(client);
+        await context.SaveChangesAsync();
+
+        var tenantService = new Mock<ICurrentTenantService>();
+        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var handler = new CreateSaleCommandHandler(context, new FakeDateTimeProvider(), tenantService.Object);
+
+        return await handler.Handle(
+            new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-ST", "status test"),
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenClientIsProspect()
+    {
+        using var context = CreateContext();
+
+        var result = await SellToClientWithStatusAsync(context, c => c.SetProspect(), "PRO001");
+
+        result.IsSuccess.Should().BeTrue("selling is what turns a prospect into a client");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenClientIsVip()
+    {
+        using var context = CreateContext();
+
+        var result = await SellToClientWithStatusAsync(context, c => c.SetVIP(), "VIP001");
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenClientIsLost()
+    {
+        using var context = CreateContext();
+
+        var result = await SellToClientWithStatusAsync(context, c => c.MarkAsLost(), "LOS001");
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Clients.Inactive");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenClientIsInactive()
+    {
+        using var context = CreateContext();
+
+        var result = await SellToClientWithStatusAsync(context, c => c.Deactivate(), "INA001");
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Clients.Inactive");
     }
 }

@@ -37,6 +37,14 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
             .AsQueryable();
 
         // Aplicar filtros
+        if (query.OnlyPurchasable)
+        {
+            // Vendido es la unica condicion que saca una unidad de la venta de forma definitiva.
+            // Reservado se sigue publicando: la reserva puede caerse, y esconderlo perderia
+            // interesados por una operacion que todavia no se cerro.
+            carsQuery = carsQuery.Where(c => c.ServiceCar != StatusServiceCar.Vendido);
+        }
+
         if (!string.IsNullOrWhiteSpace(query.SearchTerm))
         {
             var term = query.SearchTerm;
