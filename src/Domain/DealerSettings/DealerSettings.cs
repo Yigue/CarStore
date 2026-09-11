@@ -105,7 +105,10 @@ public sealed class DealerSettings : Entity
         InstagramUrl = instagramUrl;
         TwitterUrl = twitterUrl;
         InterestRateTna = interestRateTna;
+        Slug = hostName;
+        IsActive = true;
         LastAssignedAgentIndex = 0;
+        CreatedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
     }
 
