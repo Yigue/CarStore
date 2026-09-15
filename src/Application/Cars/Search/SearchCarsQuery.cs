@@ -31,6 +31,11 @@ public class SearchCarsQuery : IQuery<SearchCarsResult>
     /// </para>
     /// </summary>
     public bool OnlyPurchasable { get; set; }
+
+    /// <summary>
+    /// Option to filter by featured vehicles.
+    /// </summary>
+    public bool? Featured { get; set; }
 }
 
 /// <summary>

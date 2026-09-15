@@ -45,6 +45,11 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
             carsQuery = carsQuery.Where(c => c.ServiceCar != StatusServiceCar.Vendido);
         }
 
+        if (query.Featured.HasValue)
+        {
+            carsQuery = carsQuery.Where(c => c.Featured == query.Featured.Value);
+        }
+
         if (!string.IsNullOrWhiteSpace(query.SearchTerm))
         {
             var term = query.SearchTerm;
