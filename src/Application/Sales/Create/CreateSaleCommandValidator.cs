@@ -12,6 +12,10 @@ internal sealed class CreateSaleCommandValidator : AbstractValidator<CreateSaleC
         RuleFor(x => x.FinalPrice).NotEmpty().GreaterThan(0);
         RuleFor(x => x.PaymentMethod).IsInEnum();
 
+        // ContractNumber is NOT NULL at the schema level (SaleConfiguration.cs) but had no rule
+        // here — a missing value reached Postgres and came back as a raw 500 instead of a 400.
+        RuleFor(x => x.ContractNumber).NotEmpty().MaximumLength(50);
+
         // A sale cannot be created as already Cancelled — Cancelled only makes
         // sense as a transition away from a Pending sale (see Sale.Cancel).
         RuleFor(x => x.Status)

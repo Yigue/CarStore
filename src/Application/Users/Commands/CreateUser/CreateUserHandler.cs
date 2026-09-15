@@ -17,12 +17,16 @@ internal sealed class CreateUserCommandHandler(
 {
     public async Task<Result<Guid>> Handle(CreateUserCommand command, CancellationToken cancellationToken)
     {
-        var emailValue = command.Email.ToLowerInvariant().Trim();
+        var email = new Email(command.Email);
 
-        // Check for duplicate email within the tenant
+        // `u.Email.Value.ToLower()` never translates against Postgres — EF Core throws
+        // InvalidOperationException at LINQ-compile time, not a DomainException, so every call
+        // fell through to the generic 500 handler regardless of role or any other input. Email's
+        // own constructor already normalizes to lowercase, so the cast below is both the
+        // translatable form (mirrors RegisterUserCommandHandler) and the only comparison needed.
         bool emailExists = await context.Users
             .IgnoreQueryFilters()
-            .AnyAsync(u => u.Email.Value.ToLower() == emailValue && u.DealerId == tenantService.DealerId, cancellationToken);
+            .AnyAsync(u => (string)u.Email == email.Value && u.DealerId == tenantService.DealerId, cancellationToken);
 
         if (emailExists)
         {
@@ -31,7 +35,7 @@ internal sealed class CreateUserCommandHandler(
 
         var user = new User(
             tenantService.DealerId,
-            emailValue,
+            email.Value,
             command.FirstName.Trim(),
             command.LastName.Trim(),
             passwordHasher.Hash(command.Password),

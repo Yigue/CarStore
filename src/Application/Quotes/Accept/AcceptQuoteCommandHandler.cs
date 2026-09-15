@@ -18,10 +18,10 @@ internal sealed class AcceptQuoteCommandHandler(
     {
         var quote = await context.Quotes
             .SingleOrDefaultAsync(q => q.Id == command.QuoteId, cancellationToken);
-        
+
         if (quote is null)
             return Result.Failure(QuoteErrors.NotFound(command.QuoteId));
-        
+
         if (quote.ValidUntil < dateTimeProvider.UtcNow)
             return Result.Failure(QuoteErrors.Expired(command.QuoteId));
 
@@ -53,9 +53,31 @@ internal sealed class AcceptQuoteCommandHandler(
             car.Reserve(dateTimeProvider.UtcNow);
         }
 
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsCarAlreadyCommittedViolation(ex))
+        {
+            // The AnyAsync check above is read-then-write: two acceptances close enough together
+            // both pass it and both reach SaveChanges. ux_quotes_one_accepted_per_car is the real
+            // exclusivity guarantee; this catch makes its loser land on the exact same Conflict
+            // the sequential loser already gets above, instead of an unhandled 500 that depended
+            // on timing to tell two identical outcomes apart.
+            return Result.Failure(QuoteErrors.CarAlreadyCommitted(quote.CarId));
+        }
 
         return Result.Success();
     }
-}
 
+    /// <summary>
+    /// Detects a unique-index violation on ux_quotes_one_accepted_per_car. Provider-agnostic —
+    /// checks the inner exception message rather than a provider-specific error code, matching
+    /// the convention in ProvisionDealerCommandHandler.IsHostNameUniqueViolation.
+    /// </summary>
+    private static bool IsCarAlreadyCommittedViolation(DbUpdateException ex)
+    {
+        var message = ex.InnerException?.Message ?? string.Empty;
+        return message.Contains("ux_quotes_one_accepted_per_car", StringComparison.OrdinalIgnoreCase);
+    }
+}
