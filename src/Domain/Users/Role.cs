@@ -35,7 +35,7 @@ public sealed class Role : Entity
 
     public void RemovePermission(string permission)
     {
-        var existing = _permissions.FirstOrDefault(p => p.Permission == permission);
+        var existing = _permissions.Find(p => p.Permission == permission);
         if (existing is not null)
         {
             _permissions.Remove(existing);

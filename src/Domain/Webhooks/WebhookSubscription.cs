@@ -105,7 +105,7 @@ public sealed class WebhookSubscription : Entity
             throw new DomainException("Webhook secret must be at least 16 characters");
     }
 
-    private static IReadOnlyList<string> ValidateEventTypes(IReadOnlyList<string> eventTypes)
+    private static List<string> ValidateEventTypes(IReadOnlyList<string> eventTypes)
     {
         if (eventTypes is null || eventTypes.Count == 0)
             throw new DomainException("A webhook subscription must subscribe to at least one event type");

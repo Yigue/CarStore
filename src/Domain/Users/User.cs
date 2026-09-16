@@ -70,7 +70,7 @@ public sealed class User : Entity
     public DateTime CreatedAt { get; private set; }
 
     // Navigation property for permissions (configured in EF Core)
-    private readonly List<UserPermission> _permissions = [];
+    private readonly List<UserPermission> _permissions;
     public IReadOnlyCollection<UserPermission> Permissions => _permissions;
 
     public void SetPassword(string passwordHash)
@@ -123,7 +123,7 @@ public sealed class User : Entity
 
     public void RemovePermission(string permission)
     {
-        var existing = _permissions.FirstOrDefault(p => p.Permission == permission);
+        var existing = _permissions.Find(p => p.Permission == permission);
         if (existing is not null)
         {
             _permissions.Remove(existing);
