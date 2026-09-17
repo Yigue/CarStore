@@ -19,7 +19,10 @@ internal sealed class UpdateCarCommandHandler(
 {
     public async Task<Result<Guid>> Handle(UpdateCarCommand command, CancellationToken cancellationToken)
     {
+        // Include the gallery: the cover is part of what an update can change (INV-01), and
+        // reassigning it has to see every sibling to demote the previous one.
         Car? car = await context.Cars
+            .Include(c => c.Images)
             .SingleOrDefaultAsync(c => c.Id == command.Id, cancellationToken);
 
         if (car is null)
@@ -86,8 +89,47 @@ internal sealed class UpdateCarCommandHandler(
             car.MarkAsAvailable(dateTimeProvider.UtcNow);
         }
 
+        // INV-01: the cover travels with the rest of the vehicle's data.
+        //
+        // Until now the only way to reassign it was PATCH cars/{id}/images/{imageId}/cover, a
+        // separate call the edit form never made — so "editar el vehículo" could change fifteen
+        // fields and not the one the buyer sees first. Null leaves the gallery untouched, which
+        // is what every pre-existing caller sends.
+        if (command.CoverImageId is { } coverImageId)
+        {
+            Result coverResult = ApplyCover(car, coverImageId);
+            if (coverResult.IsFailure)
+            {
+                return Result.Failure<Guid>(coverResult.Error);
+            }
+        }
+
         await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(car.Id);
+    }
+
+    /// <summary>
+    /// Promotes one image to cover and demotes the rest. Demote-before-promote, like
+    /// <c>SetCoverImageCommandHandler</c>: the partial unique index allows a single cover per
+    /// car, so a moment with two of them fails the constraint mid-transaction.
+    /// </summary>
+    private static Result ApplyCover(Car car, Guid coverImageId)
+    {
+        CarImage? target = car.Images.FirstOrDefault(i => i.Id == coverImageId);
+
+        if (target is null)
+        {
+            return Result.Failure(CarErrors.ImageNotFoundInCar(coverImageId, car.Id));
+        }
+
+        foreach (CarImage image in car.Images.Where(i => i.IsCover && i.Id != target.Id))
+        {
+            image.SetAsCover(false);
+        }
+
+        target.SetAsCover(true);
+
+        return Result.Success();
     }
 }

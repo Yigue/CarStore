@@ -23,4 +23,10 @@ public sealed record UpdateCarCommand(
     FuelType FuelType = FuelType.Gasolina,
     bool Featured = false,
     Transmission Transmission = Transmission.Manual,
-    decimal? PurchaseCost = null) : ICommand<Guid>;
+    decimal? PurchaseCost = null,
+    /// <summary>
+    /// INV-01: which of the car's images is the cover. Null means "leave the cover as it is" —
+    /// the field is optional so every existing caller keeps working unchanged, and an update
+    /// that says nothing about images never disturbs them.
+    /// </summary>
+    Guid? CoverImageId = null) : ICommand<Guid>;

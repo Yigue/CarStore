@@ -29,6 +29,12 @@ internal sealed class Update : IEndpoint
         public bool Featured { get; set; }
         public int Transmission { get; set; }
         public decimal? PurchaseCost { get; set; }
+
+        /// <summary>
+        /// INV-01: which of the car's images becomes the cover. Optional — omit it (or send null)
+        /// to leave the gallery exactly as it is.
+        /// </summary>
+        public Guid? CoverImageId { get; set; }
     }
 
     public void MapEndpoint(IEndpointRouteBuilder app)
@@ -54,7 +60,8 @@ internal sealed class Update : IEndpoint
                 (FuelType)request.FuelType,
                 request.Featured,
                 (Transmission)request.Transmission,
-                request.PurchaseCost
+                request.PurchaseCost,
+                request.CoverImageId
             );
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
