@@ -347,4 +347,124 @@ public class CreateQuoteCommandHandlerTests
         var persistedLead = await context.Leads.AsNoTracking().SingleAsync(l => l.Id == lead.Id);
         persistedLead.Status.Should().Be(LeadStatus.Ganado);
     }
+
+    // ── LEAD-02: one live offer per car and party ────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenTheSameLeadAlreadyHasALiveQuoteForTheCar()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+
+        var first = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
+        first.IsSuccess.Should().BeTrue();
+
+        var second = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
+
+        second.IsFailure.Should().BeTrue("re-pricing is an update of the standing offer, not a second one");
+        second.Error.Code.Should().Be("Quotes.ActiveQuoteAlreadyExists");
+        (await context.Quotes.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenTheSameClientAlreadyHasALiveQuoteForTheCar()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var client = await SeedClientAsync(context, ClientStatus.Active);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+
+        await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+        var second = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+
+        second.IsFailure.Should().BeTrue();
+        second.Error.Code.Should().Be("Quotes.ActiveQuoteAlreadyExists");
+    }
+
+    // The converted lead and the client it became are one buyer. Quoting through the other half
+    // of the same record must not be the way around the rule.
+    [Fact]
+    public async Task Handle_Should_Fail_WhenTheLiveQuoteWasRaisedAgainstTheOtherHalfOfTheSameParty()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
+        var client = new Client(DealerId, "Pepe", "Mujica", "888", "pepe@test.com", "555", "Addr",
+            DateTime.UtcNow, ClientType.Individual, lead.Id);
+        context.Clients.Add(client);
+        lead.MarkConverted(client.Id);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+
+        await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
+        var second = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+
+        second.IsFailure.Should().BeTrue();
+        second.Error.Code.Should().Be("Quotes.ActiveQuoteAlreadyExists");
+    }
+
+    // The market is still allowed to compete: the guard is per party, not per car.
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenADifferentPartyQuotesTheSameCar()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
+        var otherBuyer = await SeedClientAsync(context, ClientStatus.Active);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+
+        await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
+        var second = await handler.Handle(BuildCommand(car.Id, otherBuyer.Id, null), CancellationToken.None);
+
+        second.IsSuccess.Should().BeTrue();
+        (await context.Quotes.CountAsync()).Should().Be(2);
+    }
+
+    // A rejected offer is history; re-quoting after it lapses is a new negotiation.
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenThePreviousQuoteIsNoLongerPending()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var client = await SeedClientAsync(context, ClientStatus.Active);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+
+        var first = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+        var firstQuote = await context.Quotes.SingleAsync(q => q.Id == first.Value);
+        firstQuote.Reject("buyer walked away", DateTime.UtcNow);
+        await context.SaveChangesAsync();
+
+        var second = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+
+        second.IsSuccess.Should().BeTrue();
+        (await context.Quotes.CountAsync()).Should().Be(2);
+    }
+
+    // An offer whose validity ran out is not standing any more either.
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenThePreviousQuoteHasRunOutOfValidity()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var client = await SeedClientAsync(context, ClientStatus.Active);
+        var clock = new FakeDateTimeProvider { UtcNow = new DateTime(2024, 1, 1) };
+        var handler = new CreateQuoteCommandHandler(context, clock, CreateTenantService());
+
+        var first = await handler.Handle(
+            new CreateQuoteCommand(car.Id, client.Id, null, 14000m, PaymentMethod.Contado, new DateTime(2024, 1, 5), "c"),
+            CancellationToken.None);
+        first.IsSuccess.Should().BeTrue();
+
+        clock.UtcNow = new DateTime(2024, 1, 10);
+
+        var second = await handler.Handle(
+            new CreateQuoteCommand(car.Id, client.Id, null, 13000m, PaymentMethod.Contado, new DateTime(2024, 1, 20), "c"),
+            CancellationToken.None);
+
+        second.IsSuccess.Should().BeTrue();
+        (await context.Quotes.CountAsync()).Should().Be(2);
+    }
 }

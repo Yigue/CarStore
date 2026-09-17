@@ -11,6 +11,7 @@ using Domain.Leads;
 using Domain.Leads.Events;
 using Domain.Quotes;
 using Domain.Quotes.Attributes;
+using Domain.Sales;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.UnitTests.Leads;
@@ -166,5 +167,134 @@ public class CreateClientFromLeadOnNegociacionHandlerTests
 
         var updatedLead = await context.Leads.FindAsync(lead.Id);
         updatedLead!.ConvertedClientId.Should().BeNull();
+    }
+
+    // ── LEAD-03 / VEN-01: a recycled client has to come back usable ──────────────────────────
+    //
+    // CreateSaleCommandHandler refuses a Lost or Inactive client (ClientErrors.Inactive). When
+    // the conversion reuses one of those records instead of creating a fresh Prospect, the board
+    // reaches Ganado, the sale form opens, and the API answers 400 about a client the operator
+    // never touched.
+
+    [Fact]
+    public async Task Negociacion_ReusesALostClient_RevivesItAsProspect()
+    {
+        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        var lead = CreateLead(dealerId, email: "vuelve@test.com");
+        var existingClient = new Client(dealerId, "Ana", "Lopez", "20444555", "vuelve@test.com", "4445556", "Addr", DateTime.UtcNow);
+        existingClient.MarkAsLost();
+        context.Leads.Add(lead);
+        context.Clients.Add(existingClient);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateClientFromLeadOnNegociacionHandler(context, new FakeDateTimeProvider());
+        await handler.Handle(
+            new LeadStatusChangedDomainEvent(lead.Id, LeadStatus.Contactado, LeadStatus.Negociacion),
+            CancellationToken.None);
+
+        var client = await context.Clients.SingleAsync();
+        client.Status.Should().Be(
+            ClientStatus.Prospect,
+            "negotiating again is what revives the record — otherwise the sale that follows is rejected as Clients.Inactive");
+    }
+
+    [Fact]
+    public async Task Negociacion_ReusesAnInactiveClient_RevivesItAsProspect()
+    {
+        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        var lead = CreateLead(dealerId, email: "dormido@test.com");
+        var existingClient = new Client(dealerId, "Ana", "Lopez", "20444555", "dormido@test.com", "4445556", "Addr", DateTime.UtcNow);
+        existingClient.Deactivate();
+        context.Leads.Add(lead);
+        context.Clients.Add(existingClient);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateClientFromLeadOnNegociacionHandler(context, new FakeDateTimeProvider());
+        await handler.Handle(
+            new LeadStatusChangedDomainEvent(lead.Id, LeadStatus.Contactado, LeadStatus.Negociacion),
+            CancellationToken.None);
+
+        var client = await context.Clients.SingleAsync();
+        client.Status.Should().Be(ClientStatus.Prospect);
+    }
+
+    // Someone who already bought here is a customer, not a prospect: reviving them must not
+    // rewrite that history.
+    [Fact]
+    public async Task Negociacion_ReusesALostClientWithACompletedSale_RevivesItAsActive()
+    {
+        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        var lead = CreateLead(dealerId, email: "repite@test.com");
+        var existingClient = new Client(dealerId, "Ana", "Lopez", "20444555", "repite@test.com", "4445556", "Addr", DateTime.UtcNow);
+        context.Leads.Add(lead);
+        context.Clients.Add(existingClient);
+
+        var marca = new Marca("Peugeot");
+        var modelo = new Modelo("208", marca.Id);
+        var car = new Car(dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2021, "REV001", "desc", 15000m, DateTime.UtcNow);
+        context.Marca.Add(marca);
+        context.Modelo.Add(modelo);
+        context.Cars.Add(car);
+        await context.SaveChangesAsync();
+
+        var sale = new Sale(dealerId, car.Id, existingClient.Id, 15000m, Domain.Financial.Attributes.PaymentMethod.Cash, "C-1", "", DateTime.UtcNow);
+        sale.Complete();
+        context.Sales.Add(sale);
+        existingClient.MarkAsLost();
+        await context.SaveChangesAsync();
+
+        var handler = new CreateClientFromLeadOnNegociacionHandler(context, new FakeDateTimeProvider());
+        await handler.Handle(
+            new LeadStatusChangedDomainEvent(lead.Id, LeadStatus.Contactado, LeadStatus.Negociacion),
+            CancellationToken.None);
+
+        var client = await context.Clients.SingleAsync();
+        client.Status.Should().Be(ClientStatus.Active, "a returning buyer is a customer, not a prospect");
+    }
+
+    // A client who is already trading is left exactly as they are.
+    [Fact]
+    public async Task Negociacion_ReusesAnActiveClient_LeavesItsStatusAlone()
+    {
+        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        var lead = CreateLead(dealerId, email: "activo@test.com");
+        var existingClient = new Client(dealerId, "Ana", "Lopez", "20444555", "activo@test.com", "4445556", "Addr", DateTime.UtcNow);
+        context.Leads.Add(lead);
+        context.Clients.Add(existingClient);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateClientFromLeadOnNegociacionHandler(context, new FakeDateTimeProvider());
+        await handler.Handle(
+            new LeadStatusChangedDomainEvent(lead.Id, LeadStatus.Contactado, LeadStatus.Negociacion),
+            CancellationToken.None);
+
+        var client = await context.Clients.SingleAsync();
+        client.Status.Should().Be(ClientStatus.Active);
+    }
+
+    [Fact]
+    public async Task Negociacion_ReusesAClient_StampsTheOriginLead()
+    {
+        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        var lead = CreateLead(dealerId, email: "origen@test.com");
+        var existingClient = new Client(dealerId, "Ana", "Lopez", "20444555", "origen@test.com", "4445556", "Addr", DateTime.UtcNow);
+        context.Leads.Add(lead);
+        context.Clients.Add(existingClient);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateClientFromLeadOnNegociacionHandler(context, new FakeDateTimeProvider());
+        await handler.Handle(
+            new LeadStatusChangedDomainEvent(lead.Id, LeadStatus.Contactado, LeadStatus.Negociacion),
+            CancellationToken.None);
+
+        var client = await context.Clients.SingleAsync();
+        client.OriginLeadId.Should().Be(
+            lead.Id,
+            "every rule that walks from a client back to its enquiry sees nothing without this stamp");
     }
 }

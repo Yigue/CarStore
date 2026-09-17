@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
 using Domain.Cars;
 using Domain.Cars.Attributes;
+using Domain.Sales.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
@@ -43,6 +44,14 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
             // Reservado se sigue publicando: la reserva puede caerse, y esconderlo perderia
             // interesados por una operacion que todavia no se cerro.
             carsQuery = carsQuery.Where(c => c.ServiceCar != StatusServiceCar.Vendido);
+
+            // CAT-01: el estado del vehiculo es la intencion, la venta es el hecho. Una venta
+            // completada es una unidad entregada aunque su ServiceCar todavia no lo diga —
+            // pasaba cada vez que el outbox se atrasaba o fallaba, y tambien con los registros
+            // viejos anteriores a la sincronizacion en transaccion. Consultar las ventas cierra
+            // ese hueco sin depender de que la columna este al dia.
+            carsQuery = carsQuery.Where(c =>
+                !_context.Sales.Any(s => s.CarId == c.Id && s.Status == SaleStatus.Completed));
         }
 
         if (query.Featured.HasValue)

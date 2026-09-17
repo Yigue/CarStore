@@ -1,5 +1,6 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Domain.Cars;
 using Domain.Sales;
 using Domain.Sales.Attributes;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,8 @@ using SharedKernel;
 namespace Application.Sales.Update;
 
 internal sealed class UpdateSaleCommandHandler(
-    IApplicationDbContext context)
+    IApplicationDbContext context,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<UpdateSaleCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(UpdateSaleCommand command, CancellationToken cancellationToken)
@@ -54,10 +56,20 @@ internal sealed class UpdateSaleCommandHandler(
                     contractNumber,
                     comments);
                 sale.Complete();
+
+                // CAT-01: same transaction as the completion, for the same reason as
+                // CreateSaleCommandHandler — the public catalogue reads Car.ServiceCar, so
+                // leaving the sync to the outbox leaves a sold unit on sale for as long as the
+                // job takes, or forever if it fails. The outbox handler stays the safety net.
+                await SyncCarWithCompletedSaleAsync(sale.CarId, cancellationToken);
                 break;
 
             case SaleStatus.Cancelled:
                 sale.Cancel("Cancelled via update");
+
+                // The mirror image: a cancelled sale gives the unit back to the floor, unless
+                // some other live sale still holds it.
+                await ReleaseCarIfUnheldAsync(sale.CarId, sale.Id, cancellationToken);
                 break;
 
             default:
@@ -67,5 +79,38 @@ internal sealed class UpdateSaleCommandHandler(
         await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(sale.Id);
+    }
+
+    private async Task SyncCarWithCompletedSaleAsync(Guid carId, CancellationToken cancellationToken)
+    {
+        Car? car = await context.Cars
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.Id == carId, cancellationToken);
+
+        car?.MarkAsSold(dateTimeProvider.UtcNow);
+    }
+
+    private async Task ReleaseCarIfUnheldAsync(Guid carId, Guid cancelledSaleId, CancellationToken cancellationToken)
+    {
+        // Never hand back a unit another operation is still holding: a second pending sale, or a
+        // completed one. Releasing unconditionally is how a sold car reappears in the catalogue
+        // because an unrelated draft next to it was cancelled.
+        bool stillHeld = await context.Sales
+            .AnyAsync(
+                s => s.CarId == carId
+                    && s.Id != cancelledSaleId
+                    && (s.Status == SaleStatus.Pending || s.Status == SaleStatus.Completed),
+                cancellationToken);
+
+        if (stillHeld)
+        {
+            return;
+        }
+
+        Car? car = await context.Cars
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.Id == carId, cancellationToken);
+
+        car?.MarkAsAvailable(dateTimeProvider.UtcNow);
     }
 }

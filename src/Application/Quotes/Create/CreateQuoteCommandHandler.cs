@@ -130,6 +130,31 @@ internal sealed class CreateQuoteCommandHandler(
                 .SingleOrDefaultAsync(c => c.Id == convertedClientId, cancellationToken);
         }
 
+        // LEAD-02: one LIVE offer per car and party. Everything above still lets two different
+        // buyers bid on the same unit — that is the market working. What must not happen is the
+        // same buyer ending up with two standing prices for the same car because the form was
+        // opened twice: a double submit the UI failed to swallow, or an operator going back to
+        // "edit the amount" through a path that only ever creates.
+        //
+        // Scoped to Pending and to offers that have not run out: a rejected, expired or
+        // superseded quote is history, and re-quoting after it lapses is a new negotiation.
+        Guid? partyClientId = client?.Id;
+        Guid? partyLeadId = lead?.Id;
+        DateTime nowUtc = dateTimeProvider.UtcNow;
+
+        Quote? liveQuote = await context.Quotes
+            .Where(q => q.CarId == command.CarId
+                && q.Status == QuoteStatus.Pending
+                && q.ValidUntil > nowUtc
+                && ((partyClientId != null && q.ClientId == partyClientId)
+                    || (partyLeadId != null && q.LeadId == partyLeadId)))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (liveQuote is not null)
+        {
+            return Result.Failure<Guid>(QuoteErrors.ActiveQuoteAlreadyExists(command.CarId, liveQuote.Id));
+        }
+
         var quote = new Quote(
             tenantService.DealerId,
             car,

@@ -571,4 +571,48 @@ public class CreateSaleCommandHandlerTests
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Clients.Inactive");
     }
+
+    // CAT-01: a sale registered as already settled takes the unit off the floor in the same
+    // transaction. SaleCompletedCarStatusHandler still does it off the outbox, but that is a
+    // background tick: until it runs, the public catalogue — which filters on exactly this
+    // column — keeps offering a vehicle that has been sold.
+    [Fact]
+    public async Task Handle_Should_MarkTheCarSold_WhenTheSaleIsCreatedCompleted()
+    {
+        using var context = CreateContext();
+        var (car, client) = SeedCarAndClient(context, "Fiat", "Cronos", "CMP001");
+        await context.SaveChangesAsync();
+
+        var tenantService = new Mock<ICurrentTenantService>();
+        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var handler = new CreateSaleCommandHandler(context, new FakeDateTimeProvider(), tenantService.Object);
+
+        var result = await handler.Handle(
+            new CreateSaleCommand(car.Id, client.Id, 10000m, PaymentMethod.Cash, "CN-1", "cash sale", Status: SaleStatus.Completed),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var persisted = await context.Cars.AsNoTracking().FirstAsync(c => c.Id == car.Id);
+        persisted.ServiceCar.Should().Be(StatusServiceCar.Vendido);
+    }
+
+    // A pending sale is still a draft: it holds the unit, it does not sell it.
+    [Fact]
+    public async Task Handle_Should_OnlyReserveTheCar_WhenTheSaleIsCreatedPending()
+    {
+        using var context = CreateContext();
+        var (car, client) = SeedCarAndClient(context, "Fiat", "Argo", "PND001");
+        await context.SaveChangesAsync();
+
+        var tenantService = new Mock<ICurrentTenantService>();
+        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var handler = new CreateSaleCommandHandler(context, new FakeDateTimeProvider(), tenantService.Object);
+
+        await handler.Handle(
+            new CreateSaleCommand(car.Id, client.Id, 10000m, PaymentMethod.Cash, "CN-2", "draft"),
+            CancellationToken.None);
+
+        var persisted = await context.Cars.AsNoTracking().FirstAsync(c => c.Id == car.Id);
+        persisted.ServiceCar.Should().Be(StatusServiceCar.Reservado);
+    }
 }

@@ -136,6 +136,15 @@ internal sealed class CreateSaleCommandHandler(
 
             // Complete the sale to trigger financial transaction and domain events
             sale.Complete();
+
+            // CAT-01: mark the unit sold HERE, in the same transaction as the sale.
+            // SaleCompletedCarStatusHandler does the same thing off the outbox, but that is a
+            // Quartz job on a tick — until it runs (or if it never does, because the job is down
+            // or its message errored) the car keeps its old service status and the public
+            // catalogue, which filters on exactly that column, keeps offering a vehicle the
+            // dealership has already sold. The handler stays as the idempotent safety net:
+            // MarkAsSold is a no-op once ServiceCar is Vendido.
+            car.MarkAsSold(dateTimeProvider.UtcNow);
         }
         else
         {
