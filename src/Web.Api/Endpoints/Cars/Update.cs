@@ -41,27 +41,32 @@ internal sealed class Update : IEndpoint
     {
         app.MapPut("cars/{id:guid}", async (Guid id, Request request, ISender sender, CancellationToken cancellationToken) =>
         {
+            // Named arguments (ArchitectureTests.CommandConstructionTests). Five of these are
+            // plain ints — puertas, asientos, cilindrada, kilometraje, año — and positionally a
+            // swapped pair compiles and ships a 2021-door car with 4 as its model year. This
+            // call site was grandfathered into the allowlist by line number; adding CoverImageId
+            // moved it, and re-pinning the number would have kept the hazard instead of the rule.
             var command = new UpdateCarCommand(
-                id,
-                request.Marca,
-                request.Modelo,
-                (Color)request.Color,
-                (TypeCar)request.CarType,
-                (StatusCar)request.CarStatus,
-                (StatusServiceCar)request.ServiceCar,
-                request.CantidadPuertas,
-                request.CantidadAsientos,
-                request.Cilindrada,
-                request.Kilometraje,
-                request.Anio,
-                request.Patente,
-                request.Descripcion,
-                request.Precio,
-                (FuelType)request.FuelType,
-                request.Featured,
-                (Transmission)request.Transmission,
-                request.PurchaseCost,
-                request.CoverImageId
+                Id: id,
+                Marca: request.Marca,
+                Modelo: request.Modelo,
+                Color: (Color)request.Color,
+                CarType: (TypeCar)request.CarType,
+                CarStatus: (StatusCar)request.CarStatus,
+                ServiceCar: (StatusServiceCar)request.ServiceCar,
+                CantidadPuertas: request.CantidadPuertas,
+                CantidadAsientos: request.CantidadAsientos,
+                Cilindrada: request.Cilindrada,
+                Kilometraje: request.Kilometraje,
+                Anio: request.Anio,
+                Patente: request.Patente,
+                Descripcion: request.Descripcion,
+                Price: request.Precio,
+                FuelType: (FuelType)request.FuelType,
+                Featured: request.Featured,
+                Transmission: (Transmission)request.Transmission,
+                PurchaseCost: request.PurchaseCost,
+                CoverImageId: request.CoverImageId
             );
 
             Result<Guid> result = await sender.Send(command, cancellationToken);

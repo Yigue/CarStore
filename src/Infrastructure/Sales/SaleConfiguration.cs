@@ -70,5 +70,61 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
             .IsUnique()
             .HasDatabaseName("ux_sales_one_completed_per_car")
             .HasFilter("status = 'Completed'");
+
+        // ─── VEN-03 · payment breakdown ───────────────────────────────────────────────────────
+        // Every column is nullable: a sale recorded before this change, or one paid in cash,
+        // has nothing to fill in here.
+
+        builder.Property(s => s.DownPayment)
+            .HasConversion(new NullableMoneyValueConverter())
+            .HasColumnName("down_payment");
+
+        builder.Property(s => s.TradeInCarId)
+            .HasColumnName("trade_in_car_id");
+
+        builder.Property(s => s.TradeInValue)
+            .HasConversion(new NullableMoneyValueConverter())
+            .HasColumnName("trade_in_value");
+
+        builder.Property(s => s.FinancedAmount)
+            .HasConversion(new NullableMoneyValueConverter())
+            .HasColumnName("financed_amount");
+
+        builder.Property(s => s.InstallmentCount)
+            .HasColumnName("installment_count");
+
+        builder.Property(s => s.InstallmentAmount)
+            .HasConversion(new NullableMoneyValueConverter())
+            .HasColumnName("installment_amount");
+
+        builder.Property(s => s.FinancingEntity)
+            .HasMaxLength(120)
+            .HasColumnName("financing_entity");
+
+        // The trade-in points at a Car but is NOT a constrained FK: the unit taken in part
+        // payment may be entered into inventory later, or not at all, and a hard constraint
+        // would block recording the sale until someone created it. Same convention as
+        // SalespersonId above.
+        builder.HasIndex(s => s.TradeInCarId)
+            .HasDatabaseName("ix_sales_trade_in_car_id");
+
+        // ─── VEN-03 · legal paperwork ─────────────────────────────────────────────────────────
+        // Attachments already exist (Document.SaleId). A file is not a number: the factura, the
+        // 08 and the patentamiento are looked up by theirs.
+
+        builder.Property(s => s.InvoiceNumber)
+            .HasMaxLength(50)
+            .HasColumnName("invoice_number");
+
+        builder.Property(s => s.TransferFormNumber)
+            .HasMaxLength(50)
+            .HasColumnName("transfer_form_number");
+
+        builder.Property(s => s.RegistrationNumber)
+            .HasMaxLength(50)
+            .HasColumnName("registration_number");
+
+        builder.Property(s => s.DeliveryDate)
+            .HasColumnName("delivery_date");
     }
 }

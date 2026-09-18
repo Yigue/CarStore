@@ -144,6 +144,36 @@ public sealed class Quote : Entity, ISoftDeletable
             UpdatedAt = updatedAt;
         }
     }
+
+    /// <summary>
+    /// LEAD-04: withdraws the offer because the negotiation behind it is over — the lead was
+    /// marked Perdido.
+    ///
+    /// <para>
+    /// Distinct from <see cref="Reject"/>, which only closes a PENDING quote: what actually
+    /// hurt was the ACCEPTED one, because acceptance holds the vehicle Reservado. A deal that
+    /// no longer exists kept a car off the floor and nothing ever noticed. Distinct from
+    /// <see cref="Expire"/> too, which is a no-op before the validity date and would have
+    /// silently done nothing.
+    /// </para>
+    ///
+    /// <para>
+    /// The record is kept, not deleted: the funnel has to be able to tell a lost negotiation
+    /// from one that was never quoted. Idempotent — a quote already closed stays as it is, so
+    /// an outbox retry changes nothing.
+    /// </para>
+    /// </summary>
+    public void CloseAsLost(string reason, DateTime updatedAt)
+    {
+        if (Status is QuoteStatus.Rejected or QuoteStatus.Expired)
+        {
+            return;
+        }
+
+        Status = QuoteStatus.Rejected;
+        UpdatedAt = updatedAt;
+        Raise(new QuoteRejectedDomainEvent(Id, reason ?? string.Empty));
+    }
     
     /// <summary>
     /// Attaches this quote to a client — what happens when its lead is converted.

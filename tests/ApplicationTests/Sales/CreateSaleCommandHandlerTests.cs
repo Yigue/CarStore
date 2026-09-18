@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Moq;
 using QuotePaymentMethod = Domain.Quotes.Attributes.PaymentMethod;
 using QuoteStatus = Domain.Quotes.Attributes.QuoteStatus;
+using Domain.Clients.Attributes;
 
 namespace Application.UnitTests.Sales;
 
@@ -597,6 +598,252 @@ public class CreateSaleCommandHandlerTests
     }
 
     // A pending sale is still a draft: it holds the unit, it does not sell it.
+    // ══ VEN-02 · a prospect cannot be invoiced ═══════════════════════════════════════════════
+    //
+    // A client the CRM invented when the lead reached Negociación has a name, an email and a
+    // placeholder DNI. Enough to quote, nowhere near enough to bill.
+
+    private static (Car car, Client client) SeedCarAndPlaceholderClient(
+        TestApplicationDbContext context,
+        string patente)
+    {
+        var marca = new Marca($"Marca{patente}");
+        var modelo = new Modelo($"Modelo{patente}", marca.Id);
+        var dealerId = Guid.NewGuid();
+        var car = new Car(dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New,
+            StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, patente, "desc", 10000m, DateTime.UtcNow);
+
+        // Exactly how CreateClientFromLeadOnNegociacionHandler builds one: TEMP DNI, no address.
+        var client = new Client(dealerId, "Carlos", "Perez", $"TEMP{Guid.NewGuid():N}"[..20],
+            $"{Guid.NewGuid():N}@test.com", "111", string.Empty, DateTime.UtcNow);
+        client.SetProspect();
+
+        context.Marca.Add(marca);
+        context.Modelo.Add(modelo);
+        context.Cars.Add(car);
+        context.Clients.Add(client);
+        return (car, client);
+    }
+
+    private static CreateSaleCommandHandler CreateSaleHandler(TestApplicationDbContext context)
+    {
+        var tenantService = new Mock<ICurrentTenantService>();
+        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        return new CreateSaleCommandHandler(context, new FakeDateTimeProvider(), tenantService.Object);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenTheClientIsStillAPlaceholderAndNoIdentityIsSupplied()
+    {
+        using var context = CreateContext();
+        var (car, client) = SeedCarAndPlaceholderClient(context, "PLH001");
+        await context.SaveChangesAsync();
+
+        var result = await CreateSaleHandler(context).Handle(
+            new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-1", ""),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Sales.ClientDataIncomplete");
+    }
+
+    [Fact]
+    public async Task Handle_Should_CompleteTheClient_WhenTheSaleCarriesTheMissingIdentity()
+    {
+        using var context = CreateContext();
+        var (car, client) = SeedCarAndPlaceholderClient(context, "PLH002");
+        await context.SaveChangesAsync();
+
+        var result = await CreateSaleHandler(context).Handle(
+            new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-1", "",
+                ClientDni: "20333444", ClientAddress: "Av. Siempreviva 742"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+
+        var persisted = await context.Clients.SingleAsync(c => c.Id == client.Id);
+        persisted.DNI.Should().Be("20333444");
+        persisted.Address.Should().Be("Av. Siempreviva 742");
+        persisted.Status.Should().Be(ClientStatus.Active, "selling is what turns a prospect into a customer");
+    }
+
+    // A real document is never silently rewritten by a sale form.
+    [Fact]
+    public async Task Handle_Should_NotOverwriteARealDniSuppliedOnTheSale()
+    {
+        using var context = CreateContext();
+        var (car, client) = SeedCarAndClient(context, "Ford", "Ka", "REA001");
+        await context.SaveChangesAsync();
+
+        var result = await CreateSaleHandler(context).Handle(
+            new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-1", "",
+                ClientDni: "99999999", ClientAddress: "Otra dirección"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var persisted = await context.Clients.SingleAsync(c => c.Id == client.Id);
+        persisted.DNI.Should().NotBe("99999999", "the sale form is not the place to rewrite an identity document");
+    }
+
+    // ══ VEN-04 · the sale inherits what the accepted quote agreed ════════════════════════════
+
+    private static async Task<(Car car, Client client, Quote quote)> SeedAcceptedQuoteAsync(
+        TestApplicationDbContext context,
+        string patente,
+        decimal proposedPrice,
+        QuotePaymentMethod quotePaymentMethod)
+    {
+        var (car, client) = SeedCarAndClient(context, "Fiat", "Uno", patente);
+        await context.SaveChangesAsync();
+
+        var quote = new Quote(car.DealerId, car, client, null, proposedPrice, quotePaymentMethod,
+            DateTime.UtcNow.AddDays(30), "", DateTime.UtcNow);
+        quote.Accept(DateTime.UtcNow);
+        context.Quotes.Add(quote);
+        await context.SaveChangesAsync();
+
+        return (car, client, quote);
+    }
+
+    [Fact]
+    public async Task Handle_Should_InheritThePriceAndPaymentMethod_FromTheAcceptedQuote()
+    {
+        using var context = CreateContext();
+        var (car, client, quote) = await SeedAcceptedQuoteAsync(
+            context, "INH001", 123_456m, QuotePaymentMethod.Financiado);
+
+        var result = await CreateSaleHandler(context).Handle(
+            new CreateSaleCommand(car.Id, client.Id, null, null, "CN-1", "", QuoteId: quote.Id),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+
+        var sale = await context.Sales.SingleAsync(s => s.Id == result.Value);
+        sale.FinalPrice.Amount.Should().Be(123_456m, "re-typing the number is how a car gets invoiced at a price nobody promised");
+        sale.PaymentMethod.Should().Be(PaymentMethod.BankTransfer, "Financiado maps to a transfer, not to Efectivo");
+    }
+
+    [Fact]
+    public async Task Handle_Should_PreferTheExplicitPrice_OverTheQuotes()
+    {
+        using var context = CreateContext();
+        var (car, client, quote) = await SeedAcceptedQuoteAsync(
+            context, "INH002", 123_456m, QuotePaymentMethod.Contado);
+
+        var result = await CreateSaleHandler(context).Handle(
+            new CreateSaleCommand(car.Id, client.Id, 120_000m, PaymentMethod.CreditCard, "CN-1", "", QuoteId: quote.Id),
+            CancellationToken.None);
+
+        var sale = await context.Sales.SingleAsync(s => s.Id == result.Value);
+        sale.FinalPrice.Amount.Should().Be(120_000m, "the closing price may legitimately differ from the offer");
+        sale.PaymentMethod.Should().Be(PaymentMethod.CreditCard);
+    }
+
+    [Theory]
+    [InlineData(QuotePaymentMethod.Contado, PaymentMethod.Cash)]
+    [InlineData(QuotePaymentMethod.Financiado, PaymentMethod.BankTransfer)]
+    [InlineData(QuotePaymentMethod.Permuta, PaymentMethod.Other)]
+    [InlineData(QuotePaymentMethod.Mixto, PaymentMethod.Other)]
+    public void MapQuotePaymentMethod_TranslatesIntentIntoSettlement(
+        QuotePaymentMethod intent,
+        PaymentMethod expected)
+    {
+        CreateSaleCommandHandler.MapQuotePaymentMethod(intent).Should().Be(expected);
+    }
+
+    // ══ VEN-03 · how the operation is paid ═══════════════════════════════════════════════════
+
+    [Fact]
+    public async Task Handle_Should_RecordThePaymentBreakdownAndThePaperwork()
+    {
+        using var context = CreateContext();
+        var (car, client) = SeedCarAndClient(context, "Fiat", "Mobi", "PAY001");
+        await context.SaveChangesAsync();
+
+        var result = await CreateSaleHandler(context).Handle(
+            new CreateSaleCommand(car.Id, client.Id, 100_000m, PaymentMethod.BankTransfer, "CN-1", "",
+                DownPayment: 30_000m,
+                TradeInCarId: Guid.NewGuid(),
+                TradeInValue: 20_000m,
+                FinancedAmount: 50_000m,
+                InstallmentCount: 12,
+                InstallmentAmount: 4_500m,
+                FinancingEntity: "Banco Nación",
+                InvoiceNumber: "A-0001-00001234",
+                TransferFormNumber: "08-998877",
+                RegistrationNumber: "PAT-2024-555",
+                DeliveryDate: new DateTime(2024, 3, 15)),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+
+        var sale = await context.Sales.SingleAsync(s => s.Id == result.Value);
+        sale.DownPayment!.Amount.Should().Be(30_000m);
+        sale.TradeInValue!.Amount.Should().Be(20_000m);
+        sale.FinancedAmount!.Amount.Should().Be(50_000m);
+        sale.InstallmentCount.Should().Be(12);
+        sale.FinancingEntity.Should().Be("Banco Nación");
+        sale.InvoiceNumber.Should().Be("A-0001-00001234");
+        sale.RegistrationNumber.Should().Be("PAT-2024-555");
+        sale.DeliveryDate.Should().Be(new DateTime(2024, 3, 15));
+    }
+
+    // The parts have to add up to the price, or nobody can collect against the number.
+    [Fact]
+    public async Task Handle_Should_Fail_WhenThePaymentBreakdownDoesNotAddUpToThePrice()
+    {
+        using var context = CreateContext();
+        var (car, client) = SeedCarAndClient(context, "Fiat", "Cronos", "PAY002");
+        await context.SaveChangesAsync();
+
+        var result = await CreateSaleHandler(context).Handle(
+            new CreateSaleCommand(car.Id, client.Id, 100_000m, PaymentMethod.BankTransfer, "CN-1", "",
+                DownPayment: 10_000m,
+                FinancedAmount: 50_000m,
+                InstallmentCount: 12,
+                InstallmentAmount: 4_500m),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Sales.PaymentPartsDoNotMatchPrice");
+        (await context.Sales.CountAsync()).Should().Be(0, "a sale nobody can collect against is not written");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenFinancingHasNoInstallments()
+    {
+        using var context = CreateContext();
+        var (car, client) = SeedCarAndClient(context, "Fiat", "Pulse", "PAY003");
+        await context.SaveChangesAsync();
+
+        var result = await CreateSaleHandler(context).Handle(
+            new CreateSaleCommand(car.Id, client.Id, 100_000m, PaymentMethod.BankTransfer, "CN-1", "",
+                DownPayment: 40_000m,
+                FinancedAmount: 60_000m),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Sales.FinancingWithoutInstallments");
+    }
+
+    // A cash sale recorded in one line has nothing to add here.
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenNoPaymentBreakdownIsSupplied()
+    {
+        using var context = CreateContext();
+        var (car, client) = SeedCarAndClient(context, "Fiat", "Argo", "PAY004");
+        await context.SaveChangesAsync();
+
+        var result = await CreateSaleHandler(context).Handle(
+            new CreateSaleCommand(car.Id, client.Id, 100_000m, PaymentMethod.Cash, "CN-1", ""),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var sale = await context.Sales.SingleAsync(s => s.Id == result.Value);
+        sale.DownPayment.Should().BeNull("no seña recorded is not a seña of zero");
+        sale.FinancedAmount.Should().BeNull();
+    }
+
     [Fact]
     public async Task Handle_Should_OnlyReserveTheCar_WhenTheSaleIsCreatedPending()
     {

@@ -15,6 +15,12 @@ using Domain.Sales.Events;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
+// Both namespaces define a PaymentMethod and this file has to speak about both: what the buyer
+// INTENDED on the quote, and how the money actually moves on the sale. Bare `PaymentMethod` in
+// here resolves to the quote's, so name both explicitly rather than rely on which using wins.
+using QuotePaymentMethod = Domain.Quotes.Attributes.PaymentMethod;
+using SalePaymentMethod = Domain.Financial.Attributes.PaymentMethod;
+
 namespace Application.Sales.Create;
 
 internal sealed class CreateSaleCommandHandler(
@@ -51,6 +57,8 @@ internal sealed class CreateSaleCommandHandler(
         // D-5: a quote converts into at most one sale. Guard against a second sale created
         // from the same quote (idempotency on the quote -> sale conversion). Sales are
         // tenant-scoped, so the default query filter keeps this within the dealer.
+        Quote? acceptedQuote = null;
+
         if (command.QuoteId is { } quoteId)
         {
             bool alreadyConverted = await context.Sales
@@ -92,6 +100,8 @@ internal sealed class CreateSaleCommandHandler(
             {
                 return Result.Failure<Guid>(SalesErrors.QuoteMismatch(quoteId));
             }
+
+            acceptedQuote = quote;
         }
 
         // Verify if client exists
@@ -111,12 +121,64 @@ internal sealed class CreateSaleCommandHandler(
             return Result.Failure<Guid>(ClientErrors.Inactive(client.Id));
         }
  
+        // ── VEN-02: a prospect cannot be invoiced ────────────────────────────────────────────
+        //
+        // The client the CRM created when the lead reached Negociación has a name, an email and
+        // a placeholder DNI. That is enough to quote and not enough to bill. The sale carries the
+        // missing identity, so the operator supplies it once, at the moment it is actually
+        // needed, instead of being bounced to the client screen and back.
+        if (!client.HasBillingData)
+        {
+            if (string.IsNullOrWhiteSpace(command.ClientDni) || string.IsNullOrWhiteSpace(command.ClientAddress))
+            {
+                return Result.Failure<Guid>(SalesErrors.ClientDataIncomplete(client.Id));
+            }
+
+            Result completion = client.CompleteBillingData(
+                command.ClientDni,
+                command.ClientAddress,
+                dateTimeProvider.UtcNow);
+
+            if (completion.IsFailure)
+            {
+                return Result.Failure<Guid>(completion.Error);
+            }
+
+            // Selling is what turns a prospect into a customer. ActivateClientOnSaleCompletedHandler
+            // still does this off the outbox when the sale COMPLETES; doing it here means a client
+            // whose identity was just completed is already usable for the rest of this request.
+            client.Activate();
+        }
+
+        // ── VEN-04: the sale inherits what the accepted quote agreed ─────────────────────────
+        //
+        // The price and the payment arrangement were negotiated on the quote. Re-typing them into
+        // the sale form is how a vehicle gets invoiced at a number nobody promised — and the two
+        // entities do not even share an enum for "forma de pago", so the front end had been
+        // defaulting to Efectivo regardless of what was agreed. Explicit values still win: the
+        // final price can legitimately differ from the offer.
+        decimal? finalPrice = command.FinalPrice;
+        SalePaymentMethod? paymentMethod = command.PaymentMethod;
+
+        if (acceptedQuote is not null)
+        {
+            finalPrice ??= acceptedQuote.ProposedPrice.Amount;
+            paymentMethod ??= MapQuotePaymentMethod(acceptedQuote.PaymentMethod);
+        }
+
+        if (finalPrice is not { } agreedPrice || paymentMethod is not { } agreedMethod)
+        {
+            // Unreachable through the validator, which requires both whenever there is no quote
+            // to inherit from. Kept so the aggregate is never handed a price it cannot honour.
+            return Result.Failure<Guid>(SalesErrors.PriceRequired());
+        }
+
         var sale = new Sale(
             tenantService.DealerId,
             command.CarId,
             command.ClientId,
-            command.FinalPrice,
-            command.PaymentMethod,
+            agreedPrice,
+            agreedMethod,
             command.ContractNumber,
             command.Comments,
             dateTimeProvider.UtcNow,
@@ -124,6 +186,28 @@ internal sealed class CreateSaleCommandHandler(
             command.QuoteId,
             command.SalespersonId
             );
+
+        // VEN-03: how it is paid and what paperwork backs it. Both are optional — a cash sale
+        // recorded in one line has nothing to add here.
+        Result paymentTerms = sale.SetPaymentTerms(
+            command.DownPayment,
+            command.TradeInCarId,
+            command.TradeInValue,
+            command.FinancedAmount,
+            command.InstallmentCount,
+            command.InstallmentAmount,
+            command.FinancingEntity);
+
+        if (paymentTerms.IsFailure)
+        {
+            return Result.Failure<Guid>(paymentTerms.Error);
+        }
+
+        sale.SetLegalDocuments(
+            command.InvoiceNumber,
+            command.TransferFormNumber,
+            command.RegistrationNumber,
+            command.DeliveryDate);
 
         // Sales are Pending by default. They are only force-completed when the
         // caller explicitly requests it (e.g. a legacy/cash sale recorded as
@@ -173,4 +257,26 @@ internal sealed class CreateSaleCommandHandler(
 
         return Result.Success(sale.Id);
     }
+
+    /// <summary>
+    /// VEN-04: translates the quote's payment intent into the sale's settlement method.
+    ///
+    /// <para>
+    /// The two live in different enums on purpose — a quote says how the buyer INTENDS to pay
+    /// (<c>Domain.Quotes.Attributes.PaymentMethod</c>), a sale records how the money actually
+    /// moved (<c>Domain.Financial.Attributes.PaymentMethod</c>). They were never mapped, so the
+    /// front end filled in Efectivo whatever had been agreed. Permuta and Mixto have no single
+    /// financial instrument behind them: the trade-in and the split are recorded in the payment
+    /// breakdown (VEN-03), and the method itself falls to Other rather than inventing one.
+    /// </para>
+    /// </summary>
+    internal static SalePaymentMethod MapQuotePaymentMethod(QuotePaymentMethod quotePaymentMethod) =>
+        quotePaymentMethod switch
+        {
+            QuotePaymentMethod.Contado => SalePaymentMethod.Cash,
+            QuotePaymentMethod.Financiado => SalePaymentMethod.BankTransfer,
+            QuotePaymentMethod.Permuta => SalePaymentMethod.Other,
+            QuotePaymentMethod.Mixto => SalePaymentMethod.Other,
+            _ => SalePaymentMethod.Other,
+        };
 }

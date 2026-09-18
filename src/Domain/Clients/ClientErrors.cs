@@ -15,6 +15,14 @@ public static class ClientErrors
         "Clients.NotAllAttributes",
         $"The client with the Id = '{carId}' was not found");
     
+    /// <summary>
+    /// VEN-02: the operation needs an invoiceable person and this one is still a placeholder the
+    /// CRM created when the lead reached Negociación.
+    /// </summary>
+    public static Error BillingDataRequired(Guid clientId) => Error.Validation(
+        "Clients.BillingDataRequired",
+        $"The client with Id = '{clientId}' needs a DNI and an address before it can be invoiced.");
+
     public static Error Inactive(Guid clientId) => Error.Problem(
         "Clients.Inactive",
         $"The client with Id = '{clientId}' is inactive and cannot be used in operations");

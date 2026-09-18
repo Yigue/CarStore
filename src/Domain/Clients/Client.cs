@@ -242,4 +242,58 @@ public sealed class Client : Entity, ISoftDeletable
 
         OriginLeadId ??= leadId;
     }
+
+    /// <summary>
+    /// The prefix the CRM stamps on a client it invented. A lead reaching Negociación creates a
+    /// Prospect automatically, and DNI is unique, so the placeholder has to be unique too —
+    /// <c>TEMP{leadId:N}</c>. It is a marker, not an identity document.
+    /// </summary>
+    private const string PlaceholderDniPrefix = "TEMP";
+
+    /// <summary>
+    /// VEN-02: whether this person can be invoiced.
+    ///
+    /// <para>
+    /// A Prospect born of a lead has a name, an email and a placeholder DNI. That is enough to
+    /// quote and nowhere near enough to bill: an invoice without a real document number and an
+    /// address is not a document anyone can issue.
+    /// </para>
+    /// </summary>
+    public bool HasBillingData =>
+        !string.IsNullOrWhiteSpace(DNI)
+        && !DNI.StartsWith(PlaceholderDniPrefix, StringComparison.OrdinalIgnoreCase)
+        && !string.IsNullOrWhiteSpace(Address);
+
+    /// <summary>
+    /// VEN-02: fills in the identity a placeholder client was missing, turning a prospect the
+    /// CRM invented into someone the dealership can invoice.
+    ///
+    /// <para>
+    /// Deliberately additive, never destructive: a client who already carries a real DNI keeps
+    /// it, because a sale form is not the place to silently rewrite someone's identity document.
+    /// Correcting a real one is what the client edit screen is for.
+    /// </para>
+    /// </summary>
+    public Result CompleteBillingData(string dni, string address, DateTime occurredAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(dni))
+            return Result.Failure(ClientErrors.BillingDataRequired(Id));
+
+        if (string.IsNullOrWhiteSpace(address))
+            return Result.Failure(ClientErrors.BillingDataRequired(Id));
+
+        if (string.IsNullOrWhiteSpace(DNI) || DNI.StartsWith(PlaceholderDniPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            DNI = dni.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(Address))
+        {
+            Address = address.Trim();
+        }
+
+        UpdateAt = occurredAtUtc;
+
+        return Result.Success();
+    }
 }

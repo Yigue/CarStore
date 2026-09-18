@@ -64,7 +64,10 @@ public class CommandConstructionTests : BaseTest
     private static readonly HashSet<(string File, int Line)> Allowlist = new()
     {
         (Path.Combine("Cars", "Create.cs"), 39),
-        (Path.Combine("Cars", "Update.cs"), 38),
+        // Cars/Update.cs is no longer grandfathered: INV-01 added CoverImageId to the call, which
+        // moved it off its pinned line. Re-pinning the number would have preserved the hazard and
+        // dropped the rule, so the call site was converted to named arguments instead.
+        
         (Path.Combine("Clients", "Create.cs"), 30),
         (Path.Combine("Clients", "Export.cs"), 45),
         (Path.Combine("Clients", "Get.cs"), 31),
