@@ -360,6 +360,11 @@ services.AddDbContext<ApplicationDbContext>(
 
         services.AddScoped<PermissionProvider>();
 
+        // Without this, a permission change waits out PermissionProvider's 30-minute cache: a
+        // granted permission looks ignored, and a REVOKED one keeps working.
+        services.AddScoped<Application.Abstractions.Authorization.IPermissionCacheInvalidator,
+            Infrastructure.Authorization.PermissionCacheInvalidator>();
+
         services.AddTransient<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
         services.AddTransient<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
