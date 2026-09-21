@@ -1,4 +1,5 @@
 using Domain.DealerSettings.Events;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using SharedKernel;
 
@@ -157,6 +158,32 @@ public sealed class DealerSettings : Entity
     public string? SecondaryColor { get; private set; }
     public string? FooterText { get; private set; }
 
+    // ─── CFG-06 · landing page customization ───────────────────────────────────────────────
+    //
+    // Onboarding writes a dealer's history, mission, vision and hero carousel once and the
+    // landing page has rendered a hardcoded, unrelated BMW dealership's copy ever since —
+    // nothing downstream of onboarding ever read what the dealer actually entered. These are
+    // the fields the landing page (BannerComponent, AboutUsComponent) now reads instead.
+
+    /// <summary>Free text for the "Nuestra Historia" tab. Null renders the built-in placeholder copy.</summary>
+    public string? HistoryText { get; private set; }
+
+    /// <summary>Free text for the "Nuestra Misión" tab.</summary>
+    public string? MissionText { get; private set; }
+
+    /// <summary>Free text for the "Nuestra Visión" tab.</summary>
+    public string? VisionText { get; private set; }
+
+    /// <summary>Free text for the "Nuestros Valores" tab.</summary>
+    public string? ValuesText { get; private set; }
+
+    /// <summary>
+    /// Raw JSON array of <see cref="CarouselSlide"/> for the landing hero. Stored as a jsonb
+    /// column (same convention as <c>Document.OcrRawJson</c>) rather than a child table — see
+    /// <see cref="CarouselSlide"/> for why. Null or empty means "use the built-in default slides".
+    /// </summary>
+    public string? CarouselSlidesJson { get; private set; }
+
     // Platform suspension. Also doubles as the tenant lookup gate (saas-custom-domains
     // PR1): when false, the dealer MUST be excluded from anonymous host lookups
     // (filtered partial index on HostName WHERE IsActive).
@@ -185,6 +212,110 @@ public sealed class DealerSettings : Entity
     {
         LastAssignedAgentIndex += 1;
         return LastAssignedAgentIndex;
+    }
+
+    /// <summary>Maximum number of hero-carousel slides a landing page will render.</summary>
+    public const int MaxCarouselSlides = 8;
+
+    /// <summary>Maximum length allowed for each free-text landing section.</summary>
+    public const int MaxLandingTextLength = 4000;
+
+    /// <summary>
+    /// CFG-06: replaces the landing page's editable copy and hero carousel in one call — the
+    /// admin screen edits and saves both together, so there is one moment where all of it has
+    /// to be valid together, not five independent setters that can leave the row half-updated.
+    /// </summary>
+    public void UpdateLanding(
+        string? historyText,
+        string? missionText,
+        string? visionText,
+        string? valuesText,
+        IReadOnlyList<CarouselSlide>? carouselSlides)
+    {
+        // Validate and compute EVERYTHING before touching a single field. A rejected slide
+        // must not leave the aggregate holding the new history text in memory with nothing
+        // written to the database — the caller's transaction rolls back, but this instance
+        // stays live and tracked, and a partially-mutated aggregate is exactly the kind of bug
+        // that only shows up later, when something else reads it within the same request.
+        ValidateLandingText(historyText, nameof(historyText));
+        ValidateLandingText(missionText, nameof(missionText));
+        ValidateLandingText(visionText, nameof(visionText));
+        ValidateLandingText(valuesText, nameof(valuesText));
+
+        string? carouselJson = SerializeCarouselSlides(carouselSlides);
+
+        HistoryText = NullIfWhitespace(historyText);
+        MissionText = NullIfWhitespace(missionText);
+        VisionText = NullIfWhitespace(visionText);
+        ValuesText = NullIfWhitespace(valuesText);
+        CarouselSlidesJson = carouselJson;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static void ValidateLandingText(string? value, string paramName)
+    {
+        if (value is not null && value.Length > MaxLandingTextLength)
+        {
+            throw new DomainException(
+                $"{paramName} exceeds the {MaxLandingTextLength}-character limit.");
+        }
+    }
+
+    private static string? NullIfWhitespace(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// Validates and serializes the carousel. An empty or null list clears it (the landing page
+    /// falls back to its built-in default slides) rather than being rejected — "no custom
+    /// carousel yet" is the normal state for a dealer that has not gotten to it.
+    /// </summary>
+    private static string? SerializeCarouselSlides(IReadOnlyList<CarouselSlide>? slides)
+    {
+        if (slides is null || slides.Count == 0)
+        {
+            return null;
+        }
+
+        if (slides.Count > MaxCarouselSlides)
+        {
+            throw new DomainException(
+                $"A landing carousel can have at most {MaxCarouselSlides} slides.");
+        }
+
+        foreach (CarouselSlide slide in slides)
+        {
+            if (string.IsNullOrWhiteSpace(slide.ImageUrl))
+            {
+                throw new DomainException("Every carousel slide needs an image.");
+            }
+
+            if (string.IsNullOrWhiteSpace(slide.Title))
+            {
+                throw new DomainException("Every carousel slide needs a title.");
+            }
+        }
+
+        return JsonSerializer.Serialize(slides);
+    }
+
+    /// <summary>Deserializes <see cref="CarouselSlidesJson"/> back into typed slides.</summary>
+    public IReadOnlyList<CarouselSlide> GetCarouselSlides()
+    {
+        if (string.IsNullOrWhiteSpace(CarouselSlidesJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<CarouselSlide>>(CarouselSlidesJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            // A row written by a future version of this column, or corrupted by hand, should not
+            // 500 the public landing page — it falls back to the built-in slides instead.
+            return [];
+        }
     }
 
     public void UpdateVisual(string? logoUrl, string? primaryColor, string? secondaryColor, string? footerText)

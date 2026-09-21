@@ -88,6 +88,30 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
             .HasMaxLength(200)
             .IsRequired(false);
 
+        // ─── CFG-06 · landing page customization ───────────────────────────────────────────
+        builder.Property(s => s.HistoryText)
+            .HasMaxLength(DealerSettingsEntity.MaxLandingTextLength)
+            .IsRequired(false);
+
+        builder.Property(s => s.MissionText)
+            .HasMaxLength(DealerSettingsEntity.MaxLandingTextLength)
+            .IsRequired(false);
+
+        builder.Property(s => s.VisionText)
+            .HasMaxLength(DealerSettingsEntity.MaxLandingTextLength)
+            .IsRequired(false);
+
+        builder.Property(s => s.ValuesText)
+            .HasMaxLength(DealerSettingsEntity.MaxLandingTextLength)
+            .IsRequired(false);
+
+        // Same convention as Document.OcrRawJson: a raw JSON string column, typed on read
+        // through DealerSettings.GetCarouselSlides() rather than owned/child-table mapped —
+        // see CarouselSlide's doc comment for why.
+        builder.Property(s => s.CarouselSlidesJson)
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
         // ──────────────────────────────────────────────────────────────────────
         // PR1 (saas-custom-domains) tenant-identity hardening.
         //

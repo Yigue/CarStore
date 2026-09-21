@@ -17,37 +17,49 @@ internal sealed class GetDealerSettingsQueryHandler(
         CancellationToken cancellationToken)
     {
         // El query filter ya filtra por DealerId, pero asumimos que existe una sola fila.
-        DealerSettingsResponse? settings = await context.DealerSettings
+        //
+        // Loaded as the entity rather than projected straight into the response: the carousel
+        // needs DealerSettings.GetCarouselSlides() to turn the raw jsonb column into typed
+        // slides, and that deserialization cannot be translated into SQL by a .Select().
+        Domain.DealerSettings.DealerSettings? entity = await context.DealerSettings
             .Where(s => s.DealerId == tenantService.DealerId)
-            .Select(s => new DealerSettingsResponse
-            {
-                Id = s.Id,
-                DealerId = s.DealerId,
-                DealerName = s.DealerName,
-                ContactEmail = s.ContactEmail,
-                NotificationsEnabled = s.NotificationsEnabled,
-                UpdatedAt = s.UpdatedAt,
-                HostName = s.HostName,
-                Slug = s.Slug,
-                IsActive = s.IsActive,
-                CustomDomain = s.CustomDomain,
-                Address = s.Address,
-                PhoneNumber = s.PhoneNumber,
-                FacebookUrl = s.FacebookUrl,
-                InstagramUrl = s.InstagramUrl,
-                TwitterUrl = s.TwitterUrl,
-                InterestRateTna = s.InterestRateTna,
-                LogoUrl = s.LogoUrl,
-                PrimaryColor = s.PrimaryColor,
-                SecondaryColor = s.SecondaryColor,
-                FooterText = s.FooterText
-            })
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (settings is null)
+        if (entity is null)
         {
             return Result.Failure<DealerSettingsResponse>(DealerSettingsErrors.NotFound);
         }
+
+        var settings = new DealerSettingsResponse
+        {
+            Id = entity.Id,
+            DealerId = entity.DealerId,
+            DealerName = entity.DealerName,
+            ContactEmail = entity.ContactEmail,
+            NotificationsEnabled = entity.NotificationsEnabled,
+            UpdatedAt = entity.UpdatedAt,
+            HostName = entity.HostName,
+            Slug = entity.Slug,
+            IsActive = entity.IsActive,
+            CustomDomain = entity.CustomDomain,
+            Address = entity.Address,
+            PhoneNumber = entity.PhoneNumber,
+            FacebookUrl = entity.FacebookUrl,
+            InstagramUrl = entity.InstagramUrl,
+            TwitterUrl = entity.TwitterUrl,
+            InterestRateTna = entity.InterestRateTna,
+            LogoUrl = entity.LogoUrl,
+            PrimaryColor = entity.PrimaryColor,
+            SecondaryColor = entity.SecondaryColor,
+            FooterText = entity.FooterText,
+            HistoryText = entity.HistoryText,
+            MissionText = entity.MissionText,
+            VisionText = entity.VisionText,
+            ValuesText = entity.ValuesText,
+            CarouselSlides = entity.GetCarouselSlides()
+                .Select(cs => new CarouselSlideResponse(cs.ImageUrl, cs.Title, cs.Subtitle, cs.Description, cs.CtaText, cs.CtaLink))
+                .ToList(),
+        };
 
         return settings;
     }
