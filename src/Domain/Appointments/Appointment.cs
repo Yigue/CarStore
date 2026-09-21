@@ -7,8 +7,11 @@ namespace Domain.Appointments;
 /// Appointment aggregate root. Represents a scheduled event (test drive, service, delivery)
 /// between an agent, a client, and a vehicle. Tenant-scoped via <see cref="Entity.DealerId"/>.
 /// Time-overlap conflict detection is performed at the application layer (CQRS handler)
-/// against a dealer-wide range index — invariants here are limited to the local
-/// EndDateTime &gt; StartDateTime guard.
+/// against a dealer-wide range index. Local invariants: EndDateTime &gt; StartDateTime,
+/// StartDateTime cannot be dated before the calling operation's own clock (no scheduling
+/// into the past), and Reschedule/Complete/Cancel/MarkNoShow all require the appointment to
+/// still be Scheduled (see <see cref="EnsureScheduled"/>) — once it left that status it is
+/// a closed record.
 /// </summary>
 public sealed class Appointment : Entity
 {
@@ -46,6 +49,8 @@ public sealed class Appointment : Entity
             throw new DomainException("AgentId cannot be empty");
         if (end <= start)
             throw new DomainException("La hora de fin debe ser posterior a la hora de inicio");
+        if (start.Date < createdAtUtc.Date)
+            throw new DomainException("No se puede agendar un turno en una fecha pasada");
 
         var appointment = new Appointment();
         appointment.SetDealer(dealerId);
@@ -67,14 +72,15 @@ public sealed class Appointment : Entity
 
     public void Reschedule(DateTime newStart, DateTime newEnd, DateTime rescheduledAtUtc)
     {
+        EnsureScheduled();
+
         if (newEnd <= newStart)
             throw new DomainException("La hora de fin debe ser posterior a la hora de inicio");
+        if (newStart.Date < rescheduledAtUtc.Date)
+            throw new DomainException("No se puede reagendar un turno a una fecha pasada");
 
         StartDateTime = newStart;
         EndDateTime = newEnd;
-        // rescheduledAtUtc is reserved for an audit trail field; kept as a parameter
-        // so callers can drive it from IDateTimeProvider (no hidden clock dependency).
-        _ = rescheduledAtUtc;
 
         Raise(new AppointmentRescheduledDomainEvent(Id, newStart, newEnd));
     }

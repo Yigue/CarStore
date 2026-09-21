@@ -21,7 +21,7 @@ internal sealed class RescheduleAppointmentCommandHandler(
         Guid dealerId = tenantService.DealerId;
 
         Appointment? appointment = await context.Appointments
-            .FirstOrDefaultAsync(a => a.Id == command.AppointmentId, cancellationToken);
+            .FirstOrDefaultAsync(a => a.Id == command.AppointmentId && a.DealerId == dealerId, cancellationToken);
 
         if (appointment is null)
             return Result.Failure(AppointmentErrors.NotFound(command.AppointmentId));
