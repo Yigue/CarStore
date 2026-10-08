@@ -69,9 +69,6 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired(false);
 
-        // Exclude Archivado leads from default queries (logical delete)
-        builder.HasQueryFilter(l => l.Status != Domain.Leads.LeadStatus.Archivado);
-
         builder.HasIndex(l => new { l.DealerId, l.Status })
             .HasDatabaseName("ix_leads_dealer_status");
 

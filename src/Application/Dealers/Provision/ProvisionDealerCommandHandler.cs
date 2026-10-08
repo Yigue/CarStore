@@ -116,6 +116,9 @@ internal sealed class ProvisionDealerCommandHandler(
 
             context.Roles.Add(adminRole);
 
+            var clienteRole = new Role(dealerId, "Cliente", "Cliente registrado");
+            context.Roles.Add(clienteRole);
+
             user = new User(
                 dealerId,
                 command.AdminEmail,

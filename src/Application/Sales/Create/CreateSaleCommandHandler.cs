@@ -14,6 +14,7 @@ using Domain.Sales.Attributes;
 using Domain.Sales.Events;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
+using Application.Common;
 
 // Both namespaces define a PaymentMethod and this file has to speak about both: what the buyer
 // INTENDED on the quote, and how the money actually moves on the sale. Bare `PaymentMethod` in
@@ -31,13 +32,24 @@ internal sealed class CreateSaleCommandHandler(
 {
     public async Task<Result<Guid>> Handle(CreateSaleCommand command, CancellationToken cancellationToken)
     {
+        var tenantGuard = TenantGuard.EnsureHasTenant(tenantService);
+        if (tenantGuard.IsFailure)
+        {
+            return Result.Failure<Guid>(tenantGuard.Error);
+        }
+
         // Verify if car exists and is available
         Car? car = await context.Cars
-            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.Id == command.CarId, cancellationToken);      
         if (car == null)
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
+        }
+
+        var carGuard = TenantGuard.EnsureSameDealerOrNotFound(tenantService, car.DealerId, CarErrors.NotFound(command.CarId));
+        if (carGuard.IsFailure)
+        {
+            return Result.Failure<Guid>(carGuard.Error);
         }        
         // Validate car does not already have a completed sale in Sales records.
         bool hasCompletedSale = await context.Sales

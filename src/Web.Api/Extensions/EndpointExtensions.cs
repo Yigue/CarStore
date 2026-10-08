@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Web.Api.Endpoints;
 
@@ -45,5 +45,10 @@ public static class EndpointExtensions
     public static RouteHandlerBuilder HasPermission(this RouteHandlerBuilder app, string permission)
     {
         return app.RequireAuthorization(permission);
+    }
+
+    public static RouteHandlerBuilder RequestSizeLimit(this RouteHandlerBuilder builder, long bytes)
+    {
+        return builder.WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(bytes));
     }
 }

@@ -147,8 +147,11 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         // Ignorar DealerId en entidades compartidas (catálogo)
         modelBuilder.Entity<Marca>().Ignore(x => x.DealerId);
         modelBuilder.Entity<Modelo>().Ignore(x => x.DealerId);
-        modelBuilder.Entity<TransactionCategory>().Ignore(x => x.DealerId);
         modelBuilder.Entity<CarImage>().Ignore(x => x.DealerId);
+
+        modelBuilder.Entity<TransactionCategory>()
+            .HasIndex(x => x.DealerId)
+            .HasDatabaseName("ix_transaction_categories_dealer_id");
 
         // User configuration (Email + Role + length constraints) vive en
         // Infrastructure/Database/Configurations/UserConfiguration.cs y se
@@ -180,7 +183,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<DealerSettingsEntity>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Lead>().HasQueryFilter(x =>
-            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+            (!_tenantService.HasTenant || x.DealerId == _tenantService.DealerId) && x.Status != Domain.Leads.LeadStatus.Archivado);
         modelBuilder.Entity<LeadActivity>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.Documents.Document>().HasQueryFilter(x =>
@@ -197,7 +200,9 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<WebhookDelivery>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
-        // Note: Marca, Modelo, TransactionCategory, CarImage are shared across tenants (catalog data)
+        modelBuilder.Entity<TransactionCategory>().HasQueryFilter(x =>
+            x.DealerId == Guid.Empty || !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        // Note: Marca, Modelo, CarImage are shared across tenants (catalog data)
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

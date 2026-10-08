@@ -55,4 +55,51 @@ public class TokenProviderTests
 
         act.Should().Throw<ArgumentNullException>();
     }
+
+    [Fact]
+    public void Create_DoesNotEmitPlatformRoleClaim_WhenUserHasNonEmptyDealerIdEvenIfRoleIdIsEmpty()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Jwt:Secret"] = "supersecretkeysupersecretkeysupersecretkey",
+            ["Jwt:Issuer"] = "issuer",
+            ["Jwt:Audience"] = "audience",
+            ["Jwt:ExpirationInMinutes"] = "60"
+        }).Build();
+
+        var provider = new TokenProvider(configuration);
+        var dealerId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        // User with DealerId and empty RoleId (e.g. legacy or orphan user)
+        var user = new User(dealerId, "tenant@example.com", "Tenant", "User", "hash", Guid.Empty);
+
+        string token = provider.Create(user, "Cliente");
+
+        var handler = new JsonWebTokenHandler();
+        var jwt = handler.ReadJsonWebToken(token);
+
+        jwt.Claims.Any(c => c.Type == "platform_role").Should().BeFalse(
+            "Users belonging to a dealer must NEVER receive the platform_role claim, even with empty RoleId");
+    }
+
+    [Fact]
+    public void Create_EmitsPlatformRoleClaim_WhenUserIsSuperAdmin()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Jwt:Secret"] = "supersecretkeysupersecretkeysupersecretkey",
+            ["Jwt:Issuer"] = "issuer",
+            ["Jwt:Audience"] = "audience",
+            ["Jwt:ExpirationInMinutes"] = "60"
+        }).Build();
+
+        var provider = new TokenProvider(configuration);
+        var superAdmin = User.CreateSuperAdmin("superadmin@carstore.com", "Super", "Admin", "hash");
+
+        string token = provider.Create(superAdmin, "SuperAdmin");
+
+        var handler = new JsonWebTokenHandler();
+        var jwt = handler.ReadJsonWebToken(token);
+
+        jwt.Claims.First(c => c.Type == "platform_role").Value.Should().Be("super_admin");
+    }
 }

@@ -1,4 +1,4 @@
-﻿using Application.Users.Register;
+using Application.Users.Register;
 using MediatR;
 using SharedKernel;
 using Web.Api.Extensions;
@@ -12,19 +12,17 @@ internal sealed class Register : IEndpoint
         string Email,
         string FirstName,
         string LastName,
-        string Password,
-        Guid? DealerId);
+        string Password);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("users/register", async (Request request, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new RegisterUserCommand(
-                request.Email,
-                request.FirstName,
-                request.LastName,
-                request.Password,
-                request.DealerId);
+                Email: request.Email,
+                FirstName: request.FirstName,
+                LastName: request.LastName,
+                Password: request.Password);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

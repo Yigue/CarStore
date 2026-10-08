@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Application.Abstractions.Data;
+using Application.Abstractions.Webhooks;
 using Domain.Webhooks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -21,7 +22,8 @@ public sealed class DispatchWebhookDeliveriesJob(
     IApplicationDbContext dbContext,
     IHttpClientFactory httpClientFactory,
     IDateTimeProvider dateTimeProvider,
-    ILogger<DispatchWebhookDeliveriesJob> logger) : IJob
+    ILogger<DispatchWebhookDeliveriesJob> logger,
+    IWebhookDestinationGuard? destinationGuard = null) : IJob
 {
     public const string HttpClientName = "WebhookDelivery";
 
@@ -83,6 +85,17 @@ public sealed class DispatchWebhookDeliveriesJob(
     {
         try
         {
+            if (destinationGuard is not null && !await destinationGuard.ValidateDestinationAsync(subscription.Url, cancellationToken))
+            {
+                logger.LogWarning(
+                    "Webhook delivery {DeliveryId} to subscription {SubscriptionId} rejected: destination blocked",
+                    delivery.Id,
+                    subscription.Id);
+
+                delivery.RecordFailure(dateTimeProvider.UtcNow, statusCode: null, "Destination blocked");
+                return;
+            }
+
             using var request = new HttpRequestMessage(HttpMethod.Post, subscription.Url);
             request.Content = new StringContent(delivery.Payload, Encoding.UTF8, "application/json");
             request.Headers.TryAddWithoutValidation(EventHeaderName, delivery.EventType);
@@ -101,6 +114,17 @@ public sealed class DispatchWebhookDeliveriesJob(
                     (int)response.StatusCode,
                     $"Non-success status code: {(int)response.StatusCode}");
             }
+        }
+        catch (HttpRequestException ex) when (ex.Message.Contains("Destination blocked", StringComparison.OrdinalIgnoreCase) ||
+                                              ex.InnerException?.Message.Contains("Destination blocked", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            logger.LogWarning(
+                ex,
+                "Webhook delivery {DeliveryId} to subscription {SubscriptionId} failed: destination blocked",
+                delivery.Id,
+                subscription.Id);
+
+            delivery.RecordFailure(dateTimeProvider.UtcNow, statusCode: null, "Destination blocked");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
         {

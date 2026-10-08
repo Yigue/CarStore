@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using Application.Abstractions.Tenancy;
 using Application.Quotes.Delete;
 using Domain.Cars;
 using Domain.Cars.Attributes;
@@ -9,11 +10,14 @@ using Domain.Clients;
 using Domain.Quotes;
 using Domain.Quotes.Attributes;
 using Microsoft.EntityFrameworkCore;
+using Moq;
 
 namespace Application.UnitTests.Quotes;
 
 public class DeleteQuoteCommandHandlerTests
 {
+    private static readonly Guid DealerId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
     private static TestApplicationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<TestApplicationDbContext>()
@@ -22,12 +26,23 @@ public class DeleteQuoteCommandHandlerTests
         return new TestApplicationDbContext(options);
     }
 
+    private static ICurrentTenantService CreateTenantService(Guid? dealerId = null)
+    {
+        var tenantMock = new Mock<ICurrentTenantService>();
+        tenantMock.SetupGet(t => t.HasTenant).Returns(true);
+        tenantMock.SetupGet(t => t.DealerId).Returns(dealerId ?? DealerId);
+        return tenantMock.Object;
+    }
+
+    private static DeleteQuoteCommandHandler CreateHandler(TestApplicationDbContext context, Guid? dealerId = null) =>
+        new DeleteQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(dealerId));
+
     private static async Task<(Quote Quote, Car Car)> SeedQuoteAsync(
         TestApplicationDbContext context,
         StatusServiceCar carStatus = StatusServiceCar.Reservado,
         Action<Quote>? mutateQuote = null)
     {
-        var dealerId = Guid.NewGuid();
+        var dealerId = DealerId;
         var marca = new Marca("Peugeot");
         var modelo = new Modelo("208", marca.Id);
         var car = new Car(dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New, carStatus, 4, 5, 1600, 1000, 2021, "DEL001", "desc", 15000m, DateTime.UtcNow);
@@ -48,8 +63,7 @@ public class DeleteQuoteCommandHandlerTests
     {
         using var context = CreateContext();
         var (quote, _) = await SeedQuoteAsync(context);
-        var dateProvider = new FakeDateTimeProvider();
-        var handler = new DeleteQuoteCommandHandler(context, dateProvider);
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteQuoteCommand(quote.Id), CancellationToken.None);
 
@@ -64,8 +78,7 @@ public class DeleteQuoteCommandHandlerTests
     public async Task Handle_Should_ReturnNotFound_WhenQuoteDoesNotExist()
     {
         using var context = CreateContext();
-        var dateProvider = new FakeDateTimeProvider();
-        var handler = new DeleteQuoteCommandHandler(context, dateProvider);
+        var handler = CreateHandler(context);
         var missingId = Guid.NewGuid();
 
         var result = await handler.Handle(new DeleteQuoteCommand(missingId), CancellationToken.None);
@@ -89,8 +102,7 @@ public class DeleteQuoteCommandHandlerTests
             context,
             StatusServiceCar.Reservado,
             q => q.Accept(DateTime.UtcNow));
-        var dateProvider = new FakeDateTimeProvider();
-        var handler = new DeleteQuoteCommandHandler(context, dateProvider);
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteQuoteCommand(quote.Id), CancellationToken.None);
 
@@ -106,8 +118,7 @@ public class DeleteQuoteCommandHandlerTests
         // offer must not hand the unit back to the floor.
         using var context = CreateContext();
         var (quote, car) = await SeedQuoteAsync(context, StatusServiceCar.Reservado);
-        var dateProvider = new FakeDateTimeProvider();
-        var handler = new DeleteQuoteCommandHandler(context, dateProvider);
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteQuoteCommand(quote.Id), CancellationToken.None);
 
@@ -124,8 +135,7 @@ public class DeleteQuoteCommandHandlerTests
             context,
             StatusServiceCar.Vendido,
             q => q.Reject("not interested anymore", DateTime.UtcNow));
-        var dateProvider = new FakeDateTimeProvider();
-        var handler = new DeleteQuoteCommandHandler(context, dateProvider);
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteQuoteCommand(quote.Id), CancellationToken.None);
 

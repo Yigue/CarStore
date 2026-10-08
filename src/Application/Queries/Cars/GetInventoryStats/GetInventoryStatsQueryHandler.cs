@@ -29,7 +29,7 @@ internal sealed class GetInventoryStatsQueryHandler
         var totalValue = cars.Sum(c => c.Price.Amount);
 
         var available = cars.Count(c => c.ServiceCar == StatusServiceCar.Disponible);
-        var reserved = cars.Count(c => c.ServiceCar == StatusServiceCar.EnVenta);
+        var reserved = cars.Count(c => c.ServiceCar == StatusServiceCar.Reservado);
         var sold = cars.Count(c => c.ServiceCar == StatusServiceCar.Vendido);
 
         var byBrand = cars

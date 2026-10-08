@@ -6,6 +6,7 @@ using Application.Appointments.Commands.DeleteAppointment;
 using Domain.Appointments;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 
 namespace Application.UnitTests.Appointments;
 
@@ -89,5 +90,24 @@ public class DeleteAppointmentCommandHandlerTests
             result.IsSuccess.Should().BeFalse();
             result.Error.Code.Should().Be("Appointments.NotFound");
         }
+    }
+
+    [Fact]
+    public async Task Handle_NoTenantContext_ReturnsForbidden()
+    {
+        // API-005: Missing tenant context must return Forbidden
+        var options = new DbContextOptionsBuilder<TestApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        using var context = new TestApplicationDbContext(options);
+
+        var tenantMock = new Mock<ICurrentTenantService>();
+        tenantMock.SetupGet(t => t.HasTenant).Returns(false);
+
+        var handler = new DeleteAppointmentCommandHandler(context, tenantMock.Object);
+        var result = await handler.Handle(new DeleteAppointmentCommand(Guid.NewGuid()), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Forbidden);
     }
 }

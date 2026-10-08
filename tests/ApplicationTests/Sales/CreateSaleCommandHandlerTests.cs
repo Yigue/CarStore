@@ -32,18 +32,29 @@ public class CreateSaleCommandHandlerTests
         return new TestApplicationDbContext(options);
     }
 
+    private static readonly Guid FixedDealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+    private static Mock<ICurrentTenantService> CreateTenantMock(Guid? dealerId = null)
+    {
+        var mock = new Mock<ICurrentTenantService>();
+        mock.SetupGet(t => t.HasTenant).Returns(true);
+        mock.SetupGet(t => t.DealerId).Returns(dealerId ?? FixedDealerId);
+        return mock;
+    }
+
     private static (Car car, Client client) SeedCarAndClient(
         TestApplicationDbContext context,
         string marcaName,
         string modeloName,
         string patente,
-        StatusServiceCar carStatus = StatusServiceCar.Disponible)
+        StatusServiceCar carStatus = StatusServiceCar.Disponible,
+        Guid? dealerId = null)
     {
         var marca = new Marca(marcaName);
         var modelo = new Modelo(modeloName, marca.Id);
-        var dealerId = Guid.NewGuid();
-        var car = new Car(dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New, carStatus, 4, 5, 1600, 1000, 2020, patente, "desc", 10000m, DateTime.UtcNow);
-        var client = new Client(dealerId, "Alice", "Johnson", Guid.NewGuid().ToString("N")[..8], $"{Guid.NewGuid():N}@test.com", "111", "Addr1", DateTime.UtcNow);
+        var dId = dealerId ?? FixedDealerId;
+        var car = new Car(dId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New, carStatus, 4, 5, 1600, 1000, 2020, patente, "desc", 10000m, DateTime.UtcNow);
+        var client = new Client(dId, "Alice", "Johnson", Guid.NewGuid().ToString("N")[..8], $"{Guid.NewGuid():N}@test.com", "111", "Addr1", DateTime.UtcNow);
         context.Marca.Add(marca);
         context.Modelo.Add(modelo);
         context.Cars.Add(car);
@@ -66,8 +77,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-NEW", "attempt second sale");
 
@@ -87,8 +97,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN123", "ok", Status: SaleStatus.Completed);
 
@@ -109,8 +118,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-PND", "pending sale");
 
@@ -130,8 +138,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-CMP", "completed sale", Status: SaleStatus.Completed);
 
@@ -154,8 +161,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-RSV", "from quote");
 
@@ -171,7 +177,7 @@ public class CreateSaleCommandHandlerTests
         using var context = CreateContext();
         var marca = new Marca("Peugeot");
         var modelo = new Modelo("208", marca.Id);
-        var dealerId = Guid.NewGuid();
+        var dealerId = FixedDealerId;
         var car = new Car(dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2021, "QTE001", "desc", 15000m, DateTime.UtcNow);
         var client = new Client(dealerId, "Carol", "White", "456", "carol@test.com", "222", "Addr2", DateTime.UtcNow);
         context.Marca.Add(marca);
@@ -183,8 +189,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var quoteId = quote.Id;
         var command = new CreateSaleCommand(car.Id, client.Id, 14000m, PaymentMethod.Cash, "CN-Q", "from quote", LeadId: null, QuoteId: quoteId);
@@ -202,7 +207,7 @@ public class CreateSaleCommandHandlerTests
         using var context = CreateContext();
         var marca = new Marca("Fiat");
         var modelo = new Modelo("Cronos", marca.Id);
-        var dealerId = Guid.NewGuid();
+        var dealerId = FixedDealerId;
         var car = new Car(dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1400, 1000, 2022, "QTE002", "desc", 12000m, DateTime.UtcNow);
         var client = new Client(dealerId, "Dan", "Green", "457", "dan@test.com", "333", "Addr3", DateTime.UtcNow);
         context.Marca.Add(marca);
@@ -212,8 +217,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 11000m, PaymentMethod.Cash, "CN-NQ", "no quote");
 
@@ -258,8 +262,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var quoteId = Guid.NewGuid();
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-QNF", "no quote found", LeadId: null, QuoteId: quoteId);
@@ -282,8 +285,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-QNA", "not accepted", LeadId: null, QuoteId: quote.Id);
 
@@ -306,8 +308,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-QCM", "car mismatch", LeadId: null, QuoteId: quote.Id);
 
@@ -331,8 +332,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-QLM", "client mismatch", LeadId: null, QuoteId: quote.Id);
 
@@ -360,8 +360,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-QLL", "lead-linked matches", LeadId: lead.Id, QuoteId: quote.Id);
 
@@ -386,8 +385,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-QLM2", "lead mismatch", LeadId: otherLead.Id, QuoteId: quote.Id);
 
@@ -409,8 +407,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-QOK", "matches", LeadId: null, QuoteId: quote.Id);
 
@@ -429,8 +426,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-QNULL", "no quote at all");
 
@@ -451,8 +447,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var carId = Guid.NewGuid();
         var command = new CreateSaleCommand(carId, client.Id, 1000m, PaymentMethod.Cash, "C", "comment");
@@ -472,8 +467,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var salespersonId = Guid.NewGuid();
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-SLP", "with salesperson", SalespersonId: salespersonId);
@@ -493,8 +487,7 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var dateProvider = new FakeDateTimeProvider();
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, dateProvider, tenantService.Object);
         var command = new CreateSaleCommand(car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-NOSLP", "no salesperson");
 
@@ -522,8 +515,7 @@ public class CreateSaleCommandHandlerTests
         mutateClient(client);
         await context.SaveChangesAsync();
 
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, new FakeDateTimeProvider(), tenantService.Object);
 
         return await handler.Handle(
@@ -584,8 +576,7 @@ public class CreateSaleCommandHandlerTests
         var (car, client) = SeedCarAndClient(context, "Fiat", "Cronos", "CMP001");
         await context.SaveChangesAsync();
 
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         var handler = new CreateSaleCommandHandler(context, new FakeDateTimeProvider(), tenantService.Object);
 
         var result = await handler.Handle(
@@ -609,7 +600,7 @@ public class CreateSaleCommandHandlerTests
     {
         var marca = new Marca($"Marca{patente}");
         var modelo = new Modelo($"Modelo{patente}", marca.Id);
-        var dealerId = Guid.NewGuid();
+        var dealerId = FixedDealerId;
         var car = new Car(dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New,
             StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, patente, "desc", 10000m, DateTime.UtcNow);
 
@@ -627,8 +618,7 @@ public class CreateSaleCommandHandlerTests
 
     private static CreateSaleCommandHandler CreateSaleHandler(TestApplicationDbContext context)
     {
-        var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var tenantService = CreateTenantMock();
         return new CreateSaleCommandHandler(context, new FakeDateTimeProvider(), tenantService.Object);
     }
 
@@ -852,7 +842,8 @@ public class CreateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var tenantService = new Mock<ICurrentTenantService>();
-        tenantService.Setup(t => t.DealerId).Returns(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        tenantService.Setup(t => t.DealerId).Returns(car.DealerId);
+        tenantService.Setup(t => t.HasTenant).Returns(true);
         var handler = new CreateSaleCommandHandler(context, new FakeDateTimeProvider(), tenantService.Object);
 
         await handler.Handle(
@@ -861,5 +852,85 @@ public class CreateSaleCommandHandlerTests
 
         var persisted = await context.Cars.AsNoTracking().FirstAsync(c => c.Id == car.Id);
         persisted.ServiceCar.Should().Be(StatusServiceCar.Reservado);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenCarBelongsToAnotherDealer()
+    {
+        // EXP-003 / API-003 / CU-3: Selling a car belonging to another dealer must be rejected with NotFound
+        using var context = CreateContext();
+        var currentDealerId = Guid.NewGuid();
+        var otherDealerId = Guid.NewGuid();
+
+        var marca = new Marca("Toyota");
+        var modelo = new Modelo("Corolla", marca.Id);
+        var foreignCar = new Car(
+            otherDealerId,
+            marca,
+            modelo,
+            Color.Red,
+            TypeCar.Sedan,
+            StatusCar.New,
+            StatusServiceCar.Disponible,
+            4, 5, 1800, 500, 2023,
+            "FOR999",
+            "Auto ajeno",
+            15000m,
+            DateTime.UtcNow);
+
+        var client = new Client(
+            currentDealerId,
+            "Carlos",
+            "Benitez",
+            "98765432",
+            "carlos@current.com",
+            "123456",
+            "Calle 1",
+            DateTime.UtcNow);
+
+        context.Marca.Add(marca);
+        context.Modelo.Add(modelo);
+        context.Cars.Add(foreignCar);
+        context.Clients.Add(client);
+        await context.SaveChangesAsync();
+
+        var tenantService = new Mock<ICurrentTenantService>();
+        tenantService.Setup(t => t.DealerId).Returns(currentDealerId);
+        tenantService.Setup(t => t.HasTenant).Returns(true);
+
+        var handler = new CreateSaleCommandHandler(context, new FakeDateTimeProvider(), tenantService.Object);
+
+        var command = new CreateSaleCommand(
+            foreignCar.Id,
+            client.Id,
+            15000m,
+            PaymentMethod.Cash,
+            "CN-CROSS",
+            "Cross-tenant attempt");
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert: 404 Not Found (the foreign car does not exist for this tenant)
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(CarErrors.NotFound(foreignCar.Id).Code);
+        context.Sales.Any(s => s.CarId == foreignCar.Id).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_NoTenantContext_ReturnsForbidden()
+    {
+        // API-005: When tenant context is missing, handler returns Forbidden
+        using var context = CreateContext();
+        var tenantMock = new Mock<ICurrentTenantService>();
+        tenantMock.SetupGet(t => t.HasTenant).Returns(false);
+
+        var handler = new CreateSaleCommandHandler(context, new FakeDateTimeProvider(), tenantMock.Object);
+        var command = new CreateSaleCommand(Guid.NewGuid(), Guid.NewGuid(), 10000m, PaymentMethod.Cash, "CN-1", "notes");
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Forbidden);
     }
 }

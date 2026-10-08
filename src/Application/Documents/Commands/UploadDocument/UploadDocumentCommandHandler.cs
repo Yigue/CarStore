@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Application.Abstractions.Data;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Clients;
 using Domain.Documents;
 using Domain.Sales;
@@ -32,6 +33,12 @@ internal sealed class UploadDocumentCommandHandler : IRequestHandler<UploadDocum
 
     public async Task<Result<Guid>> Handle(UploadDocumentCommand request, CancellationToken ct)
     {
+        Result guard = TenantGuard.EnsureHasTenant(_tenant);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<Guid>(guard.Error);
+        }
+
         // D7 (qa-p1-integridad PR7, Slice 13): UploadDocumentCommandValidator already rejects
         // malformed base64 with a typed 400 before this handler ever runs. This defensive
         // fallback exists so a FormatException can never escape this handler even if the

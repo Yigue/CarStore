@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Leads;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -7,15 +9,30 @@ using SharedKernel;
 namespace Application.Leads.GetAll;
 
 internal sealed class GetLeadsQueryHandler(
-    IApplicationDbContext context
+    IApplicationDbContext context,
+    ICurrentTenantService? tenantService = null
 ) : IQueryHandler<GetLeadsQuery, List<LeadResponse>>
 {
     public async Task<Result<List<LeadResponse>>> Handle(GetLeadsQuery query, CancellationToken cancellationToken)
     {
-        var leadsQuery = context.Leads
+        IQueryable<Lead> leadsQuery;
+
+        if (query.IncludeArchived || query.Status == LeadStatus.Archivado)
+        {
+            leadsQuery = tenantService != null && tenantService.HasTenant
+                ? context.Leads.IgnoreQueryFiltersForTenant(tenantService)
+                : context.Leads.IgnoreQueryFilters();
+        }
+        else
+        {
+            leadsQuery = tenantService != null && tenantService.HasTenant
+                ? context.Leads.Where(l => l.DealerId == tenantService.DealerId)
+                : context.Leads.AsQueryable();
+        }
+
+        leadsQuery = leadsQuery
             .AsNoTracking()
-            .OrderByDescending(l => l.CreatedAt)
-            .AsQueryable();
+            .OrderByDescending(l => l.CreatedAt);
 
         if (query.Status.HasValue)
             leadsQuery = leadsQuery.Where(l => l.Status == query.Status.Value);

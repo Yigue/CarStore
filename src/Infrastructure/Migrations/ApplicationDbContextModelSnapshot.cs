@@ -201,8 +201,18 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("nombre");
 
+                    b.Property<string>("NombreNormalizado")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("nombre_normalizado");
+
                     b.HasKey("Id")
                         .HasName("pk_marca");
+
+                    b.HasIndex("NombreNormalizado")
+                        .IsUnique()
+                        .HasDatabaseName("ix_marca_nombre_normalizado");
 
                     b.ToTable("marca", "public");
                 });
@@ -399,9 +409,10 @@ namespace Infrastructure.Migrations
                     b.HasIndex("ModeloId")
                         .HasDatabaseName("ix_cars_modelo_id");
 
-                    b.HasIndex("Patente")
+                    b.HasIndex("DealerId", "Patente")
                         .IsUnique()
-                        .HasDatabaseName("ix_cars_patente");
+                        .HasDatabaseName("ix_cars_dealer_patente")
+                        .HasFilter("is_deleted = false");
 
                     b.ToTable("cars", "public");
                 });
@@ -625,10 +636,6 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_clients");
 
-                    b.HasIndex("DNI")
-                        .IsUnique()
-                        .HasDatabaseName("ix_clients_dni");
-
                     b.HasIndex("IsDeleted")
                         .HasDatabaseName("ix_clients_is_deleted");
 
@@ -640,6 +647,11 @@ namespace Infrastructure.Migrations
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchName"), "gin");
                     NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("SearchName"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("DealerId", "DNI")
+                        .IsUnique()
+                        .HasDatabaseName("ix_clients_dealer_dni")
+                        .HasFilter("is_deleted = false");
 
                     b.ToTable("clients", "public");
                 });
@@ -907,6 +919,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text")
@@ -923,6 +939,9 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_transaction_categories");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_transaction_categories_dealer_id");
 
                     b.ToTable("transaction_categories", "public");
                 });

@@ -29,13 +29,29 @@ internal sealed class RestoreClientCommandHandler(
             return Result.Failure<Guid>(ClientErrors.NotFound(command.Id));
         }
 
+        // Check if an active client already exists with this DNI in the same dealer
+        var dniConflict = await context.Clients
+            .AnyAsync(c => (!tenantService.HasTenant || c.DealerId == tenantService.DealerId) && c.Id != client.Id && c.DNI == client.DNI, cancellationToken);
+
+        if (dniConflict)
+        {
+            return Result.Failure<Guid>(ClientErrors.DniConflict(client.DNI));
+        }
+
         Result result = client.Restore(userContext.UserId, dateTimeProvider.UtcNow);
         if (result.IsFailure)
         {
             return Result.Failure<Guid>(result.Error);
         }
 
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Result.Failure<Guid>(ClientErrors.DniConflict(client.DNI));
+        }
 
         return Result.Success(client.Id);
     }

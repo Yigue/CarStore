@@ -10,22 +10,26 @@ internal sealed class GetPrimaryImages : IEndpoint
     {
         app.MapGet("cars/primary-images", async (
             IApplicationDbContext context,
-            CancellationToken cancellationToken) =>
+            [Microsoft.AspNetCore.Mvc.FromQuery] int page = 1,
+            [Microsoft.AspNetCore.Mvc.FromQuery] int pageSize = 20,
+            CancellationToken cancellationToken = default) =>
         {
-            // Primero cargamos todas las imágenes
-            var allImages = await context.CarImages
-                .ToListAsync(cancellationToken);
-                
-            // Luego filtramos y construimos la respuesta en memoria
-            var primaryImages = allImages
-                .Where(img => img.IsPrimary)
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+
+            var primaryImages = await context.Cars
+                .SelectMany(c => c.Images)
+                .Where(img => img.IsCover)
+                .OrderBy(img => img.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(img => new
                 {
                     img.CarId,
                     img.Id,
                     img.ImageUrl
                 })
-                .ToList();
+                .ToListAsync(cancellationToken);
 
             return Results.Ok(primaryImages);
         })

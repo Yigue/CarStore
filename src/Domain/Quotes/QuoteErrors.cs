@@ -23,7 +23,7 @@ public static class QuoteErrors
         "Quotes.InvalidValidUntil",
         "The ValidUntil date must be in the future");
     
-    public static Error AlreadyProcessed(Guid quoteId) => Error.Problem(
+    public static Error AlreadyProcessed(Guid quoteId) => Error.Conflict(
         "Quotes.AlreadyProcessed",
         $"The quote with Id = '{quoteId}' has already been processed (accepted or rejected)");
     

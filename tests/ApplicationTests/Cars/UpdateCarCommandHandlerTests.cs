@@ -254,4 +254,132 @@ public class UpdateCarCommandHandlerTests
         images.Count(i => i.IsCover).Should().Be(1);
         images.Single(i => i.Id == imageIds[0]).IsCover.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Handle_Should_ReturnConflict_WhenPatenteAlreadyUsedByAnotherCarInSameDealer()
+    {
+        string db = Guid.NewGuid().ToString();
+        var dealerId = Guid.NewGuid();
+
+        Guid carId1, carId2, marcaId, modeloId;
+        await using (var seed = new TestApplicationDbContext(Options(db), dealerId))
+        {
+            var marca = new Marca("Toyota");
+            var modelo = new Modelo("Corolla", marca.Id);
+            seed.Marca.Add(marca);
+            seed.Modelo.Add(modelo);
+            await seed.SaveChangesAsync();
+
+            var car1 = new Car(dealerId, marca, modelo, Color.Blue, TypeCar.Sedan, StatusCar.New,
+                StatusServiceCar.Disponible, 4, 5, 2000, 0, 2020, "AAA111", "first", 25000m, DateTime.UtcNow);
+            var car2 = new Car(dealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New,
+                StatusServiceCar.Disponible, 4, 5, 2000, 0, 2020, "BBB222", "second", 25000m, DateTime.UtcNow);
+            seed.Cars.AddRange(car1, car2);
+            await seed.SaveChangesAsync();
+
+            carId1 = car1.Id;
+            carId2 = car2.Id;
+            marcaId = marca.Id;
+            modeloId = modelo.Id;
+        }
+
+        await using (var ctx = new TestApplicationDbContext(Options(db), dealerId))
+        {
+            var handler = CreateHandler(ctx, marcaId, modeloId, "Toyota", "Corolla");
+            // Attempt to update car2 with car1's patente "AAA111"
+            var updateCommand = new UpdateCarCommand(
+                carId2, marcaId, modeloId, Color.Red, TypeCar.Sedan, StatusCar.Used,
+                StatusServiceCar.Disponible, 4, 5, 1800, 100, 2020, "AAA111", "updated",
+                25000m, FuelType.Gasolina, false, Transmission.Manual, null);
+
+            var result = await handler.Handle(updateCommand, CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Should().Be(CarErrors.PatenteAlreadyExists("AAA111"));
+        }
+    }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenUpdatingWithoutChangingOwnPatente()
+    {
+        string db = Guid.NewGuid().ToString();
+        var dealerId = Guid.NewGuid();
+
+        Guid carId, marcaId, modeloId;
+        await using (var seed = new TestApplicationDbContext(Options(db), dealerId))
+        {
+            var marca = new Marca("Toyota");
+            var modelo = new Modelo("Corolla", marca.Id);
+            seed.Marca.Add(marca);
+            seed.Modelo.Add(modelo);
+            await seed.SaveChangesAsync();
+
+            var car = new Car(dealerId, marca, modelo, Color.Blue, TypeCar.Sedan, StatusCar.New,
+                StatusServiceCar.Disponible, 4, 5, 2000, 0, 2020, "AAA111", "first", 25000m, DateTime.UtcNow);
+            seed.Cars.Add(car);
+            await seed.SaveChangesAsync();
+
+            carId = car.Id;
+            marcaId = marca.Id;
+            modeloId = modelo.Id;
+        }
+
+        await using (var ctx = new TestApplicationDbContext(Options(db), dealerId))
+        {
+            var handler = CreateHandler(ctx, marcaId, modeloId, "Toyota", "Corolla");
+            // Update car keeping its own patente "AAA111"
+            var updateCommand = new UpdateCarCommand(
+                carId, marcaId, modeloId, Color.Red, TypeCar.Sedan, StatusCar.Used,
+                StatusServiceCar.Disponible, 4, 5, 1800, 500, 2020, "AAA111", "updated own",
+                27000m, FuelType.Gasolina, false, Transmission.Manual, null);
+
+            var result = await handler.Handle(updateCommand, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenPatenteUsedByCarInDifferentDealer()
+    {
+        string db = Guid.NewGuid().ToString();
+        var dealerA = Guid.NewGuid();
+        var dealerB = Guid.NewGuid();
+
+        Guid carIdB, marcaId, modeloId;
+        await using (var seed = new TestApplicationDbContext(Options(db), dealerA))
+        {
+            var marca = new Marca("Toyota");
+            var modelo = new Modelo("Corolla", marca.Id);
+            seed.Marca.Add(marca);
+            seed.Modelo.Add(modelo);
+            await seed.SaveChangesAsync();
+
+            var carA = new Car(dealerA, marca, modelo, Color.Blue, TypeCar.Sedan, StatusCar.New,
+                StatusServiceCar.Disponible, 4, 5, 2000, 0, 2020, "AAA111", "dealer A car", 25000m, DateTime.UtcNow);
+            var carB = new Car(dealerB, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New,
+                StatusServiceCar.Disponible, 4, 5, 2000, 0, 2020, "BBB222", "dealer B car", 25000m, DateTime.UtcNow);
+            seed.Cars.AddRange(carA, carB);
+            await seed.SaveChangesAsync();
+
+            carIdB = carB.Id;
+            marcaId = marca.Id;
+            modeloId = modelo.Id;
+        }
+
+        await using (var ctx = new TestApplicationDbContext(Options(db), dealerB))
+        {
+            var handler = CreateHandler(ctx, marcaId, modeloId, "Toyota", "Corolla");
+            // Dealer B updates carB to have patente "AAA111", which exists in dealer A
+            var updateCommand = new UpdateCarCommand(
+                carIdB, marcaId, modeloId, Color.Red, TypeCar.Sedan, StatusCar.Used,
+                StatusServiceCar.Disponible, 4, 5, 1800, 500, 2020, "AAA111", "updated to dealer A patente",
+                27000m, FuelType.Gasolina, false, Transmission.Manual, null);
+
+            var result = await handler.Handle(updateCommand, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue(
+                "Different dealers are isolated; reusing a license plate across dealers is permitted");
+        }
+    }
 }

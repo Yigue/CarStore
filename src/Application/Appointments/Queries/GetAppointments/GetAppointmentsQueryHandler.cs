@@ -1,6 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Common;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -21,6 +22,10 @@ internal sealed class GetAppointmentsQueryHandler(
         GetAppointmentsQuery query,
         CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+            return Result.Failure<IReadOnlyList<AppointmentDto>>(guard.Error);
+
         Guid dealerId = tenantService.DealerId;
 
         // Car display name comes from the Marca + Modelo + Anio (year) triple — the

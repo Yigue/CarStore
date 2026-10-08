@@ -28,7 +28,8 @@ internal sealed class UpdateFinancialCommandHandler(
         // DealerId, but a cross-tenant attacker with a known tx id could still
         // reach this code via raw SQL or after the GQF is bypassed. Reject
         // BEFORE the Update + SaveChanges so no DB write occurs.
-        var guard = TenantGuard.EnsureSameDealer(tenantService, financial.DealerId);
+        // Returns NotFound (404) to avoid cross-tenant resource enumeration (D2).
+        Result guard = TenantGuard.EnsureSameDealerOrNotFound(tenantService, financial.DealerId, FinancialErrors.NotFound(command.Id));
         if (guard.IsFailure)
         {
             return Result.Failure<Guid>(guard.Error);

@@ -69,6 +69,12 @@ public sealed class User : Entity
     public string? Phone { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    /// <summary>
+    /// Indicates whether the user is a platform-level SuperAdmin.
+    /// SuperAdmin users are defined exclusively by DealerId == Guid.Empty.
+    /// </summary>
+    public bool IsPlatformAdmin => DealerId == Guid.Empty;
+
     // Navigation property for permissions (configured in EF Core)
     private readonly List<UserPermission> _permissions;
     public IReadOnlyCollection<UserPermission> Permissions => _permissions;

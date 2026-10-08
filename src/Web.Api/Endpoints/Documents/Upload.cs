@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
+using Web.Api.Extensions;
 using Web.Api.Infrastructure;
 
 namespace Web.Api.Endpoints.Documents;
@@ -16,48 +17,58 @@ namespace Web.Api.Endpoints.Documents;
 /// </summary>
 internal sealed class Upload : IEndpoint
 {
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("documents/ocr-upload",
-            async (
-                IFormFile file,
-                [FromQuery] Guid? clientId,
-                [FromQuery] Guid? saleId,
-                ISender sender,
-                CancellationToken ct) =>
-            {
-                if (file is null || file.Length == 0)
-                {
-                    return Results.BadRequest(new
-                    {
-                        code = "Document.EmptyFile",
-                        description = "Se requiere un archivo no vacío.",
-                    });
-                }
-
-                await using var stream = file.OpenReadStream();
-
-                var command = new UploadAndVerifyDocumentCommand(
-                    FileStream: stream,
-                    ContentType: file.ContentType,
-                    FileName: file.FileName,
-                    ClientId: clientId,
-                    SaleId: saleId);
-
-                Result<VerifyDocumentResultDto> result = await sender.Send(command, ct);
-
-                return result.Match(
-                    dto => Results.Created($"/api/v1/documents/{dto.DocumentId}", dto),
-                    CustomResults.Problem);
-            })
+        app.MapPost("documents/ocr-upload", HandleUpload)
         .DisableAntiforgery()
         .HasPermission(Permissions.DocumentsCreate)
+        .RequestSizeLimit(MaxFileSizeBytes)
         .WithTags(Tags.Documents)
         .WithName("UploadAndVerifyDocument")
         .Accepts<IFormFile>("multipart/form-data")
         .Produces<VerifyDocumentResultDto>(StatusCodes.Status201Created)
         .ProducesValidationProblem()
+        .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
+    }
+
+    internal static async Task<IResult> HandleUpload(
+        IFormFile file,
+        [FromQuery] Guid? clientId,
+        [FromQuery] Guid? saleId,
+        [FromServices] ISender sender,
+        CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return Results.BadRequest(new
+            {
+                code = "Document.EmptyFile",
+                description = "Se requiere un archivo no vacío.",
+            });
+        }
+
+        if (file.Length > MaxFileSizeBytes)
+        {
+            return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+        }
+
+        await using var stream = file.OpenReadStream();
+
+        var command = new UploadAndVerifyDocumentCommand(
+            FileStream: stream,
+            ContentType: file.ContentType,
+            FileName: file.FileName,
+            ClientId: clientId,
+            SaleId: saleId);
+
+        Result<VerifyDocumentResultDto> result = await sender.Send(command, ct);
+
+        return result.Match(
+            dto => Results.Created($"/api/v1/documents/{dto.DocumentId}", dto),
+            CustomResults.Problem);
     }
 }

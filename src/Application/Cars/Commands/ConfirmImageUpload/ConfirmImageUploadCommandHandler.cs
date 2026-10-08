@@ -2,6 +2,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
+using Application.Cars.Commands.UploadCarImage;
 using Application.Cars.Queries.GetCarImages;
 using Domain.Cars;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,25 @@ internal sealed class ConfirmImageUploadCommandHandler(
         if (car is null)
         {
             return Result.Failure<CarImageDto>(CarErrors.NotFound(command.CarId));
+        }
+
+        if (car.Images.Count >= CarImageUploadConstraints.MaxImagesPerCar)
+        {
+            return Result.Failure<CarImageDto>(
+                CarErrors.ImageLimitReached(CarImageUploadConstraints.MaxImagesPerCar));
+        }
+
+        if (string.IsNullOrWhiteSpace(command.ContentType) ||
+            !CarImageUploadConstraints.AllowedContentTypes.Contains(command.ContentType))
+        {
+            return Result.Failure<CarImageDto>(
+                Error.Validation("CarImage.InvalidContentType", "Content type must be one of: image/jpeg, image/png, image/webp."));
+        }
+
+        if (command.SizeBytes <= 0 || command.SizeBytes > CarImageUploadConstraints.MaxUploadSizeBytes)
+        {
+            return Result.Failure<CarImageDto>(
+                Error.Validation("CarImage.InvalidSize", "Image exceeds the maximum allowed size (10 MB)."));
         }
 
         string ext = Path.GetExtension(command.FileName).TrimStart('.');

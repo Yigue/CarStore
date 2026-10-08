@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Quotes;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -8,21 +10,47 @@ namespace Application.Quotes.Reject;
 
 internal sealed class RejectQuoteCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ICurrentTenantService? tenantService = null)
     : ICommandHandler<RejectQuoteCommand>
 {
     public async Task<Result> Handle(RejectQuoteCommand command, CancellationToken cancellationToken)
     {
+        if (tenantService is not null)
+        {
+            Result guard = TenantGuard.EnsureHasTenant(tenantService);
+            if (guard.IsFailure)
+            {
+                return guard;
+            }
+        }
+
         var quote = await context.Quotes
             .SingleOrDefaultAsync(q => q.Id == command.QuoteId, cancellationToken);
         
         if (quote is null)
             return Result.Failure(QuoteErrors.NotFound(command.QuoteId));
 
+        if (tenantService is not null)
+        {
+            Result dealerCheck = TenantGuard.EnsureSameDealerOrNotFound(tenantService, quote.DealerId, QuoteErrors.NotFound(command.QuoteId));
+            if (dealerCheck.IsFailure)
+            {
+                return dealerCheck;
+            }
+        }
+
         // Quote.Reject only accepts a Pending quote, and a Pending quote holds no reservation
         // since the hold moved to acceptance. The car is deliberately left alone: releasing it
         // here would free a unit that a competing ACCEPTED quote is holding.
-        quote.Reject(command.Reason, dateTimeProvider.UtcNow);
+        try
+        {
+            quote.Reject(command.Reason, dateTimeProvider.UtcNow);
+        }
+        catch (DomainException)
+        {
+            return Result.Failure(QuoteErrors.AlreadyProcessed(quote.Id));
+        }
 
         await context.SaveChangesAsync(cancellationToken);
 

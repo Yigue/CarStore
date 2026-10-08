@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Quotes;
 using Domain.Quotes.Attributes;
 using Microsoft.EntityFrameworkCore;
@@ -9,16 +11,29 @@ namespace Application.Quotes.Delete;
 
 internal sealed class DeleteQuoteCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ICurrentTenantService tenantService)
     : ICommandHandler<DeleteQuoteCommand>
 {
     public async Task<Result> Handle(DeleteQuoteCommand command, CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+        {
+            return guard;
+        }
+
         Quote? quote = await context.Quotes
             .SingleOrDefaultAsync(q => q.Id == command.QuoteId, cancellationToken);
 
         if (quote is null)
             return Result.Failure(QuoteErrors.NotFound(command.QuoteId));
+
+        Result dealerCheck = TenantGuard.EnsureSameDealerOrNotFound(tenantService, quote.DealerId, QuoteErrors.NotFound(command.QuoteId));
+        if (dealerCheck.IsFailure)
+        {
+            return dealerCheck;
+        }
 
         // Soft delete: the row is retained and excluded from default queries via the global
         // query filter. This is an admin action and is allowed regardless of quote status.

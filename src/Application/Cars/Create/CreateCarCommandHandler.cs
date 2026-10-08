@@ -23,11 +23,10 @@ internal sealed class CreateCarCommandHandler(
 {
     public async Task<Result<Guid>> Handle(CreateCarCommand command, CancellationToken cancellationToken)
     {
-        // Validate unique license plate before insert
+        // Validate unique license plate before insert within tenant
         var licensePlate = new Domain.Shared.ValueObjects.LicensePlate(command.Patente);
         var existingCar = await context.Cars
-            .IgnoreQueryFilters() // Patente única globalmente, no solo por concesionaria
-            .AnyAsync(c => c.Patente == licensePlate, cancellationToken);
+            .AnyAsync(c => (!tenantService.HasTenant || c.DealerId == tenantService.DealerId) && c.Patente == licensePlate, cancellationToken);
 
         if (existingCar)
         {
@@ -78,7 +77,14 @@ internal sealed class CreateCarCommandHandler(
 
         context.Cars.Add(car);
 
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Result.Failure<Guid>(CarErrors.PatenteAlreadyExists(command.Patente));
+        }
 
         return Result.Success(car.Id);
     }

@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Cars;
 using Domain.Sales;
 using Domain.Sales.Attributes;
@@ -10,11 +12,18 @@ namespace Application.Sales.Update;
 
 internal sealed class UpdateSaleCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ICurrentTenantService tenantService)
     : ICommandHandler<UpdateSaleCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(UpdateSaleCommand command, CancellationToken cancellationToken)
     {
+        var guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<Guid>(guard.Error);
+        }
+
         Sale? sale = await context.Sales
             .FirstOrDefaultAsync(s => s.Id == command.Id, cancellationToken);
 
@@ -84,7 +93,7 @@ internal sealed class UpdateSaleCommandHandler(
     private async Task SyncCarWithCompletedSaleAsync(Guid carId, CancellationToken cancellationToken)
     {
         Car? car = await context.Cars
-            .IgnoreQueryFilters()
+            .IgnoreQueryFiltersForTenant(tenantService)
             .FirstOrDefaultAsync(c => c.Id == carId, cancellationToken);
 
         car?.MarkAsSold(dateTimeProvider.UtcNow);
@@ -108,7 +117,7 @@ internal sealed class UpdateSaleCommandHandler(
         }
 
         Car? car = await context.Cars
-            .IgnoreQueryFilters()
+            .IgnoreQueryFiltersForTenant(tenantService)
             .FirstOrDefaultAsync(c => c.Id == carId, cancellationToken);
 
         car?.MarkAsAvailable(dateTimeProvider.UtcNow);

@@ -13,6 +13,8 @@ using Domain.Quotes;
 using Domain.Quotes.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using FluentAssertions;
+using SharedKernel;
 
 namespace Application.UnitTests.Quotes;
 
@@ -466,5 +468,29 @@ public class CreateQuoteCommandHandlerTests
 
         second.IsSuccess.Should().BeTrue();
         (await context.Quotes.CountAsync()).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_NoTenantContext_ReturnsForbidden()
+    {
+        // API-005: When tenant context is missing, handler returns Forbidden
+        using var context = CreateContext();
+        var tenantMock = new Mock<ICurrentTenantService>();
+        tenantMock.SetupGet(t => t.HasTenant).Returns(false);
+
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), tenantMock.Object);
+        var command = new CreateQuoteCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            10000m,
+            PaymentMethod.Contado,
+            DateTime.UtcNow.AddDays(10),
+            "notes");
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Forbidden);
     }
 }

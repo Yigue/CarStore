@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Cars;
 using Domain.Sales;
 using Domain.Sales.Attributes;
@@ -8,11 +10,20 @@ using SharedKernel;
 
 namespace Application.Sales.Delete;
 
-internal sealed class DeleteSaleCommandHandler(IApplicationDbContext context, IDateTimeProvider dateTimeProvider)
+internal sealed class DeleteSaleCommandHandler(
+    IApplicationDbContext context,
+    IDateTimeProvider dateTimeProvider,
+    ICurrentTenantService tenantService)
     : ICommandHandler<DeleteSaleCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(DeleteSaleCommand command, CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<Guid>(guard.Error);
+        }
+
         Sale? sale = await context.Sales
             .SingleOrDefaultAsync(s => s.Id == command.Id, cancellationToken);
 

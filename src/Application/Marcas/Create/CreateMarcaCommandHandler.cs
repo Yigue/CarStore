@@ -20,9 +20,11 @@ internal sealed class CreateMarcaCommandHandler(
             return Result.Failure<Guid>(Error.Validation("Marca.NombreRequired", "El nombre de la marca es requerido."));
         }
 
+        var normalized = Marca.Normalize(nombre);
+
         var exists = await context.Marca
             .IgnoreQueryFilters()
-            .AnyAsync(m => m.Nombre == nombre, cancellationToken);
+            .AnyAsync(m => m.NombreNormalizado == normalized, cancellationToken);
 
         if (exists)
         {
@@ -31,7 +33,15 @@ internal sealed class CreateMarcaCommandHandler(
 
         var marca = new Marca(nombre);
         context.Marca.Add(marca);
-        await context.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Result.Failure<Guid>(Error.Conflict("Marca.AlreadyExists", $"Ya existe una marca con el nombre '{nombre}'."));
+        }
 
         // Invalidate cached brands list
         await brandService.InvalidateCacheAsync(cancellationToken);

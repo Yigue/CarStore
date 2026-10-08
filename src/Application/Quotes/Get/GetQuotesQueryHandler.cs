@@ -1,15 +1,28 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Quotes.Get;
 
-internal sealed class GetQuotesQueryHandler(IApplicationDbContext context)
+internal sealed class GetQuotesQueryHandler(
+    IApplicationDbContext context,
+    ICurrentTenantService? tenantService = null)
     : IQueryHandler<GetQuotesQuery, List<QuoteResponse>>
 {
     public async Task<Result<List<QuoteResponse>>> Handle(GetQuotesQuery query, CancellationToken cancellationToken)
     {
+        if (tenantService is not null)
+        {
+            Result guard = TenantGuard.EnsureHasTenant(tenantService);
+            if (guard.IsFailure)
+            {
+                return Result.Failure<List<QuoteResponse>>(guard.Error);
+            }
+        }
+
         IQueryable<Domain.Quotes.Quote> source = context.Quotes;
 
         if (query.ClientId is { } clientId)

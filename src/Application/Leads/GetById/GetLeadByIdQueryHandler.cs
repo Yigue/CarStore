@@ -1,18 +1,22 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Leads;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Leads.GetById;
 
-internal sealed class GetLeadByIdQueryHandler(IApplicationDbContext context)
+internal sealed class GetLeadByIdQueryHandler(
+    IApplicationDbContext context,
+    ICurrentTenantService tenantService)
     : IQueryHandler<GetLeadByIdQuery, LeadDetailResponse>
 {
     public async Task<Result<LeadDetailResponse>> Handle(GetLeadByIdQuery query, CancellationToken cancellationToken)
     {
         var result = await (
-            from l in context.Leads.IgnoreQueryFilters()
+            from l in context.Leads.IgnoreQueryFiltersForTenant(tenantService)
             join u in context.Users.IgnoreQueryFilters() on l.AssignedAgentId equals (Guid?)u.Id into agentJoin
             from agent in agentJoin.DefaultIfEmpty()
             join c in context.Cars on l.InterestedVehicleId equals (Guid?)c.Id into carJoin

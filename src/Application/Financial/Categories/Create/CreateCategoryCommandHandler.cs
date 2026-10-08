@@ -7,15 +7,16 @@ namespace Application.Financial.Categories.Create;
 
 internal sealed class CreateCategoryCommandHandler(
     IApplicationDbContext context,
-    Application.Abstractions.Caching.ICachedCategoryService cachedCategoryService)
+    Application.Abstractions.Caching.ICachedCategoryService cachedCategoryService,
+    Application.Abstractions.Tenancy.ICurrentTenantService? tenantService = null)
     : ICommandHandler<CreateCategoryCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateCategoryCommand command, CancellationToken cancellationToken)
     {
-        var category = new TransactionCategory(
-            command.Name,
-            command.Description,
-            command.Type);
+        var dealerId = tenantService?.HasTenant == true ? tenantService.DealerId : Guid.Empty;
+        var category = dealerId != Guid.Empty
+            ? new TransactionCategory(dealerId, command.Name, command.Description, command.Type)
+            : new TransactionCategory(command.Name, command.Description, command.Type);
 
         context.TransactionCategories.Add(category);
 

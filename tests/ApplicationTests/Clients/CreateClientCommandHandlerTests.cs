@@ -108,4 +108,49 @@ public class CreateClientCommandHandlerTests
             persisted.Notes.Should().Be("Test notes");
         }
     }
+
+    [Fact]
+    public async Task Handle_ReturnsConflict_WhenDniAlreadyExistsInSameDealer()
+    {
+        var (context, tenantService) = CreateSut();
+        using (context)
+        {
+            var dateProvider = new FakeDateTimeProvider { UtcNow = new DateTime(2026, 6, 25, 0, 0, 0, DateTimeKind.Utc) };
+            var existingClient = new Domain.Clients.Client(
+                TestDealerId, "Existing", "User", "12345678", "existing@test.com", "111", "Street 1", dateProvider.UtcNow);
+            context.Clients.Add(existingClient);
+            await context.SaveChangesAsync();
+
+            var handler = new CreateClientCommandHandler(context, dateProvider, tenantService);
+            var command = new CreateClientCommand("New", "User", "12345678", "new@test.com", "222", "Street 2", ClientType.Individual);
+
+            var result = await handler.Handle(command, CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Should().Be(Domain.Clients.ClientErrors.DniConflict("12345678"));
+        }
+    }
+
+    [Fact]
+    public async Task Handle_Succeeds_WhenSameDniExistsInDifferentDealer()
+    {
+        var (context, tenantService) = CreateSut();
+        using (context)
+        {
+            var otherDealerId = Guid.NewGuid();
+            var dateProvider = new FakeDateTimeProvider { UtcNow = new DateTime(2026, 6, 25, 0, 0, 0, DateTimeKind.Utc) };
+            var existingClientOtherDealer = new Domain.Clients.Client(
+                otherDealerId, "Other", "DealerUser", "12345678", "other@test.com", "111", "Street 1", dateProvider.UtcNow);
+            context.Clients.Add(existingClientOtherDealer);
+            await context.SaveChangesAsync();
+
+            var handler = new CreateClientCommandHandler(context, dateProvider, tenantService);
+            var command = new CreateClientCommand("New", "User", "12345678", "new@test.com", "222", "Street 2", ClientType.Individual);
+
+            var result = await handler.Handle(command, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Should().NotBeEmpty();
+        }
+    }
 }

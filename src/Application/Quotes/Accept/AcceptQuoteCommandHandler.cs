@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Quotes;
@@ -11,16 +13,35 @@ namespace Application.Quotes.Accept;
 
 internal sealed class AcceptQuoteCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ICurrentTenantService? tenantService = null)
     : ICommandHandler<AcceptQuoteCommand>
 {
     public async Task<Result> Handle(AcceptQuoteCommand command, CancellationToken cancellationToken)
     {
+        if (tenantService is not null)
+        {
+            Result guard = TenantGuard.EnsureHasTenant(tenantService);
+            if (guard.IsFailure)
+            {
+                return guard;
+            }
+        }
+
         var quote = await context.Quotes
             .SingleOrDefaultAsync(q => q.Id == command.QuoteId, cancellationToken);
 
         if (quote is null)
             return Result.Failure(QuoteErrors.NotFound(command.QuoteId));
+
+        if (tenantService is not null)
+        {
+            Result dealerCheck = TenantGuard.EnsureSameDealerOrNotFound(tenantService, quote.DealerId, QuoteErrors.NotFound(command.QuoteId));
+            if (dealerCheck.IsFailure)
+            {
+                return dealerCheck;
+            }
+        }
 
         if (quote.ValidUntil < dateTimeProvider.UtcNow)
             return Result.Failure(QuoteErrors.Expired(command.QuoteId));

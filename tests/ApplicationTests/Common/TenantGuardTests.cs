@@ -76,4 +76,46 @@ public class TenantGuardTests
         result.IsFailure.Should().BeTrue();
         result.Error.Type.Should().Be(ErrorType.Forbidden);
     }
+
+    [Fact]
+    public void EnsureSameDealerOrNotFound_MatchingDealer_ReturnsSuccess()
+    {
+        var dealerId = Guid.NewGuid();
+        var tenant = MakeTenant(hasTenant: true, dealerId: dealerId);
+
+        var result = TenantGuard.EnsureSameDealerOrNotFound(
+            tenant,
+            dealerId,
+            Error.NotFound("Test.NotFound", "Not found"));
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void EnsureSameDealerOrNotFound_DifferentDealer_ReturnsSuppliedNotFoundError()
+    {
+        var tenantDealer = Guid.NewGuid();
+        var entityDealer = Guid.NewGuid();
+        var tenant = MakeTenant(hasTenant: true, dealerId: tenantDealer);
+        var expectedError = Error.NotFound("Resource.NotFound", "Resource not found");
+
+        var result = TenantGuard.EnsureSameDealerOrNotFound(tenant, entityDealer, expectedError);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.NotFound);
+        result.Error.Code.Should().Be("Resource.NotFound");
+    }
+
+    [Fact]
+    public void EnsureSameDealerOrNotFound_NoTenant_ReturnsForbidden()
+    {
+        var tenant = MakeTenant(hasTenant: false);
+        var expectedError = Error.NotFound("Resource.NotFound", "Resource not found");
+
+        var result = TenantGuard.EnsureSameDealerOrNotFound(tenant, Guid.NewGuid(), expectedError);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Forbidden);
+        result.Error.Code.Should().Be("Tenant.Missing");
+    }
 }

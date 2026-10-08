@@ -77,7 +77,16 @@ internal static class UsersSeeder
         }
 
         await SeedEmpleadoAsync(context, passwordHasher, configuration, dealerId, cancellationToken);
+        await SeedClienteAsync(context, dealerId, cancellationToken);
         await SeedSuperAdminAsync(context, passwordHasher, configuration, logger, cancellationToken);
+    }
+
+    private static async Task SeedClienteAsync(
+        IApplicationDbContext context,
+        Guid dealerId,
+        CancellationToken cancellationToken)
+    {
+        await SeedRoleAsync(context, dealerId, "Cliente", "Cliente registrado", [], cancellationToken);
     }
 
     private static async Task<Role> SeedRoleAsync(

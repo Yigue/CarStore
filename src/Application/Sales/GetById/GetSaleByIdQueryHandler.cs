@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Application.Sales.Get;
 using Domain.Sales;
 using Microsoft.EntityFrameworkCore;
@@ -7,11 +9,19 @@ using SharedKernel;
 
 namespace Application.Sales.GetById;
 
-internal sealed class GetSaleByIdQueryHandler(IApplicationDbContext context)
+internal sealed class GetSaleByIdQueryHandler(
+    IApplicationDbContext context,
+    ICurrentTenantService tenantService)
     : IQueryHandler<GetSaleByIdQuery, SaleResponse>
 {
     public async Task<Result<SaleResponse>> Handle(GetSaleByIdQuery query, CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<SaleResponse>(guard.Error);
+        }
+
         Sale? sale = await context.Sales
             .Include(s => s.Car).ThenInclude(c => c.Marca)
             .Include(s => s.Car).ThenInclude(c => c.Modelo)

@@ -15,9 +15,6 @@ internal sealed class RegisterUserCommandHandler(
     ICurrentTenantService tenantService)
     : ICommandHandler<RegisterUserCommand, Guid>
 {
-    // Default DealerId for development/single-tenant scenarios
-    private static readonly Guid DefaultDealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-
     public async Task<Result<Guid>> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
     {
         var email = new Email(command.Email);
@@ -27,12 +24,21 @@ internal sealed class RegisterUserCommandHandler(
             return Result.Failure<Guid>(UserErrors.EmailNotUnique);
         }
 
-        var dealerId = command.DealerId ?? tenantService.DealerId;
-
-        // If still empty (unauthenticated registration), use default dealer for development
+        var dealerId = tenantService.DealerId;
         if (dealerId == Guid.Empty)
         {
-            dealerId = DefaultDealerId;
+            return Result.Failure<Guid>(UserErrors.TenantRequired);
+        }
+
+        // Find or create "Cliente" role for this dealer idempotently
+        var clienteRole = await context.Roles
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(r => r.DealerId == dealerId && r.Name == "Cliente", cancellationToken);
+
+        if (clienteRole is null)
+        {
+            clienteRole = new Role(dealerId, "Cliente", "Cliente registrado");
+            context.Roles.Add(clienteRole);
         }
 
         var user = new User(
@@ -41,7 +47,7 @@ internal sealed class RegisterUserCommandHandler(
             command.FirstName,
             command.LastName,
             passwordHasher.Hash(command.Password),
-            Guid.Empty);
+            clienteRole.Id);
 
         context.Users.Add(user);
 

@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using Application.Abstractions.Tenancy;
 using Application.Sales.Update;
 using Domain.Cars;
 using Domain.Cars.Attributes;
@@ -9,6 +10,8 @@ using Domain.Financial.Attributes;
 using Domain.Sales;
 using Domain.Sales.Attributes;
 using Microsoft.EntityFrameworkCore;
+using Moq;
+using SharedKernel;
 
 namespace Application.UnitTests.Sales;
 
@@ -23,6 +26,17 @@ public class UpdateSaleCommandHandlerTests
             .Options;
         return new TestApplicationDbContext(options);
     }
+
+    private static ICurrentTenantService CreateTenantService(bool hasTenant = true, Guid? dealerId = null)
+    {
+        var mock = new Mock<ICurrentTenantService>();
+        mock.SetupGet(t => t.HasTenant).Returns(hasTenant);
+        mock.SetupGet(t => t.DealerId).Returns(dealerId ?? DealerId);
+        return mock.Object;
+    }
+
+    private static UpdateSaleCommandHandler CreateHandler(TestApplicationDbContext context, IDateTimeProvider? dateProvider = null) =>
+        new(context, dateProvider ?? new FakeDateTimeProvider(), CreateTenantService());
 
     private static Sale NewPendingSale() =>
         new Sale(
@@ -39,7 +53,7 @@ public class UpdateSaleCommandHandlerTests
     public async Task Handle_Should_ReturnNotFound_When_SaleDoesNotExist()
     {
         using var context = CreateContext();
-        var handler = new UpdateSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         var missingId = Guid.NewGuid();
         var command = new UpdateSaleCommand(missingId, 5000m, PaymentMethod.Cash, SaleStatus.Pending, "CN-2", "x");
 
@@ -57,7 +71,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending, "CN-UPDATED", "updated");
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -79,7 +93,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         var command = new UpdateSaleCommand(sale.Id, 999m, PaymentMethod.Cash, SaleStatus.Pending, "CN-3", "y");
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -98,7 +112,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -119,7 +133,7 @@ public class UpdateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var salespersonId = Guid.NewGuid();
-        var handler = new UpdateSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending, SalespersonId: salespersonId);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -139,7 +153,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -176,7 +190,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         var result = await handler.Handle(
             new UpdateSaleCommand(sale.Id, 10000m, PaymentMethod.Cash, SaleStatus.Completed, "CN-1", "done"),
             CancellationToken.None);
@@ -197,7 +211,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         await handler.Handle(
             new UpdateSaleCommand(sale.Id, 10000m, PaymentMethod.Cash, SaleStatus.Cancelled, "CN-1", "no deal"),
             CancellationToken.None);
@@ -216,7 +230,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.AddRange(cancelled, surviving);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         await handler.Handle(
             new UpdateSaleCommand(cancelled.Id, 10000m, PaymentMethod.Cash, SaleStatus.Cancelled, "CN-1", "no deal"),
             CancellationToken.None);

@@ -17,7 +17,9 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
             .HasMaxLength(10)
             .IsRequired();
 
-        builder.HasIndex(c => c.Patente)
+        builder.HasIndex(c => new { c.DealerId, c.Patente })
+            .HasFilter("is_deleted = false")
+            .HasDatabaseName("ix_cars_dealer_patente")
             .IsUnique();
 
         builder.Property(c => c.Descripcion)

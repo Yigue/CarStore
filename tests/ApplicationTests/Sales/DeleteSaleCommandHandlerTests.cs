@@ -2,12 +2,14 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using Application.Abstractions.Tenancy;
 using Application.Sales.Delete;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Financial.Attributes;
 using Domain.Sales;
 using Microsoft.EntityFrameworkCore;
+using Moq;
 
 namespace Application.UnitTests.Sales;
 
@@ -22,6 +24,17 @@ public class DeleteSaleCommandHandlerTests
             .Options;
         return new TestApplicationDbContext(options);
     }
+
+    private static ICurrentTenantService CreateTenantService()
+    {
+        var tenantMock = new Mock<ICurrentTenantService>();
+        tenantMock.SetupGet(t => t.HasTenant).Returns(true);
+        tenantMock.SetupGet(t => t.DealerId).Returns(DealerId);
+        return tenantMock.Object;
+    }
+
+    private static DeleteSaleCommandHandler CreateHandler(TestApplicationDbContext context) =>
+        new DeleteSaleCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
 
     private static Sale NewPendingSale(Guid? carId = null) =>
         new Sale(
@@ -38,7 +51,7 @@ public class DeleteSaleCommandHandlerTests
     public async Task Handle_Should_ReturnNotFound_When_SaleDoesNotExist()
     {
         using var context = CreateContext();
-        var handler = new DeleteSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         var missingId = Guid.NewGuid();
 
         var result = await handler.Handle(new DeleteSaleCommand(missingId), CancellationToken.None);
@@ -55,7 +68,7 @@ public class DeleteSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteSaleCommand(sale.Id), CancellationToken.None);
 
@@ -83,7 +96,7 @@ public class DeleteSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteSaleCommand(sale.Id), CancellationToken.None);
 
@@ -100,7 +113,7 @@ public class DeleteSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteSaleCommand(sale.Id), CancellationToken.None);
 
@@ -120,7 +133,7 @@ public class DeleteSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteSaleCommand(sale.Id), CancellationToken.None);
 

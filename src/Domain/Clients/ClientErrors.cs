@@ -38,5 +38,9 @@ public static class ClientErrors
     public static Error NotesTooLong() => Error.Validation(
         "Clients.NotesTooLong",
         "Notes cannot exceed 2000 characters.");
+
+    public static Error DniConflict(string dni) => Error.Conflict(
+        "Clients.DniConflict",
+        $"A client with DNI '{dni}' already exists for this dealer.");
 }
 

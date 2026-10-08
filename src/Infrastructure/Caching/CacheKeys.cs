@@ -20,8 +20,22 @@ public static class CacheKeys
     
     // Categorías de transacciones
     public static string AllTransactionCategories() => "transaction-categories:all";
+    public static string AllTransactionCategories(Guid? dealerId) =>
+        dealerId.HasValue && dealerId.Value != Guid.Empty
+            ? $"transaction-categories:all:{dealerId.Value}"
+            : "transaction-categories:all";
+
     public static string TransactionCategoryById(Guid id) => $"transaction-categories:id:{id}";
+    public static string TransactionCategoryById(Guid id, Guid? dealerId) =>
+        dealerId.HasValue && dealerId.Value != Guid.Empty
+            ? $"transaction-categories:id:{id}:{dealerId.Value}"
+            : $"transaction-categories:id:{id}";
+
     public static string TransactionCategoryByName(string name) => $"transaction-categories:name:{name.ToLowerInvariant()}";
+    public static string TransactionCategoryByName(string name, Guid? dealerId) =>
+        dealerId.HasValue && dealerId.Value != Guid.Empty
+            ? $"transaction-categories:name:{name.ToLowerInvariant()}:{dealerId.Value}"
+            : $"transaction-categories:name:{name.ToLowerInvariant()}";
     
     // Patrones para invalidación
     public static string BrandsPattern() => "brands:*";

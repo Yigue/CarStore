@@ -24,7 +24,8 @@ internal sealed class DeleteFinancialCommandHandler(
         }
 
         // REQ-FIN-TENANT-001: defense-in-handler for delete.
-        var guard = TenantGuard.EnsureSameDealer(tenantService, financial.DealerId);
+        // Returns NotFound (404) to avoid cross-tenant resource enumeration (D2).
+        Result guard = TenantGuard.EnsureSameDealerOrNotFound(tenantService, financial.DealerId, FinancialErrors.NotFound(command.Id));
         if (guard.IsFailure)
         {
             return Result.Failure<Guid>(guard.Error);

@@ -1,5 +1,6 @@
 using Application.Abstractions.Tenancy;
 using Application.Abstractions.Data;
+using Infrastructure.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -108,11 +109,10 @@ public class CurrentTenantService : ICurrentTenantService
     {
         get
         {
-            // ADR-1: positive-claim gate. A SuperAdmin JWT carries platform_role=super_admin;
-            // that explicit claim flips HasTenant to false (cross-tenant context).
+            // ADR-1: positive-claim gate. A SuperAdmin JWT carries platform_role=super_admin
+            // AND dealer_id == Guid.Empty; that explicit check flips HasTenant to false (cross-tenant context).
             // The host-header fallback branch MUST NOT execute for SuperAdmin requests.
-            var platformRoleClaim = _httpContextAccessor.HttpContext?.User?.FindFirst("platform_role");
-            if (platformRoleClaim?.Value == "super_admin")
+            if (_httpContextAccessor.HttpContext?.User?.IsPlatformSuperAdmin() == true)
             {
                 return false;
             }

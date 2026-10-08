@@ -27,7 +27,8 @@ internal sealed class TokenProvider(IConfiguration configuration) : ITokenProvid
 
         // ADR-1: emit platform_role claim only for SuperAdmin users.
         // Claim absence is the correct signal for all tenant-scoped roles.
-        if (user.RoleId == Guid.Empty)
+        // SuperAdmin status is identified strictly by user.IsPlatformAdmin (DealerId == Guid.Empty).
+        if (user.IsPlatformAdmin)
         {
             claims.Add(new Claim("platform_role", "super_admin"));
         }

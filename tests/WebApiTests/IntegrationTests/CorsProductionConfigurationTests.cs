@@ -53,11 +53,10 @@ public sealed class CorsProductionConfigurationTests
             // ConfigureAppConfiguration additions are guaranteed to be merged into builder.Configuration.
             // Setting only the in-memory IConfiguration key here is not reliable enough — it must
             // be a real process env var, same as every other factory in this test project.
-            Environment.SetEnvironmentVariable("UseInMemoryDatabase", "true");
-
             Factory = new WebApplicationFactory<Program>()
                 .WithWebHostBuilder(builder =>
                 {
+                    builder.UseSetting("UseInMemoryDatabase", "true");
                     builder.UseEnvironment("Production");
 
                     // Mirrors StartupAssertionTests: minimum config so DI/startup
@@ -86,6 +85,7 @@ public sealed class CorsProductionConfigurationTests
                     builder.ConfigureTestServices(services =>
                     {
                         services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
+                        services.RemoveAll<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<ApplicationDbContext>>();
                         services.RemoveAll<ApplicationDbContext>();
                         services.RemoveAll<IApplicationDbContext>();
 

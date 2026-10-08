@@ -1,6 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Clients;
@@ -21,6 +22,12 @@ internal sealed class CreateQuoteCommandHandler(
 {
     public async Task<Result<Guid>> Handle(CreateQuoteCommand command, CancellationToken cancellationToken)
     {
+        Result tenantCheck = TenantGuard.EnsureHasTenant(tenantService);
+        if (tenantCheck.IsFailure)
+        {
+            return Result.Failure<Guid>(tenantCheck.Error);
+        }
+
         // Validate ValidUntil is in the future
         if (command.ValidUntil <= dateTimeProvider.UtcNow)
         {
@@ -33,6 +40,12 @@ internal sealed class CreateQuoteCommandHandler(
         if (car is null)
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
+        }
+
+        Result carDealerCheck = TenantGuard.EnsureSameDealerOrNotFound(tenantService, car.DealerId, CarErrors.NotFound(command.CarId));
+        if (carDealerCheck.IsFailure)
+        {
+            return Result.Failure<Guid>(carDealerCheck.Error);
         }
 
         // A quote is an offer, not a commitment. Several buyers asking for a price on the same
@@ -69,6 +82,12 @@ internal sealed class CreateQuoteCommandHandler(
                 return Result.Failure<Guid>(ClientErrors.NotFound(clientId));
             }
 
+            Result clientDealerCheck = TenantGuard.EnsureSameDealerOrNotFound(tenantService, client.DealerId, ClientErrors.NotFound(clientId));
+            if (clientDealerCheck.IsFailure)
+            {
+                return Result.Failure<Guid>(clientDealerCheck.Error);
+            }
+
             // REQ-QT-GATE-001: a Lost client is a commercially dead deal — reject the
             // quote before reserving the car. Use-case precondition, not an aggregate
             // invariant (design.md §1) — the Quote constructor stays untouched.
@@ -79,18 +98,13 @@ internal sealed class CreateQuoteCommandHandler(
         }
         else if (command.LeadId is { } leadId)
         {
-            // IgnoreQueryFilters: bypasses LeadConfiguration's Archivado-hiding filter
-            // so the gate below can return the precise LeadNotQuotable error instead
-            // of a misleading NotFound for a lead that exists but is archived.
-            // IMPORTANT: IgnoreQueryFilters() also strips the tenant (DealerId) query
-            // filter defined on Lead, so the DealerId check below is NOT optional —
-            // without it, a leadId belonging to another dealer would resolve
-            // successfully and get linked into a persisted Quote (cross-tenant leak,
-            // see verify-report crm-cotizaciones-etapa3 CRITICAL-1).
+            // IgnoreQueryFiltersForTenant: bypasses LeadConfiguration's Archivado-hiding filter
+            // while preserving strict tenant isolation so the gate below can return the precise
+            // LeadNotQuotable error instead of a misleading NotFound for an archived lead.
             lead = await context.Leads
-                .IgnoreQueryFilters()
+                .IgnoreQueryFiltersForTenant(tenantService)
                 .SingleOrDefaultAsync(
-                    l => l.Id == leadId && l.DealerId == tenantService.DealerId,
+                    l => l.Id == leadId,
                     cancellationToken);
 
             if (lead is null)
@@ -119,9 +133,9 @@ internal sealed class CreateQuoteCommandHandler(
         if (lead is null && client is { OriginLeadId: { } originLeadId })
         {
             lead = await context.Leads
-                .IgnoreQueryFilters()
+                .IgnoreQueryFiltersForTenant(tenantService)
                 .SingleOrDefaultAsync(
-                    l => l.Id == originLeadId && l.DealerId == tenantService.DealerId,
+                    l => l.Id == originLeadId,
                     cancellationToken);
         }
         else if (client is null && lead is { ConvertedClientId: { } convertedClientId })

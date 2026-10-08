@@ -30,32 +30,36 @@ internal sealed class LoginUserCommandHandler(
 
         if (user is null)
         {
-            return Result.Failure<string>(UserErrors.NotFoundByEmail);
+            return Result.Failure<string>(UserErrors.InvalidCredentials);
         }
 
         bool verified = passwordHasher.Verify(command.Password, user.PasswordHash);
 
         if (!verified)
         {
-            return Result.Failure<string>(UserErrors.InvalidPassword);
+            return Result.Failure<string>(UserErrors.InvalidCredentials);
         }
 
-        string roleName = "Cliente";
-        if (user.RoleId != Guid.Empty)
+        string roleName;
+        if (user.IsPlatformAdmin)
         {
-            var role = await context.Roles
-                .AsNoTracking()
-                .IgnoreQueryFilters()
-                .SingleOrDefaultAsync(r => r.Id == user.RoleId, cancellationToken);
-                
-            if (role != null)
-            {
-                roleName = role.Name;
-            }
+            roleName = "SuperAdmin";
         }
         else
         {
-            roleName = "SuperAdmin";
+            roleName = "Cliente";
+            if (user.RoleId != Guid.Empty)
+            {
+                var role = await context.Roles
+                    .AsNoTracking()
+                    .IgnoreQueryFilters()
+                    .SingleOrDefaultAsync(r => r.Id == user.RoleId, cancellationToken);
+
+                if (role is not null)
+                {
+                    roleName = role.Name;
+                }
+            }
         }
 
         string token = tokenProvider.Create(user, roleName);

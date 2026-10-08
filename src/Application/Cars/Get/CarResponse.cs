@@ -18,7 +18,7 @@ public sealed class CarResponse
     public int Cilindrada { get; init; }
     public int Kilometraje { get; init; }
     public int Anio { get; init; }
-    public string Patente { get; init; } = string.Empty;
+    public string? Patente { get; init; }
     public string Description { get; init; } = string.Empty;
     public decimal Precio { get; init; }
     public DateTime CreatedAt { get; init; }

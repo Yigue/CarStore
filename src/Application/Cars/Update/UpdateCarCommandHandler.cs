@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.Authentication;
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars;
@@ -28,6 +28,16 @@ internal sealed class UpdateCarCommandHandler(
         if (car is null)
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.Id));
+        }
+
+        // Validate unique license plate within tenant for other vehicles
+        var licensePlate = new Domain.Shared.ValueObjects.LicensePlate(command.Patente);
+        var existingCar = await context.Cars
+            .AnyAsync(c => c.Id != command.Id && c.DealerId == car.DealerId && c.Patente == licensePlate, cancellationToken);
+
+        if (existingCar)
+        {
+            return Result.Failure<Guid>(CarErrors.PatenteAlreadyExists(command.Patente));
         }
         
         // Validate existence via the cache (fast path)...
@@ -104,7 +114,14 @@ internal sealed class UpdateCarCommandHandler(
             }
         }
 
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Result.Failure<Guid>(CarErrors.PatenteAlreadyExists(command.Patente));
+        }
 
         return Result.Success(car.Id);
     }

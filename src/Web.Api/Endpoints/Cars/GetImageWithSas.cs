@@ -16,8 +16,9 @@ internal sealed class GetImageWithSas : IEndpoint
             IBlobStorageService blobStorage,
             CancellationToken cancellationToken) =>
         {
-            // Buscar la imagen por ID
-            var image = await context.CarImages
+            // Buscar la imagen por ID anclada al tenant
+            var image = await context.Cars
+                .SelectMany(c => c.Images)
                 .FirstOrDefaultAsync(img => img.Id == imageId, cancellationToken);
 
             if (image == null)

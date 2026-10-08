@@ -39,4 +39,18 @@ public class CreateClientCommandValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateClientCommand.Type));
     }
+
+    [Theory]
+    [InlineData("not-an-email")]
+    [InlineData("missingatsign.com")]
+    [InlineData("@missinguser.com")]
+    public void Validate_ShouldFail_When_Email_Is_Invalid(string invalidEmail)
+    {
+        var command = new CreateClientCommand("Name", "Last", "123456", invalidEmail, "123", "addr", ClientType.Individual);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateClientCommand.Email));
+    }
 }

@@ -220,7 +220,8 @@ public class ProvisionDealerCommandHandlerTests
         var userCount = await context.Users.IgnoreQueryFilters().CountAsync(u => u.Email.Value == "admin@automotors.com");
         userCount.Should().Be(1);
 
-        var roleCount = await context.Roles.IgnoreQueryFilters().CountAsync(r => r.DealerId == result.Value.DealerId);
-        roleCount.Should().Be(1);
+        var roles = await context.Roles.IgnoreQueryFilters().Where(r => r.DealerId == result.Value.DealerId).ToListAsync();
+        roles.Should().HaveCount(2);
+        roles.Select(r => r.Name).Should().Contain(new[] { "Admin", "Cliente" });
     }
 }

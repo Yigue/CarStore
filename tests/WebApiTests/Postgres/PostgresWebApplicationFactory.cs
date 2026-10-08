@@ -33,27 +33,28 @@ public sealed class PostgresWebApplicationFactory : WebApplicationFactory<Progra
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        Environment.SetEnvironmentVariable("UseInMemoryDatabase", "false");
-        Environment.SetEnvironmentVariable("Jwt__Secret", "SecretKeyForTestingPurposesOnly1234567890");
-        Environment.SetEnvironmentVariable("Jwt__Issuer", "CarStore");
-        Environment.SetEnvironmentVariable("Jwt__Audience", "CarStore");
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", "");
+        builder.UseSetting("UseInMemoryDatabase", "false");
+        builder.UseSetting("Jwt:Secret", "SecretKeyForTestingPurposesOnly1234567890");
+        builder.UseSetting("Jwt:Issuer", "CarStore");
+        builder.UseSetting("Jwt:Audience", "CarStore");
+        builder.UseSetting("ConnectionStrings:Redis", "");
 
-        Environment.SetEnvironmentVariable("Storage__Minio__InternalEndpoint", "http://minio:9000");
-        Environment.SetEnvironmentVariable("Storage__Minio__PublicEndpoint", "http://localhost:9000");
-        Environment.SetEnvironmentVariable("Storage__Minio__AccessKey", "minioadmin");
-        Environment.SetEnvironmentVariable("Storage__Minio__SecretKey", "minioadmin123");
-        Environment.SetEnvironmentVariable("Storage__Minio__BucketName", "cars");
+        builder.UseSetting("Storage:Minio:InternalEndpoint", "http://minio:9000");
+        builder.UseSetting("Storage:Minio:PublicEndpoint", "http://localhost:9000");
+        builder.UseSetting("Storage:Minio:AccessKey", "minioadmin");
+        builder.UseSetting("Storage:Minio:SecretKey", "minioadmin123");
+        builder.UseSetting("Storage:Minio:BucketName", "cars");
 
-        Environment.SetEnvironmentVariable("Stripe__SecretKey", "sk_test_mock");
-        Environment.SetEnvironmentVariable("Stripe__WebhookSecret", "whsec_mock");
-        Environment.SetEnvironmentVariable("Stripe__PriceId", "price_mock");
+        builder.UseSetting("Stripe:SecretKey", "sk_test_mock");
+        builder.UseSetting("Stripe:WebhookSecret", "whsec_mock");
+        builder.UseSetting("Stripe:PriceId", "price_mock");
 
         builder.UseEnvironment("Testing");
 
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
+            services.RemoveAll<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<ApplicationDbContext>>();
             services.RemoveAll<ApplicationDbContext>();
             services.RemoveAll<IApplicationDbContext>();
 

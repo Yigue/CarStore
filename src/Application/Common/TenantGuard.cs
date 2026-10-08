@@ -53,4 +53,25 @@ public static class TenantGuard
 
         return Result.Success();
     }
+
+    /// <summary>
+    /// Require the tenant's DealerId to match the entity's DealerId.
+    /// If the dealer IDs do not match, returns the supplied notFound error (404)
+    /// to avoid leaking the existence of resources across tenants.
+    /// </summary>
+    public static Result EnsureSameDealerOrNotFound(ICurrentTenantService tenant, Guid entityDealerId, Error notFound)
+    {
+        if (!tenant.HasTenant)
+        {
+            return Result.Failure(
+                Error.Forbidden("Tenant.Missing", "Tenant context is required."));
+        }
+
+        if (tenant.DealerId != entityDealerId)
+        {
+            return Result.Failure(notFound);
+        }
+
+        return Result.Success();
+    }
 }

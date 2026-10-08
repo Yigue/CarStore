@@ -32,34 +32,30 @@ internal sealed class PermissionProvider
             return cachedPermissions;
         }
 
-        // First find the user's role ID, then find all permissions for that role.
+        // Find the user's role ID and accumulate both role-based and direct user permissions.
         var roleId = await _context.Users
             .Where(u => u.Id == userId)
             .Select(u => u.RoleId)
             .FirstOrDefaultAsync();
 
-        if (roleId == Guid.Empty)
+        var permissionsSet = new HashSet<string>();
+
+        if (roleId != Guid.Empty)
         {
-            var userPermissions = await _context.UserPermissions
-                .Where(up => up.UserId == userId)
-                .Select(up => up.Permission)
+            string[] rolePermissions = await _context.RolePermissions
+                .Where(rp => rp.RoleId == roleId)
+                .Select(rp => rp.Permission)
                 .ToArrayAsync();
-                
-            var userPermSet = userPermissions.ToHashSet();
-            if (userPermSet.Count > 0)
-            {
-                await _cacheService.SetAsync(cacheKey, userPermSet, CacheTTL.Permissions);
-                _logger.LogDebug("UserPermissions loaded from DB and cached for user {UserId}. Count: {Count}", userId, userPermSet.Count);
-            }
-            return userPermSet;
+
+            permissionsSet.UnionWith(rolePermissions);
         }
 
-        string[] permissions = await _context.RolePermissions
-            .Where(rp => rp.RoleId == roleId)
-            .Select(rp => rp.Permission)
+        string[] userPermissions = await _context.UserPermissions
+            .Where(up => up.UserId == userId)
+            .Select(up => up.Permission)
             .ToArrayAsync();
 
-        var permissionsSet = permissions.ToHashSet();
+        permissionsSet.UnionWith(userPermissions);
 
         // Only cache when there are permissions. Caching an empty set locks the
         // user out for the full TTL even after the missing rows are added.

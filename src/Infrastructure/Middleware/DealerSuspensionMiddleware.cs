@@ -1,5 +1,6 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Tenancy;
+using Infrastructure.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -36,8 +37,7 @@ public sealed class DealerSuspensionMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         // SuperAdmin is a platform operator — skip suspension check.
-        var platformRole = context.User.FindFirst("platform_role")?.Value;
-        if (platformRole == "super_admin")
+        if (context.User.IsPlatformSuperAdmin())
         {
             await _next(context);
             return;

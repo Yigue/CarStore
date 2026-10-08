@@ -18,4 +18,8 @@ public static class FinancialErrors
     public static Error CategoryInUse(int blockingTransactionCount) => Error.Conflict(
         "Category.InUse",
         $"The category cannot be deleted because it is referenced by {blockingTransactionCount} transaction(s).");
+
+    public static readonly Error SystemReadOnly = Error.Forbidden(
+        "Category.SystemReadOnly",
+        "System categories are read-only and cannot be modified or deleted.");
 }

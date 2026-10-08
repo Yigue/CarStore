@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Application.Abstractions;
 using Application.Abstractions.Authentication;
@@ -5,6 +7,7 @@ using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
+using Application.Abstractions.Webhooks;
 using Application.Users.Register;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
@@ -18,6 +21,7 @@ using Infrastructure.Services;
 using Infrastructure.Tenancy;
 using Infrastructure.Time;
 using Infrastructure.Users;
+using Infrastructure.Webhooks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -59,7 +63,7 @@ public static class DependencyInjection
             .AddAuthenticationInternal(configuration)
             .AddAuthorizationInternal()
             .ConfigureOpenTelemetry()
-            .AddBackgroundJobs()
+            .AddBackgroundJobs(configuration)
             .AddBilling(configuration);
 
     private static IServiceCollection AddBilling(this IServiceCollection services, IConfiguration configuration)
@@ -240,8 +244,7 @@ public static class DependencyInjection
 
     private static IServiceCollection AddDatabase(this IServiceCollection services, IConfiguration configuration)
     {
-        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase") || 
-                          Environment.GetEnvironmentVariable("UseInMemoryDatabase") == "true";
+        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase");
 
         if (useInMemory)
         {
@@ -306,8 +309,7 @@ services.AddDbContext<ApplicationDbContext>(
     {
         var healthChecksBuilder = services.AddHealthChecks();
 
-        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase") || 
-                          Environment.GetEnvironmentVariable("UseInMemoryDatabase") == "true";
+        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase");
 
         if (!useInMemory)
         {
@@ -389,10 +391,63 @@ services.AddDbContext<ApplicationDbContext>(
 
         return services;
     }
-    private static IServiceCollection AddBackgroundJobs(this IServiceCollection services)
+    private static IServiceCollection AddBackgroundJobs(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton<IWebhookDestinationGuard, WebhookDestinationGuard>();
+
+        // Named client for outgoing webhook deliveries — anti-SSRF SocketsHttpHandler validates
+        // resolved IPs in ConnectCallback, connects directly to the validated IP to defeat DNS rebinding,
+        // and refuses auto-redirects. Short 10s timeout prevents slow endpoints from stalling dispatch.
+        services.AddHttpClient(DispatchWebhookDeliveriesJob.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        })
+        .ConfigurePrimaryHttpMessageHandler(sp =>
+        {
+            var guard = sp.GetRequiredService<IWebhookDestinationGuard>();
+            return new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                ConnectCallback = async (context, cancellationToken) =>
+                {
+                    IPAddress[] entry = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
+                    if (entry is null || entry.Length == 0)
+                    {
+                        throw new HttpRequestException("Destination blocked: unable to resolve host.");
+                    }
+
+                    IPAddress? targetIp = null;
+                    foreach (var ip in entry)
+                    {
+                        if (guard.IsBlocked(ip))
+                        {
+                            throw new HttpRequestException($"Destination blocked: resolved IP '{ip}' is in a restricted range.");
+                        }
+
+                        targetIp ??= ip;
+                    }
+
+                    var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                    try
+                    {
+                        await socket.ConnectAsync(new IPEndPoint(targetIp!, context.DnsEndPoint.Port), cancellationToken);
+                        return new NetworkStream(socket, ownsSocket: true);
+                    }
+                    catch
+                    {
+                        socket.Dispose();
+                        throw;
+                    }
+                }
+            };
+        });
+
+        // Crm:Reengagement:Enabled defaults to false — see CrmReengagementOptions.
+        services.AddOptions<CrmReengagementOptions>()
+            .BindConfiguration(CrmReengagementOptions.SectionName);
+
         // Skip background jobs when using in-memory database (integration tests)
-        bool useInMemory = Environment.GetEnvironmentVariable("UseInMemoryDatabase") == "true";
+        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase");
         if (useInMemory)
         {
             return services;
@@ -453,17 +508,6 @@ services.AddDbContext<ApplicationDbContext>(
         });
 
         services.AddQuartzHostedService();
-
-        // Named client for outgoing webhook deliveries — short timeout so a slow/unreachable
-        // tenant endpoint can never stall the dispatcher job.
-        services.AddHttpClient(DispatchWebhookDeliveriesJob.HttpClientName, client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(10);
-        });
-
-        // Crm:Reengagement:Enabled defaults to false — see CrmReengagementOptions.
-        services.AddOptions<CrmReengagementOptions>()
-            .BindConfiguration(CrmReengagementOptions.SectionName);
 
         return services;
     }

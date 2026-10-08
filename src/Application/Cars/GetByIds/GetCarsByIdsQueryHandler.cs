@@ -1,3 +1,4 @@
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
@@ -8,7 +9,10 @@ using SharedKernel;
 
 namespace Application.Cars.GetByIds;
 
-internal sealed class GetCarsByIdsQueryHandler(IApplicationDbContext context, IStorageService storage)
+internal sealed class GetCarsByIdsQueryHandler(
+    IApplicationDbContext context,
+    IStorageService storage,
+    IUserContext userContext)
     : IQueryHandler<GetCarsByIdsQuery, List<CarResponse>>
 {
     public async Task<Result<List<CarResponse>>> Handle(GetCarsByIdsQuery query, CancellationToken cancellationToken)
@@ -64,7 +68,7 @@ internal sealed class GetCarsByIdsQueryHandler(IApplicationDbContext context, IS
                 Cilindrada = car.Cilindrada,
                 Kilometraje = car.Kilometraje,
                 Anio = car.Anio,
-                Patente = car.Patente.Value,
+                Patente = userContext.IsAuthenticated ? car.Patente.Value : null,
                 Description = car.Descripcion,
                 Precio = car.Price.Amount,
                 CreatedAt = car.CreatedAt,

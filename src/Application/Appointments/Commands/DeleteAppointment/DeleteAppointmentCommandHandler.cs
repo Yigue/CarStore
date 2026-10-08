@@ -1,6 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Appointments;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -17,6 +18,10 @@ internal sealed class DeleteAppointmentCommandHandler(
 {
     public async Task<Result> Handle(DeleteAppointmentCommand command, CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+            return guard;
+
         Guid dealerId = tenantService.DealerId;
 
         Appointment? appointment = await context.Appointments

@@ -40,7 +40,7 @@ public class GetInventoryStatsQueryHandlerTests
         {
             new Car(dealerId, marca1, modelo1, Color.Blue, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 1000, 2020, "ABC123", "Car 1", 20000m, now),
             new Car(dealerId, marca1, modelo1, Color.Red, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4, 5, 1600, 2000, 2021, "DEF456", "Car 2", 25000m, now),
-            new Car(dealerId, marca2, modelo2, Color.Black, TypeCar.Hatchback, StatusCar.Used, StatusServiceCar.EnVenta, 4, 5, 1400, 5000, 2019, "GHI789", "Car 3", 15000m, now),
+            new Car(dealerId, marca2, modelo2, Color.Black, TypeCar.Hatchback, StatusCar.Used, StatusServiceCar.Reservado, 4, 5, 1400, 5000, 2019, "GHI789", "Car 3", 15000m, now),
             new Car(dealerId, marca1, modelo1, Color.White, TypeCar.SUV, StatusCar.New, StatusServiceCar.Vendido, 4, 7, 2000, 0, 2022, "JKL012", "Car 4", 35000m, now),
             new Car(dealerId, marca2, modelo2, Color.Green, TypeCar.Sedan, StatusCar.Used, StatusServiceCar.Vendido, 4, 5, 1800, 3000, 2020, "MNO345", "Car 5", 22000m, now),
         };
@@ -90,8 +90,32 @@ public class GetInventoryStatsQueryHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.ByStatus.Available.Should().Be(2); // Disponible
-        result.Value.ByStatus.Reserved.Should().Be(1); // EnVenta
+        result.Value.ByStatus.Reserved.Should().Be(1); // Reservado
         result.Value.ByStatus.Sold.Should().Be(2); // Vendido
+    }
+
+    [Fact]
+    public async Task Handle_ByStatus_CorrectlyCounts_ReservadoStatus()
+    {
+        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        var marca = new Marca("Nissan");
+        context.Marca.Add(marca);
+        await context.SaveChangesAsync();
+        var modelo = new Modelo("Versa", marca.Id);
+        context.Modelo.Add(modelo);
+        await context.SaveChangesAsync();
+
+        var now = DateTime.UtcNow;
+        var carReserved = new Car(dealerId, marca, modelo, Color.Blue, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Reservado, 4, 5, 1600, 1000, 2020, "RES999", "Reserved Car", 20000m, now);
+        context.Cars.Add(carReserved);
+        await context.SaveChangesAsync();
+
+        var handler = new GetInventoryStatsQueryHandler(context);
+        var result = await handler.Handle(new GetInventoryStatsQuery(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ByStatus.Reserved.Should().Be(1);
     }
 
     [Fact]

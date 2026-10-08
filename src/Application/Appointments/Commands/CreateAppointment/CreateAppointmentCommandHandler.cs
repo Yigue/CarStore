@@ -1,6 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Appointments;
 using Domain.Leads;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,10 @@ internal sealed class CreateAppointmentCommandHandler(
 {
     public async Task<Result<Guid>> Handle(CreateAppointmentCommand command, CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+            return Result.Failure<Guid>(guard.Error);
+
         Guid dealerId = tenantService.DealerId;
 
         bool hasConflict = await context.Appointments

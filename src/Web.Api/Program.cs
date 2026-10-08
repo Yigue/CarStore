@@ -278,6 +278,8 @@ app.MapHealthChecks("health", new HealthCheckOptions
 app.Run();
 
 // REMARK: Required for functional and integration tests to work.
+public partial class Program;
+
 namespace Web.Api
 {
     public partial class Program;

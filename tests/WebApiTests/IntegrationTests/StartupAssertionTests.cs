@@ -10,6 +10,7 @@ namespace WebApiTests.IntegrationTests;
 /// Startup guard tests for saas-custom-domains PR1 ADR-1.
 /// task 1.6.4: env=Production + Tenant:DevFallbackDealerId → host throws InvalidOperationException.
 /// </summary>
+[Collection("StartupAssertionTests")]
 public sealed class StartupAssertionTests
 {
     /// <summary>
@@ -76,41 +77,32 @@ public sealed class StartupAssertionTests
     [Fact]
     public void Host_WithStripeSecretKeyButNoPriceId_ThrowsValidationException()
     {
-        Environment.SetEnvironmentVariable("Stripe__SecretKey", "sk_test_123");
-        Environment.SetEnvironmentVariable("Stripe__PriceId", ""); // Explicitly missing
-
-        try
-        {
-            var factory = new WebApplicationFactory<Program>()
-                .WithWebHostBuilder(builder =>
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("Stripe:SecretKey", "sk_test_123");
+                builder.UseSetting("Stripe:PriceId", ""); // Explicitly missing
+                builder.UseEnvironment("Production");
+                builder.ConfigureAppConfiguration((_, config) =>
                 {
-                    builder.UseEnvironment("Production");
-                    builder.ConfigureAppConfiguration((_, config) =>
+                    config.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        config.AddInMemoryCollection(new Dictionary<string, string?>
-                        {
-                            ["FeatureFlags:SubscriptionEnforcement"] = "false",
-                            ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
-                            ["UseInMemoryDatabase"] = "true",
-                            ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
-                            ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
-                            ["Storage:Minio:AccessKey"] = "minioadmin",
-                            ["Storage:Minio:SecretKey"] = "minioadmin123",
-                            ["Storage:Minio:BucketName"] = "cars"
-                        });
+                        ["FeatureFlags:SubscriptionEnforcement"] = "false",
+                        ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
+                        ["UseInMemoryDatabase"] = "true",
+                        ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
+                        ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
+                        ["Storage:Minio:AccessKey"] = "minioadmin",
+                        ["Storage:Minio:SecretKey"] = "minioadmin123",
+                        ["Storage:Minio:BucketName"] = "cars"
                     });
                 });
+            });
 
-            var act = () => factory.CreateClient();
+        var act = () => factory.CreateClient();
 
-            act.Should().Throw<Microsoft.Extensions.Options.OptionsValidationException>()
-                .And.Message.Should().Contain("PriceId");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("Stripe__SecretKey", null);
-            Environment.SetEnvironmentVariable("Stripe__PriceId", null);
-        }
+        act.Should().Throw<Microsoft.Extensions.Options.OptionsValidationException>()
+            .And.Message.Should().Contain("PriceId");
     }
 
     [Fact]
@@ -141,4 +133,9 @@ public sealed class StartupAssertionTests
 
         act.Should().NotThrow();
     }
+}
+
+[CollectionDefinition("StartupAssertionTests", DisableParallelization = true)]
+public class StartupAssertionTestsCollection
+{
 }

@@ -1,5 +1,6 @@
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
+using Application.Abstractions.Tenancy;
 using Domain.Financial.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -14,20 +15,25 @@ internal sealed class CachedCategoryService : ICachedCategoryService
     private readonly IApplicationDbContext _context;
     private readonly ICacheService _cacheService;
     private readonly ILogger<CachedCategoryService> _logger;
+    private readonly ICurrentTenantService? _tenantService;
 
     public CachedCategoryService(
         IApplicationDbContext context,
         ICacheService cacheService,
-        ILogger<CachedCategoryService> logger)
+        ILogger<CachedCategoryService> logger,
+        ICurrentTenantService? tenantService = null)
     {
         _context = context;
         _cacheService = cacheService;
         _logger = logger;
+        _tenantService = tenantService;
     }
+
+    private Guid? CurrentDealerId => _tenantService?.HasTenant == true ? _tenantService.DealerId : null;
 
     public async Task<TransactionCategory?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var cacheKey = CacheKeys.TransactionCategoryById(id);
+        var cacheKey = CacheKeys.TransactionCategoryById(id, CurrentDealerId);
         var cached = await _cacheService.GetAsync<TransactionCategory>(cacheKey, cancellationToken);
         
         if (cached != null)
@@ -48,7 +54,7 @@ internal sealed class CachedCategoryService : ICachedCategoryService
 
     public async Task<TransactionCategory?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
     {
-        var cacheKey = CacheKeys.TransactionCategoryByName(name);
+        var cacheKey = CacheKeys.TransactionCategoryByName(name, CurrentDealerId);
         var cached = await _cacheService.GetAsync<TransactionCategory>(cacheKey, cancellationToken);
         
         if (cached != null)
@@ -57,7 +63,9 @@ internal sealed class CachedCategoryService : ICachedCategoryService
         }
 
         var category = await _context.TransactionCategories
-            .FirstOrDefaultAsync(c => c.Name == name, cancellationToken);
+            .Where(c => c.Name == name)
+            .OrderBy(c => c.DealerId == Guid.Empty ? 0 : 1)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (category != null)
         {
@@ -69,7 +77,7 @@ internal sealed class CachedCategoryService : ICachedCategoryService
 
     public async Task<List<TransactionCategory>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var cacheKey = CacheKeys.AllTransactionCategories();
+        var cacheKey = CacheKeys.AllTransactionCategories(CurrentDealerId);
         var cached = await _cacheService.GetAsync<List<TransactionCategory>>(cacheKey, cancellationToken);
         
         if (cached != null)
@@ -91,7 +99,7 @@ internal sealed class CachedCategoryService : ICachedCategoryService
     public async Task InvalidateCacheAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Invalidating transaction categories cache");
-        var cacheKey = CacheKeys.AllTransactionCategories();
+        var cacheKey = CacheKeys.AllTransactionCategories(CurrentDealerId);
         await _cacheService.RemoveAsync(cacheKey, cancellationToken);
     }
 }
