@@ -196,6 +196,50 @@ public sealed class Car : Entity
     }
 
     /// <summary>
+    /// sfc B1 / ADR C3 (RN-005, RN-006): guarded status change following <see cref="VehicleLifecycle"/>.
+    /// Vendido can never be left through here (only <see cref="RevertSale"/>, or MarkDelivered
+    /// for Entregado). Same-status is an idempotent success. Existing callers of
+    /// MarkAsSold/MarkAsAvailable/Reserve/Release are unchanged.
+    /// </summary>
+    public Result ChangeStatus(StatusServiceCar target, DateTime updatedAt)
+    {
+        if (VehicleLifecycle.Normalize(ServiceCar) == VehicleLifecycle.Normalize(target))
+            return Result.Success();
+
+        if (ServiceCar == StatusServiceCar.Vendido && target != StatusServiceCar.Entregado)
+            return Result.Failure(CarErrors.SaleActiveBlocksStatusChange(Id));
+
+        if (!VehicleLifecycle.CanTransition(ServiceCar, target))
+            return Result.Failure(CarErrors.InvalidStatusTransition(Id, ServiceCar, target));
+
+        StatusServiceCar normalizedTarget = VehicleLifecycle.Normalize(target);
+        ServiceCar = normalizedTarget;
+        UpdatedAt = updatedAt;
+
+        if (normalizedTarget == StatusServiceCar.Vendido)
+            Raise(new CarSoldDomainEvent(Id));
+
+        return Result.Success();
+    }
+
+    /// <summary>RN-005: Vendido → Entregado once the delivery is confirmed.</summary>
+    public Result MarkDelivered(DateTime updatedAt) => ChangeStatus(StatusServiceCar.Entregado, updatedAt);
+
+    /// <summary>
+    /// RN-006 (ADR C3): the ONLY way back from Vendido to Disponible. Invoked when a sale is
+    /// voided (<c>SaleVoidedDomainEvent</c>); a plain status edit is rejected by <see cref="ChangeStatus"/>.
+    /// </summary>
+    public Result RevertSale(Guid saleId, DateTime updatedAt)
+    {
+        if (ServiceCar != StatusServiceCar.Vendido)
+            return Result.Failure(CarErrors.NotSold(Id));
+
+        ServiceCar = StatusServiceCar.Disponible;
+        UpdatedAt = updatedAt;
+        return Result.Success();
+    }
+
+    /// <summary>
     /// D-1: concreta la venta (Reservado o Disponible -> Vendido). Idempotente si ya está vendido.
     /// </summary>
     public void Sell(DateTime updatedAt) => MarkAsSold(updatedAt);

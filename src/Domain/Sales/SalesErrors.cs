@@ -86,5 +86,14 @@ public static class SalesErrors
     public static Error ClientDataIncomplete(Guid clientId) => Error.Problem(
         "Sales.ClientDataIncomplete",
         $"The client with Id = '{clientId}' is still a prospect with incomplete data. DNI and address are required before invoicing.");
-}
 
+    // ─── ADR C3 · Sale.Void ───────────────────────────────────────────────────────────────────
+
+    public static Error VoidReasonRequired() => Error.Validation(
+        "Sales.VoidReasonRequired",
+        "A reason is required to void a sale.");
+
+    public static Error OnlyCompletedCanBeVoided(Guid saleId) => Error.Conflict(
+        "Sales.OnlyCompletedCanBeVoided",
+        $"The sale with Id = '{saleId}' cannot be voided because it is not Completed.");
+}

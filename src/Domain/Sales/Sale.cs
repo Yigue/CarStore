@@ -131,6 +131,24 @@ public sealed class Sale : Entity
         Raise(new SaleCancelledDomainEvent(Id, CarId, reason));
     }
     
+    /// <summary>
+    /// ADR C3 / RN-006: reverts a Completed sale. <see cref="Cancel"/> keeps accepting only
+    /// Pending sales; this is the only way to undo a Completed one. The reason is mandatory and
+    /// the raised event lets the car return to Disponible (<c>Car.RevertSale</c>).
+    /// </summary>
+    public Result Void(string reason, Guid actorId, DateTime occurredAtUtc)
+    {
+        if (Status != SaleStatus.Completed)
+            return Result.Failure(SalesErrors.OnlyCompletedCanBeVoided(Id));
+
+        if (string.IsNullOrWhiteSpace(reason))
+            return Result.Failure(SalesErrors.VoidReasonRequired());
+
+        Status = SaleStatus.Voided;
+        Raise(new SaleVoidedDomainEvent(Id, CarId, reason.Trim(), actorId, occurredAtUtc));
+        return Result.Success();
+    }
+
     public void Update(
         decimal finalPrice,
         PaymentMethod paymentMethod,
