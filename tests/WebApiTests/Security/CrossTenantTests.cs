@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
@@ -26,7 +27,7 @@ namespace WebApiTests.Security;
 public class CrossTenantTests : IAsyncLifetime
 {
     private static readonly Guid Dealer1Id = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    private static readonly Guid Dealer2Id = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly Guid Dealer2Id = Guid.Parse("bbbbbbbb-2222-2222-2222-222222222222");
 
     private readonly PostgresWebApplicationFactory _factory;
     private Guid _dealer1LeadId;
@@ -57,17 +58,17 @@ public class CrossTenantTests : IAsyncLifetime
         _dealer1LeadId = lead.Id;
 
         // Client & Car for Dealer 1
-        var client1 = new Client(Dealer1Id, "Dealer1", "Client", "11111111", "d1@test.com", "123", "Addr 1", now);
+        var client1 = new Client(Dealer1Id, "Dealer1", "Client", Random.Shared.Next(10000000, 99999999).ToString(), $"d1{Guid.NewGuid():N}@test.com", "123", "Addr 1", now);
         context.Clients.Add(client1);
 
-        var marca = new Marca("Toyota");
+        var marca = new Marca($"Marca{Guid.NewGuid():N}");
         var modelo = new Modelo("Yaris", marca.Id);
         context.Marca.Add(marca);
         context.Modelo.Add(modelo);
 
         var car1 = new Car(
             Dealer1Id, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New,
-            StatusServiceCar.Disponible, 4, 5, 1600, 0, 2023, "D1AAA1", "Car 1",
+            StatusServiceCar.Disponible, 4, 5, 1600, 0, 2023, $"{(char)(65 + Random.Shared.Next(26))}{(char)(65 + Random.Shared.Next(26))}{(char)(65 + Random.Shared.Next(26))}{Random.Shared.Next(100, 999)}", "Car 1",
             20000m, now, FuelType.Gasolina, false, Transmission.Manual, null);
         var image1 = CarImage.Create(Guid.NewGuid(), car1.Id, $"{Dealer1Id}/{car1.Id}/img1.jpg", "image/jpeg", 1024, 0, true);
         car1.Images.Add(image1);
@@ -97,13 +98,7 @@ public class CrossTenantTests : IAsyncLifetime
         if (dealer2Role is null)
         {
             dealer2Role = new Role(Dealer2Id, "Admin", "Admin Dealer 2");
-            dealer2Role.ReplacePermissions(new[]
-            {
-                "leads:read", "leads:update", "leads:delete",
-                "sales:read", "sales:update", "sales:delete",
-                "cars:update", "cars:delete",
-                "documents:read", "documents:create"
-            });
+            dealer2Role.ReplacePermissions(PermissionCatalog.All.Select(d => d.Value));
             context.Roles.Add(dealer2Role);
         }
 
@@ -144,7 +139,7 @@ public class CrossTenantTests : IAsyncLifetime
         getRes.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         // PUT notes
-        var putRes = await client.PutAsJsonAsync(
+        var putRes = await client.PatchAsJsonAsync(
             $"/api/v1/leads/{_dealer1LeadId}/notes",
             new { Notes = "Malicious update" },
             IntegrationTestHelpers.JsonOptions);
