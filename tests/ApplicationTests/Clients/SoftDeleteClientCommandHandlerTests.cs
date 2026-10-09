@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Tenancy;
 using Application.Clients.SoftDelete;
 using Domain.Clients;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,14 @@ public class SoftDeleteClientCommandHandlerTests
         return new TestApplicationDbContext(options);
     }
 
+    private static ICurrentTenantService TenantFor(Guid dealerId)
+    {
+        var tenant = new Mock<ICurrentTenantService>();
+        tenant.Setup(t => t.HasTenant).Returns(true);
+        tenant.Setup(t => t.DealerId).Returns(dealerId);
+        return tenant.Object;
+    }
+
     [Fact]
     public async Task Handle_Should_SoftDeleteClient_WhenNotAlreadyDeleted()
     {
@@ -37,7 +46,7 @@ public class SoftDeleteClientCommandHandlerTests
         await context.SaveChangesAsync();
         client.ClearDomainEvents();
 
-        var handler = new SoftDeleteClientCommandHandler(context, mockUserContext.Object, dateProvider);
+        var handler = new SoftDeleteClientCommandHandler(context, mockUserContext.Object, dateProvider, TenantFor(dealerId));
         var result = await handler.Handle(new SoftDeleteClientCommand(client.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -64,7 +73,7 @@ public class SoftDeleteClientCommandHandlerTests
         context.Clients.Add(client);
         await context.SaveChangesAsync();
 
-        var handler = new SoftDeleteClientCommandHandler(context, mockUserContext.Object, dateProvider);
+        var handler = new SoftDeleteClientCommandHandler(context, mockUserContext.Object, dateProvider, TenantFor(dealerId));
         var result = await handler.Handle(new SoftDeleteClientCommand(client.Id), CancellationToken.None);
 
         // Idempotent: already deleted, should still succeed
@@ -78,12 +87,31 @@ public class SoftDeleteClientCommandHandlerTests
         using var context = CreateContext();
         var dateProvider = new FakeDateTimeProvider();
         var mockUserContext = new Mock<IUserContext>();
-        var handler = new SoftDeleteClientCommandHandler(context, mockUserContext.Object, dateProvider);
+        var handler = new SoftDeleteClientCommandHandler(context, mockUserContext.Object, dateProvider, TenantFor(Guid.NewGuid()));
         var missingId = Guid.NewGuid();
 
         var result = await handler.Handle(new SoftDeleteClientCommand(missingId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Be(ClientErrors.NotFound(missingId));
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnNotFound_AndNotDelete_WhenClientBelongsToAnotherDealer()
+    {
+        using var context = CreateContext();
+        var dateProvider = new FakeDateTimeProvider { UtcNow = new DateTime(2026, 6, 27, 20, 0, 0, DateTimeKind.Utc) };
+        var mockUserContext = new Mock<IUserContext>();
+        var otherDealerClient = new Client(Guid.NewGuid(), "Other", "Dealer", "777", "other@test.com", "555", "Street 9", dateProvider.UtcNow);
+        context.Clients.Add(otherDealerClient);
+        await context.SaveChangesAsync();
+
+        var handler = new SoftDeleteClientCommandHandler(context, mockUserContext.Object, dateProvider, TenantFor(Guid.NewGuid()));
+        var result = await handler.Handle(new SoftDeleteClientCommand(otherDealerClient.Id), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(ClientErrors.NotFound(otherDealerClient.Id));
+        var persisted = await context.Clients.IgnoreQueryFilters().FirstAsync(c => c.Id == otherDealerClient.Id);
+        persisted.IsDeleted.Should().BeFalse();
     }
 }

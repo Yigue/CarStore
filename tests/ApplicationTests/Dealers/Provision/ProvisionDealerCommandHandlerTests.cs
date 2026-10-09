@@ -163,8 +163,7 @@ public class ProvisionDealerCommandHandlerTests
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
         var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
 
-        try { await handler.Handle(ValidCommand(), CancellationToken.None); }
-        catch (InvalidOperationException) { /* expected */ }
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
 
         publisher.Verify(
             p => p.Publish(It.IsAny<DealerProvisionedDomainEvent>(), It.IsAny<CancellationToken>()),

@@ -119,4 +119,24 @@ public class TenantIndexesTests : BaseTest
             "spec wildcard-subdomain-routing §Anonymous Host Lookup Uses a Dedicated Index requires a filtered index " +
             "on host_name with predicate IsActive = true to keep the hot path small and exclude soft-deleted dealers.");
     }
+
+    [Theory]
+    [InlineData(typeof(Domain.Clients.Client))]
+    [InlineData(typeof(Domain.Cars.Car))]
+    public void Unique_Indexes_On_Tenant_Entities_Should_Include_DealerId(Type entityClrType)
+    {
+        // Arrange — a natural-key uniqueness (dni, patente) must be per dealer, never global,
+        // otherwise one dealership blocks (or probes) another's data.
+        var model = BuildSnapshotModel();
+        var entity = model.GetEntityTypes().Single(t => t.ClrType == entityClrType);
+
+        // Act
+        var uniqueIndexes = entity.GetIndexes().Where(i => i.IsUnique).ToList();
+
+        // Assert
+        uniqueIndexes.Should().NotBeEmpty();
+        uniqueIndexes.Should().OnlyContain(
+            i => i.Properties.Any(p => p.Name == "DealerId"),
+            $"every unique index on {entityClrType.Name} must be scoped by dealer_id.");
+    }
 }
