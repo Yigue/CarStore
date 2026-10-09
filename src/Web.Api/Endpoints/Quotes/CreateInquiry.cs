@@ -39,6 +39,7 @@ internal sealed class CreateInquiry : IEndpoint
                 CustomResults.Problem);
         })
         .AllowAnonymous()
+        .RequireRateLimiting("public")
         .WithTags(Tags.Quotes)
         .WithName("CreatePublicInquiry")
         .Produces<Guid>(StatusCodes.Status201Created)

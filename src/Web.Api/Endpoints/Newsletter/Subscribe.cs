@@ -42,6 +42,7 @@ internal sealed class Subscribe : IEndpoint
                 CustomResults.Problem);
         })
         .AllowAnonymous()
+        .RequireRateLimiting("public")
         .WithTags("Newsletter")
         .WithName("SubscribeNewsletter")
         .Produces(StatusCodes.Status200OK)

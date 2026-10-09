@@ -33,6 +33,7 @@ internal sealed class Register : IEndpoint
         .WithTags(Tags.Users)
         .WithName("RegisterUser")
         .AllowAnonymous()
+        .RequireRateLimiting("public")
         .Produces<Guid>(StatusCodes.Status201Created)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status409Conflict)

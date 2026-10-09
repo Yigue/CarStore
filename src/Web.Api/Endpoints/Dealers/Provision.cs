@@ -48,6 +48,7 @@ internal sealed class Provision : IEndpoint
         .WithTags(Tags.Dealers)
         .WithName("ProvisionDealer")
         .AllowAnonymous()
+        .RequireRateLimiting("public")
         .Produces<ProvisionDealerResponse>(StatusCodes.Status201Created)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status409Conflict)

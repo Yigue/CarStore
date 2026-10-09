@@ -8,6 +8,7 @@ using Infrastructure.Middleware;
 using Infrastructure.Billing;
 using Infrastructure.Tenancy;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -54,19 +55,19 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(o =>
     o.JsonSerializerOptions.Converters.Add(new Web.Api.Infrastructure.NullableGuidJsonConverter());
 });
 
-// Rate limiting for login endpoint
+// Rate limiting (API-007). Every policy is partitioned by the caller's IP: one noisy client
+// exhausts only its own bucket, never everyone's. "login" covers the credential endpoints;
+// "public" covers the anonymous write endpoints (register, provisioning, newsletter, inquiry).
+// The store is in-process, so with several replicas the ingress limit is what bounds the total.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    options.AddFixedWindowLimiter("login", limiterOptions =>
-    {
-        var rateLimitConfig = builder.Configuration.GetSection("RateLimiting:Login");
-        limiterOptions.PermitLimit = rateLimitConfig.GetValue("PermitLimit", 10);
-        limiterOptions.Window = TimeSpan.FromSeconds(rateLimitConfig.GetValue("WindowSeconds", 60));
-        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        limiterOptions.QueueLimit = 0;
-    });
+    options.AddPolicy("login", context =>
+        PerIpFixedWindow(context, builder.Configuration.GetSection("RateLimiting:Login"), defaultPermitLimit: 10));
+
+    options.AddPolicy("public", context =>
+        PerIpFixedWindow(context, builder.Configuration.GetSection("RateLimiting:Public"), defaultPermitLimit: 30));
 
     options.OnRejected = async (context, cancellationToken) =>
     {
@@ -76,10 +77,39 @@ builder.Services.AddRateLimiter(options =>
             type = "https://datatracker.ietf.org/doc/html/rfc6585#section-4",
             title = "Too Many Requests",
             status = 429,
-            detail = "Too many login attempts. Please try again later."
+            detail = "Too many requests. Please try again later."
         }, cancellationToken);
     };
 });
+
+// Behind an ingress the socket peer is the proxy, so the real client IP only comes from
+// X-Forwarded-For. Only proxies listed in ForwardedHeaders:KnownProxies are trusted (loopback
+// by default); trusting arbitrary senders would let a client choose its own rate-limit bucket.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    foreach (string proxy in builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
+    {
+        if (System.Net.IPAddress.TryParse(proxy, out var address))
+        {
+            options.KnownProxies.Add(address);
+        }
+    }
+});
+
+static RateLimitPartition<string> PerIpFixedWindow(
+    HttpContext context,
+    IConfigurationSection config,
+    int defaultPermitLimit) =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = config.GetValue("PermitLimit", defaultPermitLimit),
+            Window = TimeSpan.FromSeconds(config.GetValue("WindowSeconds", 60)),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        });
 
 builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 
@@ -235,6 +265,8 @@ app.UseRequestContextLogging();
 app.UseSerilogRequestLogging();
 
 app.UseExceptionHandler();
+
+app.UseForwardedHeaders();
 
 app.UseRateLimiter();
 
