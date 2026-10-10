@@ -23,6 +23,14 @@ public class CreateUserCommandTests
         return new TestApplicationDbContext(options, dealerId ?? Guid.NewGuid());
     }
 
+    private static async Task<Guid> SeedRoleAsync(TestApplicationDbContext context, Guid dealerId)
+    {
+        var role = new Role(dealerId, "Empleado", "Rol del mismo dealer");
+        context.Roles.Add(role);
+        await context.SaveChangesAsync();
+        return role.Id;
+    }
+
     private static CreateUserCommandHandler CreateHandler(
         TestApplicationDbContext context,
         IPasswordHasher? passwordHasher = null,
@@ -32,7 +40,7 @@ public class CreateUserCommandTests
         mockPasswordHasher.Setup(x => x.Hash(It.IsAny<string>())).Returns("hashed_password");
 
         var mockTenantService = new Mock<ICurrentTenantService>();
-        mockTenantService.Setup(x => x.DealerId).Returns(Guid.NewGuid());
+        mockTenantService.Setup(x => x.DealerId).Returns(context.TenantDealerId);
 
         return new CreateUserCommandHandler(
             context,
@@ -43,7 +51,9 @@ public class CreateUserCommandTests
     [Fact]
     public async Task Handle_ValidCommand_ReturnsSuccessWithUserId()
     {
-        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        using var context = CreateContext(dealerId);
+        var roleId = await SeedRoleAsync(context, dealerId);
         var handler = CreateHandler(context);
 
         var command = new CreateUserCommand(
@@ -52,7 +62,7 @@ public class CreateUserCommandTests
             "John",
             "Doe",
             "+5491112345678",
-            Guid.NewGuid());
+            roleId);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -97,7 +107,9 @@ public class CreateUserCommandTests
     [Fact]
     public async Task Handle_WithoutPhone_SetsPhoneToNull()
     {
-        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        using var context = CreateContext(dealerId);
+        var roleId = await SeedRoleAsync(context, dealerId);
         var handler = CreateHandler(context);
 
         var command = new CreateUserCommand(
@@ -106,7 +118,7 @@ public class CreateUserCommandTests
             "No",
             "Phone",
             null,
-            Guid.NewGuid());
+            roleId);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -121,6 +133,7 @@ public class CreateUserCommandTests
         using var context = CreateContext();
         var dealerId1 = Guid.NewGuid();
         var dealerId2 = Guid.NewGuid();
+        var roleId = await SeedRoleAsync(context, dealerId1);
 
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId1);
@@ -133,7 +146,7 @@ public class CreateUserCommandTests
             "Shared",
             "Email",
             null,
-            Guid.NewGuid());
+            roleId);
 
         // Create user in different dealer
         var differentDealerUser = new User(dealerId2, "shared@example.com", "Other", "Dealer", "hash2", Guid.NewGuid());
@@ -148,7 +161,9 @@ public class CreateUserCommandTests
     [Fact]
     public async Task Handle_TrimsWhitespace_FromNameAndEmail()
     {
-        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        using var context = CreateContext(dealerId);
+        var roleId = await SeedRoleAsync(context, dealerId);
         var handler = CreateHandler(context);
 
         var command = new CreateUserCommand(
@@ -157,7 +172,7 @@ public class CreateUserCommandTests
             "  John  ",
             "  Doe  ",
             null,
-            Guid.NewGuid());
+            roleId);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -171,7 +186,9 @@ public class CreateUserCommandTests
     [Fact]
     public async Task Handle_EmailIsLowercased()
     {
-        using var context = CreateContext();
+        var dealerId = Guid.NewGuid();
+        using var context = CreateContext(dealerId);
+        var roleId = await SeedRoleAsync(context, dealerId);
         var handler = CreateHandler(context);
 
         var command = new CreateUserCommand(
@@ -180,7 +197,7 @@ public class CreateUserCommandTests
             "Test",
             "User",
             null,
-            Guid.NewGuid());
+            roleId);
 
         var result = await handler.Handle(command, CancellationToken.None);
 

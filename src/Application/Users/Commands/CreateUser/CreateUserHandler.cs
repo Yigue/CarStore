@@ -33,6 +33,14 @@ internal sealed class CreateUserCommandHandler(
             return Result.Failure<Guid>(UserErrors.EmailNotUnique);
         }
 
+        var roleBelongsToDealer = await context.Roles
+            .AnyAsync(r => r.Id == command.RoleId && r.DealerId == tenantService.DealerId, cancellationToken);
+
+        if (!roleBelongsToDealer)
+        {
+            return Result.Failure<Guid>(RoleErrors.NotFound(command.RoleId));
+        }
+
         var user = new User(
             tenantService.DealerId,
             email.Value,

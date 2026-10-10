@@ -21,6 +21,8 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
 {
     private readonly Guid _dealerId;
 
+    public Guid TenantDealerId => _dealerId;
+
     public TestApplicationDbContext(DbContextOptions<TestApplicationDbContext> options) : base(options)
     {
         _dealerId = Guid.NewGuid();
@@ -55,6 +57,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<BackfillAudit> BackfillAudits => Set<BackfillAudit>();
     public DbSet<DealerSubscription> DealerSubscriptions => Set<DealerSubscription>();
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
+    public DbSet<BillingReconciliationFlag> BillingReconciliationFlags => Set<BillingReconciliationFlag>();
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
     public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs => Set<Domain.Platform.PlatformAuditLogEntry>();

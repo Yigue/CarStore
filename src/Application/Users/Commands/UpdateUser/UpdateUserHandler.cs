@@ -22,6 +22,14 @@ internal sealed class UpdateUserCommandHandler(
             return Result.Failure<Guid>(UserErrors.NotFound(command.UserId));
         }
 
+        var roleBelongsToDealer = await context.Roles
+            .AnyAsync(r => r.Id == command.RoleId && r.DealerId == tenantService.DealerId, cancellationToken);
+
+        if (!roleBelongsToDealer)
+        {
+            return Result.Failure<Guid>(RoleErrors.NotFound(command.RoleId));
+        }
+
         // Update user properties using domain methods
         user.UpdateName(command.FirstName.Trim(), command.LastName.Trim());
 
