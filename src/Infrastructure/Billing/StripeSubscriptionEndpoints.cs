@@ -14,9 +14,16 @@ public static class StripeSubscriptionEndpoints
     {
         builder.MapPost("subscriptions/checkout", async (
             CreateCheckoutSessionRequest request,
+            HttpContext context,
             ISender sender) =>
         {
-            var command = new CreateCheckoutSessionCommand(request.DealerId, request.Email);
+            var dealerIdClaim = context.User.FindFirst("dealer_id")?.Value;
+            if (string.IsNullOrEmpty(dealerIdClaim) || !Guid.TryParse(dealerIdClaim, out var dealerId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var command = new CreateCheckoutSessionCommand(dealerId, request.Email);
             var result = await sender.Send(command);
 
             return result.IsSuccess
@@ -24,7 +31,8 @@ public static class StripeSubscriptionEndpoints
                 : Results.BadRequest(result.Error);
         })
         .WithName("CreateCheckoutSession")
-        .WithTags("Billing");
+        .WithTags("Billing")
+        .RequireAuthorization();
 
         builder.MapGet("subscriptions/status", async (
             HttpContext context,
