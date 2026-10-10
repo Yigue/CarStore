@@ -67,4 +67,4 @@ public static class StripeSubscriptionEndpoints
     }
 }
 
-public sealed record CreateCheckoutSessionRequest(Guid DealerId, string Email);
+public sealed record CreateCheckoutSessionRequest(string Email);
