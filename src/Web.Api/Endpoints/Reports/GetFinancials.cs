@@ -20,12 +20,14 @@ internal sealed class GetFinancials : IEndpoint
         {
             if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to))
             {
-                return Results.BadRequest(new { error = "MISSING_DATE_RANGE" });
+                return CustomResults.Problem(Result.Failure(Error.Validation(
+                    "MISSING_DATE_RANGE", "Both 'from' and 'to' are required, as valid dates.")));
             }
 
             if (!DateTime.TryParse(from, out DateTime parsedFrom) || !DateTime.TryParse(to, out DateTime parsedTo))
             {
-                return Results.BadRequest(new { error = "MISSING_DATE_RANGE" });
+                return CustomResults.Problem(Result.Failure(Error.Validation(
+                    "MISSING_DATE_RANGE", "Both 'from' and 'to' are required, as valid dates.")));
             }
 
             parsedFrom = parsedFrom.ToUtc();
@@ -42,11 +44,8 @@ internal sealed class GetFinancials : IEndpoint
             }
             else
             {
-                return Results.BadRequest(new 
-                { 
-                    error = "INVALID_GROUP_BY",
-                    allowedValues = new[] { "Day", "Week", "Month", "Year" }
-                });
+                return CustomResults.Problem(Result.Failure(Error.Validation(
+                    "INVALID_GROUP_BY", "groupBy must be one of: Day, Week, Month, Year.")));
             }
 
             Result<FinancialReportDto> result =

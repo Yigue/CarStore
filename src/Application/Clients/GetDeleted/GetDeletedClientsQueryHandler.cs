@@ -1,4 +1,5 @@
 using System.Linq;
+using Application.Common;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Abstractions.Data;
@@ -32,8 +33,8 @@ internal sealed class GetDeletedClientsQueryHandler(
 
         var clients = await dbQuery
             .OrderByDescending(c => c.DeletedAtUtc)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
+            .Skip((Pagination.ClampPage(query.Page) - 1) * Pagination.ClampPageSize(query.PageSize))
+            .Take(Pagination.ClampPageSize(query.PageSize))
             .ToListAsync(cancellationToken);
 
         var items = clients.Select(ClientResponseMapper.Map).ToList();
@@ -41,7 +42,7 @@ internal sealed class GetDeletedClientsQueryHandler(
         return Result.Success(new PaginatedResult<ClientResponse>(
             items,
             totalCount,
-            query.Page,
-            query.PageSize));
+            Pagination.ClampPage(query.Page),
+            Pagination.ClampPageSize(query.PageSize)));
     }
 }

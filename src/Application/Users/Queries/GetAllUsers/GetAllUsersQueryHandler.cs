@@ -1,4 +1,5 @@
 using Application.Abstractions.Data;
+using Application.Common;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -43,8 +44,8 @@ internal sealed class GetAllUsersQueryHandler(
         var users = await usersQuery
             .OrderBy(u => u.LastName)
             .ThenBy(u => u.FirstName)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
+            .Skip((Pagination.ClampPage(query.Page) - 1) * Pagination.ClampPageSize(query.PageSize))
+            .Take(Pagination.ClampPageSize(query.PageSize))
             .Select(u => new UserListResponse(
                 u.Id,
                 u.Email.Value,
@@ -56,6 +57,6 @@ internal sealed class GetAllUsersQueryHandler(
                 u.CreatedAt))
             .ToListAsync(cancellationToken);
 
-        return Result.Success(new PaginatedUsersResponse(users, total, query.Page, query.PageSize));
+        return Result.Success(new PaginatedUsersResponse(users, total, Pagination.ClampPage(query.Page), Pagination.ClampPageSize(query.PageSize)));
     }
 }

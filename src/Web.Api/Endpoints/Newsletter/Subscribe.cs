@@ -19,7 +19,7 @@ internal sealed class Subscribe : IEndpoint
         {
             if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.Contains('@'))
             {
-                return Results.BadRequest(new { error = "Email no es válido." });
+                return CustomResults.Problem(Result.Failure(Error.Validation("Newsletter.InvalidEmail", "Email no es válido.")));
             }
 
             // qa-p1-integridad D6: named arguments — CreateClientCommand's positional order

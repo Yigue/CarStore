@@ -27,14 +27,15 @@ internal sealed class GetAppointmentsQueryHandler(
             return Result.Failure<IReadOnlyList<AppointmentDto>>(guard.Error);
 
         Guid dealerId = tenantService.DealerId;
+        (DateTime rangeFrom, DateTime rangeTo) = Pagination.ClampRange(query.From, query.To);
 
         // Car display name comes from the Marca + Modelo + Anio (year) triple — the
         // domain model stores brand/model as related catalog entities, not strings.
         var rows = await (
             from a in context.Appointments.AsNoTracking()
             where a.DealerId == dealerId
-                  && a.StartDateTime < query.To
-                  && a.EndDateTime > query.From
+                  && a.StartDateTime < rangeTo
+                  && a.EndDateTime > rangeFrom
             join car in context.Cars.IgnoreQueryFilters().AsNoTracking()
                 on a.VehicleId equals car.Id into carJoin
             from car in carJoin.DefaultIfEmpty()

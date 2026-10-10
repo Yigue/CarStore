@@ -1,4 +1,5 @@
 using Application.Abstractions.Data;
+using Application.Common;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
 using Domain.Cars;
@@ -164,7 +165,7 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
 
         // Paginación en memoria sobre el conjunto ya filtrado
         var page = query.Page > 0 ? query.Page : 1;
-        var pageSize = query.PageSize > 0 ? query.PageSize : 10;
+        var pageSize = Pagination.ClampPageSize(query.PageSize > 0 ? query.PageSize : 10);
 
         var cars = allFiltered
             .Skip((page - 1) * pageSize)

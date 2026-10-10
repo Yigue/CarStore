@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Users.GetByEmail;
+using Application.Users.ResetPassword;
 using Domain.Users;
 using MediatR;
 using Microsoft.Extensions.Configuration;
@@ -33,12 +34,12 @@ internal sealed class RequestPasswordResetCommandHandler(
 
         UserResponse user = userResult.Value;
 
-        // Single-use, time-limited token. Stored hashed-free (it is already a high-entropy
-        // 256-bit random value) and looked up directly when the user submits the reset.
+        // Single-use, time-limited token. Only its SHA-256 digest is stored; the plain value
+        // travels in the email and is hashed again when the user submits the reset.
         string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         DateTime expiresAt = DateTime.UtcNow.Add(TokenLifetime);
 
-        context.PasswordResetTokens.Add(new PasswordResetToken(user.Id, token, expiresAt));
+        context.PasswordResetTokens.Add(new PasswordResetToken(user.Id, PasswordResetTokenHasher.Hash(token), expiresAt));
         await context.SaveChangesAsync(cancellationToken);
 
         string baseUrl = (configuration["Frontend:BaseUrl"] ?? "https://carstore-app.com").TrimEnd('/');

@@ -35,8 +35,8 @@ internal sealed class GetFinancialReportQueryHandler(
             return Result.Failure<FinancialReportDto>(guard.Error);
         }
 
-        DateTime from = query.From;
-        DateTime to = query.To;
+        // A ten-year window would build thousands of buckets: cut it to the maximum range.
+        (DateTime from, DateTime to) = Pagination.ClampRange(query.From, query.To);
 
         var rows = await context.Transactions.AsNoTracking()
             .Where(t => t.DealerId == tenantService.DealerId)

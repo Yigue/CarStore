@@ -1,4 +1,5 @@
 using Application.Abstractions.Data;
+using Application.Common;
 using Application.Abstractions.Messaging;
 using Domain.Leads;
 using Microsoft.EntityFrameworkCore;
@@ -34,8 +35,8 @@ internal sealed class GetLeadActivityQueryHandler(IApplicationDbContext context)
         List<LeadActivityEntry> items = await activities
             .OrderByDescending(a => a.OccurredAtUtc)
             .ThenByDescending(a => a.Id)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
+            .Skip((Pagination.ClampPage(query.Page) - 1) * Pagination.ClampPageSize(query.PageSize))
+            .Take(Pagination.ClampPageSize(query.PageSize))
             .Select(a => new LeadActivityEntry(
                 a.Id,
                 a.Type,

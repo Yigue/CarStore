@@ -1,4 +1,5 @@
 using Application.Abstractions.Authentication;
+using Application.Common;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
@@ -31,8 +32,8 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, ISto
         // Sort is applied to the whole set before Skip/Take, so page N holds the Nth
         // slice of the sorted inventory rather than a re-ordered arbitrary page.
         var cars = await ordering.Value
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
+            .Skip((Pagination.ClampPage(query.Page) - 1) * Pagination.ClampPageSize(query.PageSize))
+            .Take(Pagination.ClampPageSize(query.PageSize))
             .ToListAsync(cancellationToken);
 
         var responses = new List<CarsResponses>(cars.Count);
@@ -90,8 +91,8 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, ISto
         var paginatedResult = new PaginatedResult<CarsResponses>(
             responses,
             totalCount,
-            query.Page,
-            query.PageSize);
+            Pagination.ClampPage(query.Page),
+            Pagination.ClampPageSize(query.PageSize));
 
         return Result.Success(paginatedResult);
     }
