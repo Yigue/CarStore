@@ -66,7 +66,7 @@ public sealed class Quote : Entity, ISoftDeletable
         }
 
         
-        ProposedPrice = new Money(proposedPrice);
+        ProposedPrice = Money.Of(proposedPrice, CurrencyCode.Ars);
         PaymentMethod = paymentMethod;
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
@@ -89,7 +89,7 @@ public sealed class Quote : Entity, ISoftDeletable
         if (validUntil <= updatedAt)
             throw new DomainException("ValidUntil must be in the future");
         
-        ProposedPrice = new Money(proposedPrice);
+        ProposedPrice = Money.Of(proposedPrice, CurrencyCode.Ars);
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
         UpdatedAt = updatedAt;

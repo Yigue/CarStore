@@ -57,7 +57,7 @@ public sealed class FinancialTransaction : Entity
     {
         SetDealer(dealerId);
         Type = type;
-        Amount = new Money(amount);
+        Amount = Money.Of(amount, CurrencyCode.Ars);
         Description = description;
         PaymentMethod = paymentMethod;
         Category = category;
@@ -137,7 +137,7 @@ public sealed class FinancialTransaction : Entity
         Guid? saleId)
     {
         Type = type;
-        Amount = new Money(amount);
+        Amount = Money.Of(amount, CurrencyCode.Ars);
         Description = description;
         PaymentMethod = paymentMethod;
         ReferenceNumber = referenceNumber;

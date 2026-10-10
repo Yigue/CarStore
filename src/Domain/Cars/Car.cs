@@ -96,10 +96,10 @@ public sealed class Car : Entity
         Anio = anio;
         Patente = new LicensePlate(patente);
         Descripcion = descripcion;
-        Price = new Money(price);
+        Price = Money.Of(price, CurrencyCode.Ars);
 
         if (purchaseCost.HasValue)
-            PurchaseCost = new Money(purchaseCost.Value);
+            PurchaseCost = Money.Of(purchaseCost.Value, CurrencyCode.Ars);
 
         CreatedAt = date;
         UpdatedAt = date;
@@ -146,7 +146,7 @@ public sealed class Car : Entity
         Patente = new LicensePlate(patente);
         Descripcion = descripcion;
         if (purchaseCost.HasValue)
-            PurchaseCost = new Money(purchaseCost.Value);
+            PurchaseCost = Money.Of(purchaseCost.Value, CurrencyCode.Ars);
         UpdatedAt = updatedAt;
     }
     
@@ -246,7 +246,7 @@ public sealed class Car : Entity
     
     public void UpdatePrice(decimal newPrice, DateTime updatedAt)
     {
-        Price = new Money(newPrice);
+        Price = Money.Of(newPrice, CurrencyCode.Ars);
         UpdatedAt = updatedAt;
     }
     

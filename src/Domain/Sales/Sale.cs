@@ -100,7 +100,7 @@ public sealed class Sale : Entity
         LeadId = leadId;
         QuoteId = quoteId;
         SalespersonId = salespersonId;
-        FinalPrice = new Money(finalPrice);
+        FinalPrice = Money.Of(finalPrice, CurrencyCode.Ars);
         PaymentMethod = paymentMethod;
         ContractNumber = contractNumber;
         Comments = comments;
@@ -158,7 +158,7 @@ public sealed class Sale : Entity
         if (Status != SaleStatus.Pending)
             throw new DomainException("Only pending sales can be updated");
         
-        FinalPrice = new Money(finalPrice);
+        FinalPrice = Money.Of(finalPrice, CurrencyCode.Ars);
         PaymentMethod = paymentMethod;
         ContractNumber = contractNumber;
         Comments = comments;
@@ -228,12 +228,12 @@ public sealed class Sale : Entity
             }
         }
 
-        DownPayment = downPayment.HasValue ? new Money(downPayment.Value) : null;
+        DownPayment = downPayment.HasValue ? Money.Of(downPayment.Value, CurrencyCode.Ars) : null;
         TradeInCarId = tradeInCarId;
-        TradeInValue = tradeInValue.HasValue ? new Money(tradeInValue.Value) : null;
-        FinancedAmount = financedAmount.HasValue ? new Money(financedAmount.Value) : null;
+        TradeInValue = tradeInValue.HasValue ? Money.Of(tradeInValue.Value, CurrencyCode.Ars) : null;
+        FinancedAmount = financedAmount.HasValue ? Money.Of(financedAmount.Value, CurrencyCode.Ars) : null;
         InstallmentCount = installmentCount;
-        InstallmentAmount = installmentAmount.HasValue ? new Money(installmentAmount.Value) : null;
+        InstallmentAmount = installmentAmount.HasValue ? Money.Of(installmentAmount.Value, CurrencyCode.Ars) : null;
         FinancingEntity = string.IsNullOrWhiteSpace(financingEntity) ? null : financingEntity.Trim();
 
         return Result.Success();
