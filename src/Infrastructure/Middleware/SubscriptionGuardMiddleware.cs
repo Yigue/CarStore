@@ -81,10 +81,6 @@ public sealed class SubscriptionGuardMiddleware
                 var response = new
                 {
                     error = "subscription.suspended",
-                    dealerId = dealerId,
-                    // Additive: lets the UI tell "pay to start" (None/Incomplete) from "payment lapsed".
-                    subscriptionStatus = status?.ToString() ?? "None",
-                    reactivationUrl = (string?)null // Wait, where do we get this? Maybe just null in middleware, FE handles it by creating a checkout session?
                 };
 
                 await context.Response.WriteAsync(JsonSerializer.Serialize(response), context.RequestAborted);

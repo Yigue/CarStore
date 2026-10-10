@@ -245,4 +245,32 @@ public class SubscriptionGuardMiddlewareTests
         Assert.False(nextCalled);
         Assert.Equal(StatusCodes.Status402PaymentRequired, context.Response.StatusCode);
     }
+
+    [Fact]
+    public async Task InvokeAsync_AnonymousRequest_DoesNotLeakDealerIdOrStatus()
+    {
+        var dealerId = Guid.NewGuid();
+        var cacheMock = new Mock<ISubscriptionStatusCache>();
+        cacheMock.Setup(c => c.GetAsync(dealerId, default)).ReturnsAsync(SubscriptionStatus.Suspended);
+
+        var services = new ServiceCollection();
+        services.AddScoped(_ => cacheMock.Object);
+
+        var context = new DefaultHttpContext
+        {
+            RequestServices = services.BuildServiceProvider(),
+            Response = { Body = new MemoryStream() }
+        };
+        context.Items["Tenant.DealerId"] = dealerId;
+        context.Request.Path = "/api/v1/some-endpoint";
+
+        var middleware = new SubscriptionGuardMiddleware(_ => Task.CompletedTask);
+        await middleware.InvokeAsync(context);
+
+        Assert.Equal(StatusCodes.Status402PaymentRequired, context.Response.StatusCode);
+        context.Response.Body.Seek(0, SeekOrigin.Begin);
+        var body = await new StreamReader(context.Response.Body).ReadToEndAsync();
+        Assert.DoesNotContain(dealerId.ToString(), body);
+        Assert.DoesNotContain("subscriptionStatus", body);
+    }
 }
