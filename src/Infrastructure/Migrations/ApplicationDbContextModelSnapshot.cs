@@ -102,6 +102,32 @@ namespace Infrastructure.Migrations
                     b.ToTable("appointments", "public");
                 });
 
+            modelBuilder.Entity("Domain.Billing.BillingReconciliationFlag", b =>
+                {
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTime?>("ClearedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cleared_at");
+
+                    b.Property<DateTime>("FlaggedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("flagged_at");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("DealerId")
+                        .HasName("pk_billing_reconciliation_flags");
+
+                    b.ToTable("billing_reconciliation_flags", "public");
+                });
+
             modelBuilder.Entity("Domain.Billing.DealerSubscription", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2080,6 +2106,7 @@ namespace Infrastructure.Migrations
                                 .HasColumnName("id");
 
                             b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
                                 .HasColumnType("numeric(18,2)")
                                 .HasColumnName("amount");
 

@@ -18,7 +18,7 @@ public class StripeSubscriptionGatewayInterfaceContractTests
         var type = typeof(ISubscriptionGateway);
         var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance);
 
-        methods.Should().HaveCount(4);
+        methods.Should().HaveCount(5);
 
         // Method 1: CreateCheckoutSessionAsync
         var m1 = methods.SingleOrDefault(m => m.Name == "CreateCheckoutSessionAsync");
@@ -57,5 +57,14 @@ public class StripeSubscriptionGatewayInterfaceContractTests
         p4[0].ParameterType.Should().Be<Guid>(); // dealerId
         p4[1].ParameterType.Should().Be<string>(); // email
         p4[2].ParameterType.Should().Be<CancellationToken>();
+    
+        // Method 5 (spr ADR B9 / C14): FindSubscriptionForDealerAsync — provider lookup used by reconciliation.
+        var m5 = methods.SingleOrDefault(m => m.Name == "FindSubscriptionForDealerAsync");
+        m5.Should().NotBeNull();
+        m5.ReturnType.Should().Be<Task<ExternalSubscription?>>();
+        var p5 = m5.GetParameters();
+        p5.Should().HaveCount(2);
+        p5[0].ParameterType.Should().Be<Guid>(); // dealerId
+        p5[1].ParameterType.Should().Be<CancellationToken>();
     }
 }

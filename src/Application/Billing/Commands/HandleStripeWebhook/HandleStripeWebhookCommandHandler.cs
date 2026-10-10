@@ -65,19 +65,30 @@ internal sealed class HandleStripeWebhookCommandHandler : ICommandHandler<Handle
                     var trialEndsAt = trialEndUnix.HasValue ? DateTimeOffset.FromUnixTimeSeconds(trialEndUnix.Value).UtcDateTime : (DateTime?)null;
 
                     var subscription = await _repository.GetByStripeCustomerIdAsync(customerId, cancellationToken);
+
+                    Guid? metadataDealerId = null;
+                    if (dataObject.TryGetProperty("metadata", out var metadataProp) &&
+                        metadataProp.TryGetProperty("dealer_id", out var dealerIdProp) &&
+                        Guid.TryParse(dealerIdProp.GetString(), out var parsedDealerId))
+                    {
+                        metadataDealerId = parsedDealerId;
+                    }
+
+                    // spr ADR B8: provisioning already left a pending row for this dealer. When Stripe was
+                    // unreachable at that moment the row has no customer id, so the lookup above misses it;
+                    // finding it by dealer avoids inserting a second row (ux_dealer_subscriptions_dealer_id).
+                    if (subscription == null && metadataDealerId.HasValue)
+                    {
+                        subscription = await _repository.GetByDealerIdAsync(metadataDealerId.Value, cancellationToken);
+                        subscription?.AttachStripeCustomer(customerId);
+                    }
+
                     if (subscription == null)
                     {
-                        var dealerIdStr = string.Empty;
-                        if (dataObject.TryGetProperty("metadata", out var metadataProp) && 
-                            metadataProp.TryGetProperty("dealer_id", out var dealerIdProp))
-                        {
-                            dealerIdStr = dealerIdProp.GetString();
-                        }
-
-                        if (Guid.TryParse(dealerIdStr, out var dealerId))
+                        if (metadataDealerId.HasValue)
                         {
                             subscription = DealerSubscription.Create(
-                                dealerId,
+                                metadataDealerId.Value,
                                 customerId,
                                 subscriptionId,
                                 priceId,
@@ -85,14 +96,15 @@ internal sealed class HandleStripeWebhookCommandHandler : ICommandHandler<Handle
                             );
 
                             subscription.RenewPeriod(periodStart, periodEnd);
-                            UpdateAggregateStatus(subscription, status, subscriptionId, periodStart, periodEnd);
+                            UpdateAggregateStatus(subscription, status, subscriptionId, trialEndsAt, periodStart, periodEnd);
                             await _repository.AddAsync(subscription, cancellationToken);
                         }
                     }
                     else
                     {
+                        subscription.SetPlan(priceId);
                         subscription.RenewPeriod(periodStart, periodEnd);
-                        UpdateAggregateStatus(subscription, status, subscriptionId, periodStart, periodEnd);
+                        UpdateAggregateStatus(subscription, status, subscriptionId, trialEndsAt, periodStart, periodEnd);
                         _repository.Update(subscription);
                     }
                     break;
@@ -115,7 +127,8 @@ internal sealed class HandleStripeWebhookCommandHandler : ICommandHandler<Handle
 
                         if (subscription.Status == SubscriptionStatus.Suspended ||
                             subscription.Status == SubscriptionStatus.Cancelled ||
-                            subscription.Status == SubscriptionStatus.PastDue)
+                            subscription.Status == SubscriptionStatus.PastDue ||
+                            subscription.Status == SubscriptionStatus.Incomplete)
                         {
                             subscription.Activate(subscriptionId, periodStart, periodEnd);
                         }
@@ -162,7 +175,7 @@ internal sealed class HandleStripeWebhookCommandHandler : ICommandHandler<Handle
         return Result.Success();
     }
 
-    private static void UpdateAggregateStatus(DealerSubscription aggregate, string stripeStatus, string stripeSubscriptionId, DateTime start, DateTime end)
+    private static void UpdateAggregateStatus(DealerSubscription aggregate, string stripeStatus, string stripeSubscriptionId, DateTime? trialEndsAt, DateTime start, DateTime end)
     {
         switch (stripeStatus)
         {
@@ -173,6 +186,12 @@ internal sealed class HandleStripeWebhookCommandHandler : ICommandHandler<Handle
                 }
                 break;
             case "trialing":
+                // A pending (Incomplete) row only leaves its blocked state when Stripe confirms the
+                // trial; otherwise the dealer would stay behind the 402 gate forever.
+                if (aggregate.Status == SubscriptionStatus.Incomplete)
+                {
+                    aggregate.StartTrial(stripeSubscriptionId, trialEndsAt, start, end);
+                }
                 break;
             case "past_due":
             case "incomplete":

@@ -94,6 +94,16 @@ public class CrossTenantTests : IAsyncLifetime
             context.DealerSettings.Add(ds2);
         }
 
+        // spr ADR B8: the subscription gate is fail-closed — a dealer with no (confirmed) subscription row
+        // gets 402 before any tenant check runs. Dealer 2 is a paying customer here so these tests keep
+        // exercising what they are about: tenant isolation, not billing.
+        if (!await context.DealerSubscriptions.IgnoreQueryFilters().AnyAsync(s => s.DealerId == Dealer2Id))
+        {
+            var sub2 = Domain.Billing.DealerSubscription.Create(Dealer2Id, "cus_dealer2", "sub_dealer2", "price_test");
+            sub2.Activate("sub_dealer2", now, now.AddDays(30));
+            context.DealerSubscriptions.Add(sub2);
+        }
+
         var dealer2Role = await context.Roles.FirstOrDefaultAsync(r => r.DealerId == Dealer2Id && r.Name == "Admin");
         if (dealer2Role is null)
         {

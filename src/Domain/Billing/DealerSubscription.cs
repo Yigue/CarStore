@@ -41,6 +41,62 @@ public sealed class DealerSubscription : Entity
         return subscription;
     }
 
+    /// <summary>
+    /// spr ADR B8: the row provisioning always creates. Status is <see cref="SubscriptionStatus.Incomplete"/>
+    /// until Stripe confirms a trial or a payment; <paramref name="stripeCustomerId"/> is null when
+    /// Stripe was unreachable during provisioning.
+    /// </summary>
+    public static DealerSubscription CreatePending(Guid dealerId, string? stripeCustomerId, string planId)
+    {
+        var now = DateTime.UtcNow;
+        var subscription = new DealerSubscription
+        {
+            Id = Guid.NewGuid(),
+            StripeCustomerId = stripeCustomerId,
+            PlanId = planId,
+            Status = SubscriptionStatus.Incomplete,
+            CurrentPeriodStart = now,
+            CurrentPeriodEnd = now
+        };
+        subscription.SetDealer(dealerId);
+        return subscription;
+    }
+
+    /// <summary>Links the Stripe customer to a pending row. An existing link is never overwritten.</summary>
+    public void AttachStripeCustomer(string stripeCustomerId)
+    {
+        if (string.IsNullOrWhiteSpace(StripeCustomerId))
+        {
+            StripeCustomerId = stripeCustomerId;
+        }
+    }
+
+    /// <summary>Records the plan the dealer actually subscribed to (the Stripe price id).</summary>
+    public void SetPlan(string planId)
+    {
+        if (!string.IsNullOrWhiteSpace(planId))
+        {
+            PlanId = planId;
+        }
+    }
+
+    /// <summary>Stripe confirmed a trial subscription: Incomplete → Trialing.</summary>
+    public void StartTrial(string stripeSubscriptionId, DateTime? trialEndsAt, DateTime periodStart, DateTime periodEnd)
+    {
+        if (Status != SubscriptionStatus.Incomplete)
+        {
+            throw new InvalidSubscriptionTransitionException(Status, SubscriptionStatus.Trialing);
+        }
+
+        Status = SubscriptionStatus.Trialing;
+        StripeSubscriptionId = stripeSubscriptionId;
+        TrialEndsAt = trialEndsAt;
+        CurrentPeriodStart = periodStart;
+        CurrentPeriodEnd = periodEnd;
+        // Reuses the "left a blocked state" event so the status cache is invalidated.
+        Raise(new SubscriptionActivatedDomainEvent(Id, DealerId, stripeSubscriptionId));
+    }
+
     public void Activate(string stripeSubscriptionId, DateTime periodStart, DateTime periodEnd)
     {
         if (Status == SubscriptionStatus.Cancelled)
@@ -56,7 +112,7 @@ public sealed class DealerSubscription : Entity
             return;
         }
 
-        if (Status == SubscriptionStatus.Trialing || Status == SubscriptionStatus.PastDue || Status == SubscriptionStatus.Suspended)
+        if (Status == SubscriptionStatus.Trialing || Status == SubscriptionStatus.PastDue || Status == SubscriptionStatus.Suspended || Status == SubscriptionStatus.Incomplete)
         {
             Status = SubscriptionStatus.Active;
             StripeSubscriptionId = stripeSubscriptionId;
@@ -77,6 +133,12 @@ public sealed class DealerSubscription : Entity
         }
 
         if (Status == SubscriptionStatus.PastDue)
+        {
+            return;
+        }
+
+        // Stripe "incomplete" is the first payment still unconfirmed, not a late renewal.
+        if (Status == SubscriptionStatus.Incomplete)
         {
             return;
         }
@@ -103,7 +165,7 @@ public sealed class DealerSubscription : Entity
             return;
         }
 
-        if (Status == SubscriptionStatus.Active || Status == SubscriptionStatus.PastDue || Status == SubscriptionStatus.Trialing)
+        if (Status == SubscriptionStatus.Active || Status == SubscriptionStatus.PastDue || Status == SubscriptionStatus.Trialing || Status == SubscriptionStatus.Incomplete)
         {
             Status = SubscriptionStatus.Suspended;
             Raise(new SubscriptionSuspendedDomainEvent(Id, DealerId));

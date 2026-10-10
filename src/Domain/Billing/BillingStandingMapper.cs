@@ -6,6 +6,7 @@ public static class BillingStandingMapper
     public static BillingStanding From(SubscriptionStatus? status) => status switch
     {
         null => BillingStanding.NoSubscription,
+        SubscriptionStatus.Incomplete => BillingStanding.Incomplete,
         SubscriptionStatus.Active => BillingStanding.Active,
         SubscriptionStatus.Trialing => BillingStanding.Trialing,
         SubscriptionStatus.PastDue => BillingStanding.PastDue,

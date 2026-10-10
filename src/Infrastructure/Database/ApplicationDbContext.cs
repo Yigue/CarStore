@@ -62,6 +62,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<BackfillAudit> BackfillAudits { get; set; }
     public DbSet<DealerSubscription> DealerSubscriptions { get; set; }
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
+    public DbSet<BillingReconciliationFlag> BillingReconciliationFlags { get; set; }
     public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; }
     public DbSet<WebhookDelivery> WebhookDeliveries { get; set; }
     public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; set; }

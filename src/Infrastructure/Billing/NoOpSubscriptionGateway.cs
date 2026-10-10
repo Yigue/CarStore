@@ -23,6 +23,11 @@ public class NoOpSubscriptionGateway : ISubscriptionGateway
         return Task.CompletedTask;
     }
 
+    public Task<ExternalSubscription?> FindSubscriptionForDealerAsync(Guid dealerId, CancellationToken ct = default)
+    {
+        return Task.FromResult<ExternalSubscription?>(null);
+    }
+
     public Task<string> CreateCustomerAsync(Guid dealerId, string email, CancellationToken ct = default)
     {
         return Task.FromResult($"cus_noop_{Guid.NewGuid():N}");

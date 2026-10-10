@@ -2,6 +2,7 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Billing;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Domain.Billing;
 using Domain.DealerSettings;
 using Domain.DealerSettings.Events;
 using Domain.Users;
@@ -128,6 +129,13 @@ internal sealed class ProvisionDealerCommandHandler(
                 adminRole.Id);
 
             context.Users.Add(user);
+
+            // spr ADR B8: a dealer NEVER exists without a subscription row. It is created in the
+            // same transaction as the dealer, with or without a Stripe customer, as Incomplete:
+            // SubscriptionGuardMiddleware blocks it (402) until Stripe confirms a trial/payment, so
+            // the product is not usable for free while checkout is pending.
+            context.DealerSubscriptions.Add(
+                DealerSubscription.CreatePending(dealerId, stripeCustomerId, planId: string.Empty));
 
             await dbContext.SaveChangesAsync(cancellationToken);
 

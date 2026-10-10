@@ -20,7 +20,11 @@ public sealed class SubscriptionGuardMiddleware
         new Regex("^/webhooks/stripe$", RegexOptions.Compiled | RegexOptions.IgnoreCase),
         new Regex("^/health$", RegexOptions.Compiled | RegexOptions.IgnoreCase),
         new Regex("^/api/v1/subscriptions/status$", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-        new Regex("^/api/v1/subscriptions/checkout$", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        new Regex("^/api/v1/subscriptions/checkout$", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        // spr ADR B8: a dealer behind the 402 gate (Incomplete / no row / unpaid) must still be able to
+        // sign in, recover its password and read its own profile so the UI can render the blocker with
+        // the checkout CTA. None of these expose tenant data beyond the caller's own account.
+        new Regex("^/api/v1/users/(login|forgot-password|reset-password|me)$", RegexOptions.Compiled | RegexOptions.IgnoreCase)
     };
 
     private bool IsExemptCatalogRoute(HttpContext context)
@@ -63,7 +67,13 @@ public sealed class SubscriptionGuardMiddleware
             var cache = context.RequestServices.GetRequiredService<ISubscriptionStatusCache>();
             var status = await cache.GetAsync(dealerId, context.RequestAborted);
             
-            if (status.HasValue && status.Value != SubscriptionStatus.Active && status.Value != SubscriptionStatus.Trialing)
+            // spr ADR B8: fail CLOSED. A missing row (legacy dealer, status == null) is blocked exactly like
+            // Incomplete/Suspended/Cancelled; only a confirmed Active/Trialing subscription passes.
+            // Before this, `status.HasValue == false` skipped the whole check and the product was free.
+            bool allowed = status.HasValue
+                && (status.Value == SubscriptionStatus.Active || status.Value == SubscriptionStatus.Trialing);
+
+            if (!allowed)
             {
                 context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
                 context.Response.ContentType = "application/json";
@@ -72,6 +82,8 @@ public sealed class SubscriptionGuardMiddleware
                 {
                     error = "subscription.suspended",
                     dealerId = dealerId,
+                    // Additive: lets the UI tell "pay to start" (None/Incomplete) from "payment lapsed".
+                    subscriptionStatus = status?.ToString() ?? "None",
                     reactivationUrl = (string?)null // Wait, where do we get this? Maybe just null in middleware, FE handles it by creating a checkout session?
                 };
 

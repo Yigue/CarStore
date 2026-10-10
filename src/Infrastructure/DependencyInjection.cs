@@ -446,6 +446,9 @@ services.AddDbContext<ApplicationDbContext>(
         services.AddOptions<CrmReengagementOptions>()
             .BindConfiguration(CrmReengagementOptions.SectionName);
 
+        services.AddOptions<BillingReconciliationOptions>()
+            .BindConfiguration(BillingReconciliationOptions.SectionName);
+
         // Skip background jobs when using in-memory database (integration tests)
         bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase");
         if (useInMemory)
@@ -505,6 +508,23 @@ services.AddDbContext<ApplicationDbContext>(
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInHours(24)
                                 .RepeatForever()));
+
+            // Job 6: Billing reconciliation (spr ADR B9) — flags dealers without a confirmed
+            // subscription past the grace window; never deletes. Billing:Reconciliation:Enabled
+            // turns it off entirely; the interval is read here because Quartz fixes it at startup.
+            var reconciliation = configuration.GetSection(BillingReconciliationOptions.SectionName)
+                .Get<BillingReconciliationOptions>() ?? new BillingReconciliationOptions();
+            if (reconciliation.Enabled)
+            {
+                var reconcileJobKey = new JobKey(nameof(ReconcileSubscriptionsJob));
+                configure
+                    .AddJob<ReconcileSubscriptionsJob>(opts => opts.WithIdentity(reconcileJobKey))
+                    .AddTrigger(trigger =>
+                        trigger.ForJob(reconcileJobKey)
+                            .WithSimpleSchedule(schedule =>
+                                schedule.WithIntervalInMinutes(Math.Max(1, reconciliation.IntervalMinutes))
+                                    .RepeatForever()));
+            }
         });
 
         services.AddQuartzHostedService();

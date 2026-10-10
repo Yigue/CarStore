@@ -41,7 +41,8 @@ internal sealed class GetSubscriptionStatusQueryHandler : IQueryHandler<GetSubsc
         if (subscription == null ||
             subscription.Status == SubscriptionStatus.Suspended ||
             subscription.Status == SubscriptionStatus.Cancelled ||
-            subscription.Status == SubscriptionStatus.PastDue)
+            subscription.Status == SubscriptionStatus.PastDue ||
+            subscription.Status == SubscriptionStatus.Incomplete)
         {
             var adminUser = await _context.Users
                 .Where(u => u.DealerId == request.DealerId && u.RoleId != Guid.Empty)

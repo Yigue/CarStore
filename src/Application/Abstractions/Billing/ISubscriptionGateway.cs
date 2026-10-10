@@ -28,4 +28,22 @@ public interface ISubscriptionGateway
     /// <summary>Creates a Stripe customer for a new dealer. Idempotent on StripeCustomerId.</summary>
     Task<string> CreateCustomerAsync(Guid dealerId, string email,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// spr ADR B9 / C14: looks the provider up for a live (non-cancelled) subscription that belongs to
+    /// the dealer, by the <c>dealer_id</c> metadata. Used by the reconciliation job to heal a pending
+    /// row before flagging it. Returns null when the provider has nothing for that dealer.
+    /// </summary>
+    Task<ExternalSubscription?> FindSubscriptionForDealerAsync(Guid dealerId,
+        CancellationToken ct = default);
 }
+
+/// <summary>Provider-agnostic snapshot of a subscription held by the payment provider.</summary>
+public sealed record ExternalSubscription(
+    string CustomerId,
+    string SubscriptionId,
+    SubscriptionStatus Status,
+    DateTime PeriodStart,
+    DateTime PeriodEnd,
+    DateTime? TrialEnd,
+    string? PriceId);

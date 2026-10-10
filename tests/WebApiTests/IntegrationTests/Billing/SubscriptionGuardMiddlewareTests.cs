@@ -135,33 +135,84 @@ public class SubscriptionGuardMiddlewareTests
         cacheMock.Verify(c => c.GetAsync(It.IsAny<Guid>(), default), Times.Never);
     }
 
-    [Fact]
-    public async Task InvokeAsync_NoSubscriptionRow_CallsNext()
+    private static (DefaultHttpContext Context, Mock<ISubscriptionStatusCache> Cache, Func<bool> NextCalled, SubscriptionGuardMiddleware Middleware)
+        Arrange(Guid dealerId, SubscriptionStatus? status, string path, string method = "GET")
     {
-        var dealerId = Guid.NewGuid();
         var cacheMock = new Mock<ISubscriptionStatusCache>();
-        cacheMock.Setup(c => c.GetAsync(dealerId, default)).ReturnsAsync((SubscriptionStatus?)null);
+        cacheMock.Setup(c => c.GetAsync(dealerId, default)).ReturnsAsync(status);
 
         var services = new ServiceCollection();
         services.AddScoped(_ => cacheMock.Object);
 
         var context = new DefaultHttpContext
         {
-            RequestServices = services.BuildServiceProvider()
+            RequestServices = services.BuildServiceProvider(),
+            Response = { Body = new MemoryStream() }
         };
         context.Items["Tenant.DealerId"] = dealerId;
-        context.Request.Path = "/api/v1/some-endpoint";
+        context.Request.Path = path;
+        context.Request.Method = method;
 
         var nextCalled = false;
-        var middleware = new SubscriptionGuardMiddleware(innerContext =>
+        var middleware = new SubscriptionGuardMiddleware(_ =>
         {
             nextCalled = true;
             return Task.CompletedTask;
         });
 
+        return (context, cacheMock, () => nextCalled, middleware);
+    }
+
+    // spr ADR B8 (task 3.1.3): the legacy dealer with no subscription row used to pass (fail-open).
+    [Fact]
+    public async Task InvokeAsync_NoSubscriptionRow_Returns402()
+    {
+        var (context, _, nextCalled, middleware) = Arrange(Guid.NewGuid(), null, "/api/v1/clients");
+
         await middleware.InvokeAsync(context);
 
-        Assert.True(nextCalled);
+        Assert.False(nextCalled());
+        Assert.Equal(StatusCodes.Status402PaymentRequired, context.Response.StatusCode);
+    }
+
+    // spr ADR B8 (task 3.1.2): a freshly provisioned dealer (Incomplete) does not use the product for free.
+    [Fact]
+    public async Task InvokeAsync_IncompleteDealer_Returns402()
+    {
+        var (context, _, nextCalled, middleware) = Arrange(Guid.NewGuid(), SubscriptionStatus.Incomplete, "/api/v1/clients");
+
+        await middleware.InvokeAsync(context);
+
+        Assert.False(nextCalled());
+        Assert.Equal(StatusCodes.Status402PaymentRequired, context.Response.StatusCode);
+    }
+
+    // spr ADR B8: the dealer must be able to log in, read its status and start a checkout to pay its way out.
+    [Theory]
+    [InlineData("/api/v1/subscriptions/status", "GET")]
+    [InlineData("/api/v1/subscriptions/checkout", "POST")]
+    [InlineData("/api/v1/users/login", "POST")]
+    [InlineData("/api/v1/users/forgot-password", "POST")]
+    [InlineData("/api/v1/users/reset-password", "POST")]
+    [InlineData("/api/v1/users/me", "GET")]
+    public async Task InvokeAsync_IncompleteDealer_CanReachTheRoutesNeededToPay(string path, string method)
+    {
+        var (context, cache, nextCalled, middleware) = Arrange(Guid.NewGuid(), SubscriptionStatus.Incomplete, path, method);
+
+        await middleware.InvokeAsync(context);
+
+        Assert.True(nextCalled());
+        cache.Verify(c => c.GetAsync(It.IsAny<Guid>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_NoSubscriptionRow_StillReachesStatusAndCheckout()
+    {
+        var (context, _, nextCalled, middleware) = Arrange(Guid.NewGuid(), null, "/api/v1/subscriptions/checkout", "POST");
+
+        await middleware.InvokeAsync(context);
+
+        Assert.True(nextCalled());
     }
 
     [Fact]

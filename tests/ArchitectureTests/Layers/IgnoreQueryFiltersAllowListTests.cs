@@ -42,6 +42,9 @@ public class IgnoreQueryFiltersAllowListTests
         "DealerSettings/Commands/UpdateHostName/",
         "Leads/GetAll/",
         "Leads/GetById/",
+        // spr ADR B9: the reconciliation job runs across ALL dealers with no tenant context by
+        // design (it looks for dealers WITHOUT a subscription row); it only reads and flags.
+        "Billing/Commands/ReconcileSubscriptions/",
         // Global catalogs without a tenant (Marca/Modelo) and the pre-tenant email lookup
         // used by the anonymous password-reset request.
         "Marcas/Create/",

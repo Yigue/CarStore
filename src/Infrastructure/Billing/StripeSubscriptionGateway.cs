@@ -122,6 +122,34 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
         return MapStripeStatus(subscription.Status);
     }
 
+    public async Task<ExternalSubscription?> FindSubscriptionForDealerAsync(Guid dealerId, CancellationToken ct = default)
+    {
+        var subscriptionService = new SubscriptionService(_stripeClient);
+        var search = await subscriptionService.SearchAsync(
+            new SubscriptionSearchOptions { Query = $"metadata['dealer_id']:'{dealerId}'", Limit = 10 },
+            cancellationToken: ct);
+
+        // Most recent live subscription wins; a cancelled one does not count as "confirmed".
+        var live = search.Data
+            .Where(s => s.Status != "canceled" && s.Status != "incomplete_expired")
+            .OrderByDescending(s => s.Created)
+            .FirstOrDefault();
+
+        if (live is null)
+        {
+            return null;
+        }
+
+        return new ExternalSubscription(
+            live.CustomerId,
+            live.Id,
+            MapStripeStatus(live.Status),
+            live.CurrentPeriodStart,
+            live.CurrentPeriodEnd,
+            live.TrialEnd,
+            live.Items?.Data?.FirstOrDefault()?.Price?.Id);
+    }
+
     private static SubscriptionStatus MapStripeStatus(string stripeStatus)
     {
         return stripeStatus switch
