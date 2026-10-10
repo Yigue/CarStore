@@ -22,6 +22,14 @@ internal sealed class AssignRoleCommandHandler(
             return Result.Failure<Guid>(UserErrors.NotFound(command.UserId));
         }
 
+        var roleBelongsToDealer = await context.Roles
+            .AnyAsync(r => r.Id == command.RoleId && r.DealerId == tenantService.DealerId, cancellationToken);
+
+        if (!roleBelongsToDealer)
+        {
+            return Result.Failure<Guid>(RoleErrors.NotFound(command.RoleId));
+        }
+
         user.UpdateRole(command.RoleId);
 
         await context.SaveChangesAsync(cancellationToken);

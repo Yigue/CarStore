@@ -40,7 +40,9 @@ public class AssignRoleCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var newRoleId = Guid.NewGuid();
+        var ownRole = new Role(dealerId, "Empleado", "Rol del mismo dealer");
+        context.Roles.Add(ownRole);
+        var newRoleId = ownRole.Id;
         var user = new User(dealerId, "assign@example.com", "Assign", "Role", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -104,7 +106,9 @@ public class AssignRoleCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var roleId = Guid.NewGuid();
+        var ownRole = new Role(dealerId, "Empleado", "Rol del mismo dealer");
+        context.Roles.Add(ownRole);
+        var roleId = ownRole.Id;
         var user = new User(dealerId, "samerole@example.com", "Same", "Role", "hash", roleId);
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -127,6 +131,9 @@ public class AssignRoleCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
+        var ownRole = new Role(dealerId, "Gerente", "Rol del mismo dealer");
+        context.Roles.Add(ownRole);
+        newRole = ownRole.Id;
         var user = new User(dealerId, $"role{newRole}@example.com", "Role", "Test", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -140,5 +147,40 @@ public class AssignRoleCommandTests
         result.IsSuccess.Should().BeTrue();
         var updatedUser = await context.Users.FirstOrDefaultAsync(u => u.Id == user.Id);
         updatedUser!.RoleId.Should().Be(newRole);
+    }
+}
+public class AssignRoleCrossDealerTests
+{
+    private static TestApplicationDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<TestApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        return new TestApplicationDbContext(options);
+    }
+
+    [Fact]
+    public async Task Handle_RoleFromAnotherDealer_IsRejected_AndUserKeepsItsRole()
+    {
+        using var context = CreateContext();
+        var callerDealer = Guid.NewGuid();
+        var otherDealer = Guid.NewGuid();
+
+        var originalRoleId = Guid.NewGuid();
+        var user = new User(callerDealer, "victim@example.com", "Vic", "Tim", "hash", originalRoleId);
+        var foreignRole = new Role(otherDealer, "Admin", "Admin de otra concesionaria");
+        context.Users.Add(user);
+        context.Roles.Add(foreignRole);
+        await context.SaveChangesAsync();
+
+        var tenant = new Mock<ICurrentTenantService>();
+        tenant.SetupGet(t => t.DealerId).Returns(callerDealer);
+        var handler = new AssignRoleCommandHandler(context, tenant.Object);
+
+        var result = await handler.Handle(new AssignRoleCommand(user.Id, foreignRole.Id), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        var reloaded = await context.Users.FirstAsync(u => u.Id == user.Id);
+        reloaded.RoleId.Should().Be(originalRoleId);
     }
 }
