@@ -4,10 +4,10 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Infrastructure.Database.Configurations;
 
-// PHASE-4: Money is mapped via OwnsOne (cost_amount + cost_currency) instead of the
-// existing MoneyValueConverter pattern (single decimal column, hard-coded "USD")
-// because ReconditioningTaskCompletedDomainEvent carries Currency to the ledger
-// and we must persist it faithfully.
+// PHASE-4: Money is mapped via OwnsOne (cost_amount + cost_currency) because
+// ReconditioningTaskCompletedDomainEvent carries Currency to the ledger and we must persist it
+// faithfully. Since ADR C1 every other Money in the model follows the same two-column shape
+// (see MoneyMapping).
 internal sealed class ReconditioningTaskConfiguration : IEntityTypeConfiguration<ReconditioningTask>
 {
     public void Configure(EntityTypeBuilder<ReconditioningTask> builder)

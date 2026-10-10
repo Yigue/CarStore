@@ -54,7 +54,10 @@ public class CarReferenceDeleteBehaviorTests
         return context.Model.GetEntityTypes()
             .SelectMany(e => e.GetForeignKeys())
             .Where(fk => fk.PrincipalEntityType.ClrType == typeof(Domain.Cars.Car))
-            .ToDictionary(fk => fk.DeclaringEntityType.ClrType.Name, StringComparer.Ordinal);
+            // Money is owned by Car more than once (Price and PurchaseCost, ADR C1): same dependent
+            // type, same cascade, so the type name stays the classification key.
+            .GroupBy(fk => fk.DeclaringEntityType.ClrType.Name, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
     }
 
     [Fact]

@@ -11,10 +11,7 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
     {
         builder.HasKey(q => q.Id);
 
-        builder.Property(q => q.ProposedPrice)
-            .HasConversion(new MoneyValueConverter())
-            .HasColumnName("proposed_price")
-            .IsRequired();
+        builder.OwnsRequiredMoney(q => q.ProposedPrice, "proposed_price", "proposed_price_currency");
 
         builder.Property(q => q.Status)
             .HasConversion<string>();

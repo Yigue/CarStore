@@ -292,7 +292,7 @@ public sealed class Car : Entity
     /// <summary>
     /// Total Cost of Ownership: <see cref="PurchaseCost"/> + sum of cost of all completed
     /// reconditioning tasks (currencies must match). When no purchase cost is set we use
-    /// <see cref="Money.Zero"/> defaulted to the currency of completed tasks (or "USD").
+    /// <see cref="Money.Zero"/> defaulted to the currency of completed tasks (or <see cref="Money.DefaultCurrency"/>).
     /// </summary>
     public Money GetTotalCostOfOwnership()
     {
@@ -302,7 +302,7 @@ public sealed class Car : Entity
 
         string baseCurrency = PurchaseCost?.Currency
             ?? completed.FirstOrDefault()?.Cost.Currency
-            ?? "USD";
+            ?? Money.DefaultCurrency;
 
         Money total = PurchaseCost ?? new Money(0, baseCurrency);
 

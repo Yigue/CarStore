@@ -11,10 +11,7 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
     {
         builder.HasKey(s => s.Id);
 
-        builder.Property(s => s.FinalPrice)
-            .HasConversion(new MoneyValueConverter())
-            .HasColumnName("final_price")
-            .IsRequired();
+        builder.OwnsRequiredMoney(s => s.FinalPrice, "final_price", "final_price_currency");
 
         builder.Property(s => s.Status)
             .HasConversion<string>();
@@ -75,27 +72,19 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
         // Every column is nullable: a sale recorded before this change, or one paid in cash,
         // has nothing to fill in here.
 
-        builder.Property(s => s.DownPayment)
-            .HasConversion(new NullableMoneyValueConverter())
-            .HasColumnName("down_payment");
+        builder.OwnsOptionalMoney(s => s.DownPayment, "down_payment", "down_payment_currency");
 
         builder.Property(s => s.TradeInCarId)
             .HasColumnName("trade_in_car_id");
 
-        builder.Property(s => s.TradeInValue)
-            .HasConversion(new NullableMoneyValueConverter())
-            .HasColumnName("trade_in_value");
+        builder.OwnsOptionalMoney(s => s.TradeInValue, "trade_in_value", "trade_in_value_currency");
 
-        builder.Property(s => s.FinancedAmount)
-            .HasConversion(new NullableMoneyValueConverter())
-            .HasColumnName("financed_amount");
+        builder.OwnsOptionalMoney(s => s.FinancedAmount, "financed_amount", "financed_amount_currency");
 
         builder.Property(s => s.InstallmentCount)
             .HasColumnName("installment_count");
 
-        builder.Property(s => s.InstallmentAmount)
-            .HasConversion(new NullableMoneyValueConverter())
-            .HasColumnName("installment_amount");
+        builder.OwnsOptionalMoney(s => s.InstallmentAmount, "installment_amount", "installment_amount_currency");
 
         builder.Property(s => s.FinancingEntity)
             .HasMaxLength(120)

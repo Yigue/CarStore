@@ -29,11 +29,7 @@ public class TransactionConfiguration : IEntityTypeConfiguration<FinancialTransa
             .IsUnique()
             .HasFilter("\"reconditioning_task_id\" IS NOT NULL AND \"source_id\" IS NOT NULL");
 
-        builder.Property(t => t.Amount)
-            .HasConversion(new MoneyValueConverter())
-            .HasColumnName("amount")
-            .HasPrecision(18, 2)
-            .IsRequired();
+        builder.OwnsRequiredMoney(t => t.Amount, "amount", "amount_currency", precision18x2: true);
 
         builder.Property(t => t.Type)
             .IsRequired();

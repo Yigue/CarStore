@@ -380,10 +380,6 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("patente");
 
-                    b.Property<decimal>("Price")
-                        .HasColumnType("numeric")
-                        .HasColumnName("price");
-
                     b.Property<string>("ServiceCar")
                         .IsRequired()
                         .HasColumnType("text")
@@ -953,11 +949,6 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("amount");
-
                     b.Property<Guid?>("CarId")
                         .HasColumnType("uuid")
                         .HasColumnName("car_id");
@@ -1317,10 +1308,6 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("payment_method");
 
-                    b.Property<decimal>("ProposedPrice")
-                        .HasColumnType("numeric")
-                        .HasColumnName("proposed_price");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1392,26 +1379,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("delivery_date");
 
-                    b.Property<decimal?>("DownPayment")
-                        .HasColumnType("numeric")
-                        .HasColumnName("down_payment");
-
-                    b.Property<decimal>("FinalPrice")
-                        .HasColumnType("numeric")
-                        .HasColumnName("final_price");
-
-                    b.Property<decimal?>("FinancedAmount")
-                        .HasColumnType("numeric")
-                        .HasColumnName("financed_amount");
-
                     b.Property<string>("FinancingEntity")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
                         .HasColumnName("financing_entity");
-
-                    b.Property<decimal?>("InstallmentAmount")
-                        .HasColumnType("numeric")
-                        .HasColumnName("installment_amount");
 
                     b.Property<int?>("InstallmentCount")
                         .HasColumnType("integer")
@@ -1456,10 +1427,6 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("TradeInCarId")
                         .HasColumnType("uuid")
                         .HasColumnName("trade_in_car_id");
-
-                    b.Property<decimal?>("TradeInValue")
-                        .HasColumnType("numeric")
-                        .HasColumnName("trade_in_value");
 
                     b.Property<string>("TransferFormNumber")
                         .HasMaxLength(50)
@@ -1910,6 +1877,31 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_cars_modelo_modelo_id");
 
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "Price", b1 =>
+                        {
+                            b1.Property<Guid>("CarId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("price");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("price_currency");
+
+                            b1.HasKey("CarId");
+
+                            b1.ToTable("cars", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CarId")
+                                .HasConstraintName("fk_cars_cars_id");
+                        });
+
                     b.OwnsOne("Domain.Shared.ValueObjects.Money", "PurchaseCost", b1 =>
                         {
                             b1.Property<Guid>("CarId")
@@ -1938,6 +1930,9 @@ namespace Infrastructure.Migrations
                     b.Navigation("Marca");
 
                     b.Navigation("Modelo");
+
+                    b.Navigation("Price")
+                        .IsRequired();
 
                     b.Navigation("PurchaseCost");
                 });
@@ -2078,6 +2073,34 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_transactions_sales_sale_id");
 
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "Amount", b1 =>
+                        {
+                            b1.Property<Guid>("FinancialTransactionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("amount_currency");
+
+                            b1.HasKey("FinancialTransactionId");
+
+                            b1.ToTable("transactions", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("FinancialTransactionId")
+                                .HasConstraintName("fk_transactions_transactions_id");
+                        });
+
+                    b.Navigation("Amount")
+                        .IsRequired();
+
                     b.Navigation("Car");
 
                     b.Navigation("Category");
@@ -2133,11 +2156,39 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_quotes_leads_lead_id");
 
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "ProposedPrice", b1 =>
+                        {
+                            b1.Property<Guid>("QuoteId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("proposed_price");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("proposed_price_currency");
+
+                            b1.HasKey("QuoteId");
+
+                            b1.ToTable("quotes", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("QuoteId")
+                                .HasConstraintName("fk_quotes_quotes_id");
+                        });
+
                     b.Navigation("Car");
 
                     b.Navigation("Client");
 
                     b.Navigation("Lead");
+
+                    b.Navigation("ProposedPrice")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Sales.Sale", b =>
@@ -2168,9 +2219,145 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_sales_quotes_quote_id");
 
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "DownPayment", b1 =>
+                        {
+                            b1.Property<Guid>("SaleId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("down_payment");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("down_payment_currency");
+
+                            b1.HasKey("SaleId");
+
+                            b1.ToTable("sales", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SaleId")
+                                .HasConstraintName("fk_sales_sales_id");
+                        });
+
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "FinalPrice", b1 =>
+                        {
+                            b1.Property<Guid>("SaleId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("final_price");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("final_price_currency");
+
+                            b1.HasKey("SaleId");
+
+                            b1.ToTable("sales", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SaleId")
+                                .HasConstraintName("fk_sales_sales_id");
+                        });
+
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "FinancedAmount", b1 =>
+                        {
+                            b1.Property<Guid>("SaleId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("financed_amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("financed_amount_currency");
+
+                            b1.HasKey("SaleId");
+
+                            b1.ToTable("sales", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SaleId")
+                                .HasConstraintName("fk_sales_sales_id");
+                        });
+
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "InstallmentAmount", b1 =>
+                        {
+                            b1.Property<Guid>("SaleId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("installment_amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("installment_amount_currency");
+
+                            b1.HasKey("SaleId");
+
+                            b1.ToTable("sales", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SaleId")
+                                .HasConstraintName("fk_sales_sales_id");
+                        });
+
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "TradeInValue", b1 =>
+                        {
+                            b1.Property<Guid>("SaleId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("trade_in_value");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("trade_in_value_currency");
+
+                            b1.HasKey("SaleId");
+
+                            b1.ToTable("sales", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SaleId")
+                                .HasConstraintName("fk_sales_sales_id");
+                        });
+
                     b.Navigation("Car");
 
                     b.Navigation("Client");
+
+                    b.Navigation("DownPayment");
+
+                    b.Navigation("FinalPrice")
+                        .IsRequired();
+
+                    b.Navigation("FinancedAmount");
+
+                    b.Navigation("InstallmentAmount");
+
+                    b.Navigation("TradeInValue");
                 });
 
             modelBuilder.Entity("Domain.Users.PasswordResetToken", b =>
