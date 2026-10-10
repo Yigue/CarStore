@@ -21,6 +21,7 @@ public class UsersEndpointsTests
             FirstName = "User", 
             LastName = "Test", 
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var response = await client.PostAsJsonAsync("/api/v1/users/register", request);
@@ -42,6 +43,7 @@ public class UsersEndpointsTests
             FirstName = "User", 
             LastName = "Test", 
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         await client.PostAsJsonAsync("/api/v1/users/register", request);
@@ -59,6 +61,7 @@ public class UsersEndpointsTests
             FirstName = "No", 
             LastName = "Auth", 
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var regResponse = await client.PostAsJsonAsync("/api/v1/users/register", register);
@@ -78,6 +81,7 @@ public class UsersEndpointsTests
             FirstName = "Auth", 
             LastName = "User", 
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var regResponse = await client.PostAsJsonAsync("/api/v1/users/register", register);

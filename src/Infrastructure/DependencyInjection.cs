@@ -118,6 +118,7 @@ public static class DependencyInjection
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+        services.AddSingleton<Application.Legal.ILegalTermsProvider, Infrastructure.Legal.ConfigurationLegalTermsProvider>();
 
         // PHASE-2 (Inventario-Overhaul): MinIO-backed storage for the Cars aggregate.
         // ADR-3: single production implementation (no factory, no multi-binding).

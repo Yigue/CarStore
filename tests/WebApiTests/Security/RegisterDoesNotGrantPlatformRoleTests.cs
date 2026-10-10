@@ -42,7 +42,8 @@ public class RegisterDoesNotGrantPlatformRoleTests : IAsyncLifetime
                 Email = uniqueEmail,
                 FirstName = "Test",
                 LastName = "User",
-                Password = password
+                Password = password,
+                AcceptedTermsVersion = "2026-10-01"
             },
             IntegrationTestHelpers.JsonOptions);
 

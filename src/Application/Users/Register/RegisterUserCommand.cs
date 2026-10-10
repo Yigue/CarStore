@@ -2,5 +2,8 @@ using Application.Abstractions.Messaging;
 
 namespace Application.Users.Register;
 
-public sealed record RegisterUserCommand(string Email, string FirstName, string LastName, string Password)
+public sealed record RegisterUserCommand(string Email, string FirstName, string LastName, string Password,
+    string? AcceptedTermsVersion = null,
+    string? AcceptanceIp = null,
+    string? AcceptanceUserAgent = null)
     : ICommand<Guid>;

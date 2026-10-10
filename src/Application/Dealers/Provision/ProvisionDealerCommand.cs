@@ -12,4 +12,7 @@ public sealed record ProvisionDealerCommand(
     string AdminEmail,
     string AdminPassword,
     string AdminFirstName,
-    string AdminLastName) : ICommand<ProvisionDealerResponse>;
+    string AdminLastName,
+    string? AcceptedTermsVersion = null,
+    string? AcceptanceIp = null,
+    string? AcceptanceUserAgent = null) : ICommand<ProvisionDealerResponse>;

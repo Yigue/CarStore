@@ -31,8 +31,8 @@ public class RegisterUserCommandHandlerTests
         tenantService.Setup(t => t.DealerId).Returns(Guid.Empty);
         tenantService.Setup(t => t.HasTenant).Returns(false);
 
-        var handler = new RegisterUserCommandHandler(context, passwordHasher.Object, tenantService.Object);
-        var command = new RegisterUserCommand("newuser@example.com", "John", "Doe", "Pass123!");
+        var handler = new RegisterUserCommandHandler(context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var command = new RegisterUserCommand("newuser@example.com", "John", "Doe", "Pass123!", Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -56,8 +56,8 @@ public class RegisterUserCommandHandlerTests
         tenantService.Setup(t => t.DealerId).Returns(dealerId);
         tenantService.Setup(t => t.HasTenant).Returns(true);
 
-        var handler = new RegisterUserCommandHandler(context, passwordHasher.Object, tenantService.Object);
-        var command = new RegisterUserCommand("newuser@example.com", "Jane", "Doe", "Pass123!");
+        var handler = new RegisterUserCommandHandler(context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var command = new RegisterUserCommand("newuser@example.com", "Jane", "Doe", "Pass123!", Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -91,8 +91,8 @@ public class RegisterUserCommandHandlerTests
         tenantService.Setup(t => t.DealerId).Returns(dealerId);
         tenantService.Setup(t => t.HasTenant).Returns(true);
 
-        var handler = new RegisterUserCommandHandler(context, passwordHasher.Object, tenantService.Object);
-        var command = new RegisterUserCommand("seconduser@example.com", "Bob", "Smith", "Pass123!");
+        var handler = new RegisterUserCommandHandler(context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var command = new RegisterUserCommand("seconduser@example.com", "Bob", "Smith", "Pass123!", Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);

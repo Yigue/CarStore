@@ -12,17 +12,21 @@ internal sealed class Register : IEndpoint
         string Email,
         string FirstName,
         string LastName,
-        string Password);
+        string Password,
+        string? AcceptedTermsVersion = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("users/register", async (Request request, ISender sender, CancellationToken cancellationToken) =>
+        app.MapPost("users/register", async (Request request, HttpContext httpContext, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new RegisterUserCommand(
                 Email: request.Email,
                 FirstName: request.FirstName,
                 LastName: request.LastName,
-                Password: request.Password);
+                Password: request.Password,
+                AcceptedTermsVersion: request.AcceptedTermsVersion,
+                AcceptanceIp: httpContext.Connection.RemoteIpAddress?.ToString(),
+                AcceptanceUserAgent: httpContext.Request.Headers.UserAgent.ToString());
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

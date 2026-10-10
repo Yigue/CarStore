@@ -20,22 +20,27 @@ internal sealed class Provision : IEndpoint
         string AdminEmail,
         string AdminPassword,
         string AdminFirstName,
-        string AdminLastName);
+        string AdminLastName,
+        string? AcceptedTermsVersion = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("dealers/provision", async (
             Request request,
+            HttpContext httpContext,
             ISender sender,
             CancellationToken cancellationToken) =>
         {
             var command = new ProvisionDealerCommand(
-                request.DealerName,
-                request.Subdomain,
-                request.AdminEmail,
-                request.AdminPassword,
-                request.AdminFirstName,
-                request.AdminLastName);
+                DealerName: request.DealerName,
+                Subdomain: request.Subdomain,
+                AdminEmail: request.AdminEmail,
+                AdminPassword: request.AdminPassword,
+                AdminFirstName: request.AdminFirstName,
+                AdminLastName: request.AdminLastName,
+                AcceptedTermsVersion: request.AcceptedTermsVersion,
+                AcceptanceIp: httpContext.Connection.RemoteIpAddress?.ToString(),
+                AcceptanceUserAgent: httpContext.Request.Headers.UserAgent.ToString());
 
             Result<ProvisionDealerResponse> result = await sender.Send(command, cancellationToken);
 

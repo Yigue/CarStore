@@ -30,6 +30,7 @@ public class RbacEndpointTests
             FirstName = "Fresh",
             LastName = "User",
             Password = password,
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var registerResponse = await client.PostAsJsonAsync("/api/v1/users/register", register, IntegrationTestHelpers.JsonOptions);

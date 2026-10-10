@@ -24,6 +24,8 @@ public static class DependencyInjection
         services.AddScoped<LeadActivityRecorder>();
         services.AddScoped<Application.Platform.AuditLogs.PlatformAuditLogRecorder>();
 
+        services.AddScoped<Application.Legal.LegalAcceptanceRecorder>();
+
         return services;
     }
 }

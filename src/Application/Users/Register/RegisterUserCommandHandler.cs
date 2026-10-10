@@ -12,11 +12,18 @@ namespace Application.Users.Register;
 internal sealed class RegisterUserCommandHandler(
     IApplicationDbContext context,
     IPasswordHasher passwordHasher,
-    ICurrentTenantService tenantService)
+    ICurrentTenantService tenantService,
+    Application.Legal.LegalAcceptanceRecorder legalRecorder)
     : ICommandHandler<RegisterUserCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
     {
+        Result termsCheck = legalRecorder.EnsureCurrentVersion(command.AcceptedTermsVersion);
+        if (termsCheck.IsFailure)
+        {
+            return Result.Failure<Guid>(termsCheck.Error);
+        }
+
         var email = new Email(command.Email);
 
         if (await context.Users.IgnoreQueryFilters().AnyAsync(u => (string)u.Email == email.Value, cancellationToken))
@@ -50,6 +57,8 @@ internal sealed class RegisterUserCommandHandler(
             clienteRole.Id);
 
         context.Users.Add(user);
+
+        legalRecorder.RecordTermsAcceptance(dealerId, user.Id, command.AcceptanceIp, command.AcceptanceUserAgent);
 
         await context.SaveChangesAsync(cancellationToken);
 

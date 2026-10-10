@@ -56,6 +56,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<BackfillAudit> BackfillAudits => Set<BackfillAudit>();
     public DbSet<DealerSubscription> DealerSubscriptions => Set<DealerSubscription>();
+    public DbSet<Domain.Legal.LegalAcceptance> LegalAcceptances => Set<Domain.Legal.LegalAcceptance>();
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
     public DbSet<BillingReconciliationFlag> BillingReconciliationFlags => Set<BillingReconciliationFlag>();
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();

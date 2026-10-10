@@ -28,7 +28,8 @@ public class ProvisionDealerSubscriptionRowTests
         AdminEmail: "admin@automotors.com",
         AdminPassword: "Sup3r$ecret!",
         AdminFirstName: "Ana",
-        AdminLastName: "García");
+        AdminLastName: "García",
+        AcceptedTermsVersion: Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
 
     private static ProvisionDealerCommandHandler Handler(
         Application.UnitTests.TestApplicationDbContext context,
@@ -41,7 +42,7 @@ public class ProvisionDealerSubscriptionRowTests
             .Returns(Task.CompletedTask);
         return new ProvisionDealerCommandHandler(
             context, context, hasher.Object, publisher.Object, gateway.Object,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
     }
 
     [Fact]

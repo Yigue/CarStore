@@ -61,6 +61,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Appointment> Appointments { get; set; }
     public DbSet<BackfillAudit> BackfillAudits { get; set; }
     public DbSet<DealerSubscription> DealerSubscriptions { get; set; }
+    public DbSet<Domain.Legal.LegalAcceptance> LegalAcceptances { get; set; }
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
     public DbSet<BillingReconciliationFlag> BillingReconciliationFlags { get; set; }
     public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; }
@@ -221,6 +222,13 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     // Implement interface methods
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        // RN-016: legal acceptance records are append-only audit evidence.
+        if (ChangeTracker.Entries<Domain.Legal.LegalAcceptance>()
+            .Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+        {
+            throw new InvalidOperationException("LegalAcceptance records are append-only and cannot be modified or deleted.");
+        }
+
         var outboxMessages = ChangeTracker
             .Entries<Entity>()
             .Select(entry => entry.Entity)

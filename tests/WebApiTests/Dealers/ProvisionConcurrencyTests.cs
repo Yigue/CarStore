@@ -42,7 +42,8 @@ public class ProvisionConcurrencyTests
             AdminEmail = "a@racetest.com",
             AdminPassword = "Sup3r$ecret!",
             AdminFirstName = "A",
-            AdminLastName = "A"
+            AdminLastName = "A",
+            AcceptedTermsVersion = "2026-10-01"
         };
         var body2 = new
         {
@@ -51,7 +52,8 @@ public class ProvisionConcurrencyTests
             AdminEmail = "b@racetest.com",
             AdminPassword = "Sup3r$ecret!",
             AdminFirstName = "B",
-            AdminLastName = "B"
+            AdminLastName = "B",
+            AcceptedTermsVersion = "2026-10-01"
         };
 
         // Fire both POSTs concurrently.

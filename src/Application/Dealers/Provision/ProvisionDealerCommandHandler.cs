@@ -41,7 +41,8 @@ internal sealed class ProvisionDealerCommandHandler(
     IPasswordHasher passwordHasher,
     IPublisher publisher,
     ISubscriptionGateway subscriptionGateway,
-    ILogger<ProvisionDealerCommandHandler> logger)
+    ILogger<ProvisionDealerCommandHandler> logger,
+    Application.Legal.LegalAcceptanceRecorder legalRecorder)
     : ICommandHandler<ProvisionDealerCommand, ProvisionDealerResponse>
 {
     private const string DashboardBaseUrl = "carstore.com";
@@ -50,6 +51,13 @@ internal sealed class ProvisionDealerCommandHandler(
         ProvisionDealerCommand command,
         CancellationToken cancellationToken)
     {
+        // RN-016: the admin must have accepted the currently published T&C version.
+        Result termsCheck = legalRecorder.EnsureCurrentVersion(command.AcceptedTermsVersion);
+        if (termsCheck.IsFailure)
+        {
+            return Result.Failure<ProvisionDealerResponse>(termsCheck.Error);
+        }
+
         // REQ: subdomain must be stored lowercase (TenantResolutionMiddleware
         // matches lowercase against the Host header).
         var subdomain = command.Subdomain.Trim().ToLowerInvariant();
@@ -129,6 +137,8 @@ internal sealed class ProvisionDealerCommandHandler(
                 adminRole.Id);
 
             context.Users.Add(user);
+
+            legalRecorder.RecordTermsAcceptance(dealerId, user.Id, command.AcceptanceIp, command.AcceptanceUserAgent);
 
             // spr ADR B8: a dealer NEVER exists without a subscription row. It is created in the
             // same transaction as the dealer, with or without a Stripe customer, as Incomplete:

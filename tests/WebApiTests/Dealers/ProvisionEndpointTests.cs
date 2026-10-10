@@ -20,7 +20,8 @@ public class ProvisionEndpointTests
         AdminEmail = email,
         AdminPassword = "Sup3r$ecret!",
         AdminFirstName = "Ana",
-        AdminLastName = "García"
+        AdminLastName = "García",
+        AcceptedTermsVersion = "2026-10-01"
     };
 
     [Fact]
@@ -70,7 +71,8 @@ public class ProvisionEndpointTests
             AdminEmail = "admin@foo.com",
             AdminPassword = "password",
             AdminFirstName = "A",
-            AdminLastName = "B"
+            AdminLastName = "B",
+            AcceptedTermsVersion = "2026-10-01"
         };
 
         var response = await client.PostAsJsonAsync("/api/v1/dealers/provision", weak);

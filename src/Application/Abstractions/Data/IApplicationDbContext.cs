@@ -44,6 +44,7 @@ public interface IApplicationDbContext
     DbSet<Appointment> Appointments { get; }
     DbSet<BackfillAudit> BackfillAudits { get; }
     DbSet<DealerSubscription> DealerSubscriptions { get; }
+    DbSet<Domain.Legal.LegalAcceptance> LegalAcceptances { get; }
     DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; }
     DbSet<BillingReconciliationFlag> BillingReconciliationFlags { get; }
     DbSet<WebhookSubscription> WebhookSubscriptions { get; }

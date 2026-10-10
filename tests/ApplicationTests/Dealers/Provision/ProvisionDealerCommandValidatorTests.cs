@@ -12,7 +12,8 @@ public class ProvisionDealerCommandValidatorTests
         AdminEmail: "admin@automotors.com",
         AdminPassword: "Sup3r$ecret!",
         AdminFirstName: "Ana",
-        AdminLastName: "García");
+        AdminLastName: "García",
+        AcceptedTermsVersion: Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
 
     [Fact]
     public void Validate_ShouldPass_ForValidCommand()

@@ -1202,6 +1202,63 @@ namespace Infrastructure.Migrations
                     b.ToTable("lead_activities", "public");
                 });
 
+            modelBuilder.Entity("Domain.Legal.LegalAcceptance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("AcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at_utc");
+
+                    b.Property<string>("ContentSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_sha256");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<int>("DocumentKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("document_kind");
+
+                    b.Property<string>("Ip")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ip");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("user_agent");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_legal_acceptances");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_legal_acceptances_dealer_id");
+
+                    b.HasIndex("UserId", "DocumentKind", "AcceptedAtUtc")
+                        .HasDatabaseName("ix_legal_acceptances_user_id_document_kind_accepted_at_utc");
+
+                    b.ToTable("legal_acceptances", "public");
+                });
+
             modelBuilder.Entity("Domain.Platform.PlatformAuditLogEntry", b =>
                 {
                     b.Property<Guid>("Id")
