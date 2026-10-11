@@ -42,14 +42,15 @@ public class PurgeTenantCommandHandlerTests
     private readonly Mock<ITenantLifecycleCache> _cache = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
     private readonly TestApplicationDbContext _context;
+    private readonly DbContextOptions<TestApplicationDbContext> _options;
 
     public PurgeTenantCommandHandlerTests()
     {
         _clock.SetupGet(c => c.UtcNow).Returns(Now);
-        _context = new TestApplicationDbContext(
-            new DbContextOptionsBuilder<TestApplicationDbContext>()
-                .UseInMemoryDatabase(Guid.NewGuid().ToString())
-                .Options, _dealerId);
+        _options = new DbContextOptionsBuilder<TestApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        _context = new TestApplicationDbContext(_options, _dealerId);
     }
 
     private PurgeTenantCommandHandler Handler() =>
@@ -333,6 +334,38 @@ public class PurgeTenantCommandHandlerTests
         var result = await Handler().Handle(new PurgeTenantCommand(_dealerId, DryRun: false), CancellationToken.None);
 
         result.Error.Should().Be(TenantPurgeErrors.ExportStillAvailable);
+    }
+
+    // ---------------------------------------------------------------- race: state changes after the first check
+
+    [Fact]
+    public async Task Purge_WhenTheTenantIsReactivatedAfterTheFirstCheck_ReturnsNotEligibleAndDeletesNothing()
+    {
+        SeedDealer(_dealerId, TenantLifecycleStatus.Locked);
+        await SeedTenantDataAsync(_dealerId, "a");
+        int before = await RowCountAsync(_dealerId);
+
+        // The first operation after the eligibility read is the export check. A second context (another
+        // connection in production) flips the row to Active right there, i.e. between check and delete.
+        _context.OnFirstTenantExportsAccess = () =>
+        {
+            using var other = new TestApplicationDbContext(_options, _dealerId);
+            var row = other.DealerSettings.IgnoreQueryFilters().Single(d => d.DealerId == _dealerId);
+            other.Entry(row).Property(d => d.LifecycleStatus).CurrentValue = TenantLifecycleStatus.Active;
+            other.Entry(row).Property(d => d.PurgeScheduledAt).CurrentValue = null;
+            other.SaveChanges();
+        };
+
+        var result = await Handler().Handle(new PurgeTenantCommand(_dealerId, DryRun: false), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(TenantPurgeErrors.NotEligible);
+        (await RowCountAsync(_dealerId)).Should().Be(before);
+        (await _context.DealerSettings.AsNoTracking().IgnoreQueryFilters().SingleAsync()).LifecycleStatus
+            .Should().Be(TenantLifecycleStatus.Active);
+        (await _context.TenantPurgeRecords.CountAsync()).Should().Be(0);
+        _storage.Verify(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _cache.Verify(c => c.Invalidate(It.IsAny<Guid>()), Times.Never);
     }
 
     // ---------------------------------------------------------------- failure safety

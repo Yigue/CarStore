@@ -60,6 +60,16 @@ public class PurgeTenantForeignKeyOrderTests
             Task.FromResult<(string, IReadOnlyDictionary<string, string>)>(("", new Dictionary<string, string>()));
     }
 
+    private sealed class FailingStorage : IStorageService
+    {
+        public Task<string> UploadFileAsync(Stream stream, string objectKey, string contentType, long? size, CancellationToken ct) => Task.FromResult(objectKey);
+        public Task DeleteFileAsync(string objectKey, CancellationToken ct) => throw new InvalidOperationException("storage down");
+        public Task<Uri> GetPresignedUrlAsync(string objectKey, TimeSpan ttl, CancellationToken ct) => Task.FromResult(new Uri("https://x.test"));
+        public Task<Stream?> OpenReadAsync(string objectKey, CancellationToken ct) => Task.FromResult<Stream?>(null);
+        public Task<(string Url, IReadOnlyDictionary<string, string> Fields)> GeneratePresignedPostAsync(string objectKey, string contentType, TimeSpan ttl, CancellationToken ct) =>
+            Task.FromResult<(string, IReadOnlyDictionary<string, string>)>(("", new Dictionary<string, string>()));
+    }
+
     private sealed class NoOpCache : ITenantLifecycleCache
     {
         public List<Guid> Invalidated { get; } = [];
@@ -182,5 +192,25 @@ public class PurgeTenantForeignKeyOrderTests
         (await db.TenantPurgeRecords.SingleAsync()).DealerId.Should().Be(DealerA);
         storage.Deleted.Should().BeEquivalentTo(new[] { $"cars/{DealerA}/img.jpg", $"docs/{DealerA}/dni.png" });
         cache.Invalidated.Should().Contain(DealerA).And.NotContain(DealerB);
+    }
+
+    [Fact]
+    public async Task Purge_WhenItFailsHalfWay_RollsBackEveryDeleteMadeBeforeTheFailure()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        await using var db = NewContext(connection);
+        await db.Database.EnsureCreatedAsync();
+        await SeedGraphAsync(db, DealerA, "a");
+        int before = await RowsOfAsync(db, DealerA);
+        var handler = new PurgeTenantCommandHandler(db, new FailingStorage(), new FixedClock(), new NoOpCache(), NullLogger<PurgeTenantCommandHandler>.Instance);
+
+        Func<Task> act = () => handler.Handle(new PurgeTenantCommand(DealerA, DryRun: false), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        db.ChangeTracker.Clear();
+        (await RowsOfAsync(db, DealerA)).Should().Be(before, "one transaction: nothing deleted before the failure may survive");
+        (await db.DealerSettings.IgnoreQueryFilters().SingleAsync(d => d.DealerId == DealerA)).LifecycleStatus
+            .Should().Be(TenantLifecycleStatus.Locked);
     }
 }

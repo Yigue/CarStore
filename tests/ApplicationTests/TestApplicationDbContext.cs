@@ -57,7 +57,19 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<BackfillAudit> BackfillAudits => Set<BackfillAudit>();
     public DbSet<DealerSubscription> DealerSubscriptions => Set<DealerSubscription>();
     public DbSet<Domain.Legal.LegalAcceptance> LegalAcceptances => Set<Domain.Legal.LegalAcceptance>();
-    public DbSet<Domain.Tenancy.TenantExport> TenantExports => Set<Domain.Tenancy.TenantExport>();
+    /// <summary>One-shot hook fired the first time <see cref="TenantExports"/> is touched (race simulation).</summary>
+    public Action? OnFirstTenantExportsAccess { get; set; }
+
+    public DbSet<Domain.Tenancy.TenantExport> TenantExports
+    {
+        get
+        {
+            Action? hook = OnFirstTenantExportsAccess;
+            OnFirstTenantExportsAccess = null;
+            hook?.Invoke();
+            return Set<Domain.Tenancy.TenantExport>();
+        }
+    }
     public DbSet<Domain.Tenancy.TenantPurgeRecord> TenantPurgeRecords => Set<Domain.Tenancy.TenantPurgeRecord>();
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
     public DbSet<BillingReconciliationFlag> BillingReconciliationFlags => Set<BillingReconciliationFlag>();
