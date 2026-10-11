@@ -36,4 +36,15 @@ public sealed class PendingStorageDeletion : Entity
     }
 
     public const int MaxErrorLength = 1000;
+
+    /// <summary>After this many failed attempts the retry job stops trying and leaves the row for a human.</summary>
+    public const int MaxAttempts = 20;
+
+    public bool HasReachedMaxAttempts => Attempts >= MaxAttempts;
+
+    public void RecordFailure(string? error)
+    {
+        Attempts++;
+        LastError = error is { Length: > MaxErrorLength } ? error[..MaxErrorLength] : error;
+    }
 }

@@ -537,6 +537,17 @@ services.AddDbContext<ApplicationDbContext>(
                     trigger.ForJob(purgeJobKey)
                         .WithCronSchedule("0 0 3 * * ?"));
 
+            // Job 9: retries storage deletes parked by the tenant purge (every 15 minutes). No feature flag: it only
+            // deletes objects of tenants already purged.
+            var storageRetryJobKey = new JobKey(nameof(StorageDeletionRetryJob));
+            configure
+                .AddJob<StorageDeletionRetryJob>(opts => opts.WithIdentity(storageRetryJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(storageRetryJobKey)
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInMinutes(15)
+                                .RepeatForever()));
+
             // Job 6: Billing reconciliation (spr ADR B9) — flags dealers without a confirmed
             // subscription past the grace window; never deletes. Billing:Reconciliation:Enabled
             // turns it off entirely; the interval is read here because Quartz fixes it at startup.
