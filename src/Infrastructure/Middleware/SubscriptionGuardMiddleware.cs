@@ -2,7 +2,10 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Application.Abstractions.Billing;
+using Application.Abstractions.Tenancy;
+using Application.Tenancy;
 using Domain.Billing;
+using Domain.DealerSettings;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -69,9 +72,19 @@ public sealed class SubscriptionGuardMiddleware
             
             // spr ADR B8: fail CLOSED. A missing row (legacy dealer, status == null) is blocked exactly like
             // Incomplete/Suspended/Cancelled; only a confirmed Active/Trialing subscription passes.
-            // Before this, `status.HasValue == false` skipped the whole check and the product was free.
-            bool allowed = status.HasValue
-                && (status.Value == SubscriptionStatus.Active || status.Value == SubscriptionStatus.Trialing);
+            // RN-013 (H9): a non-paying tenant under retention is not blocked wholesale. The lifecycle is
+            // read only in that case (never on the paying hot path) and ITenantAccessPolicy decides by method.
+            var lifecycle = TenantLifecycleStatus.Active;
+            bool paying = status is SubscriptionStatus.Active or SubscriptionStatus.Trialing;
+            if (!paying)
+            {
+                var reader = context.RequestServices.GetService<ITenantLifecycleReader>();
+                if (reader is not null)
+                    lifecycle = await reader.GetAsync(dealerId, context.RequestAborted);
+            }
+
+            var decision = TenantAccessPolicy.Evaluate(status, lifecycle, context.Request.Method, path);
+            bool allowed = decision.Allowed;
 
             if (!allowed)
             {
@@ -80,7 +93,7 @@ public sealed class SubscriptionGuardMiddleware
                 
                 var response = new
                 {
-                    error = "subscription.suspended",
+                    error = decision.Error,
                 };
 
                 await context.Response.WriteAsync(JsonSerializer.Serialize(response), context.RequestAborted);

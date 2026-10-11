@@ -85,6 +85,7 @@ public static class DependencyInjection
         }
 
         services.AddScoped<ISubscriptionStatusCache, RedisSubscriptionStatusCache>();
+        services.AddScoped<Application.Abstractions.Tenancy.ITenantLifecycleReader, Infrastructure.Tenancy.EfTenantLifecycleReader>();
         services.AddScoped<IDealerSubscriptionRepository, DealerSubscriptionRepository>();
         services.AddScoped<ProcessedStripeEventRepository>();
 
