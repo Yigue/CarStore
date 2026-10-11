@@ -109,15 +109,42 @@ public class SubscriptionGuardLifecycleTests
     }
 
     [Fact]
-    public async Task ActiveSubscription_DoesNotQueryTheLifecycle()
+    public async Task ActiveSubscription_WithActiveLifecycle_Passes()
     {
-        var (context, nextCalled, middleware, reader) =
+        var (context, nextCalled, middleware, _) =
             Arrange(SubscriptionStatus.Active, TenantLifecycleStatus.Active, "POST", "/api/v1/clients");
 
         await middleware.InvokeAsync(context);
 
         Assert.True(nextCalled());
-        reader.Verify(r => r.GetAsync(It.IsAny<Guid>(), default), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(SubscriptionStatus.Active, TenantLifecycleStatus.Locked, "POST", "/api/v1/cars")]
+    [InlineData(SubscriptionStatus.Active, TenantLifecycleStatus.Locked, "GET", "/api/v1/clients")]
+    [InlineData(SubscriptionStatus.Trialing, TenantLifecycleStatus.Purged, "POST", "/api/v1/cars")]
+    public async Task PayingSubscription_WithLockedOrPurgedLifecycle_Gets402Locked(
+        SubscriptionStatus status, TenantLifecycleStatus lifecycle, string method, string path)
+    {
+        var (context, nextCalled, middleware, _) = Arrange(status, lifecycle, method, path);
+
+        await middleware.InvokeAsync(context);
+
+        Assert.False(nextCalled());
+        Assert.Equal(StatusCodes.Status402PaymentRequired, context.Response.StatusCode);
+        Assert.Contains("subscription.locked", await BodyAsync(context));
+    }
+
+    [Fact]
+    public async Task PayingSubscription_WithCancelledGrace_BlocksWrites()
+    {
+        var (context, nextCalled, middleware, _) =
+            Arrange(SubscriptionStatus.Active, TenantLifecycleStatus.CancelledGrace, "POST", "/api/v1/clients");
+
+        await middleware.InvokeAsync(context);
+
+        Assert.False(nextCalled());
+        Assert.Contains("subscription.read_only", await BodyAsync(context));
     }
 
     [Fact]

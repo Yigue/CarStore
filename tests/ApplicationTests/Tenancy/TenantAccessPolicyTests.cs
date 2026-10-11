@@ -127,4 +127,26 @@ public class TenantAccessPolicyTests
         Evaluate(SubscriptionStatus.Cancelled, TenantLifecycleStatus.Purged, "GET", "/api/v1/users/me")
             .Allowed.Should().BeTrue();
     }
+
+    [Theory]
+    [InlineData(SubscriptionStatus.Active, TenantLifecycleStatus.Locked, "POST", Cars)]
+    [InlineData(SubscriptionStatus.Trialing, TenantLifecycleStatus.Purged, "POST", Cars)]
+    [InlineData(SubscriptionStatus.Active, TenantLifecycleStatus.Locked, "GET", Cars)]
+    public void PayingStatus_DoesNotOverrideLockedOrPurged(
+        SubscriptionStatus status, TenantLifecycleStatus lifecycle, string method, string path)
+    {
+        var decision = Evaluate(status, lifecycle, method, path);
+
+        decision.Allowed.Should().BeFalse();
+        decision.Error.Should().Be("subscription.locked");
+    }
+
+    [Fact]
+    public void PayingStatus_DoesNotOverrideCancelledGraceWrites()
+    {
+        var decision = Evaluate(SubscriptionStatus.Active, TenantLifecycleStatus.CancelledGrace, "POST", Cars);
+
+        decision.Allowed.Should().BeFalse();
+        decision.Error.Should().Be("subscription.read_only");
+    }
 }

@@ -72,16 +72,13 @@ public sealed class SubscriptionGuardMiddleware
             
             // spr ADR B8: fail CLOSED. A missing row (legacy dealer, status == null) is blocked exactly like
             // Incomplete/Suspended/Cancelled; only a confirmed Active/Trialing subscription passes.
-            // RN-013 (H9): a non-paying tenant under retention is not blocked wholesale. The lifecycle is
-            // read only in that case (never on the paying hot path) and ITenantAccessPolicy decides by method.
+            // RN-013 (H9): the lifecycle is enforced regardless of subscription status, so a tenant that
+            // still reads Active/Trialing but is Locked/Purged/CancelledGrace cannot bypass retention.
+            // Without a registered reader the lifecycle defaults to Active.
             var lifecycle = TenantLifecycleStatus.Active;
-            bool paying = status is SubscriptionStatus.Active or SubscriptionStatus.Trialing;
-            if (!paying)
-            {
-                var reader = context.RequestServices.GetService<ITenantLifecycleReader>();
-                if (reader is not null)
-                    lifecycle = await reader.GetAsync(dealerId, context.RequestAborted);
-            }
+            var reader = context.RequestServices.GetService<ITenantLifecycleReader>();
+            if (reader is not null)
+                lifecycle = await reader.GetAsync(dealerId, context.RequestAborted);
 
             var decision = TenantAccessPolicy.Evaluate(status, lifecycle, context.Request.Method, path);
             bool allowed = decision.Allowed;
