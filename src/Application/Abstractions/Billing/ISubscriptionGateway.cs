@@ -25,6 +25,13 @@ public interface ISubscriptionGateway
     Task CancelSubscriptionAsync(string stripeSubscriptionId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Cancels the subscription immediately (no period-end grace), e.g. for account self-deletion (RN-015).
+    /// Must be idempotent: an already-cancelled subscription is not an error.
+    /// </summary>
+    Task CancelNowAsync(string stripeSubscriptionId,
+        CancellationToken ct = default);
+
     /// <summary>Creates a Stripe customer for a new dealer. Idempotent on StripeCustomerId.</summary>
     Task<string> CreateCustomerAsync(Guid dealerId, string email,
         CancellationToken ct = default);

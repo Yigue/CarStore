@@ -18,7 +18,7 @@ public class StripeSubscriptionGatewayInterfaceContractTests
         var type = typeof(ISubscriptionGateway);
         var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance);
 
-        methods.Should().HaveCount(5);
+        methods.Should().HaveCount(6);
 
         // Method 1: CreateCheckoutSessionAsync
         var m1 = methods.SingleOrDefault(m => m.Name == "CreateCheckoutSessionAsync");
@@ -66,5 +66,14 @@ public class StripeSubscriptionGatewayInterfaceContractTests
         p5.Should().HaveCount(2);
         p5[0].ParameterType.Should().Be<Guid>(); // dealerId
         p5[1].ParameterType.Should().Be<CancellationToken>();
+
+        // Method 6 (sfc A1.4, RN-015): CancelNowAsync — immediate cancellation for account self-deletion.
+        var m6 = methods.SingleOrDefault(m => m.Name == "CancelNowAsync");
+        m6.Should().NotBeNull();
+        m6.ReturnType.Should().Be<Task>();
+        var p6 = m6.GetParameters();
+        p6.Should().HaveCount(2);
+        p6[0].ParameterType.Should().Be<string>(); // stripeSubscriptionId
+        p6[1].ParameterType.Should().Be<CancellationToken>();
     }
 }

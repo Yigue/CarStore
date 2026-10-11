@@ -115,6 +115,22 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
         await subscriptionService.UpdateAsync(stripeSubscriptionId, options, cancellationToken: ct);
     }
 
+    public async Task CancelNowAsync(string stripeSubscriptionId, CancellationToken ct = default)
+    {
+        var subscriptionService = new SubscriptionService(_stripeClient);
+        try
+        {
+            await subscriptionService.CancelAsync(
+                stripeSubscriptionId,
+                new SubscriptionCancelOptions { InvoiceNow = false, Prorate = false },
+                cancellationToken: ct);
+        }
+        catch (StripeException ex) when (ex.StripeError?.Code == "resource_missing")
+        {
+            // Already cancelled / gone at the provider: the end state is the one we wanted.
+        }
+    }
+
     public async Task<SubscriptionStatus> GetStatusAsync(string stripeSubscriptionId, CancellationToken ct = default)
     {
         var subscriptionService = new SubscriptionService(_stripeClient);

@@ -529,6 +529,14 @@ services.AddDbContext<ApplicationDbContext>(
                             schedule.WithIntervalInSeconds(30)
                                 .RepeatForever()));
 
+            // Job 8: Tenant purge (RN-013, A1.4): daily at 03:00 UTC. Dry run unless Retention:PurgeEnabled=true.
+            var purgeJobKey = new JobKey(nameof(PurgeTenantDataJob));
+            configure
+                .AddJob<PurgeTenantDataJob>(opts => opts.WithIdentity(purgeJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(purgeJobKey)
+                        .WithCronSchedule("0 0 3 * * ?"));
+
             // Job 6: Billing reconciliation (spr ADR B9) — flags dealers without a confirmed
             // subscription past the grace window; never deletes. Billing:Reconciliation:Enabled
             // turns it off entirely; the interval is read here because Quartz fixes it at startup.

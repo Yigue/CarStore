@@ -38,6 +38,7 @@ public class IgnoreQueryFiltersAllowListTests
         // RN-014 (A1.3): the export builder and the expiry sweep run from Quartz with no tenant;
         // every query constrains DealerId explicitly (or sweeps platform-wide by design).
         "Tenancy/Export/",
+        "Tenancy/Purge/",
         // Reviewed in QA remediation: every query below constrains DealerId explicitly
         // (or joins onto an already tenant-scoped set) after bypassing the soft-delete filter.
         "Appointments/Queries/GetAppointments/",

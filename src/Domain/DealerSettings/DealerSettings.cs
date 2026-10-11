@@ -409,7 +409,67 @@ public sealed class DealerSettings : Entity
         UpdatedAt = DateTime.UtcNow;
     }
 
-    /// <summary>Terminal state set by the purge job (A1.5).</summary>
+    /// <summary>
+    /// RN-013: ends the read-only grace period. Moves <see cref="TenantLifecycleStatus.CancelledGrace"/> to
+    /// <see cref="TenantLifecycleStatus.Locked"/> once <paramref name="graceDays"/> have elapsed since
+    /// <see cref="CancelledAt"/>. Any other state is left untouched. Returns whether the tenant was locked.
+    /// </summary>
+    public bool LockAfterGrace(DateTime nowUtc, int graceDays)
+    {
+        if (graceDays <= 0)
+            throw new DomainException("GraceDays must be positive");
+
+        if (LifecycleStatus != TenantLifecycleStatus.CancelledGrace || CancelledAt is null)
+            return false;
+
+        if (nowUtc < CancelledAt.Value.AddDays(graceDays))
+            return false;
+
+        LifecycleStatus = TenantLifecycleStatus.Locked;
+        UpdatedAt = nowUtc;
+        return true;
+    }
+
+    /// <summary>
+    /// RN-013: a tenant may be purged only when it is <see cref="TenantLifecycleStatus.Locked"/> and its
+    /// <see cref="PurgeScheduledAt"/> is not in the future. Every other state is not purgeable.
+    /// </summary>
+    public bool IsDueForPurge(DateTime nowUtc) =>
+        LifecycleStatus == TenantLifecycleStatus.Locked
+        && PurgeScheduledAt is not null
+        && PurgeScheduledAt.Value <= nowUtc;
+
+    /// <summary>
+    /// Terminal state set by the purge job after the tenant data was removed. Contact and branding data is
+    /// anonymized; <see cref="DealerName"/> (fiscal name, billing obligation) and the Stripe customer id
+    /// are kept. Throws unless <see cref="IsDueForPurge"/>.
+    /// </summary>
+    public void Purge(DateTime nowUtc)
+    {
+        if (!IsDueForPurge(nowUtc))
+            throw new DomainException("Only a Locked tenant whose purge date has passed can be purged");
+
+        LifecycleStatus = TenantLifecycleStatus.Purged;
+        ContactEmail = $"purged-{DealerId:N}@purged.invalid";
+        Address = null;
+        PhoneNumber = null;
+        FacebookUrl = null;
+        InstagramUrl = null;
+        TwitterUrl = null;
+        LogoUrl = null;
+        FooterText = null;
+        HistoryText = null;
+        MissionText = null;
+        VisionText = null;
+        ValuesText = null;
+        CarouselSlidesJson = null;
+        IsActive = false;
+        SuspendedAt ??= nowUtc;
+        SuspendReason ??= "Tenant purged";
+        UpdatedAt = nowUtc;
+    }
+
+    /// <summary>Test/legacy helper: marks the tenant purged without the eligibility check. Use <see cref="Purge"/> in the job.</summary>
     public void MarkPurged()
     {
         LifecycleStatus = TenantLifecycleStatus.Purged;

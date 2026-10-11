@@ -23,6 +23,11 @@ public sealed class FakeSubscriptionGateway : ISubscriptionGateway
         return Task.CompletedTask;
     }
 
+    public Task CancelNowAsync(string stripeSubscriptionId, CancellationToken ct = default)
+    {
+        return Task.CompletedTask;
+    }
+
     public Task<ExternalSubscription?> FindSubscriptionForDealerAsync(Guid dealerId, CancellationToken ct = default)
     {
         return Task.FromResult<ExternalSubscription?>(null);

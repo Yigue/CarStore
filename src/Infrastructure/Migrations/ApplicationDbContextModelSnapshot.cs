@@ -1684,6 +1684,41 @@ namespace Infrastructure.Migrations
                     b.ToTable("tenant_exports", "public");
                 });
 
+            modelBuilder.Entity("Domain.Tenancy.TenantPurgeRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CountsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("counts_json");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("DealerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("dealer_name");
+
+                    b.Property<DateTime>("PurgedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("purged_at_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tenant_purge_records");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_tenant_purge_records_dealer_id");
+
+                    b.ToTable("tenant_purge_records", "public");
+                });
+
             modelBuilder.Entity("Domain.Users.PasswordResetToken", b =>
                 {
                     b.Property<Guid>("Id")

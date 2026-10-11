@@ -20,6 +20,9 @@ public sealed class Client : Entity, ISoftDeletable
     public ClientStatus Status { get; private set; }
     public ClientType Type { get; private set; }
     public Guid? OriginLeadId { get; private set; }
+
+    /// <summary>Breaks the Client-Lead cycle (clients.origin_lead_id vs leads.converted_client_id) so a tenant purge can delete both sides.</summary>
+    public void ClearOriginLead() => OriginLeadId = null;
     public List<Sale> Sales { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdateAt { get; private set; }
