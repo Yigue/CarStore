@@ -98,6 +98,42 @@ internal sealed class MinioStorageService : IStorageService
         }
     }
 
+    public async Task<Stream?> OpenReadAsync(string objectKey, CancellationToken ct)
+    {
+        // Spool to a self-deleting temp file: attachments can be large and an export bundles many.
+        var buffer = new FileStream(
+            Path.Combine(Path.GetTempPath(), $"carstore-{Guid.NewGuid():N}.tmp"),
+            FileMode.Create, FileAccess.ReadWrite, FileShare.None, 81920,
+            FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+
+        try
+        {
+            var args = new GetObjectArgs()
+                .WithBucket(_options.BucketName)
+                .WithObject(objectKey)
+                .WithCallbackStream((source, token) => source.CopyToAsync(buffer, token));
+
+            await _client.GetObjectAsync(args, ct);
+            buffer.Position = 0;
+            return buffer;
+        }
+        catch (ObjectNotFoundException)
+        {
+            await buffer.DisposeAsync();
+            return null;
+        }
+        catch (MinioException ex) when (IsNoSuchKey(ex))
+        {
+            await buffer.DisposeAsync();
+            return null;
+        }
+        catch
+        {
+            await buffer.DisposeAsync();
+            throw;
+        }
+    }
+
     public async Task<Uri> GetPresignedUrlAsync(string objectKey, TimeSpan ttl, CancellationToken ct)
     {
         var args = new PresignedGetObjectArgs()

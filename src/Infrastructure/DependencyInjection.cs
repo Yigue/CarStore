@@ -519,6 +519,16 @@ services.AddDbContext<ApplicationDbContext>(
                             schedule.WithIntervalInHours(24)
                                 .RepeatForever()));
 
+            // Job 7: Tenant data exports (RN-014): builds pending ZIPs and expires old ones.
+            var exportJobKey = new JobKey(nameof(BuildTenantExportJob));
+            configure
+                .AddJob<BuildTenantExportJob>(opts => opts.WithIdentity(exportJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(exportJobKey)
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInSeconds(30)
+                                .RepeatForever()));
+
             // Job 6: Billing reconciliation (spr ADR B9) — flags dealers without a confirmed
             // subscription past the grace window; never deletes. Billing:Reconciliation:Enabled
             // turns it off entirely; the interval is read here because Quartz fixes it at startup.

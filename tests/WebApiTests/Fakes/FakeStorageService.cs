@@ -58,6 +58,9 @@ public sealed class FakeStorageService : IStorageService
         return Task.CompletedTask;
     }
 
+    public Task<Stream?> OpenReadAsync(string objectKey, CancellationToken ct) =>
+        Task.FromResult<Stream?>(_objects.TryGetValue(objectKey, out var bytes) ? new MemoryStream(bytes) : null);
+
     public Task<Uri> GetPresignedUrlAsync(string objectKey, TimeSpan ttl, CancellationToken ct)
     {
         // Presigned-looking URL whose host is always the PUBLIC endpoint (never minio:9000).

@@ -62,6 +62,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<BackfillAudit> BackfillAudits { get; set; }
     public DbSet<DealerSubscription> DealerSubscriptions { get; set; }
     public DbSet<Domain.Legal.LegalAcceptance> LegalAcceptances { get; set; }
+    public DbSet<Domain.Tenancy.TenantExport> TenantExports { get; set; }
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
     public DbSet<BillingReconciliationFlag> BillingReconciliationFlags { get; set; }
     public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; }
@@ -197,6 +198,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<BackfillAudit>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<DealerSubscription>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Tenancy.TenantExport>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<WebhookSubscription>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);

@@ -51,6 +51,15 @@ public interface IStorageService
         CancellationToken ct);
 
     /// <summary>
+    /// Opens the object for reading. Returns <c>null</c> when the object does not exist, so callers
+    /// that bundle many objects (tenant export) can report a missing one instead of aborting.
+    /// The caller owns disposal of the returned stream.
+    /// </summary>
+    Task<Stream?> OpenReadAsync(
+        string objectKey,
+        CancellationToken ct);
+
+    /// <summary>
     /// Generates a presigned POST URL and fields for direct client-side upload.
     /// </summary>
     Task<(string Url, IReadOnlyDictionary<string, string> Fields)> GeneratePresignedPostAsync(

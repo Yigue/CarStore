@@ -62,6 +62,9 @@ public class GetAllCarsSortTranslationTests
         public Task<Uri> GetPresignedUrlAsync(string objectKey, TimeSpan ttl, CancellationToken ct) =>
             throw new NotSupportedException("Seeded cars carry no images.");
 
+        public Task<Stream?> OpenReadAsync(string objectKey, CancellationToken ct) =>
+            throw new NotSupportedException("Seeded cars carry no images.");
+
         public Task<(string Url, IReadOnlyDictionary<string, string> Fields)> GeneratePresignedPostAsync(
             string objectKey, string contentType, TimeSpan ttl, CancellationToken ct) =>
             throw new NotSupportedException("Seeded cars carry no images.");
