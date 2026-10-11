@@ -200,6 +200,34 @@ public class BuildTenantExportCommandHandlerTests
         attachments.GetProperty("missing").GetArrayLength().Should().Be(1);
     }
 
+    [Theory]
+    [InlineData("..\\..\\evil.exe")]
+    [InlineData("../../evil.exe")]
+    [InlineData("C:\\Windows\\evil.exe")]
+    [InlineData("....//evil.exe")]
+    [InlineData("..")]
+    [InlineData("...")]
+    [InlineData("a..b\\..\\c.exe")]
+    public async Task Handle_HostileDocumentFileName_ProducesSafeEntryName(string hostileName)
+    {
+        var blobKey = $"documents/{_dealerId}/x.bin";
+        var rig = CreateRig(new Dictionary<string, byte[]> { [blobKey] = [1] });
+        var export = SeedRequestedExport(rig.Context);
+        rig.Context.Documents.Add(Document.Create(null, DocumentType.DNI, blobKey, hostileName, "application/octet-stream", _dealerId));
+        rig.Context.SaveChanges();
+
+        await rig.Handler.Handle(new BuildTenantExportCommand(export.Id), CancellationToken.None);
+
+        using var zip = Open(rig.UploadedZip!);
+        var attachment = zip.Entries.Should().ContainSingle(e => e.FullName.StartsWith("adjuntos/documentos/")).Subject;
+        attachment.FullName.Should().NotContain("\\");
+        attachment.FullName.Should().NotContain("..");
+        attachment.FullName.Should().NotContain(":");
+        attachment.FullName.Should().NotStartWith("/");
+        attachment.FullName.Split('/').Should().NotContain("..").And.OnlyContain(segment => segment.Length > 0);
+        attachment.Name.Should().NotStartWith(".");
+    }
+
     [Fact]
     public async Task Handle_ManifestHashesMatchTheCsvFiles()
     {

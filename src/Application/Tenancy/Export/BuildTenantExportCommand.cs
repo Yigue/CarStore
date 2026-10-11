@@ -234,11 +234,23 @@ internal sealed class BuildTenantExportCommandHandler(
         }
     }
 
+    /// <summary>
+    /// Keeps only the last path segment (treating both / and \ as separators, since Path.GetFileName on Linux
+    /// ignores the backslash), neutralises characters that are special on Windows extractors (:, invalid
+    /// chars, ".." runs) and strips leading dots, so the entry can never escape the extraction directory.
+    /// </summary>
     private static string SafeFileName(string fileName)
     {
-        string name = Path.GetFileName(fileName ?? string.Empty);
+        string name = fileName ?? string.Empty;
+        name = name[(name.LastIndexOfAny(['/', '\\']) + 1)..];
+
         foreach (char c in Path.GetInvalidFileNameChars())
             name = name.Replace(c, '_');
+        name = name.Replace('\\', '_').Replace(':', '_');
+        while (name.Contains("..", StringComparison.Ordinal))
+            name = name.Replace("..", "_", StringComparison.Ordinal);
+
+        name = name.TrimStart('.').TrimEnd('.', ' ');
         return string.IsNullOrWhiteSpace(name) ? "archivo" : name;
     }
 }

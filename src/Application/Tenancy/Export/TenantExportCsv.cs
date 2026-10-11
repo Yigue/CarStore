@@ -16,7 +16,7 @@ internal static class TenantExportCsv
 {
     private static readonly ConcurrentDictionary<Type, Column[]> Columns = new();
 
-    private sealed record Column(string Header, Func<object, string> Read);
+    private sealed record Column(string Header, Func<object, string> Read, bool IsText = false);
 
     public static async Task<(int Rows, string Sha256, long Bytes)> WriteAsync<T>(
         Stream destination, IAsyncEnumerable<T> rows, CancellationToken ct) where T : class
@@ -27,12 +27,12 @@ internal static class TenantExportCsv
         writer.NewLine = "\r\n";
 
         Column[] columns = Columns.GetOrAdd(typeof(T), BuildColumns);
-        await writer.WriteLineAsync(string.Join(',', columns.Select(c => Escape(c.Header))));
+        await writer.WriteLineAsync(string.Join(',', columns.Select(c => Escape(NeutralizeFormula(c.Header)))));
 
         int count = 0;
         await foreach (T row in rows.WithCancellation(ct))
         {
-            await writer.WriteLineAsync(string.Join(',', columns.Select(c => Escape(c.Read(row)))));
+            await writer.WriteLineAsync(string.Join(',', columns.Select(c => Escape(c.IsText ? NeutralizeFormula(c.Read(row)) : c.Read(row)))));
             count++;
         }
 
@@ -44,6 +44,15 @@ internal static class TenantExportCsv
         value.AsSpan().IndexOfAny(",\"\r\n") >= 0
             ? "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
             : value;
+
+    /// <summary>
+    /// CSV formula injection guard (OWASP): a text cell starting with = + - @ tab or CR is executed as a
+    /// formula by Excel/Sheets, so it is prefixed with a single quote. Only text columns (string, Email,
+    /// currency code) and headers are guarded; numeric columns are emitted verbatim so a legitimate
+    /// negative amount such as -1500.00 keeps its value.
+    /// </summary>
+    internal static string NeutralizeFormula(string value) =>
+        value.Length > 0 && value[0] is '=' or '+' or '-' or '@' or '\t' or '\r' ? "'" + value : value;
 
     private static Column[] BuildColumns(Type type)
     {
@@ -59,15 +68,15 @@ internal static class TenantExportCsv
             if (propertyType == typeof(Money))
             {
                 columns.Add(new Column(p.Name, o => p.GetValue(o) is Money m ? Format(m.Amount) : string.Empty));
-                columns.Add(new Column(p.Name + "Currency", o => p.GetValue(o) is Money m ? m.Currency : string.Empty));
+                columns.Add(new Column(p.Name + "Currency", o => p.GetValue(o) is Money m ? m.Currency : string.Empty, IsText: true));
             }
             else if (propertyType == typeof(Email))
             {
-                columns.Add(new Column(p.Name, o => p.GetValue(o) is Email e ? e.Value : string.Empty));
+                columns.Add(new Column(p.Name, o => p.GetValue(o) is Email e ? e.Value : string.Empty, IsText: true));
             }
             else if (IsScalar(propertyType))
             {
-                columns.Add(new Column(p.Name, o => Format(p.GetValue(o))));
+                columns.Add(new Column(p.Name, o => Format(p.GetValue(o)), propertyType == typeof(string)));
             }
         }
 
