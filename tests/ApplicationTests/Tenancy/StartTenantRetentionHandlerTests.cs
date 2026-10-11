@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Application.Abstractions.Tenancy;
 using Application.Tenancy;
 using Domain.Billing.Events;
 using Domain.DealerSettings;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Moq;
 using Xunit;
 
 namespace Application.UnitTests.Tenancy;
@@ -39,7 +41,7 @@ public class StartTenantRetentionHandlerTests
     public async Task Cancelled_SchedulesPurgeWithDefaultNinetyDays()
     {
         var (ctx, dealer) = await SeedAsync();
-        var handler = new StartTenantRetentionHandler(ctx, Config());
+        var handler = new StartTenantRetentionHandler(ctx, Config(), new Mock<ITenantLifecycleCache>().Object);
         var cancelledAt = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
 
         await handler.Handle(new SubscriptionCancelledDomainEvent(Guid.NewGuid(), dealer.DealerId, cancelledAt), CancellationToken.None);
@@ -54,7 +56,7 @@ public class StartTenantRetentionHandlerTests
     public async Task Cancelled_HonoursConfiguredRetentionDays()
     {
         var (ctx, dealer) = await SeedAsync();
-        var handler = new StartTenantRetentionHandler(ctx, Config("60"));
+        var handler = new StartTenantRetentionHandler(ctx, Config("60"), new Mock<ITenantLifecycleCache>().Object);
         var cancelledAt = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
 
         await handler.Handle(new SubscriptionCancelledDomainEvent(Guid.NewGuid(), dealer.DealerId, cancelledAt), CancellationToken.None);
@@ -66,7 +68,7 @@ public class StartTenantRetentionHandlerTests
     public async Task Activated_AfterCancellation_ClearsPurgeSchedule()
     {
         var (ctx, dealer) = await SeedAsync();
-        var handler = new StartTenantRetentionHandler(ctx, Config());
+        var handler = new StartTenantRetentionHandler(ctx, Config(), new Mock<ITenantLifecycleCache>().Object);
         await handler.Handle(new SubscriptionCancelledDomainEvent(Guid.NewGuid(), dealer.DealerId, DateTime.UtcNow.AddDays(-10)), CancellationToken.None);
 
         await handler.Handle(new SubscriptionActivatedDomainEvent(Guid.NewGuid(), dealer.DealerId, "sub_1"), CancellationToken.None);
@@ -81,10 +83,34 @@ public class StartTenantRetentionHandlerTests
     public async Task Cancelled_ForUnknownDealer_DoesNothing()
     {
         var ctx = CreateContext();
-        var handler = new StartTenantRetentionHandler(ctx, Config());
+        var handler = new StartTenantRetentionHandler(ctx, Config(), new Mock<ITenantLifecycleCache>().Object);
 
         var act = () => handler.Handle(new SubscriptionCancelledDomainEvent(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow), CancellationToken.None);
 
         await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task Cancelled_InvalidatesLifecycleCache_AfterPersisting()
+    {
+        var (ctx, dealer) = await SeedAsync();
+        var cache = new Mock<ITenantLifecycleCache>();
+        var handler = new StartTenantRetentionHandler(ctx, Config(), cache.Object);
+
+        await handler.Handle(new SubscriptionCancelledDomainEvent(Guid.NewGuid(), dealer.DealerId, DateTime.UtcNow), CancellationToken.None);
+
+        cache.Verify(c => c.Invalidate(dealer.DealerId), Times.Once);
+    }
+
+    [Fact]
+    public async Task Activated_InvalidatesLifecycleCache()
+    {
+        var (ctx, dealer) = await SeedAsync();
+        var cache = new Mock<ITenantLifecycleCache>();
+        var handler = new StartTenantRetentionHandler(ctx, Config(), cache.Object);
+
+        await handler.Handle(new SubscriptionActivatedDomainEvent(Guid.NewGuid(), dealer.DealerId, "sub_1"), CancellationToken.None);
+
+        cache.Verify(c => c.Invalidate(dealer.DealerId), Times.Once);
     }
 }

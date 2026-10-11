@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Abstractions.Data;
+using Application.Abstractions.Tenancy;
 using Domain.Billing.Events;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,8 @@ namespace Application.Tenancy;
 /// </summary>
 internal sealed class StartTenantRetentionHandler(
     IApplicationDbContext context,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    ITenantLifecycleCache lifecycleCache)
     : INotificationHandler<SubscriptionCancelledDomainEvent>,
       INotificationHandler<SubscriptionActivatedDomainEvent>
 {
@@ -40,6 +42,7 @@ internal sealed class StartTenantRetentionHandler(
 
         dealer.StartRetention(cancelledAt, days);
         await context.SaveChangesAsync(cancellationToken);
+        lifecycleCache.Invalidate(notification.DealerId);
     }
 
     public async Task Handle(SubscriptionActivatedDomainEvent notification, CancellationToken cancellationToken)
@@ -50,6 +53,7 @@ internal sealed class StartTenantRetentionHandler(
 
         dealer.ClearRetention();
         await context.SaveChangesAsync(cancellationToken);
+        lifecycleCache.Invalidate(notification.DealerId);
     }
 
     // Event handlers run outside an HTTP tenant scope (outbox job / webhook), so the tenant filter is bypassed.

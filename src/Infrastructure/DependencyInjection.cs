@@ -85,7 +85,15 @@ public static class DependencyInjection
         }
 
         services.AddScoped<ISubscriptionStatusCache, RedisSubscriptionStatusCache>();
-        services.AddScoped<Application.Abstractions.Tenancy.ITenantLifecycleReader, Infrastructure.Tenancy.EfTenantLifecycleReader>();
+        // Short-TTL (30s) cache over the lifecycle read: the guard hits it on every authenticated request.
+        // IMemoryCache is a singleton, so invalidation from the retention handler reaches every scoped reader.
+        services.AddMemoryCache();
+        services.AddScoped<Infrastructure.Tenancy.EfTenantLifecycleReader>();
+        services.AddScoped<Infrastructure.Tenancy.CachedTenantLifecycleReader>(sp => new Infrastructure.Tenancy.CachedTenantLifecycleReader(
+            sp.GetRequiredService<Infrastructure.Tenancy.EfTenantLifecycleReader>(),
+            sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>()));
+        services.AddScoped<Application.Abstractions.Tenancy.ITenantLifecycleReader>(sp => sp.GetRequiredService<Infrastructure.Tenancy.CachedTenantLifecycleReader>());
+        services.AddScoped<Application.Abstractions.Tenancy.ITenantLifecycleCache>(sp => sp.GetRequiredService<Infrastructure.Tenancy.CachedTenantLifecycleReader>());
         services.AddScoped<IDealerSubscriptionRepository, DealerSubscriptionRepository>();
         services.AddScoped<ProcessedStripeEventRepository>();
 
