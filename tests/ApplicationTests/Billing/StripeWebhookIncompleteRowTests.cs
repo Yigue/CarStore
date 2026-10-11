@@ -101,7 +101,7 @@ public class StripeWebhookIncompleteRowTests
     }
 
     [Fact]
-    public async Task SubscriptionDeleted_OnIncompleteRow_SuspendsIt()
+    public async Task SubscriptionDeleted_OnIncompleteRow_CancelsIt()
     {
         var dealerId = Guid.NewGuid();
         var row = DealerSubscription.CreatePending(dealerId, "cus_1", string.Empty);
@@ -113,7 +113,7 @@ public class StripeWebhookIncompleteRowTests
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        row.Status.Should().Be(SubscriptionStatus.Suspended);
+        row.Status.Should().Be(SubscriptionStatus.Cancelled);
     }
 
     [Fact]

@@ -191,6 +191,15 @@ public sealed class DealerSettings : Entity
     public DateTime? SuspendedAt { get; private set; }
     public string? SuspendReason { get; private set; }
 
+    /// <summary>RN-013 tenant retention lifecycle (A6). Independent from <see cref="IsActive"/>.</summary>
+    public TenantLifecycleStatus LifecycleStatus { get; private set; } = TenantLifecycleStatus.Active;
+
+    /// <summary>When the subscription was cancelled; starts the 30-day grace / 90-day purge clock.</summary>
+    public DateTime? CancelledAt { get; private set; }
+
+    /// <summary>CancelledAt + Retention:PurgeAfterDays. Null while the tenant is not under retention.</summary>
+    public DateTime? PurgeScheduledAt { get; private set; }
+
     public string? StripeCustomerId { get; private set; }
 
     /// <summary>
@@ -367,6 +376,47 @@ public sealed class DealerSettings : Entity
     }
 
     /// <summary>
+    /// RN-013: enters the post-cancellation grace period and schedules the purge.
+    /// Idempotent: a tenant already under retention keeps its original schedule
+    /// (a replayed webhook must not push the purge date forward).
+    /// </summary>
+    public void StartRetention(DateTime cancelledAtUtc, int purgeAfterDays)
+    {
+        if (purgeAfterDays <= 0)
+            throw new DomainException("PurgeAfterDays must be positive");
+
+        if (LifecycleStatus != TenantLifecycleStatus.Active)
+            return;
+
+        LifecycleStatus = TenantLifecycleStatus.CancelledGrace;
+        CancelledAt = cancelledAtUtc;
+        PurgeScheduledAt = cancelledAtUtc.AddDays(purgeAfterDays);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// RN-013: reactivation before the purge clears the schedule. No-op unless the tenant
+    /// is in <see cref="TenantLifecycleStatus.CancelledGrace"/>; purged/locked tenants never resurrect here.
+    /// </summary>
+    public void ClearRetention()
+    {
+        if (LifecycleStatus != TenantLifecycleStatus.CancelledGrace)
+            return;
+
+        LifecycleStatus = TenantLifecycleStatus.Active;
+        CancelledAt = null;
+        PurgeScheduledAt = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Terminal state set by the purge job (A1.5).</summary>
+    public void MarkPurged()
+    {
+        LifecycleStatus = TenantLifecycleStatus.Purged;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
     /// Soft-suspends the dealer. Idempotent: calling on an already-suspended dealer is a no-op.
     /// </summary>
     public void Suspend(string reason, Guid actorId, DateTime utcNow)
@@ -480,4 +530,13 @@ public sealed class DealerSettings : Entity
             ValidateRfc1035Label(label, paramName);
         }
     }
+}
+
+/// <summary>RN-013 retention lifecycle of a tenant after its subscription is cancelled.</summary>
+public enum TenantLifecycleStatus
+{
+    Active = 0,
+    CancelledGrace = 1,
+    Locked = 2,
+    Purged = 3
 }

@@ -184,7 +184,7 @@ public sealed class DealerSubscription : Entity
 
         Status = SubscriptionStatus.Cancelled;
         CancelledAt = DateTime.UtcNow;
-        Raise(new SubscriptionCancelledDomainEvent(Id, DealerId));
+        Raise(new SubscriptionCancelledDomainEvent(Id, DealerId, CancelledAt.Value));
     }
 
     public void RenewPeriod(DateTime periodStart, DateTime periodEnd)

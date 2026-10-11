@@ -32,6 +32,9 @@ public class IgnoreQueryFiltersAllowListTests
         // Outbox handlers run with no tenant context (HasTenant == false).
         "Sales/Events/",
         "Leads/CloseArtifacts/",
+        // RN-013 (A1.1): retention handler reacts to billing events from the outbox (no tenant context);
+        // its single query filters by the event DealerId explicitly.
+        "Tenancy/StartTenantRetentionHandler.cs",
         // Reviewed in QA remediation: every query below constrains DealerId explicitly
         // (or joins onto an already tenant-scoped set) after bypassing the soft-delete filter.
         "Appointments/Queries/GetAppointments/",

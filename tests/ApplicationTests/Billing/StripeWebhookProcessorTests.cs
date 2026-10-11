@@ -130,7 +130,7 @@ public class StripeWebhookProcessorTests
     }
 
     [Fact]
-    public async Task Handle_CustomerSubscriptionDeleted_SuspendsSubscription()
+    public async Task Handle_CustomerSubscriptionDeleted_CancelsSubscription()
     {
         var dealerId = Guid.NewGuid();
         var subscription = DealerSubscription.Create(dealerId, "cus_123", "sub_123", "price_123");
@@ -154,7 +154,7 @@ public class StripeWebhookProcessorTests
         var result = await _handler.Handle(command, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        subscription.Status.Should().Be(SubscriptionStatus.Suspended);
+        subscription.Status.Should().Be(SubscriptionStatus.Cancelled);
         _repositoryMock.Verify(r => r.Update(subscription), Times.Once);
     }
 

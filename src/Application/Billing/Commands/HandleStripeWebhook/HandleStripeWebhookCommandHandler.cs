@@ -162,9 +162,10 @@ internal sealed class HandleStripeWebhookCommandHandler : ICommandHandler<Handle
                     var subscription = await _repository.GetByStripeCustomerIdAsync(customerId, cancellationToken);
                     if (subscription != null)
                     {
+                        // H8 / RN-013: a deleted Stripe subscription is a cancellation, not a suspension.
                         if (subscription.Status != SubscriptionStatus.Cancelled)
                         {
-                            subscription.Suspend();
+                            subscription.Cancel();
                         }
                         _repository.Update(subscription);
                     }

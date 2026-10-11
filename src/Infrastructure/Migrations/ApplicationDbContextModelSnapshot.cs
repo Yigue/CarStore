@@ -689,6 +689,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("address");
 
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
                     b.Property<string>("CarouselSlidesJson")
                         .HasColumnType("jsonb")
                         .HasColumnName("carousel_slides_json");
@@ -756,6 +760,14 @@ namespace Infrastructure.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("last_assigned_agent_index");
 
+                    b.Property<string>("LifecycleStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Active")
+                        .HasColumnName("lifecycle_status");
+
                     b.Property<string>("LogoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -780,6 +792,10 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)")
                         .HasColumnName("primary_color");
+
+                    b.Property<DateTime?>("PurgeScheduledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("purge_scheduled_at");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -842,6 +858,10 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("IsActive")
                         .HasDatabaseName("ix_dealer_settings_is_active");
+
+                    b.HasIndex("PurgeScheduledAt")
+                        .HasDatabaseName("ix_dealer_settings_purge_scheduled_at")
+                        .HasFilter("purge_scheduled_at IS NOT NULL");
 
                     b.HasIndex("Slug")
                         .IsUnique()

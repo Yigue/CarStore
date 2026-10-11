@@ -54,6 +54,20 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
             .HasDefaultValue(true)
             .IsRequired();
 
+        // RN-013 (A6) tenant retention lifecycle. Existing rows backfill to Active.
+        builder.Property(s => s.LifecycleStatus)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(Domain.DealerSettings.TenantLifecycleStatus.Active)
+            .IsRequired();
+
+        builder.Property(s => s.CancelledAt).IsRequired(false);
+        builder.Property(s => s.PurgeScheduledAt).IsRequired(false);
+
+        builder.HasIndex(s => s.PurgeScheduledAt)
+            .HasDatabaseName("ix_dealer_settings_purge_scheduled_at")
+            .HasFilter("purge_scheduled_at IS NOT NULL");
+
         builder.HasIndex(s => s.IsActive)
             .HasDatabaseName("ix_dealer_settings_is_active");
 

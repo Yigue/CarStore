@@ -100,9 +100,11 @@ public static class StripeWebhookProcessor
                         var subscription = await repo.GetByStripeCustomerIdAsync(stripeSub.CustomerId, ct);
                         if (subscription != null)
                         {
+                            // H8 / RN-013: a deleted Stripe subscription is a cancellation, not a suspension.
+                            // Cancel() stamps CancelledAt and starts the tenant retention clock.
                             if (subscription.Status != SubscriptionStatus.Cancelled)
                             {
-                                subscription.Suspend();
+                                subscription.Cancel();
                             }
                             repo.Update(subscription);
                         }
