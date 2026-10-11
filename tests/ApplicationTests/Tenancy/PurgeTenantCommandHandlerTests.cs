@@ -371,23 +371,35 @@ public class PurgeTenantCommandHandlerTests
     // ---------------------------------------------------------------- failure safety
 
     [Fact]
-    public async Task Purge_WhenStorageFails_KeepsTheRowsAndTheTenantLockedSoItCanBeRetried()
+    public async Task Purge_WhenStorageDeleteFailsAfterCommit_StillSucceedsAndParksTheKeysForRetry()
     {
         SeedDealer(_dealerId, TenantLifecycleStatus.Locked);
+        SeedDealer(_otherId, TenantLifecycleStatus.Locked);
         await SeedTenantDataAsync(_dealerId, "a");
+        await SeedTenantDataAsync(_otherId, "b");
         _storage
             .Setup(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("storage down"));
 
-        Func<Task> act = () => Handler().Handle(new PurgeTenantCommand(_dealerId, DryRun: false), CancellationToken.None);
+        var result = await Handler().Handle(new PurgeTenantCommand(_dealerId, DryRun: false), CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
-        // Rows that own a stored file are only removed after the file is gone, so none of them was dropped.
-        (await _context.Documents.CountAsync()).Should().Be(1);
-        (await _context.CarImages.CountAsync()).Should().Be(1);
-        (await _context.Cars.CountAsync()).Should().Be(1);
-        (await _context.Clients.CountAsync()).Should().Be(1);
-        (await _context.DealerSettings.SingleAsync()).LifecycleStatus.Should().Be(TenantLifecycleStatus.Locked);
-        (await _context.TenantPurgeRecords.CountAsync()).Should().Be(0);
+        result.IsSuccess.Should().BeTrue("the rows are already committed; a blob failure must not undo or fail the purge");
+        (await _context.DealerSettings.IgnoreQueryFilters().SingleAsync(d => d.DealerId == _dealerId))
+            .LifecycleStatus.Should().Be(TenantLifecycleStatus.Purged);
+        var pending = await _context.PendingStorageDeletions.ToListAsync();
+        pending.Select(p => p.ObjectKey).Should().BeEquivalentTo(new[] { $"cars/{_dealerId}/a.jpg", "docs/a.png" });
+        pending.Should().OnlyContain(p => p.DealerId == _dealerId && p.Attempts == 1 && p.LastError == "storage down");
+    }
+
+    [Fact]
+    public async Task Purge_WhenStorageIsHealthy_LeavesNothingPending()
+    {
+        SeedDealer(_dealerId, TenantLifecycleStatus.Locked);
+        await SeedTenantDataAsync(_dealerId, "a");
+
+        var result = await Handler().Handle(new PurgeTenantCommand(_dealerId, DryRun: false), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        (await _context.PendingStorageDeletions.CountAsync()).Should().Be(0);
     }
 }

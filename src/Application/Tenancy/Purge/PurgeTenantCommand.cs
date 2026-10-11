@@ -106,18 +106,20 @@ internal sealed class PurgeTenantCommandHandler(
         await ClearClientOriginLeadsAsync(dealerId, ct);
 
         // 2. Delete in FK order, children first. Batches are separate SaveChanges but one transaction: a failure rolls
-        //    everything back, the tenant stays Locked and the next run starts over (storage deletes are idempotent).
+        //    everything back, the tenant stays Locked and the next run starts over. Stored blobs CANNOT be rolled back,
+        //    so nothing is deleted from storage here: the keys are only collected and removed after the commit.
+        var storageKeys = new HashSet<string>(StringComparer.Ordinal);
         counts["webhookDeliveries"] = await DeleteAsync(context.WebhookDeliveries.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.WebhookDeliveries, null, ct);
         counts["webhookSubscriptions"] = await DeleteAsync(context.WebhookSubscriptions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.WebhookSubscriptions, null, ct);
         counts["leadActivities"] = await DeleteAsync(context.LeadActivities.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.LeadActivities, null, ct);
-        counts["documents"] = await DeleteAsync(context.Documents.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Documents, d => d.BlobName, ct);
+        counts["documents"] = await DeleteAsync(context.Documents.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Documents, d => d.BlobName, ct, storageKeys);
         counts["transactions"] = await DeleteAsync(context.Transactions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Transactions, null, ct);
         counts["appointments"] = await DeleteAsync(context.Appointments.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Appointments, null, ct);
         counts["sales"] = await DeleteAsync(context.Sales.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Sales, null, ct);
         counts["quotes"] = await DeleteAsync(context.Quotes.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Quotes, null, ct);
         counts["reconditioningTasks"] = await DeleteAsync(context.ReconditioningTasks.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.ReconditioningTasks, null, ct);
         counts["leads"] = await DeleteAsync(context.Leads.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Leads, null, ct);
-        counts["carImages"] = await DeleteAsync(CarImagesOf(dealerId), context.CarImages, i => i.ObjectKey, ct);
+        counts["carImages"] = await DeleteAsync(CarImagesOf(dealerId), context.CarImages, i => i.ObjectKey, ct, storageKeys);
         counts["cars"] = await DeleteAsync(context.Cars.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Cars, null, ct);
         counts["clients"] = await DeleteAsync(context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Clients, null, ct);
         counts["transactionCategories"] = await DeleteAsync(context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.TransactionCategories, null, ct);
@@ -126,7 +128,7 @@ internal sealed class PurgeTenantCommandHandler(
         counts["users"] = await DeleteAsync(context.Users.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Users, null, ct);
         counts["rolePermissions"] = await DeleteAsync(RolePermissionsOf(dealerId), context.RolePermissions, null, ct);
         counts["roles"] = await DeleteAsync(context.Roles.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Roles, null, ct);
-        counts["tenantExports"] = await DeleteAsync(context.TenantExports.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.TenantExports, e => e.ObjectKey, ct);
+        counts["tenantExports"] = await DeleteAsync(context.TenantExports.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.TenantExports, e => e.ObjectKey, ct, storageKeys);
 
         // 3. Terminal transition + tombstone, saved together. DealerSubscription, audit logs, legal acceptances,
         //    Stripe events and refund records are NOT touched (billing / evidence retention).
@@ -136,6 +138,10 @@ internal sealed class PurgeTenantCommandHandler(
         if (transaction is not null)
             await transaction.CommitAsync(ct);
         lifecycleCache.Invalidate(dealerId);
+
+        // 4. Only now that the rows are gone for good: remove the blobs. A failure here must not fail or undo the
+        //    purge; the key is parked in pending_storage_deletions so it is not lost.
+        await DeleteStorageObjectsAsync(dealerId, storageKeys, now, ct);
 
         logger.LogInformation("Tenant {DealerId} purged: {Counts}", dealerId, counts);
         return new TenantPurgeResult(false, counts);
@@ -232,8 +238,42 @@ internal sealed class PurgeTenantCommandHandler(
         }
     }
 
+    private async Task DeleteStorageObjectsAsync(
+        Guid dealerId, IReadOnlyCollection<string> keys, DateTime now, CancellationToken ct)
+    {
+        var failed = new List<(string Key, string Error)>();
+        foreach (string key in keys)
+        {
+            try
+            {
+                await storage.DeleteFileAsync(key, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Tenant {DealerId} purged but storage object {ObjectKey} could not be deleted; queued for retry", dealerId, key);
+                failed.Add((key, ex.Message));
+            }
+        }
+
+        if (failed.Count == 0)
+            return;
+
+        try
+        {
+            foreach ((string key, string error) in failed)
+                context.PendingStorageDeletions.Add(PendingStorageDeletion.Create(dealerId, key, now, error));
+            // The purge is already committed and the caller may have cancelled: persist the retry list regardless.
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // Last resort: the keys stay in the log so an operator can clean them up by hand.
+            logger.LogError(ex, "Could not persist pending storage deletions for tenant {DealerId}: {ObjectKeys}", dealerId, failed.Select(f => f.Key));
+        }
+    }
+
     private async Task<int> DeleteAsync<T>(
-        IQueryable<T> query, DbSet<T> set, Func<T, string?>? storageKey, CancellationToken ct)
+        IQueryable<T> query, DbSet<T> set, Func<T, string?>? storageKey, CancellationToken ct, ISet<string>? collectedKeys = null)
         where T : class
     {
         int total = 0;
@@ -243,13 +283,13 @@ internal sealed class PurgeTenantCommandHandler(
             if (batch.Count == 0)
                 return total;
 
-            if (storageKey is not null)
+            if (storageKey is not null && collectedKeys is not null)
             {
                 foreach (T row in batch)
                 {
                     string? key = storageKey(row);
                     if (!string.IsNullOrWhiteSpace(key))
-                        await storage.DeleteFileAsync(key, ct);
+                        collectedKeys.Add(key);
                 }
             }
 

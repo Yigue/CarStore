@@ -71,6 +71,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
         }
     }
     public DbSet<Domain.Tenancy.TenantPurgeRecord> TenantPurgeRecords => Set<Domain.Tenancy.TenantPurgeRecord>();
+    public DbSet<Domain.Tenancy.PendingStorageDeletion> PendingStorageDeletions => Set<Domain.Tenancy.PendingStorageDeletion>();
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
     public DbSet<BillingReconciliationFlag> BillingReconciliationFlags => Set<BillingReconciliationFlag>();
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();

@@ -47,6 +47,7 @@ public interface IApplicationDbContext
     DbSet<Domain.Legal.LegalAcceptance> LegalAcceptances { get; }
     DbSet<Domain.Tenancy.TenantExport> TenantExports { get; }
     DbSet<Domain.Tenancy.TenantPurgeRecord> TenantPurgeRecords { get; }
+    DbSet<Domain.Tenancy.PendingStorageDeletion> PendingStorageDeletions { get; }
     DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; }
     DbSet<BillingReconciliationFlag> BillingReconciliationFlags { get; }
     DbSet<WebhookSubscription> WebhookSubscriptions { get; }

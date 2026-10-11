@@ -1616,6 +1616,45 @@ namespace Infrastructure.Migrations
                     b.ToTable("OutboxMessages", "public");
                 });
 
+            modelBuilder.Entity("Domain.Tenancy.PendingStorageDeletion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("object_key");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pending_storage_deletions");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_pending_storage_deletions_dealer_id");
+
+                    b.ToTable("pending_storage_deletions", "public");
+                });
+
             modelBuilder.Entity("Domain.Tenancy.TenantExport", b =>
                 {
                     b.Property<Guid>("Id")

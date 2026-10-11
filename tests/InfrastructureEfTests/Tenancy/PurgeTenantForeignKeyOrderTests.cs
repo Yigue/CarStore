@@ -18,6 +18,7 @@ using Infrastructure.Database;
 using MediatR;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using SharedKernel;
 using DealerSettingsEntity = Domain.DealerSettings.DealerSettings;
@@ -70,6 +71,20 @@ public class PurgeTenantForeignKeyOrderTests
             Task.FromResult<(string, IReadOnlyDictionary<string, string>)>(("", new Dictionary<string, string>()));
     }
 
+    /// <summary>Throws on the save that writes the tombstone, i.e. AFTER every row was deleted, inside the transaction.</summary>
+    private sealed class FailOnTombstoneInterceptor : Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesInterceptor
+    {
+        public override ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (eventData.Context!.ChangeTracker.Entries<Domain.Tenancy.TenantPurgeRecord>().Any(e => e.State == EntityState.Added))
+                throw new InvalidOperationException("forced failure before commit");
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
     private sealed class NoOpCache : ITenantLifecycleCache
     {
         public List<Guid> Invalidated { get; } = [];
@@ -81,10 +96,11 @@ public class PurgeTenantForeignKeyOrderTests
         public DateTime UtcNow => Now;
     }
 
-    private static ApplicationDbContext NewContext(SqliteConnection connection)
+    private static ApplicationDbContext NewContext(SqliteConnection connection, params IInterceptor[] interceptors)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(connection)
+            .AddInterceptors(interceptors)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
@@ -195,22 +211,53 @@ public class PurgeTenantForeignKeyOrderTests
     }
 
     [Fact]
-    public async Task Purge_WhenItFailsHalfWay_RollsBackEveryDeleteMadeBeforeTheFailure()
+    public async Task Purge_WhenTheTransactionRollsBackAfterTheRowsWereDeleted_DeletesNoStorageObject()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        await using var seedDb = NewContext(connection);
+        await seedDb.Database.EnsureCreatedAsync();
+        await SeedGraphAsync(seedDb, DealerA, "a");
+        await SeedGraphAsync(seedDb, DealerB, "b");
+        int before = await RowsOfAsync(seedDb, DealerA);
+
+        await using var db = NewContext(connection, new FailOnTombstoneInterceptor());
+        var storage = new RecordingStorage();
+        var cache = new NoOpCache();
+        var handler = new PurgeTenantCommandHandler(db, storage, new FixedClock(), cache, NullLogger<PurgeTenantCommandHandler>.Instance);
+
+        Func<Task> act = () => handler.Handle(new PurgeTenantCommand(DealerA, DryRun: false), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("forced failure before commit");
+        storage.Deleted.Should().BeEmpty("blobs cannot be rolled back, so none may be deleted before the commit");
+        cache.Invalidated.Should().BeEmpty();
+        db.ChangeTracker.Clear();
+        (await RowsOfAsync(db, DealerA)).Should().Be(before, "one transaction: nothing deleted before the failure may survive");
+        (await db.CarImages.CountAsync()).Should().Be(2);
+        (await db.DealerSettings.IgnoreQueryFilters().SingleAsync(d => d.DealerId == DealerA)).LifecycleStatus
+            .Should().Be(TenantLifecycleStatus.Locked);
+        (await db.PendingStorageDeletions.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Purge_WhenStorageFailsAfterCommit_SucceedsAndPersistsTheKeysInPendingStorageDeletions()
     {
         await using var connection = new SqliteConnection("Filename=:memory:");
         await connection.OpenAsync();
         await using var db = NewContext(connection);
         await db.Database.EnsureCreatedAsync();
         await SeedGraphAsync(db, DealerA, "a");
-        int before = await RowsOfAsync(db, DealerA);
+        await SeedGraphAsync(db, DealerB, "b");
         var handler = new PurgeTenantCommandHandler(db, new FailingStorage(), new FixedClock(), new NoOpCache(), NullLogger<PurgeTenantCommandHandler>.Instance);
 
-        Func<Task> act = () => handler.Handle(new PurgeTenantCommand(DealerA, DryRun: false), CancellationToken.None);
+        Result<TenantPurgeResult> result = await handler.Handle(new PurgeTenantCommand(DealerA, DryRun: false), CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.Description : "");
         db.ChangeTracker.Clear();
-        (await RowsOfAsync(db, DealerA)).Should().Be(before, "one transaction: nothing deleted before the failure may survive");
         (await db.DealerSettings.IgnoreQueryFilters().SingleAsync(d => d.DealerId == DealerA)).LifecycleStatus
-            .Should().Be(TenantLifecycleStatus.Locked);
+            .Should().Be(TenantLifecycleStatus.Purged);
+        var pending = await db.PendingStorageDeletions.ToListAsync();
+        pending.Select(p => p.ObjectKey).Should().BeEquivalentTo(new[] { $"cars/{DealerA}/img.jpg", $"docs/{DealerA}/dni.png" });
+        pending.Should().OnlyContain(p => p.DealerId == DealerA && p.Attempts == 1 && p.LastError == "storage down");
     }
 }
