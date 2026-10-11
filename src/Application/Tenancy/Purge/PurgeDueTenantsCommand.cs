@@ -16,7 +16,8 @@ namespace Application.Tenancy.Purge;
 /// </summary>
 public sealed record PurgeDueTenantsCommand(bool DryRun) : ICommand<PurgeRunSummary>;
 
-public sealed record PurgeRunSummary(bool DryRun, int Locked, int Purged, int Skipped, int Failed);
+public sealed record PurgeRunSummary(bool DryRun, int Locked, int Purged, int Skipped, int Failed, int LockCandidates = 0);
+// Locked = tenants actually moved to Locked. LockCandidates = tenants whose grace ended but were NOT locked (dry run).
 
 internal sealed class PurgeDueTenantsCommandHandler(
     IApplicationDbContext context,
@@ -36,7 +37,13 @@ internal sealed class PurgeDueTenantsCommandHandler(
             ? configured
             : DefaultGraceDays;
 
-        int locked = await LockExpiredGraceAsync(now, graceDays, ct);
+        // Dry run (Retention:PurgeEnabled off) must not change any tenant: locking returns 402 to real customers.
+        // Candidates are counted and reported instead.
+        int locked = 0, lockCandidates = 0;
+        if (request.DryRun)
+            lockCandidates = await CountLockCandidatesAsync(now, graceDays, ct);
+        else
+            locked = await LockExpiredGraceAsync(now, graceDays, ct);
 
         // Platform job: no tenant in scope.
         List<Guid> due = await context.DealerSettings
@@ -66,10 +73,22 @@ internal sealed class PurgeDueTenantsCommandHandler(
         }
 
         logger.LogInformation(
-            "Tenant purge run (dryRun={DryRun}): locked={Locked} purged={Purged} skipped={Skipped} failed={Failed}",
-            request.DryRun, locked, purged, skipped, failed);
+            "Tenant purge run (dryRun={DryRun}): locked={Locked} lockCandidates={LockCandidates} purged={Purged} skipped={Skipped} failed={Failed}",
+            request.DryRun, locked, lockCandidates, purged, skipped, failed);
 
-        return new PurgeRunSummary(request.DryRun, locked, purged, skipped, failed);
+        return new PurgeRunSummary(request.DryRun, locked, purged, skipped, failed, lockCandidates);
+    }
+
+    private async Task<int> CountLockCandidatesAsync(DateTime now, int graceDays, CancellationToken ct)
+    {
+        List<DateTime?> cancelled = await context.DealerSettings
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(d => d.LifecycleStatus == TenantLifecycleStatus.CancelledGrace && d.CancelledAt != null)
+            .Select(d => d.CancelledAt)
+            .ToListAsync(ct);
+
+        return cancelled.Count(c => now >= c!.Value.AddDays(graceDays));
     }
 
     private async Task<int> LockExpiredGraceAsync(DateTime now, int graceDays, CancellationToken ct)

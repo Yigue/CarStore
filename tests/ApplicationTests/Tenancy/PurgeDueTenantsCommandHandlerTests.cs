@@ -26,8 +26,9 @@ public class PurgeDueTenantsCommandHandlerTests
     private static readonly DateTime Cancelled = new(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime Now = Cancelled.AddDays(91);
 
-    private readonly TestApplicationDbContext _context = new(
-        new DbContextOptionsBuilder<TestApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+    private readonly DbContextOptions<TestApplicationDbContext> _options =
+        new DbContextOptionsBuilder<TestApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
+    private readonly TestApplicationDbContext _context;
     private readonly Mock<ISender> _sender = new();
     private readonly Mock<ITenantLifecycleCache> _cache = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
@@ -35,6 +36,7 @@ public class PurgeDueTenantsCommandHandlerTests
 
     public PurgeDueTenantsCommandHandlerTests()
     {
+        _context = new(_options);
         _clock.SetupGet(c => c.UtcNow).Returns(Now);
         _sender
             .Setup(s => s.Send(It.IsAny<IRequest<Result<TenantPurgeResult>>>(), It.IsAny<CancellationToken>()))
@@ -77,7 +79,7 @@ public class PurgeDueTenantsCommandHandlerTests
         var inGrace = Seed(TenantLifecycleStatus.CancelledGrace, Now.AddDays(-5));
         var active = Seed(TenantLifecycleStatus.Active);
 
-        var result = await Handler().Handle(new PurgeDueTenantsCommand(DryRun: true), CancellationToken.None);
+        var result = await Handler().Handle(new PurgeDueTenantsCommand(DryRun: false), CancellationToken.None);
 
         (await StatusOf(pastGrace)).Should().Be(TenantLifecycleStatus.Locked);
         (await StatusOf(inGrace)).Should().Be(TenantLifecycleStatus.CancelledGrace);
@@ -86,6 +88,39 @@ public class PurgeDueTenantsCommandHandlerTests
         _cache.Verify(c => c.Invalidate(pastGrace), Times.Once);
         _cache.Verify(c => c.Invalidate(inGrace), Times.Never);
         _cache.Verify(c => c.Invalidate(active), Times.Never);
+    }
+
+    [Fact]
+    public async Task DryRun_DoesNotLockGraceTenants_AndReportsThemAsCandidates()
+    {
+        var pastGrace = Seed(TenantLifecycleStatus.CancelledGrace, Now.AddDays(-31));
+        var inGrace = Seed(TenantLifecycleStatus.CancelledGrace, Now.AddDays(-5));
+
+        var result = await Handler().Handle(new PurgeDueTenantsCommand(DryRun: true), CancellationToken.None);
+
+        using var fresh = new TestApplicationDbContext(_options);
+        (await fresh.DealerSettings.IgnoreQueryFilters().SingleAsync(d => d.DealerId == pastGrace)).LifecycleStatus
+            .Should().Be(TenantLifecycleStatus.CancelledGrace);
+        (await StatusOf(pastGrace)).Should().Be(TenantLifecycleStatus.CancelledGrace);
+        (await StatusOf(inGrace)).Should().Be(TenantLifecycleStatus.CancelledGrace);
+        result.Value.Locked.Should().Be(0);
+        result.Value.LockCandidates.Should().Be(1);
+        _cache.Verify(c => c.Invalidate(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RealRun_LocksTheTenant_PersistsIt_AndInvalidatesTheCache()
+    {
+        var pastGrace = Seed(TenantLifecycleStatus.CancelledGrace, Now.AddDays(-31));
+
+        var result = await Handler().Handle(new PurgeDueTenantsCommand(DryRun: false), CancellationToken.None);
+
+        using var fresh = new TestApplicationDbContext(_options);
+        (await fresh.DealerSettings.IgnoreQueryFilters().SingleAsync(d => d.DealerId == pastGrace)).LifecycleStatus
+            .Should().Be(TenantLifecycleStatus.Locked);
+        result.Value.Locked.Should().Be(1);
+        result.Value.LockCandidates.Should().Be(0);
+        _cache.Verify(c => c.Invalidate(pastGrace), Times.Once);
     }
 
     [Fact]
@@ -162,7 +197,7 @@ public class PurgeDueTenantsCommandHandlerTests
     {
         var id = Seed(TenantLifecycleStatus.CancelledGrace, Now.AddDays(-10));
 
-        await Handler(new() { ["Retention:GraceDays"] = "7" }).Handle(new PurgeDueTenantsCommand(DryRun: true), CancellationToken.None);
+        await Handler(new() { ["Retention:GraceDays"] = "7" }).Handle(new PurgeDueTenantsCommand(DryRun: false), CancellationToken.None);
 
         (await StatusOf(id)).Should().Be(TenantLifecycleStatus.Locked);
     }
