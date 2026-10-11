@@ -28,4 +28,7 @@ public sealed class FeatureFlagsOptions
 
     /// <summary>PR3: When true, subscription payment status is enforced.</summary>
     public bool SubscriptionEnforcement { get; set; } = false;
+
+    /// <summary>A0.2: When true, writes from users who have not accepted the current material Terms get 428.</summary>
+    public bool LegalGate { get; set; } = false;
 }

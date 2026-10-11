@@ -280,6 +280,12 @@ app.UseTenantResolution();
 app.UseDealerSuspensionCheck();
 
 var flags = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<Web.Api.Infrastructure.FeatureFlagsOptions>>().Value;
+// A0.2: legal acceptance gate (428) — after authentication/tenant resolution, before the subscription guard.
+if (flags.LegalGate)
+{
+    app.UseMiddleware<Web.Api.Infrastructure.LegalAcceptanceGateMiddleware>();
+}
+
 if (flags.SubscriptionEnforcement)
 {
     app.UseSubscriptionGuard();
