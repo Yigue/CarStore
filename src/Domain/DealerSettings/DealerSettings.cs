@@ -118,6 +118,18 @@ public sealed class DealerSettings : Entity
     public string ContactEmail { get; private set; }
 
     /// <summary>
+    /// sfc A2.2: optional extra recipient of billing emails (dunning, refunds), besides the owner.
+    /// Cleared by <see cref="Purge"/>.
+    /// </summary>
+    public string? BillingEmail { get; private set; }
+
+    public void SetBillingEmail(string? billingEmail)
+    {
+        BillingEmail = string.IsNullOrWhiteSpace(billingEmail) ? null : billingEmail.Trim();
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
     /// Stable tenant identifier on the public DNS ({slug}.carstore.com).
     /// Nullable pre-PR1; existing rows must be backfilled before a NOT NULL constraint
     /// is enforced at the schema level.
@@ -451,6 +463,7 @@ public sealed class DealerSettings : Entity
 
         LifecycleStatus = TenantLifecycleStatus.Purged;
         ContactEmail = $"purged-{DealerId:N}@purged.invalid";
+        BillingEmail = null;
         Address = null;
         PhoneNumber = null;
         FacebookUrl = null;

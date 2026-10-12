@@ -1,5 +1,6 @@
 using Application.Abstractions.Billing;
 using Application.Abstractions.Data;
+using Application.Abstractions.Messaging;
 using Domain.Billing;
 using Domain.Shared;
 using FluentAssertions;
@@ -8,7 +9,9 @@ using Infrastructure.Billing;
 using Infrastructure.Database;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Quartz;
@@ -274,5 +277,132 @@ public class ProcessStripeWebhooksJobTests
         sub.Status.Should().Be(SubscriptionStatus.PastDue);
         sub.LastProviderEventAtUtc.Should().Be(FromUnix(PaymentFailedUnix));
         (await dbContext.OutboxMessages.AsNoTracking().SingleAsync(m => m.Type == "StripeRaw")).Error.Should().BeNull();
+    }
+
+    // --- sfc A2.2: dunning and refunds through the real webhook job ---
+
+    private sealed class CapturingEmailService : IEmailService
+    {
+        public System.Collections.Concurrent.ConcurrentBag<(string To, string Subject)> Sent { get; } = new();
+
+        public Task SendEmailAsync(string to, string subject, string body, System.Threading.CancellationToken cancellationToken = default)
+        {
+            Sent.Add((to, subject));
+            return Task.CompletedTask;
+        }
+    }
+
+    private static async Task<Guid> SeedDealerWithOwnerAsync(ApplicationDbContext dbContext)
+    {
+        var dealerId = Guid.NewGuid();
+        var adminRole = new Domain.Users.Role(dealerId, "Admin", "Administrator");
+        dbContext.DealerSettings.Add(new Domain.DealerSettings.DealerSettings(dealerId, "Autos del Sur", "contacto@autosdelsur.test"));
+        dbContext.Roles.Add(adminRole);
+        dbContext.Users.Add(new Domain.Users.User(dealerId, "owner@autosdelsur.test", "Marta", "Gomez", "hash", adminRole.Id));
+        var sub = DealerSubscription.Create(dealerId, "cus_fail", "sub_fail", "price_1");
+        sub.Activate("sub_fail", DateTime.UtcNow, DateTime.UtcNow.AddMonths(1));
+        sub.TryRegisterProviderEvent(FromUnix(BaselineUnix)).Should().BeTrue();
+        dbContext.DealerSubscriptions.Add(sub);
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
+        return dealerId;
+    }
+
+    [Fact]
+    public async Task Execute_DuplicatePaymentFailedEvent_SendsOneDunningEmail()
+    {
+        var email = new CapturingEmailService();
+        await using var factory = new CustomWebApplicationFactory().WithWebHostBuilder(b =>
+            b.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IEmailService>();
+                services.AddSingleton<IEmailService>(email);
+            }));
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.EnsureCreatedAsync();
+        await SeedDealerWithOwnerAsync(dbContext);
+
+        dbContext.OutboxMessages.Add(RawMessage(PaymentFailedPayload));
+        await dbContext.SaveChangesAsync();
+        var job = new ProcessStripeWebhooksJob(
+            dbContext,
+            scope.ServiceProvider.GetRequiredService<IDealerSubscriptionRepository>(),
+            scope.ServiceProvider.GetRequiredService<ProcessedStripeEventRepository>(),
+            scope.ServiceProvider.GetRequiredService<ISender>(),
+            NullLogger<ProcessStripeWebhooksJob>.Instance);
+        await job.Execute(new Mock<IJobExecutionContext>().Object);
+
+        // Stripe retries the very same event.
+        dbContext.OutboxMessages.Add(RawMessage(PaymentFailedPayload));
+        await dbContext.SaveChangesAsync();
+        await job.Execute(new Mock<IJobExecutionContext>().Object);
+
+        email.Sent.Should().ContainSingle().Which.Should().Be(("owner@autosdelsur.test", "Tu pago no pudo procesarse"));
+    }
+
+    private const string RefundPayload = """
+    {
+        "id": "evt_refund_1",
+        "type": "charge.refunded",
+        "created": 1700002000,
+        "data": { "object": { "id": "ch_1", "customer": "cus_fail", "invoice": "in_1", "amount": 5000, "amount_refunded": 5000, "currency": "usd" } }
+    }
+    """;
+
+    [Fact]
+    public async Task Execute_ChargeRefunded_PersistsRecordAndLeavesSubscriptionUntouched()
+    {
+        await using var factory = new CustomWebApplicationFactory().WithWebHostBuilder(b =>
+            b.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IEmailService>();
+                services.AddSingleton<IEmailService>(new CapturingEmailService());
+            }));
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.EnsureCreatedAsync();
+        var dealerId = await SeedDealerWithOwnerAsync(dbContext);
+
+        dbContext.OutboxMessages.Add(RawMessage(RefundPayload));
+        await dbContext.SaveChangesAsync();
+        var job = new ProcessStripeWebhooksJob(
+            dbContext,
+            scope.ServiceProvider.GetRequiredService<IDealerSubscriptionRepository>(),
+            scope.ServiceProvider.GetRequiredService<ProcessedStripeEventRepository>(),
+            scope.ServiceProvider.GetRequiredService<ISender>(),
+            NullLogger<ProcessStripeWebhooksJob>.Instance);
+        await job.Execute(new Mock<IJobExecutionContext>().Object);
+
+        var record = await dbContext.BillingRefundRecords.AsNoTracking().SingleAsync();
+        record.DealerId.Should().Be(dealerId);
+        record.Kind.Should().Be(BillingRefundKind.Full);
+        (await dbContext.PlatformAuditLogs.AsNoTracking().CountAsync()).Should().Be(1);
+        var sub = await dbContext.DealerSubscriptions.AsNoTracking().IgnoreQueryFilters().SingleAsync(s => s.DealerId == dealerId);
+        sub.Status.Should().Be(SubscriptionStatus.Active);
+        sub.LastProviderEventAtUtc.Should().Be(FromUnix(BaselineUnix));
+    }
+
+    [Fact]
+    public async Task Execute_ChargeRefundedThatFailsMidway_DoesNotPersistRecordOrAudit()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.EnsureCreatedAsync();
+        await SeedDealerWithOwnerAsync(dbContext);
+
+        dbContext.OutboxMessages.Add(RawMessage(RefundPayload));
+        await dbContext.SaveChangesAsync();
+        var job = new ProcessStripeWebhooksJob(
+            dbContext,
+            scope.ServiceProvider.GetRequiredService<IDealerSubscriptionRepository>(),
+            scope.ServiceProvider.GetRequiredService<ProcessedStripeEventRepository>(),
+            SenderThatFailsAfterApplying(scope.ServiceProvider.GetRequiredService<ISender>()),
+            NullLogger<ProcessStripeWebhooksJob>.Instance);
+        await job.Execute(new Mock<IJobExecutionContext>().Object);
+
+        (await dbContext.BillingRefundRecords.AsNoTracking().CountAsync()).Should().Be(0);
+        (await dbContext.PlatformAuditLogs.AsNoTracking().CountAsync()).Should().Be(0);
     }
 }

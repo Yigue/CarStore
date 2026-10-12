@@ -4,4 +4,5 @@ public enum PlatformAuditActorKind
 {
     SuperAdmin,
     SelfService,
+    System,
 }

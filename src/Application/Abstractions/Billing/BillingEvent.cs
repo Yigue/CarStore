@@ -1,3 +1,4 @@
+using MediatR;
 using System;
 
 namespace Application.Abstractions.Billing;
@@ -7,7 +8,7 @@ namespace Application.Abstractions.Billing;
 /// into one of these; <c>ApplyBillingEventCommand</c> owns the domain logic. Every event carries the
 /// provider event id and the provider timestamp used for out-of-order detection (RN-023).
 /// </summary>
-public abstract record BillingEvent(string ProviderEventId, DateTime OccurredAtUtc)
+public abstract record BillingEvent(string ProviderEventId, DateTime OccurredAtUtc) : INotification
 {
     /// <summary>
     /// State events mutate the subscription aggregate and are subject to out-of-order discarding.

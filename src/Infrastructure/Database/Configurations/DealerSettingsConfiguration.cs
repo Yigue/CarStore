@@ -36,6 +36,9 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(s => s.BillingEmail)
+            .HasMaxLength(200);
+
         builder.Property(s => s.NotificationsEnabled)
             .HasDefaultValue(true);
 

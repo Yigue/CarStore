@@ -1,6 +1,7 @@
 using Application.Abstractions.Billing;
 using Application.Abstractions.Messaging;
 using Domain.Billing;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
 using System;
@@ -18,13 +19,16 @@ internal sealed class ApplyBillingEventCommandHandler : ICommandHandler<ApplyBil
     private static readonly EventId AppliedEvent = new(2302, "BillingEventApplied");
 
     private readonly IDealerSubscriptionRepository _repository;
+    private readonly IPublisher _publisher;
     private readonly ILogger<ApplyBillingEventCommandHandler> _logger;
 
     public ApplyBillingEventCommandHandler(
         IDealerSubscriptionRepository repository,
+        IPublisher publisher,
         ILogger<ApplyBillingEventCommandHandler> logger)
     {
         _repository = repository;
+        _publisher = publisher;
         _logger = logger;
     }
 
@@ -41,16 +45,30 @@ internal sealed class ApplyBillingEventCommandHandler : ICommandHandler<ApplyBil
             case PaymentFailed e:
                 await ApplyPaymentFailed(e, cancellationToken);
                 break;
+            case ChargeRefunded e:
+                // Informational events never change the state machine and are never discarded for being "old"
+                // (RN-023). Their side effects (refund record + email, trial notice) live in notification handlers.
+                await _publisher.Publish(e, cancellationToken);
+                LogApplied(e);
+                break;
+            case TrialWillEnd e:
+                await _publisher.Publish(e, cancellationToken);
+                LogApplied(e);
+                break;
             default:
-                // Refunds, trial notices and checkout acknowledgements do not change the state machine and
-                // are never discarded for being "old" (RN-023). Their side effects arrive with A2.2.
-                _logger.LogInformation(AppliedEvent,
-                    "Applied non-state billing event {EventId} ({EventType}) occurred at {OccurredAtUtc:o}.",
-                    request.Event.ProviderEventId, request.Event.GetType().Name, request.Event.OccurredAtUtc);
+                // Checkout acknowledgements: the subscription itself arrives through SubscriptionChanged.
+                LogApplied(request.Event);
                 break;
         }
 
         return Result.Success();
+    }
+
+    private void LogApplied(BillingEvent billingEvent)
+    {
+        _logger.LogInformation(AppliedEvent,
+            "Applied non-state billing event {EventId} ({EventType}) occurred at {OccurredAtUtc:o}.",
+            billingEvent.ProviderEventId, billingEvent.GetType().Name, billingEvent.OccurredAtUtc);
     }
 
     private async Task ApplySubscriptionChanged(SubscriptionChanged e, CancellationToken ct)
@@ -145,6 +163,9 @@ internal sealed class ApplyBillingEventCommandHandler : ICommandHandler<ApplyBil
         }
 
         _repository.Update(subscription);
+
+        // RN-022: one dunning email per accepted failed attempt (an out-of-order attempt was discarded above).
+        await _publisher.Publish(e, ct);
     }
 
     /// <summary>RN-023: false (with a log) when the event is older than the newest one already applied.</summary>

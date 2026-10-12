@@ -14,7 +14,7 @@ internal static class WebhookPipeline
 {
     public static HandleStripeWebhookCommandHandler Create(IDealerSubscriptionRepository repository)
     {
-        var apply = new ApplyBillingEventCommandHandler(repository, NullLogger<ApplyBillingEventCommandHandler>.Instance);
+        var apply = new ApplyBillingEventCommandHandler(repository, new Mock<IPublisher>().Object, NullLogger<ApplyBillingEventCommandHandler>.Instance);
         var sender = new Mock<ISender>();
         sender
             .Setup(s => s.Send(It.IsAny<IRequest<Result>>(), It.IsAny<CancellationToken>()))

@@ -2,6 +2,7 @@ using Application.Abstractions.Billing;
 using Application.Billing.ApplyBillingEvent;
 using Domain.Billing;
 using Domain.Billing.Events;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -19,12 +20,13 @@ public class ApplyBillingEventCommandHandlerTests
     private static readonly DateTime T0 = T1.AddMinutes(-5);
 
     private readonly Mock<IDealerSubscriptionRepository> _repo = new();
+    private readonly Mock<IPublisher> _publisher = new();
     private readonly CapturingLogger _logger = new();
     private readonly ApplyBillingEventCommandHandler _handler;
 
     public ApplyBillingEventCommandHandlerTests()
     {
-        _handler = new ApplyBillingEventCommandHandler(_repo.Object, _logger);
+        _handler = new ApplyBillingEventCommandHandler(_repo.Object, _publisher.Object, _logger);
     }
 
     private DealerSubscription ActiveSubscription(DateTime lastEventAt)
@@ -237,6 +239,44 @@ public class ApplyBillingEventCommandHandlerTests
         added!.DealerId.Should().Be(dealerId);
         added.Status.Should().Be(SubscriptionStatus.Trialing);
         added.LastProviderEventAtUtc.Should().Be(T1);
+    }
+
+    // --- sfc A2.2: side effects are published to the notification handlers ---
+
+    [Fact]
+    public async Task PaymentFailed_Accepted_IsPublishedForDunning()
+    {
+        ActiveSubscription(T0);
+        var failed = new PaymentFailed("evt_f", T1, "cus_1", "sub_1", 1);
+
+        await _handler.Handle(new ApplyBillingEventCommand(failed), CancellationToken.None);
+
+        _publisher.Verify(p => p.Publish(failed, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PaymentFailed_Discarded_IsNotPublished()
+    {
+        ActiveSubscription(T2);
+
+        await _handler.Handle(new ApplyBillingEventCommand(new PaymentFailed("evt_f", T1, "cus_1", "sub_1", 1)), CancellationToken.None);
+
+        _publisher.Verify(p => p.Publish(It.IsAny<PaymentFailed>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task TrialWillEnd_And_ChargeRefunded_ArePublishedEvenWhenOld()
+    {
+        var sub = ActiveSubscription(T2);
+        var trial = new TrialWillEnd("evt_t", T1, "cus_1", "sub_1", T1.AddDays(3));
+        var refund = new ChargeRefunded("evt_r", T1, "cus_1", "ch_1", "in_1", 1000, 500, "usd", null);
+
+        await _handler.Handle(new ApplyBillingEventCommand(trial), CancellationToken.None);
+        await _handler.Handle(new ApplyBillingEventCommand(refund), CancellationToken.None);
+
+        _publisher.Verify(p => p.Publish(trial, It.IsAny<CancellationToken>()), Times.Once);
+        _publisher.Verify(p => p.Publish(refund, It.IsAny<CancellationToken>()), Times.Once);
+        sub.LastProviderEventAtUtc.Should().Be(T2);
     }
 
     private sealed class CapturingLogger : ILogger<ApplyBillingEventCommandHandler>

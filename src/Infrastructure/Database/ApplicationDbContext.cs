@@ -67,6 +67,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Domain.Tenancy.PendingStorageDeletion> PendingStorageDeletions { get; set; }
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
     public DbSet<BillingReconciliationFlag> BillingReconciliationFlags { get; set; }
+    public DbSet<BillingRefundRecord> BillingRefundRecords { get; set; }
     public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; }
     public DbSet<WebhookDelivery> WebhookDeliveries { get; set; }
     public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; set; }

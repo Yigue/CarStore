@@ -50,6 +50,7 @@ public interface IApplicationDbContext
     DbSet<Domain.Tenancy.PendingStorageDeletion> PendingStorageDeletions { get; }
     DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; }
     DbSet<BillingReconciliationFlag> BillingReconciliationFlags { get; }
+    DbSet<BillingRefundRecord> BillingRefundRecords { get; }
     DbSet<WebhookSubscription> WebhookSubscriptions { get; }
     DbSet<WebhookDelivery> WebhookDeliveries { get; }
     DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; }
