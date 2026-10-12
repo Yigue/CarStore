@@ -61,6 +61,10 @@ public class DealerSubscriptionConfiguration : IEntityTypeConfiguration<DealerSu
             .HasColumnName("cancelled_at")
             .IsRequired(false);
 
+        builder.Property(x => x.LastProviderEventAtUtc)
+            .HasColumnName("last_provider_event_at_utc")
+            .IsRequired(false);
+
         builder.Property(x => x.PlanId)
             .HasColumnName("plan_id")
             .HasMaxLength(64)

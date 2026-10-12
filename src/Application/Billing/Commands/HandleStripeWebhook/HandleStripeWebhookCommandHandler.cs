@@ -1,219 +1,46 @@
 using Application.Abstractions.Billing;
 using Application.Abstractions.Messaging;
-using Domain.Billing;
+using Application.Billing.ApplyBillingEvent;
+using MediatR;
 using SharedKernel;
 using System;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Application.Billing.Commands.HandleStripeWebhook;
 
+/// <summary>
+/// Entry point of the outbox job: translates the raw provider payload into a normalized
+/// <see cref="BillingEvent"/> and delegates the domain logic to <see cref="ApplyBillingEventCommand"/>.
+/// </summary>
 internal sealed class HandleStripeWebhookCommandHandler : ICommandHandler<HandleStripeWebhookCommand>
 {
-    private readonly IDealerSubscriptionRepository _repository;
+    private readonly IBillingEventTranslator _translator;
+    private readonly ISender _sender;
 
-    public HandleStripeWebhookCommandHandler(IDealerSubscriptionRepository repository)
+    public HandleStripeWebhookCommandHandler(IBillingEventTranslator translator, ISender sender)
     {
-        _repository = repository;
+        _translator = translator;
+        _sender = sender;
     }
 
     public async Task<Result> Handle(HandleStripeWebhookCommand request, CancellationToken cancellationToken)
     {
-        using var doc = JsonDocument.Parse(request.RawJson);
-        var root = doc.RootElement;
-        var eventType = request.EventType;
-
-        if (!root.TryGetProperty("data", out var dataElement) || 
-            !dataElement.TryGetProperty("object", out var dataObject))
+        BillingEvent? billingEvent;
+        try
+        {
+            billingEvent = _translator.Translate(request.RawJson);
+        }
+        catch (Exception ex) when (ex is ArgumentException or System.Text.Json.JsonException)
         {
             return Result.Failure(Error.Validation("Webhook.InvalidPayload", "Invalid event payload."));
         }
 
-        switch (eventType)
+        if (billingEvent is null)
         {
-            case "customer.subscription.created":
-            case "customer.subscription.updated":
-                {
-                    var customerId = dataObject.GetProperty("customer").GetString() ?? string.Empty;
-                    var subscriptionId = dataObject.GetProperty("id").GetString() ?? string.Empty;
-                    var status = dataObject.GetProperty("status").GetString() ?? string.Empty;
-                    var currentPeriodStartUnix = dataObject.GetProperty("current_period_start").GetInt64();
-                    var currentPeriodEndUnix = dataObject.GetProperty("current_period_end").GetInt64();
-
-                    long? trialEndUnix = null;
-                    if (dataObject.TryGetProperty("trial_end", out var trialEndProp) && trialEndProp.ValueKind != JsonValueKind.Null)
-                    {
-                        trialEndUnix = trialEndProp.GetInt64();
-                    }
-
-                    var priceId = string.Empty;
-                    if (dataObject.TryGetProperty("items", out var itemsProp) && 
-                        itemsProp.TryGetProperty("data", out var itemsDataProp) && 
-                        itemsDataProp.ValueKind == JsonValueKind.Array && 
-                        itemsDataProp.GetArrayLength() > 0)
-                    {
-                        var firstItem = itemsDataProp[0];
-                        if (firstItem.TryGetProperty("price", out var priceProp))
-                        {
-                            priceId = priceProp.GetProperty("id").GetString() ?? string.Empty;
-                        }
-                    }
-
-                    var periodStart = DateTimeOffset.FromUnixTimeSeconds(currentPeriodStartUnix).UtcDateTime;
-                    var periodEnd = DateTimeOffset.FromUnixTimeSeconds(currentPeriodEndUnix).UtcDateTime;
-                    var trialEndsAt = trialEndUnix.HasValue ? DateTimeOffset.FromUnixTimeSeconds(trialEndUnix.Value).UtcDateTime : (DateTime?)null;
-
-                    var subscription = await _repository.GetByStripeCustomerIdAsync(customerId, cancellationToken);
-
-                    Guid? metadataDealerId = null;
-                    if (dataObject.TryGetProperty("metadata", out var metadataProp) &&
-                        metadataProp.TryGetProperty("dealer_id", out var dealerIdProp) &&
-                        Guid.TryParse(dealerIdProp.GetString(), out var parsedDealerId))
-                    {
-                        metadataDealerId = parsedDealerId;
-                    }
-
-                    // spr ADR B8: provisioning already left a pending row for this dealer. When Stripe was
-                    // unreachable at that moment the row has no customer id, so the lookup above misses it;
-                    // finding it by dealer avoids inserting a second row (ux_dealer_subscriptions_dealer_id).
-                    if (subscription == null && metadataDealerId.HasValue)
-                    {
-                        subscription = await _repository.GetByDealerIdAsync(metadataDealerId.Value, cancellationToken);
-                        subscription?.AttachStripeCustomer(customerId);
-                    }
-
-                    if (subscription == null)
-                    {
-                        if (metadataDealerId.HasValue)
-                        {
-                            subscription = DealerSubscription.Create(
-                                metadataDealerId.Value,
-                                customerId,
-                                subscriptionId,
-                                priceId,
-                                trialEndsAt
-                            );
-
-                            subscription.RenewPeriod(periodStart, periodEnd);
-                            UpdateAggregateStatus(subscription, status, subscriptionId, trialEndsAt, periodStart, periodEnd);
-                            await _repository.AddAsync(subscription, cancellationToken);
-                        }
-                    }
-                    else
-                    {
-                        subscription.SetPlan(priceId);
-                        subscription.RenewPeriod(periodStart, periodEnd);
-                        UpdateAggregateStatus(subscription, status, subscriptionId, trialEndsAt, periodStart, periodEnd);
-                        _repository.Update(subscription);
-                    }
-                    break;
-                }
-
-            case "invoice.payment_succeeded":
-                {
-                    var customerId = dataObject.GetProperty("customer").GetString() ?? string.Empty;
-                    var subscriptionId = dataObject.GetProperty("subscription").GetString() ?? string.Empty;
-                    var periodStartUnix = dataObject.GetProperty("period_start").GetInt64();
-                    var periodEndUnix = dataObject.GetProperty("period_end").GetInt64();
-
-                    var periodStart = DateTimeOffset.FromUnixTimeSeconds(periodStartUnix).UtcDateTime;
-                    var periodEnd = DateTimeOffset.FromUnixTimeSeconds(periodEndUnix).UtcDateTime;
-
-                    var subscription = await _repository.GetByStripeCustomerIdAsync(customerId, cancellationToken);
-                    if (subscription != null)
-                    {
-                        subscription.RenewPeriod(periodStart, periodEnd);
-
-                        if (subscription.Status == SubscriptionStatus.Suspended ||
-                            subscription.Status == SubscriptionStatus.Cancelled ||
-                            subscription.Status == SubscriptionStatus.PastDue ||
-                            subscription.Status == SubscriptionStatus.Incomplete)
-                        {
-                            subscription.Activate(subscriptionId, periodStart, periodEnd);
-                        }
-                        _repository.Update(subscription);
-                    }
-                    break;
-                }
-
-            case "invoice.payment_failed":
-                {
-                    var customerId = dataObject.GetProperty("customer").GetString() ?? string.Empty;
-                    var subscription = await _repository.GetByStripeCustomerIdAsync(customerId, cancellationToken);
-                    if (subscription != null)
-                    {
-                        if (subscription.Status == SubscriptionStatus.PastDue)
-                        {
-                            subscription.Suspend();
-                        }
-                        else if (subscription.Status == SubscriptionStatus.Active || subscription.Status == SubscriptionStatus.Trialing)
-                        {
-                            subscription.MarkPastDue();
-                        }
-                        _repository.Update(subscription);
-                    }
-                    break;
-                }
-
-            case "customer.subscription.deleted":
-                {
-                    var customerId = dataObject.GetProperty("customer").GetString() ?? string.Empty;
-                    var subscription = await _repository.GetByStripeCustomerIdAsync(customerId, cancellationToken);
-                    if (subscription != null)
-                    {
-                        // H8 / RN-013: a deleted Stripe subscription is a cancellation, not a suspension.
-                        if (subscription.Status != SubscriptionStatus.Cancelled)
-                        {
-                            subscription.Cancel();
-                        }
-                        _repository.Update(subscription);
-                    }
-                    break;
-                }
+            return Result.Success();
         }
 
-        return Result.Success();
-    }
-
-    private static void UpdateAggregateStatus(DealerSubscription aggregate, string stripeStatus, string stripeSubscriptionId, DateTime? trialEndsAt, DateTime start, DateTime end)
-    {
-        switch (stripeStatus)
-        {
-            case "active":
-                if (aggregate.Status != SubscriptionStatus.Active)
-                {
-                    aggregate.Activate(stripeSubscriptionId, start, end);
-                }
-                break;
-            case "trialing":
-                // A pending (Incomplete) row only leaves its blocked state when Stripe confirms the
-                // trial; otherwise the dealer would stay behind the 402 gate forever.
-                if (aggregate.Status == SubscriptionStatus.Incomplete)
-                {
-                    aggregate.StartTrial(stripeSubscriptionId, trialEndsAt, start, end);
-                }
-                break;
-            case "past_due":
-            case "incomplete":
-                if (aggregate.Status != SubscriptionStatus.PastDue)
-                {
-                    aggregate.MarkPastDue();
-                }
-                break;
-            case "unpaid":
-                if (aggregate.Status != SubscriptionStatus.Suspended)
-                {
-                    aggregate.Suspend();
-                }
-                break;
-            case "canceled":
-            case "incomplete_expired":
-                if (aggregate.Status != SubscriptionStatus.Cancelled)
-                {
-                    aggregate.Cancel();
-                }
-                break;
-        }
+        return await _sender.Send(new ApplyBillingEventCommand(billingEvent), cancellationToken);
     }
 }

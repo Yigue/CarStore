@@ -28,6 +28,11 @@ public class NoOpSubscriptionGateway : ISubscriptionGateway
         return Task.CompletedTask;
     }
 
+    public Task UpdateCustomerEmailAsync(string stripeCustomerId, string email, CancellationToken ct = default)
+    {
+        return Task.CompletedTask;
+    }
+
     public Task<ExternalSubscription?> FindSubscriptionForDealerAsync(Guid dealerId, CancellationToken ct = default)
     {
         return Task.FromResult<ExternalSubscription?>(null);

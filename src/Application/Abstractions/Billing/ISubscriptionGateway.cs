@@ -32,6 +32,10 @@ public interface ISubscriptionGateway
     Task CancelNowAsync(string stripeSubscriptionId,
         CancellationToken ct = default);
 
+    /// <summary>Updates the billing email of the provider customer (invoices and dunning go there). Idempotent.</summary>
+    Task UpdateCustomerEmailAsync(string stripeCustomerId, string email,
+        CancellationToken ct = default);
+
     /// <summary>Creates a Stripe customer for a new dealer. Idempotent on StripeCustomerId.</summary>
     Task<string> CreateCustomerAsync(Guid dealerId, string email,
         CancellationToken ct = default);

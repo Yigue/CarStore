@@ -19,6 +19,12 @@ public sealed class DealerSubscription : Entity
     public DateTime? CancelledAt { get; private set; }
     public string PlanId { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// RN-023: provider timestamp (Stripe <c>evt.created</c>) of the newest state event applied to this row.
+    /// Null until the first provider event is applied.
+    /// </summary>
+    public DateTime? LastProviderEventAtUtc { get; private set; }
+
     public static DealerSubscription Create(
         Guid dealerId,
         string? stripeCustomerId,
@@ -60,6 +66,21 @@ public sealed class DealerSubscription : Entity
         };
         subscription.SetDealer(dealerId);
         return subscription;
+    }
+
+    /// <summary>
+    /// RN-023: registers a provider state event. Returns false (and changes nothing) when the event is
+    /// older than the newest one already applied; an event with the same timestamp is accepted.
+    /// </summary>
+    public bool TryRegisterProviderEvent(DateTime occurredAtUtc)
+    {
+        if (LastProviderEventAtUtc.HasValue && occurredAtUtc < LastProviderEventAtUtc.Value)
+        {
+            return false;
+        }
+
+        LastProviderEventAtUtc = occurredAtUtc;
+        return true;
     }
 
     /// <summary>Links the Stripe customer to a pending row. An existing link is never overwritten.</summary>

@@ -131,6 +131,15 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
         }
     }
 
+    public async Task UpdateCustomerEmailAsync(string stripeCustomerId, string email, CancellationToken ct = default)
+    {
+        var customerService = new CustomerService(_stripeClient);
+        await customerService.UpdateAsync(
+            stripeCustomerId,
+            new CustomerUpdateOptions { Email = email },
+            cancellationToken: ct);
+    }
+
     public async Task<SubscriptionStatus> GetStatusAsync(string stripeSubscriptionId, CancellationToken ct = default)
     {
         var subscriptionService = new SubscriptionService(_stripeClient);

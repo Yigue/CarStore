@@ -18,7 +18,7 @@ public class StripeSubscriptionGatewayInterfaceContractTests
         var type = typeof(ISubscriptionGateway);
         var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance);
 
-        methods.Should().HaveCount(6);
+        methods.Should().HaveCount(7);
 
         // Method 1: CreateCheckoutSessionAsync
         var m1 = methods.SingleOrDefault(m => m.Name == "CreateCheckoutSessionAsync");
@@ -75,5 +75,15 @@ public class StripeSubscriptionGatewayInterfaceContractTests
         p6.Should().HaveCount(2);
         p6[0].ParameterType.Should().Be<string>(); // stripeSubscriptionId
         p6[1].ParameterType.Should().Be<CancellationToken>();
+
+        // Method 7 (sfc A2.1, ADR C14): UpdateCustomerEmailAsync — keeps the provider billing email in sync.
+        var m7 = methods.SingleOrDefault(m => m.Name == "UpdateCustomerEmailAsync");
+        m7.Should().NotBeNull();
+        m7!.ReturnType.Should().Be<Task>();
+        var p7 = m7.GetParameters();
+        p7.Should().HaveCount(3);
+        p7[0].ParameterType.Should().Be<string>(); // stripeCustomerId
+        p7[1].ParameterType.Should().Be<string>(); // email
+        p7[2].ParameterType.Should().Be<CancellationToken>();
     }
 }

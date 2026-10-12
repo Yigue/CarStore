@@ -84,6 +84,9 @@ public static class DependencyInjection
             services.AddScoped<ISubscriptionGateway, NoOpSubscriptionGateway>();
         }
 
+        // Pure translation (no I/O): needed even when billing is disabled so queued events can still be applied.
+        services.AddSingleton<IBillingEventTranslator, StripeBillingEventTranslator>();
+
         services.AddScoped<ISubscriptionStatusCache, RedisSubscriptionStatusCache>();
         // Short-TTL (30s) cache over the lifecycle read: the guard hits it on every authenticated request.
         // IMemoryCache is a singleton, so invalidation from the retention handler reaches every scoped reader.

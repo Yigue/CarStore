@@ -20,7 +20,7 @@ public class StripeWebhookIncompleteRowTests
 
     public StripeWebhookIncompleteRowTests()
     {
-        _handler = new HandleStripeWebhookCommandHandler(_repo.Object);
+        _handler = WebhookPipeline.Create(_repo.Object);
     }
 
     private static string SubscriptionEvent(string type, string status, string customerId, Guid dealerId) => $@"{{

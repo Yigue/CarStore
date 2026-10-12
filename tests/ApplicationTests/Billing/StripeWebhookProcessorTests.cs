@@ -18,7 +18,7 @@ public class StripeWebhookProcessorTests
     public StripeWebhookProcessorTests()
     {
         _repositoryMock = new Mock<IDealerSubscriptionRepository>();
-        _handler = new HandleStripeWebhookCommandHandler(_repositoryMock.Object);
+        _handler = WebhookPipeline.Create(_repositoryMock.Object);
     }
 
     [Fact]
