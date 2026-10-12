@@ -9,6 +9,7 @@ using Domain.Sales;
 using Domain.Sales.Attributes;
 using Domain.Sales.Events;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -23,6 +24,26 @@ public class VoidSaleCommandHandlerTests
     private static TestApplicationDbContext CreateContext() =>
         new(new DbContextOptionsBuilder<TestApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+
+    private sealed class ThrowingSaveInterceptor : SaveChangesInterceptor
+    {
+        public bool Armed { get; set; }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default) =>
+            Armed ? throw new InvalidOperationException("boom") : base.SavingChangesAsync(eventData, result, cancellationToken);
+    }
+
+    private static async Task<(Sale Sale, Car Car)> SeedCompletedSaleAsync(TestApplicationDbContext context, Car? car = null)
+    {
+        car ??= NewSoldCar();
+        context.Cars.Add(car);
+        Sale sale = NewSale(car.Id);
+        sale.Complete();
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+        return (sale, car);
+    }
 
     private static VoidSaleCommandHandler CreateHandler(TestApplicationDbContext context, Guid? dealerId = null)
     {
@@ -45,15 +66,13 @@ public class VoidSaleCommandHandlerTests
     public async Task Handle_Should_VoidCompletedSale_And_TakeActorFromTenantUserContext()
     {
         using var context = CreateContext();
-        Sale sale = NewSale(Guid.NewGuid());
-        sale.Complete();
-        context.Sales.Add(sale);
-        await context.SaveChangesAsync();
+        (Sale sale, Car car) = await SeedCompletedSaleAsync(context);
 
         var result = await CreateHandler(context).Handle(new VoidSaleCommand(sale.Id, "Cliente desistió"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         sale.Status.Should().Be(SaleStatus.Voided);
+        car.ServiceCar.Should().Be(StatusServiceCar.Disponible);
         sale.DomainEvents.OfType<SaleVoidedDomainEvent>().Single().ActorId.Should().Be(ActorId);
     }
 
@@ -103,36 +122,107 @@ public class VoidSaleCommandHandlerTests
     }
 
     [Fact]
-    public async Task SaleVoidedEvent_Should_RevertCarToDisponible()
+    public async Task Handle_Should_RevertCarAndVoidSale_InOneSave()
     {
-        using var context = CreateContext();
-        Car car = NewSoldCar();
-        context.Cars.Add(car);
-        await context.SaveChangesAsync();
-        var handler = new SaleVoidedDomainEventHandler(context, new FakeDateTimeProvider(),
-            NullLogger<SaleVoidedDomainEventHandler>.Instance);
+        var interceptor = new CountingSaveInterceptor();
+        using var context = new TestApplicationDbContext(new DbContextOptionsBuilder<TestApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).AddInterceptors(interceptor).Options);
+        (Sale sale, Car car) = await SeedCompletedSaleAsync(context);
+        interceptor.Count = 0;
 
-        await handler.Handle(new SaleVoidedDomainEvent(Guid.NewGuid(), car.Id, "motivo", ActorId, DateTime.UtcNow),
-            CancellationToken.None);
+        var result = await CreateHandler(context).Handle(new VoidSaleCommand(sale.Id, "x"), CancellationToken.None);
 
+        result.IsSuccess.Should().BeTrue();
+        interceptor.Count.Should().Be(1);
+        sale.Status.Should().Be(SaleStatus.Voided);
         car.ServiceCar.Should().Be(StatusServiceCar.Disponible);
     }
 
+    private sealed class CountingSaveInterceptor : SaveChangesInterceptor
+    {
+        public int Count { get; set; }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            Count++;
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
     [Fact]
-    public async Task SaleVoidedEvent_Should_NotThrow_When_CarIsNotSold()
+    public async Task Handle_Should_ChangeNeitherSaleNorCar_When_SaveFails()
+    {
+        var interceptor = new ThrowingSaveInterceptor();
+        string dbName = Guid.NewGuid().ToString();
+        var options = new DbContextOptionsBuilder<TestApplicationDbContext>()
+            .UseInMemoryDatabase(dbName).AddInterceptors(interceptor).Options;
+        Guid saleId, carId;
+        using (var seed = new TestApplicationDbContext(options))
+        {
+            (Sale s, Car c) = await SeedCompletedSaleAsync(seed);
+            saleId = s.Id;
+            carId = c.Id;
+        }
+
+        using (var context = new TestApplicationDbContext(options))
+        {
+            interceptor.Armed = true;
+            Func<Task> act = () => CreateHandler(context).Handle(new VoidSaleCommand(saleId, "x"), CancellationToken.None);
+            await act.Should().ThrowAsync<InvalidOperationException>();
+        }
+
+        interceptor.Armed = false;
+        using var verify = new TestApplicationDbContext(options);
+        (await verify.Sales.SingleAsync(s => s.Id == saleId)).Status.Should().Be(SaleStatus.Completed);
+        (await verify.Cars.SingleAsync(c => c.Id == carId)).ServiceCar.Should().Be(StatusServiceCar.Vendido);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_AndKeepSaleCompleted_When_CarIsMissing()
+    {
+        using var context = CreateContext();
+        Sale sale = NewSale(Guid.NewGuid());
+        sale.Complete();
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var result = await CreateHandler(context).Handle(new VoidSaleCommand(sale.Id, "x"), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(CarErrors.NotFound(sale.CarId));
+        context.ChangeTracker.Clear();
+        (await context.Sales.SingleAsync(s => s.Id == sale.Id)).Status.Should().Be(SaleStatus.Completed);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_AndKeepSaleCompleted_When_CarIsNotSold()
     {
         using var context = CreateContext();
         Car car = NewSoldCar();
         car.MarkAsAvailable(DateTime.UtcNow);
+        (Sale sale, _) = await SeedCompletedSaleAsync(context, car);
+
+        var result = await CreateHandler(context).Handle(new VoidSaleCommand(sale.Id, "x"), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(CarErrors.NotSold(car.Id));
+        context.ChangeTracker.Clear();
+        (await context.Sales.SingleAsync(s => s.Id == sale.Id)).Status.Should().Be(SaleStatus.Completed);
+    }
+
+    [Fact]
+    public async Task SaleVoidedEvent_Should_NotTouchTheCar_BecauseTheHandlerAlreadyRevertedIt()
+    {
+        using var context = CreateContext();
+        Car car = NewSoldCar();
         context.Cars.Add(car);
         await context.SaveChangesAsync();
-        var handler = new SaleVoidedDomainEventHandler(context, new FakeDateTimeProvider(),
-            NullLogger<SaleVoidedDomainEventHandler>.Instance);
+        var handler = new SaleVoidedDomainEventHandler(NullLogger<SaleVoidedDomainEventHandler>.Instance);
 
-        Func<Task> act = () => handler.Handle(
-            new SaleVoidedDomainEvent(Guid.NewGuid(), car.Id, "motivo", ActorId, DateTime.UtcNow), CancellationToken.None);
+        await handler.Handle(new SaleVoidedDomainEvent(Guid.NewGuid(), car.Id, "motivo", ActorId, DateTime.UtcNow),
+            CancellationToken.None);
 
-        await act.Should().NotThrowAsync();
-        car.ServiceCar.Should().Be(StatusServiceCar.Disponible);
+        car.ServiceCar.Should().Be(StatusServiceCar.Vendido);
     }
 }
