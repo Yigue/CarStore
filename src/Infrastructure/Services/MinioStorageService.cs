@@ -134,6 +134,30 @@ internal sealed class MinioStorageService : IStorageService
         }
     }
 
+    public async Task<byte[]?> ReadHeadAsync(string objectKey, int count, CancellationToken ct)
+    {
+        using var head = new MemoryStream(count);
+        try
+        {
+            var args = new GetObjectArgs()
+                .WithBucket(_options.BucketName)
+                .WithObject(objectKey)
+                .WithOffsetAndLength(0, count)
+                .WithCallbackStream((source, token) => source.CopyToAsync(head, token));
+
+            await _client.GetObjectAsync(args, ct);
+            return head.ToArray();
+        }
+        catch (ObjectNotFoundException)
+        {
+            return null;
+        }
+        catch (MinioException ex) when (IsNoSuchKey(ex))
+        {
+            return null;
+        }
+    }
+
     public async Task<Uri> GetPresignedUrlAsync(string objectKey, TimeSpan ttl, CancellationToken ct)
     {
         var args = new PresignedGetObjectArgs()

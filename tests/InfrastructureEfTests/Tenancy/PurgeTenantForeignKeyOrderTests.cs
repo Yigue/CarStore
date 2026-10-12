@@ -57,6 +57,7 @@ public class PurgeTenantForeignKeyOrderTests
         public Task DeleteFileAsync(string objectKey, CancellationToken ct) { Deleted.Add(objectKey); return Task.CompletedTask; }
         public Task<Uri> GetPresignedUrlAsync(string objectKey, TimeSpan ttl, CancellationToken ct) => Task.FromResult(new Uri("https://x.test"));
         public Task<Stream?> OpenReadAsync(string objectKey, CancellationToken ct) => Task.FromResult<Stream?>(null);
+        public Task<byte[]?> ReadHeadAsync(string objectKey, int count, CancellationToken ct) => Task.FromResult<byte[]?>(null);
         public Task<(string Url, IReadOnlyDictionary<string, string> Fields)> GeneratePresignedPostAsync(string objectKey, string contentType, TimeSpan ttl, CancellationToken ct) =>
             Task.FromResult<(string, IReadOnlyDictionary<string, string>)>(("", new Dictionary<string, string>()));
     }
@@ -67,6 +68,7 @@ public class PurgeTenantForeignKeyOrderTests
         public Task DeleteFileAsync(string objectKey, CancellationToken ct) => throw new InvalidOperationException("storage down");
         public Task<Uri> GetPresignedUrlAsync(string objectKey, TimeSpan ttl, CancellationToken ct) => Task.FromResult(new Uri("https://x.test"));
         public Task<Stream?> OpenReadAsync(string objectKey, CancellationToken ct) => Task.FromResult<Stream?>(null);
+        public Task<byte[]?> ReadHeadAsync(string objectKey, int count, CancellationToken ct) => Task.FromResult<byte[]?>(null);
         public Task<(string Url, IReadOnlyDictionary<string, string> Fields)> GeneratePresignedPostAsync(string objectKey, string contentType, TimeSpan ttl, CancellationToken ct) =>
             Task.FromResult<(string, IReadOnlyDictionary<string, string>)>(("", new Dictionary<string, string>()));
     }

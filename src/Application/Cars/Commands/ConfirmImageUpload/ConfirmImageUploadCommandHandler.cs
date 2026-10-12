@@ -4,6 +4,7 @@ using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
 using Application.Cars.Commands.UploadCarImage;
 using Application.Cars.Queries.GetCarImages;
+using Application.Common.Files;
 using Domain.Cars;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -55,8 +56,15 @@ internal sealed class ConfirmImageUploadCommandHandler(
         if (string.IsNullOrEmpty(ext)) ext = "jpg";
         string objectKey = $"{tenant.DealerId}/{car.Id}/{command.ImageId}.{ext}";
 
-        // We assume the file is already in storage because the client uploaded it.
-        // In a more robust system, we would verify its existence here.
+        // The declared Content-Type is client-controlled: verify the real signature of the stored
+        // object (A5.1 / H11) and discard it when it is missing or not a supported image.
+        byte[]? head = await storage.ReadHeadAsync(objectKey, FileSignatureInspector.HeadLength, cancellationToken);
+        if (head is null || !FileSignatureInspector.IsSupportedImage(head))
+        {
+            await storage.DeleteFileAsync(objectKey, cancellationToken);
+            return Result.Failure<CarImageDto>(
+                Error.Validation("CarImage.InvalidSignature", "The uploaded file is not a valid JPEG, PNG or WebP image."));
+        }
 
         int nextOrder = car.Images.Count == 0
             ? 0

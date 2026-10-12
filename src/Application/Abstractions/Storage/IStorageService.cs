@@ -67,4 +67,13 @@ public interface IStorageService
         string contentType,
         TimeSpan ttl,
         CancellationToken ct);
+
+    /// <summary>
+    /// Reads up to <paramref name="count"/> leading bytes of the object (used for magic-byte checks).
+    /// Returns <c>null</c> when the object does not exist.
+    /// </summary>
+    Task<byte[]?> ReadHeadAsync(
+        string objectKey,
+        int count,
+        CancellationToken ct);
 }
