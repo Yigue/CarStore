@@ -5,4 +5,4 @@ namespace Application.Reports.GetFinancialReport;
 public sealed record GetFinancialReportQuery(
     DateTime From,
     DateTime To,
-    ReportGroupBy GroupBy) : IQuery<FinancialReportDto>;
+    ReportGroupBy GroupBy) : IQuery<FinancialReportDto>, IReportRangeQuery;
