@@ -7,5 +7,6 @@ internal static class Permissions
     internal const string SalesUpdate = "sales:update";
     internal const string SalesDelete = "sales:delete";
     internal const string SalesCancel = "sales:cancel";
+    internal const string SalesVoid = "sales:void";
 }
 

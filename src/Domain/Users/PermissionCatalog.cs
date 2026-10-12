@@ -72,6 +72,7 @@ public static class PermissionCatalog
         new("sales:update", ModuleSales, "Editar ventas"),
         new("sales:delete", ModuleSales, "Eliminar ventas"),
         new("sales:cancel", ModuleSales, "Cancelar ventas"),
+        new("sales:void", ModuleSales, "Anular ventas completadas"),
 
         // ── Finanzas ─────────────────────────────────────────────────────────────────────────
         new("financial:read", ModuleFinance, "Ver los movimientos financieros"),
