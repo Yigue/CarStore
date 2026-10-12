@@ -3,6 +3,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars;
 using Domain.Cars.Attributes;
+using Domain.Sales.Attributes;
 using Domain.Shared.ValueObjects;
 using Application.Abstractions.Caching;
 using Microsoft.EntityFrameworkCore;
@@ -61,6 +62,16 @@ internal sealed class UpdateCarCommandHandler(
         Modelo modelo = await context.Modelo
             .SingleAsync(m => m.Id == command.Modelo, cancellationToken);
 
+        // RN-006 (sfc B1.1): a sold car with a Completed sale only returns to circulation through
+        // POST /sales/{id}/void. Checked before UpdateDetails, which assigns ServiceCar directly.
+        if (car.ServiceCar == StatusServiceCar.Vendido
+            && command.ServiceCar is not (StatusServiceCar.Vendido or StatusServiceCar.Entregado)
+            && await context.Sales.AnyAsync(
+                s => s.CarId == car.Id && s.Status == SaleStatus.Completed, cancellationToken))
+        {
+            return Result.Failure<Guid>(CarErrors.SaleActiveBlocksStatusChange(car.Id));
+        }
+
         // Update properties that need to be public for EF Core
         // Update properties that need to be public for EF Core
         car.UpdateDetails(
@@ -89,16 +100,6 @@ internal sealed class UpdateCarCommandHandler(
             car.UpdatePrice(command.Price, dateTimeProvider.UtcNow);
         }
         
-        // Handle service status changes using domain methods
-        if (command.ServiceCar == StatusServiceCar.Vendido && car.ServiceCar != StatusServiceCar.Vendido)
-        {
-            car.MarkAsSold(dateTimeProvider.UtcNow);
-        }
-        else if (command.ServiceCar == StatusServiceCar.Disponible && car.ServiceCar != StatusServiceCar.Disponible)
-        {
-            car.MarkAsAvailable(dateTimeProvider.UtcNow);
-        }
-
         // INV-01: the cover travels with the rest of the vehicle's data.
         //
         // Until now the only way to reassign it was PATCH cars/{id}/images/{imageId}/cover, a

@@ -200,7 +200,7 @@ public class VoidSaleCommandHandlerTests
     {
         using var context = CreateContext();
         Car car = NewSoldCar();
-        car.MarkAsAvailable(DateTime.UtcNow);
+        car.RevertSale(Guid.NewGuid(), DateTime.UtcNow);
         (Sale sale, _) = await SeedCompletedSaleAsync(context, car);
 
         var result = await CreateHandler(context).Handle(new VoidSaleCommand(sale.Id, "x"), CancellationToken.None);

@@ -160,7 +160,7 @@ public sealed class Car : Entity
         Raise(new CarSoldDomainEvent(Id));
     }
     
-    public void MarkAsAvailable(DateTime updatedAt)
+    internal void MarkAsAvailable(DateTime updatedAt)
     {
         if (ServiceCar == StatusServiceCar.Disponible)
             return;

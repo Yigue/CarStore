@@ -51,7 +51,7 @@ internal sealed class SaleCancelledDomainEventHandler(
         }
 
         // Release the car
-        car.MarkAsAvailable(dateTimeProvider.UtcNow);
+        car.Release(dateTimeProvider.UtcNow);
         
         // Save changes.
         await context.SaveChangesAsync(cancellationToken);

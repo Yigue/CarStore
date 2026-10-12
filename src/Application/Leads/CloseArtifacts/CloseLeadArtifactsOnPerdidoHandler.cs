@@ -169,7 +169,7 @@ internal sealed class CloseLeadArtifactsOnPerdidoHandler(
                 continue;
             }
 
-            car.MarkAsAvailable(nowUtc);
+            car.Release(nowUtc);
         }
     }
 }

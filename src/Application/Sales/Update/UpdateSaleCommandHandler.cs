@@ -120,6 +120,6 @@ internal sealed class UpdateSaleCommandHandler(
             .IgnoreQueryFiltersForTenant(tenantService)
             .FirstOrDefaultAsync(c => c.Id == carId, cancellationToken);
 
-        car?.MarkAsAvailable(dateTimeProvider.UtcNow);
+        car?.Release(dateTimeProvider.UtcNow);
     }
 }
