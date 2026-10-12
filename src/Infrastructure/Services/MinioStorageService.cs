@@ -160,10 +160,27 @@ internal sealed class MinioStorageService : IStorageService
 
     public async Task<Uri> GetPresignedUrlAsync(string objectKey, TimeSpan ttl, CancellationToken ct)
     {
+        // Never let the client-declared type decide how the browser interprets the bytes: the response
+        // type comes from the key extension (which confirm verified against the file signature), and
+        // anything unrecognised is forced to download as an opaque binary.
+        // S3/MinIO has no response-* override for X-Content-Type-Options, so nosniff cannot be set here.
+        (string responseType, string disposition) = Path.GetExtension(objectKey).TrimStart('.').ToLowerInvariant() switch
+        {
+            "jpg" or "jpeg" => ("image/jpeg", "inline"),
+            "png" => ("image/png", "inline"),
+            "webp" => ("image/webp", "inline"),
+            _ => ("application/octet-stream", "attachment"),
+        };
+
         var args = new PresignedGetObjectArgs()
             .WithBucket(_options.BucketName)
             .WithObject(objectKey)
-            .WithExpiry((int)ttl.TotalSeconds);
+            .WithExpiry((int)ttl.TotalSeconds)
+            .WithHeaders(new Dictionary<string, string>
+            {
+                ["response-content-type"] = responseType,
+                ["response-content-disposition"] = disposition,
+            });
 
         string presigned = await _client.PresignedGetObjectAsync(args);
 

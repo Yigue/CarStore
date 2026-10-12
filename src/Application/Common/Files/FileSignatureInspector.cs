@@ -22,4 +22,40 @@ public static class FileSignatureInspector
         head.StartsWith(JpegSignature)
         || head.StartsWith(PngSignature)
         || (head.Length >= 12 && head.StartsWith(RiffSignature) && head.Slice(8, 4).SequenceEqual(WebpSignature));
+
+    /// <summary>
+    /// Content type derived from the file signature (<c>image/jpeg</c>, <c>image/png</c>, <c>image/webp</c>),
+    /// or null when the bytes are not a supported image. Only the leading bytes are inspected: content
+    /// after the signature (e.g. a polyglot carrying HTML/SVG) is NOT scanned.
+    /// </summary>
+    public static string? Detect(ReadOnlySpan<byte> head)
+    {
+        if (head.StartsWith(JpegSignature))
+        {
+            return "image/jpeg";
+        }
+
+        if (head.StartsWith(PngSignature))
+        {
+            return "image/png";
+        }
+
+        if (head.Length >= 12 && head.StartsWith(RiffSignature) && head.Slice(8, 4).SequenceEqual(WebpSignature))
+        {
+            return "image/webp";
+        }
+
+        return null;
+    }
+
+    /// <summary>True when <paramref name="extension"/> (no dot, any case) is valid for the detected type.</summary>
+    public static bool IsExtensionCompatible(string detectedContentType, string extension) =>
+        detectedContentType switch
+        {
+            "image/jpeg" => extension.Equals("jpg", StringComparison.OrdinalIgnoreCase)
+                            || extension.Equals("jpeg", StringComparison.OrdinalIgnoreCase),
+            "image/png" => extension.Equals("png", StringComparison.OrdinalIgnoreCase),
+            "image/webp" => extension.Equals("webp", StringComparison.OrdinalIgnoreCase),
+            _ => false,
+        };
 }

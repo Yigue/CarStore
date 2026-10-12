@@ -55,7 +55,27 @@ public class FileSignatureInspectorTests
     }
 
     [Fact]
-    public async Task Confirm_Should_Accept_PngBytes_DeclaredAsJpeg()
+    public void Detect_Should_ReturnTypeFromSignature()
+    {
+        FileSignatureInspector.Detect(Jpeg).Should().Be("image/jpeg");
+        FileSignatureInspector.Detect(Png).Should().Be("image/png");
+        FileSignatureInspector.Detect(Webp).Should().Be("image/webp");
+        FileSignatureInspector.Detect(Exe).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("image/jpeg", "jpg", true)]
+    [InlineData("image/jpeg", "JPEG", true)]
+    [InlineData("image/png", "png", true)]
+    [InlineData("image/webp", "webp", true)]
+    [InlineData("image/png", "jpg", false)]
+    [InlineData("image/jpeg", "html", false)]
+    [InlineData("image/jpeg", "svg", false)]
+    public void IsExtensionCompatible_Should_MatchDetectedType(string type, string ext, bool expected) =>
+        FileSignatureInspector.IsExtensionCompatible(type, ext).Should().Be(expected);
+
+    [Fact]
+    public async Task Confirm_Should_RejectAndDelete_WhenPngBytesAreDeclaredAsJpeg()
     {
         var (handler, storage, car) = await ArrangeAsync(Png);
 
@@ -63,7 +83,49 @@ public class FileSignatureInspectorTests
             new ConfirmImageUploadCommand(car.Id, Guid.NewGuid(), "photo.jpg", "image/jpeg", 2048),
             CancellationToken.None);
 
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("CarImage.InvalidSignature");
+        storage.Verify(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Confirm_Should_RejectAndDelete_WhenDeclaredHtmlButBytesAreJpeg()
+    {
+        var (handler, storage, car) = await ArrangeAsync(Jpeg);
+
+        var result = await handler.Handle(
+            new ConfirmImageUploadCommand(car.Id, Guid.NewGuid(), "photo.jpg", "text/html", 2048),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Validation);
+    }
+
+    [Fact]
+    public async Task Confirm_Should_RejectAndDelete_WhenPngKeyHasJpgExtension()
+    {
+        var (handler, storage, car) = await ArrangeAsync(Png);
+
+        var result = await handler.Handle(
+            new ConfirmImageUploadCommand(car.Id, Guid.NewGuid(), "photo.jpg", "image/png", 2048),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("CarImage.InvalidSignature");
+        storage.Verify(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Confirm_Should_StoreDetectedContentType_WhenEverythingAgrees()
+    {
+        var (handler, storage, car) = await ArrangeAsync(Png);
+
+        var result = await handler.Handle(
+            new ConfirmImageUploadCommand(car.Id, Guid.NewGuid(), "photo.PNG", "IMAGE/PNG", 2048),
+            CancellationToken.None);
+
         result.IsSuccess.Should().BeTrue();
+        car.Images.Single().ContentType.Should().Be("image/png");
         storage.Verify(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
