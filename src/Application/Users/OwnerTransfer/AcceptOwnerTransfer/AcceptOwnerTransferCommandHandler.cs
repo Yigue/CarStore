@@ -8,6 +8,7 @@ using Application.Users.Verification;
 using Domain.Platform;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
 using DealerSettingsEntity = Domain.DealerSettings.DealerSettings;
@@ -30,6 +31,9 @@ internal sealed class AcceptOwnerTransferCommandHandler(
     ILogger<AcceptOwnerTransferCommandHandler> logger)
     : ICommandHandler<AcceptOwnerTransferCommand>
 {
+    // Provider name ends with "PostgreSQL"; matched by suffix because Application must not reference the driver name.
+    private const string PostgresProviderSuffix = "EntityFrameworkCore.PostgreSQL";
+
     public async Task<Result> Handle(AcceptOwnerTransferCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.Token))
@@ -60,9 +64,34 @@ internal sealed class AcceptOwnerTransferCommandHandler(
         if (recipient is null || !await OwnerTransferEligibility.IsEligibleAsync(context, recipient, dealerId, cancellationToken))
             return Result.Failure(OwnerTransferErrors.TargetNotEligible);
 
-        // Atomic single use: of N concurrent accepts exactly one gets rowcount = 1.
+        // Everything above is a fast path and is NOT trusted for the write. The authoritative re-check, the consume, the
+        // swap, the audit and the save run in ONE transaction (relational providers only; InMemory has no transactions).
+        DbContext? db = context as DbContext;
+        await using IDbContextTransaction? transaction = db is not null && db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        // Row lock on dealer_settings (PostgreSQL only; SQLite serializes writers on its own, InMemory has no lock at all,
+        // where the re-check below still runs but concurrent accepts are not serialized). It serializes concurrent
+        // accepts and owner changes for this dealer: the loser blocks here and then sees the new owner in the re-check.
+        if (db is not null && db.Database.ProviderName?.EndsWith(PostgresProviderSuffix, StringComparison.Ordinal) == true)
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM dealer_settings WHERE dealer_id = {dealerId} FOR UPDATE", cancellationToken);
+        }
+
+        // Fresh read of the row under the lock: a copy already tracked by this context would be returned stale.
+        foreach (DealerSettingsEntity stale in context.DealerSettings.Local.Where(d => d.DealerId == dealerId).ToList())
+            context.DetachEntity(stale);
+
+        dealer = await context.DealerSettings.FirstOrDefaultAsync(d => d.DealerId == dealerId, cancellationToken);
+        if (dealer?.OwnerUserId is null || token.CreatedBy != dealer.OwnerUserId)
+            return await RefuseAsync(transaction, OwnerTransferErrors.InvalidToken, cancellationToken);
+
+        // Atomic single use: of N concurrent accepts exactly one gets rowcount = 1. It also re-validates expiry and
+        // consumption against the database. If anything below fails, the rollback leaves the token pending.
         if (!await context.TryConsumeUserActionTokenAsync(token.Id, now, cancellationToken))
-            return Result.Failure(OwnerTransferErrors.InvalidToken);
+            return await RefuseAsync(transaction, OwnerTransferErrors.InvalidToken, cancellationToken);
 
         Guid formerOwnerId = dealer.OwnerUserId.Value;
         string? formerEmail = (await context.Users
@@ -83,6 +112,9 @@ internal sealed class AcceptOwnerTransferCommandHandler(
             cancellationToken: cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
 
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
+
         // Best effort: the swap is already committed, and a provider outage must not undo it.
         if (!string.IsNullOrWhiteSpace(dealer.StripeCustomerId))
         {
@@ -97,5 +129,12 @@ internal sealed class AcceptOwnerTransferCommandHandler(
         }
 
         return Result.Success();
+    }
+
+    private static async Task<Result> RefuseAsync(IDbContextTransaction? transaction, Error error, CancellationToken cancellationToken)
+    {
+        if (transaction is not null)
+            await transaction.RollbackAsync(cancellationToken);
+        return Result.Failure(error);
     }
 }
