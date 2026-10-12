@@ -25,6 +25,7 @@ internal sealed class BillingHandlerTestDb : IDisposable
     public DealerSettings Settings { get; private set; } = null!;
     public DealerSubscription Subscription { get; private set; } = null!;
     public User Owner { get; private set; } = null!;
+    public User NewerAdmin { get; private set; } = null!;
 
     public BillingHandlerTestDb()
     {
@@ -40,8 +41,12 @@ internal sealed class BillingHandlerTestDb : IDisposable
         Db.Database.EnsureCreated();
     }
 
-    /// <summary>Dealer with settings, an Admin role, an owner (oldest Admin), a newer Admin and a Seller; active subscription.</summary>
-    public async Task SeedAsync(string? billingEmail = null, string status = "active", string ownerFirstName = "Marta")
+    /// <summary>
+    /// Dealer with settings, an Admin role, an owner (oldest Admin), a newer Admin and a Seller; active subscription.
+    /// <paramref name="ownerMode"/>: <c>"oldest"</c> (default) sets <c>OwnerUserId</c> to the first Admin, <c>"newer"</c> to the
+    /// second one, <c>"none"</c> leaves it null (legacy row that was never backfilled).
+    /// </summary>
+    public async Task SeedAsync(string? billingEmail = null, string status = "active", string ownerFirstName = "Marta", string ownerMode = "oldest")
     {
         Settings = new DealerSettings(DealerId, "Autos del Sur", "contacto@autosdelsur.test");
         Settings.SetBillingEmail(billingEmail);
@@ -57,8 +62,14 @@ internal sealed class BillingHandlerTestDb : IDisposable
         await Db.SaveChangesAsync();
         await Task.Delay(30);
 
-        Db.Users.Add(new User(DealerId, "newer-admin@autosdelsur.test", "Pablo", "Ruiz", "hash", adminRole.Id));
+        NewerAdmin = new User(DealerId, "newer-admin@autosdelsur.test", "Pablo", "Ruiz", "hash", adminRole.Id);
+        Db.Users.Add(NewerAdmin);
         Db.Users.Add(new User(DealerId, "seller@autosdelsur.test", "Sofia", "Paz", "hash", sellerRole.Id));
+
+        if (ownerMode == "oldest")
+            Settings.SetOwner(Owner.Id);
+        else if (ownerMode == "newer")
+            Settings.SetOwner(NewerAdmin.Id);
 
         Subscription = DealerSubscription.Create(DealerId, CustomerId, "sub_a22", "price_1");
         if (status == "active")

@@ -30,6 +30,11 @@ internal sealed class DeleteUserCommandHandler(
             return Result.Failure<Guid>(UserErrors.NotFound(command.UserId));
         }
 
+        if (await OwnerGuard.IsOwnerAsync(context, tenantService.DealerId, user.Id, cancellationToken))
+        {
+            return Result.Failure<Guid>(UserErrors.OwnerProtected);
+        }
+
         // Soft-delete: deactivate the user
         user.Deactivate();
 

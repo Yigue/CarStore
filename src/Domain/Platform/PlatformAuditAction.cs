@@ -6,4 +6,5 @@ public enum PlatformAuditAction
     DealerReactivated,
     DealerProvisioned,
     SubscriptionRefunded,
+    OwnerTransferred,
 }

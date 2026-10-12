@@ -32,6 +32,17 @@ public class TenantDeletionRequestTests
         return (factory, client);
     }
 
+    /// <summary>There is no verification backfill: the seeded owner starts unverified, so tests that need it verify it explicitly.</summary>
+    private static async Task VerifyOwnerAsync(CustomWebApplicationFactory factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Guid ownerId = (await db.DealerSettings.IgnoreQueryFilters().SingleAsync(d => d.DealerId == AdminDealer)).OwnerUserId!.Value;
+        var owner = await db.Users.IgnoreQueryFilters().SingleAsync(u => u.Id == ownerId);
+        owner.MarkEmailVerified(DateTime.UtcNow);
+        await db.SaveChangesAsync();
+    }
+
     private static async Task<TenantLifecycleStatus> LifecycleAsync(CustomWebApplicationFactory factory)
     {
         using var scope = factory.Services.CreateScope();
@@ -87,10 +98,24 @@ public class TenantDeletionRequestTests
     }
 
     [Fact]
+    public async Task OwnerWithUnverifiedEmail_Returns403_AndNothingChanges()
+    {
+        var (factory, client) = await CreateHostAsync();
+        await using var _ = factory;
+
+        var response = await client.PostAsJsonAsync("/api/v1/dealer/deletion-request", new { password = "Admin123!", confirmationSlug = Slug });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("TenantDeletion.EmailNotVerified");
+        (await LifecycleAsync(factory)).Should().Be(TenantLifecycleStatus.Active);
+    }
+
+    [Fact]
     public async Task Confirmed_EntersRetention_WithoutDeletingTheAccount()
     {
         var (factory, client) = await CreateHostAsync();
         await using var _ = factory;
+        await VerifyOwnerAsync(factory);
 
         var response = await client.PostAsJsonAsync("/api/v1/dealer/deletion-request", new { password = "Admin123!", confirmationSlug = Slug });
 

@@ -56,7 +56,8 @@ public class DeletionRequestCommandHandlerTests
         new(_context, _tenant.Object, _user.Object, _hasher.Object, _gateway.Object, _cache.Object, _clock.Object,
             new ConfigurationBuilder().AddInMemoryCollection(config ?? new Dictionary<string, string?>()).Build());
 
-    private Domain.DealerSettings.DealerSettings SeedDealer(bool inGrace = false, string? slug = Slug, string roleName = "Admin")
+    private Domain.DealerSettings.DealerSettings SeedDealer(
+        bool inGrace = false, string? slug = Slug, string roleName = "Admin", bool isOwner = true, bool verified = true)
     {
         var dealer = new Domain.DealerSettings.DealerSettings(
             _dealerId, _dealerId, "Autos Sur SA", "owner@autossur.com");
@@ -67,7 +68,13 @@ public class DeletionRequestCommandHandlerTests
         _context.DealerSettings.Add(dealer);
         var role = new Role(_dealerId, roleName, roleName);
         _context.Roles.Add(role);
-        _context.Users.Add(new User(_dealerId, "owner@autossur.com", "Ana", "Owner", "hash", role.Id));
+        var user = new User(_dealerId, "owner@autossur.com", "Ana", "Owner", "hash", role.Id);
+        if (verified)
+            user.MarkEmailVerified(Now.AddDays(-30));
+        _context.Users.Add(user);
+        // sfc C17: the owner is DealerSettings.OwnerUserId, not "whoever has the Admin role".
+        if (isOwner)
+            dealer.SetOwner(user.Id);
         _context.SaveChanges();
         // The user id used by the handler is the one from IUserContext.
         _user.SetupGet(u => u.UserId).Returns(_context.Users.Local.Single().Id);
@@ -143,12 +150,56 @@ public class DeletionRequestCommandHandlerTests
     [Fact]
     public async Task NonOwner_IsForbidden_AndNothingChanges()
     {
-        SeedDealer(roleName: "Vendedor");
+        SeedDealer(roleName: "Vendedor", isOwner: false);
         SeedSubscription();
 
         var result = await Handler().Handle(new RequestTenantDeletionCommand(Password, Slug), CancellationToken.None);
 
         result.Error.Should().Be(TenantDeletionErrors.NotOwner);
+        _gateway.Verify(g => g.CancelNowAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        (await StoredDealerAsync()).LifecycleStatus.Should().Be(TenantLifecycleStatus.Active);
+    }
+
+    [Fact]
+    public async Task AnAdminWhoIsNotTheOwner_IsForbidden_AndNothingChanges()
+    {
+        var dealer = SeedDealer(roleName: "Admin", isOwner: false);
+        dealer.SetOwner(Guid.NewGuid());
+        _context.SaveChanges();
+        SeedSubscription();
+
+        var result = await Handler().Handle(new RequestTenantDeletionCommand(Password, Slug), CancellationToken.None);
+
+        result.Error.Should().Be(TenantDeletionErrors.NotOwner);
+        _gateway.Verify(g => g.CancelNowAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        (await StoredDealerAsync()).LifecycleStatus.Should().Be(TenantLifecycleStatus.Active);
+    }
+
+    [Fact]
+    public async Task DealerWithoutOwnerUserId_FailsClosed_EvenForTheOnlyAdmin()
+    {
+        // Legacy row that was never backfilled: a destructive action must not guess the owner from the role name.
+        SeedDealer(roleName: "Admin", isOwner: false);
+        SeedSubscription();
+
+        var result = await Handler().Handle(new RequestTenantDeletionCommand(Password, Slug), CancellationToken.None);
+
+        result.Error.Should().Be(TenantDeletionErrors.NotOwner);
+        (await StoredDealerAsync()).OwnerUserId.Should().BeNull();
+        (await StoredDealerAsync()).LifecycleStatus.Should().Be(TenantLifecycleStatus.Active);
+    }
+
+    [Fact]
+    public async Task OwnerWithUnverifiedEmail_IsRefused_AndNothingChanges()
+    {
+        // sfc A1.4.2 / RN-030: there is no verification backfill, so existing owners are refused until they verify.
+        SeedDealer(verified: false);
+        SeedSubscription();
+
+        var result = await Handler().Handle(new RequestTenantDeletionCommand(Password, Slug), CancellationToken.None);
+
+        result.Error.Should().Be(TenantDeletionErrors.EmailNotVerified);
+        result.Error.Type.Should().Be(ErrorType.Forbidden);
         _gateway.Verify(g => g.CancelNowAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         (await StoredDealerAsync()).LifecycleStatus.Should().Be(TenantLifecycleStatus.Active);
     }

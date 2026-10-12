@@ -30,6 +30,13 @@ internal sealed class AssignRoleCommandHandler(
             return Result.Failure<Guid>(RoleErrors.NotFound(command.RoleId));
         }
 
+        // sfc A4.3 / C17: the owner keeps its role until the account is transferred.
+        if (user.RoleId != command.RoleId
+            && await OwnerGuard.IsOwnerAsync(context, tenantService.DealerId, user.Id, cancellationToken))
+        {
+            return Result.Failure<Guid>(UserErrors.OwnerProtected);
+        }
+
         user.UpdateRole(command.RoleId);
 
         await context.SaveChangesAsync(cancellationToken);

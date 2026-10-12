@@ -31,6 +31,9 @@ public static class TenantDeletionErrors
     public static readonly Error NotOwner = new(
         "TenantDeletion.NotOwner", "Solo el titular de la cuenta puede solicitar su eliminación.", ErrorType.Forbidden);
 
+    public static readonly Error EmailNotVerified = new(
+        "TenantDeletion.EmailNotVerified", "Verifica tu email antes de solicitar la eliminación de la cuenta.", ErrorType.Forbidden);
+
     public static readonly Error ReauthenticationFailed = new(
         "TenantDeletion.ReauthenticationFailed", "La contraseña no es correcta.", ErrorType.Forbidden);
 
@@ -60,8 +63,6 @@ internal sealed class RequestTenantDeletionCommandHandler(
     IDateTimeProvider clock,
     IConfiguration configuration) : ICommandHandler<RequestTenantDeletionCommand, TenantDeletionResult>
 {
-    private const string AdminRoleName = "Admin";
-
     public async Task<Result<TenantDeletionResult>> Handle(RequestTenantDeletionCommand request, CancellationToken ct)
     {
         Guid dealerId = tenant.DealerId;
@@ -76,12 +77,9 @@ internal sealed class RequestTenantDeletionCommandHandler(
         if (user is null)
             return Result.Failure<TenantDeletionResult>(TenantDeletionErrors.ReauthenticationFailed);
 
-        // There is no explicit owner column yet (sfc C17): the dealer administrator is the owner. The role is read
-        // from the database, not from the JWT "role" claim: with inbound claim mapping on, IUserContext.IsAdmin
-        // (FindFirst("role")) is false for real requests.
-        bool isOwner = await context.Roles
-            .AnyAsync(r => r.Id == user.RoleId && r.DealerId == dealerId && r.Name == AdminRoleName, ct);
-        if (!isOwner)
+        // sfc C17: the owner is DealerSettings.OwnerUserId. A legacy row without owner fails closed: the role name is
+        // never used to guess who may destroy the account.
+        if (dealer.OwnerUserId is null || dealer.OwnerUserId != user.Id)
             return Result.Failure<TenantDeletionResult>(TenantDeletionErrors.NotOwner);
 
         if (!passwordHasher.Verify(request.Password ?? string.Empty, user.PasswordHash))
@@ -94,6 +92,10 @@ internal sealed class RequestTenantDeletionCommandHandler(
 
         if (dealer.LifecycleStatus != TenantLifecycleStatus.Active)
             return Result.Failure<TenantDeletionResult>(TenantDeletionErrors.AlreadyInProgress);
+
+        // sfc A1.4.2 / RN-030: there is no verification backfill; existing owners are refused until they verify.
+        if (!user.IsEmailVerified)
+            return Result.Failure<TenantDeletionResult>(TenantDeletionErrors.EmailNotVerified);
 
         DateTime now = clock.UtcNow;
 

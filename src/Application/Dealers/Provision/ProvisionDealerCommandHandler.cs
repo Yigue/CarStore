@@ -138,6 +138,9 @@ internal sealed class ProvisionDealerCommandHandler(
 
             context.Users.Add(user);
 
+            // sfc A4.3 / C17: the first administrator is the owner from the very first row.
+            settings.SetOwner(user.Id);
+
             legalRecorder.RecordTermsAcceptance(dealerId, user.Id, command.AcceptanceIp, command.AcceptanceUserAgent);
 
             // spr ADR B8: a dealer NEVER exists without a subscription row. It is created in the

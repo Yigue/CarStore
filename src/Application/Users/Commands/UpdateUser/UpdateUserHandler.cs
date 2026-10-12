@@ -30,6 +30,13 @@ internal sealed class UpdateUserCommandHandler(
             return Result.Failure<Guid>(RoleErrors.NotFound(command.RoleId));
         }
 
+        // sfc A4.3 / C17: the owner can be renamed, but not deactivated or moved to another role.
+        if ((user.RoleId != command.RoleId || (!command.IsActive && user.IsActive))
+            && await OwnerGuard.IsOwnerAsync(context, tenantService.DealerId, user.Id, cancellationToken))
+        {
+            return Result.Failure<Guid>(UserErrors.OwnerProtected);
+        }
+
         // Update user properties using domain methods
         user.UpdateName(command.FirstName.Trim(), command.LastName.Trim());
 

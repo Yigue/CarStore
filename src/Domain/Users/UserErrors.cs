@@ -40,6 +40,10 @@ public static class UserErrors
         "Users.SelfDeleteNotAllowed",
         "No puedes eliminar tu propia cuenta");
 
+    public static readonly Error OwnerProtected = Error.Conflict(
+        "Users.OwnerProtected",
+        "El titular de la cuenta no puede desactivarse, eliminarse ni cambiar de rol: transfiere la titularidad primero");
+
     public static readonly Error CannotRevokeOwnPermission = Error.Failure(
         "Users.CannotRevokeOwnPermission",
         "No puedes revocar tus propios permisos de administrador");

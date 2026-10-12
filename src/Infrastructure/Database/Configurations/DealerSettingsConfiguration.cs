@@ -39,6 +39,9 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
         builder.Property(s => s.BillingEmail)
             .HasMaxLength(200);
 
+        // sfc A4.3 / C17: explicit account holder; null only on legacy rows. No FK to users (cross-aggregate, avoids a cycle).
+        builder.Property(s => s.OwnerUserId);
+
         builder.Property(s => s.NotificationsEnabled)
             .HasDefaultValue(true);
 

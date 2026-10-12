@@ -16,13 +16,10 @@ namespace Application.Billing.EventHandlers;
 internal sealed record BillingRecipient(string Email, string? FirstName);
 
 /// <summary>
-/// sfc A2.2: who receives billing emails. The owner is the oldest active Admin of the dealer (there is no explicit
-/// owner column until sfc C17 / A4.3.3), plus the optional <c>DealerSettings.BillingEmail</c>.
+/// sfc A2.2: who receives billing emails. The owner is <c>DealerSettings.OwnerUserId</c> (sfc C17), plus the optional <c>DealerSettings.BillingEmail</c>.
 /// </summary>
 internal static class BillingNotificationSupport
 {
-    private const string AdminRoleName = "Admin";
-
     public static async Task<IReadOnlyList<BillingRecipient>> ResolveRecipientsAsync(
         IApplicationDbContext context,
         Guid dealerId,
@@ -31,14 +28,11 @@ internal static class BillingNotificationSupport
     {
         var recipients = new List<BillingRecipient>();
 
-        // The role is read from the database, not from a JWT claim: webhooks run without any user context.
-        User? owner = await context.Users
-            .Where(u => u.DealerId == dealerId
-                        && u.IsActive
-                        && context.Roles.Any(r => r.Id == u.RoleId && r.DealerId == dealerId && r.Name == AdminRoleName))
-            .OrderBy(u => u.CreatedAt)
-            .ThenBy(u => u.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        // sfc C17: the owner is DealerSettings.OwnerUserId (no role-name guessing). Without it, or when the owner is
+        // inactive, the ContactEmail receives the notification.
+        User? owner = settings?.OwnerUserId is Guid ownerId
+            ? await context.Users.FirstOrDefaultAsync(u => u.Id == ownerId && u.DealerId == dealerId && u.IsActive, cancellationToken)
+            : null;
 
         if (owner is not null)
         {

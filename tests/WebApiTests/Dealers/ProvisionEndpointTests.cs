@@ -49,6 +49,8 @@ public class ProvisionEndpointTests
         settings!.HostName.Should().Be("automotors");
         settings.Id.Should().Be(body.DealerId,
             "the row PK (Id) and the tenant FK (DealerId) must share the same Guid in the provision path");
+        settings.OwnerUserId.Should().Be(body.AdminUserId,
+            "sfc C17: the first administrator is the owner from the very first row");
 
         var user = await context.Users
             .IgnoreQueryFilters()

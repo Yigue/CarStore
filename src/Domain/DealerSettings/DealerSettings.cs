@@ -215,6 +215,21 @@ public sealed class DealerSettings : Entity
     public string? StripeCustomerId { get; private set; }
 
     /// <summary>
+    /// sfc A4.3 / C17: the single account holder (the user who may delete the account, receives billing emails and can
+    /// hand the dealership over). Null only on legacy rows; destructive actions fail closed when it is null.
+    /// </summary>
+    public Guid? OwnerUserId { get; private set; }
+
+    public void SetOwner(Guid userId)
+    {
+        if (userId == Guid.Empty)
+            throw new DomainException("OwnerUserId cannot be empty");
+
+        OwnerUserId = userId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
     /// Postgres xmin concurrency token. Populated by EF Core (Npgsql) from the
     /// xmin system column. Zero on non-Postgres providers (InMemory/SQLite).
     /// </summary>

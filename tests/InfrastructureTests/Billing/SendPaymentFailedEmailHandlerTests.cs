@@ -42,6 +42,27 @@ public class SendPaymentFailedEmailHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task PaymentFailed_GoesToDealerSettingsOwnerUserId_NotToTheOldestAdmin()
+    {
+        // sfc C17 / A4.3: after an owner transfer the owner is not the oldest Admin any more.
+        await _t.SeedAsync(ownerMode: "newer");
+
+        await _handler.Handle(Failed(1), CancellationToken.None);
+
+        _t.Email.Sent.Should().ContainSingle().Which.To.Should().Be("newer-admin@autosdelsur.test");
+    }
+
+    [Fact]
+    public async Task PaymentFailed_WithoutOwnerUserId_FallsBackToContactEmail_NotToAnAdminGuessedByRole()
+    {
+        await _t.SeedAsync(ownerMode: "none");
+
+        await _handler.Handle(Failed(1), CancellationToken.None);
+
+        _t.Email.Sent.Should().ContainSingle().Which.To.Should().Be("contacto@autosdelsur.test");
+    }
+
+    [Fact]
     public async Task PaymentFailed_GoesToOwnerAndBillingEmail()
     {
         await _t.SeedAsync(billingEmail: "facturacion@autosdelsur.test");

@@ -871,6 +871,10 @@ namespace Infrastructure.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("notifications_enabled");
 
+                    b.Property<Guid?>("OwnerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_user_id");
+
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("text")
                         .HasColumnName("phone_number");

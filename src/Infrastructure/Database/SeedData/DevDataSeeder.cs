@@ -210,6 +210,11 @@ internal static class DevDataSeeder
                     var passwordHash = passwordHasher.Hash(seededAdminPassword);
                     var user = new Domain.Users.User(item.DealerId, item.Email, "Admin", item.DealerName, passwordHash, role.Id);
                     context.Users.Add(user);
+                    if (context is ApplicationDbContext ownerDb)
+                    {
+                        // sfc C17: the seeded admin is the dealer owner.
+                        ownerDb.DealerSettings.Local.FirstOrDefault(s => s.DealerId == item.DealerId && s.OwnerUserId is null)?.SetOwner(user.Id);
+                    }
                 }
 
                 var sub = SubscriptionStateSeed.CreateSeededSubscription(item.DealerId, item.Status);
