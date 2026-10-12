@@ -29,6 +29,7 @@ public class OwnerTransferCommandHandlerTests
 {
     private static readonly DateTime Now = new(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc);
     private const string StripeCustomer = "cus_owner";
+    private const string OwnerPassword = "Owner123!";
 
     private readonly Guid _dealerId = Guid.NewGuid();
     private readonly TestApplicationDbContext _context;
@@ -36,6 +37,7 @@ public class OwnerTransferCommandHandlerTests
     private readonly Mock<IUserContext> _user = new();
     private readonly Mock<ISubscriptionGateway> _gateway = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
+    private readonly Mock<IPasswordHasher> _hasher = new();
     private readonly List<(EmailTemplate Template, string Recipient, IReadOnlyDictionary<string, string> Model)> _sent = [];
     private readonly Mock<ITransactionalEmailSender> _email = new();
     private Role _admin = null!;
@@ -52,6 +54,7 @@ public class OwnerTransferCommandHandlerTests
         _tenant.SetupGet(t => t.DealerId).Returns(_dealerId);
         _tenant.SetupGet(t => t.HasTenant).Returns(true);
         _clock.SetupGet(c => c.UtcNow).Returns(Now);
+        _hasher.Setup(h => h.Verify(OwnerPassword, It.IsAny<string>())).Returns(true);
         _email
             .Setup(s => s.SendAsync(It.IsAny<EmailTemplate>(), It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
             .Callback<EmailTemplate, string, IReadOnlyDictionary<string, string>, CancellationToken>((t, r, m, _) => _sent.Add((t, r, m)))
@@ -86,7 +89,7 @@ public class OwnerTransferCommandHandlerTests
     private void ActAs(User user) => _user.SetupGet(u => u.UserId).Returns(user.Id);
 
     private InitiateOwnerTransferCommandHandler Initiate() =>
-        new(_context, _tenant.Object, _user.Object, _email.Object,
+        new(_context, _tenant.Object, _user.Object, _hasher.Object, _email.Object,
             new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Frontend:BaseUrl"] = "https://app.example.com/" }).Build(),
             _clock.Object, NullLogger<InitiateOwnerTransferCommandHandler>.Instance);
 
@@ -114,7 +117,7 @@ public class OwnerTransferCommandHandlerTests
     [Fact]
     public async Task Initiate_ByTheOwner_PersistsOnlyTheHashAndEmailsTheRecipient()
     {
-        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_target.Id), CancellationToken.None);
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_target.Id, OwnerPassword), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         _sent.Should().ContainSingle();
@@ -139,6 +142,36 @@ public class OwnerTransferCommandHandlerTests
         (await StoredDealerAsync()).OwnerUserId.Should().Be(_owner.Id, "nothing changes until the recipient accepts");
     }
 
+    [Theory]
+    [InlineData("wrong-password")]
+    [InlineData("")]
+    public async Task Initiate_WithAWrongOrEmptyPassword_FailsGenericallyWithoutTokenOrEmail(string password)
+    {
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_target.Id, password), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(OwnerTransferErrors.ReauthenticationFailed);
+        (await _context.UserActionTokens.CountAsync()).Should().Be(0);
+        _sent.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Initiate_WithAWrongPasswordForAnUnknownTarget_DoesNotRevealTheTarget()
+    {
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(Guid.NewGuid(), "wrong-password"), CancellationToken.None);
+
+        result.Error.Should().Be(OwnerTransferErrors.ReauthenticationFailed);
+    }
+
+    [Fact]
+    public void Validator_RejectsAnEmptyPassword()
+    {
+        var validator = new InitiateOwnerTransferCommandValidator();
+
+        validator.Validate(new InitiateOwnerTransferCommand(_target.Id, "")).IsValid.Should().BeFalse();
+        validator.Validate(new InitiateOwnerTransferCommand(_target.Id, OwnerPassword)).IsValid.Should().BeTrue();
+    }
+
     [Fact]
     public async Task Initiate_ByAnAdminWhoIsNotTheOwner_IsForbidden()
     {
@@ -146,7 +179,7 @@ public class OwnerTransferCommandHandlerTests
         await _context.SaveChangesAsync();
         ActAs(otherAdmin);
 
-        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_target.Id), CancellationToken.None);
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_target.Id, OwnerPassword), CancellationToken.None);
 
         result.Error.Should().Be(OwnerTransferErrors.NotOwner);
         _sent.Should().BeEmpty();
@@ -160,7 +193,7 @@ public class OwnerTransferCommandHandlerTests
         await _context.SaveChangesAsync();
         ActAs(seller);
 
-        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_target.Id), CancellationToken.None);
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_target.Id, OwnerPassword), CancellationToken.None);
 
         result.Error.Should().Be(OwnerTransferErrors.NotOwner);
         _sent.Should().BeEmpty();
@@ -180,7 +213,7 @@ public class OwnerTransferCommandHandlerTests
         await _context.SaveChangesAsync();
         ActAs(legacyAdmin);
 
-        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(legacyTarget.Id), CancellationToken.None);
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(legacyTarget.Id, OwnerPassword), CancellationToken.None);
 
         result.Error.Should().Be(OwnerTransferErrors.NotOwner);
         _sent.Should().BeEmpty();
@@ -195,7 +228,7 @@ public class OwnerTransferCommandHandlerTests
         User foreign = NewUser(otherDealer, "foreign@otro.com", "Fer", otherRole, verified: true);
         await _context.SaveChangesAsync();
 
-        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(foreign.Id), CancellationToken.None);
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(foreign.Id, OwnerPassword), CancellationToken.None);
 
         result.Error.Type.Should().Be(ErrorType.NotFound);
         _sent.Should().BeEmpty();
@@ -205,7 +238,7 @@ public class OwnerTransferCommandHandlerTests
     [Fact]
     public async Task Initiate_ToAnUnknownUser_Is404()
     {
-        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(Guid.NewGuid()), CancellationToken.None);
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(Guid.NewGuid(), OwnerPassword), CancellationToken.None);
 
         result.Error.Type.Should().Be(ErrorType.NotFound);
         _sent.Should().BeEmpty();
@@ -214,7 +247,7 @@ public class OwnerTransferCommandHandlerTests
     [Fact]
     public async Task Initiate_ToYourself_IsRejected()
     {
-        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_owner.Id), CancellationToken.None);
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_owner.Id, OwnerPassword), CancellationToken.None);
 
         result.Error.Should().Be(OwnerTransferErrors.SameUser);
         _sent.Should().BeEmpty();
@@ -236,7 +269,7 @@ public class OwnerTransferCommandHandlerTests
             target.Deactivate();
         await _context.SaveChangesAsync();
 
-        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(target.Id), CancellationToken.None);
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(target.Id, OwnerPassword), CancellationToken.None);
 
         result.Error.Should().Be(OwnerTransferErrors.TargetNotEligible);
         _sent.Should().BeEmpty();
@@ -250,7 +283,7 @@ public class OwnerTransferCommandHandlerTests
         await _context.SaveChangesAsync();
         string first = await IssueTokenAsync(_target);
 
-        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(second.Id), CancellationToken.None);
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(second.Id, OwnerPassword), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         List<UserActionToken> tokens = await _context.UserActionTokens.ToListAsync();
@@ -266,7 +299,7 @@ public class OwnerTransferCommandHandlerTests
             .Setup(s => s.SendAsync(It.IsAny<EmailTemplate>(), It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("smtp down"));
 
-        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_target.Id), CancellationToken.None);
+        Result result = await Initiate().Handle(new InitiateOwnerTransferCommand(_target.Id, OwnerPassword), CancellationToken.None);
 
         result.Error.Should().Be(OwnerTransferErrors.EmailNotSent);
         (await _context.UserActionTokens.ToListAsync()).Should().OnlyContain(t => !t.IsPending(Now));

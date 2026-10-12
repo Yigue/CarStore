@@ -22,6 +22,7 @@ internal sealed class InitiateOwnerTransferCommandHandler(
     IApplicationDbContext context,
     ICurrentTenantService tenant,
     IUserContext userContext,
+    IPasswordHasher passwordHasher,
     ITransactionalEmailSender emailSender,
     IConfiguration configuration,
     IDateTimeProvider clock,
@@ -39,6 +40,13 @@ internal sealed class InitiateOwnerTransferCommandHandler(
         // Fails closed: a dealer without OwnerUserId has nobody who can start a transfer.
         if (dealer?.OwnerUserId is null || dealer.OwnerUserId != actorId)
             return Result.Failure(OwnerTransferErrors.NotOwner);
+
+        // Re-authentication (same as the account deletion request): a stolen session alone cannot start a transfer.
+        // Checked before the target lookup so a wrong password reveals nothing about the target.
+        User? actor = await context.Users
+            .FirstOrDefaultAsync(u => u.Id == actorId && u.DealerId == dealerId, cancellationToken);
+        if (actor is null || !passwordHasher.Verify(command.Password ?? string.Empty, actor.PasswordHash))
+            return Result.Failure(OwnerTransferErrors.ReauthenticationFailed);
 
         if (command.TargetUserId == actorId)
             return Result.Failure(OwnerTransferErrors.SameUser);

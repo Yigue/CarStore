@@ -20,6 +20,7 @@ public class OwnerTransferEndpointTests
     private static readonly Guid AdminDealer = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
     private const string TargetEmail = "nuevo.owner@carstore.com";
     private const string TargetPassword = "Target123!";
+    private const string AdminPassword = "Admin123!";
     private const string Plain = "owner-transfer-plain-token-for-the-test";
 
     private static async Task<(CustomWebApplicationFactory Factory, HttpClient Client)> CreateHostAsync()
@@ -89,7 +90,7 @@ public class OwnerTransferEndpointTests
         factory.SeedDatabase();
         var client = factory.CreateClient();
 
-        var initiate = await client.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = Guid.NewGuid() });
+        var initiate = await client.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = Guid.NewGuid(), password = AdminPassword });
         var accept = await client.PostAsJsonAsync("/api/v1/dealer/owner-transfer/accept", new { token = Plain });
 
         initiate.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -104,7 +105,7 @@ public class OwnerTransferEndpointTests
         Guid targetId = await SeedAdminAsync(factory);
         Guid? ownerBefore = await OwnerAsync(factory);
 
-        var response = await client.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = targetId });
+        var response = await client.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = targetId, password = AdminPassword });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         using var scope = factory.Services.CreateScope();
@@ -115,6 +116,24 @@ public class OwnerTransferEndpointTests
         (await OwnerAsync(factory)).Should().Be(ownerBefore);
     }
 
+    [Theory]
+    [InlineData("wrong-password")]
+    [InlineData("")]
+    [InlineData(null)]
+    public async Task Initiate_WithAWrongOrMissingPassword_IsRejectedAndStoresNoToken(string? password)
+    {
+        var (factory, client) = await CreateHostAsync();
+        await using var _ = factory;
+        Guid targetId = await SeedAdminAsync(factory);
+
+        var response = await client.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = targetId, password });
+
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Forbidden);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await db.UserActionTokens.CountAsync(t => t.Purpose == UserActionPurpose.OwnerTransfer)).Should().Be(0);
+    }
+
     [Fact]
     public async Task Initiate_ToAUserOfAnotherDealer_Returns404()
     {
@@ -122,7 +141,7 @@ public class OwnerTransferEndpointTests
         await using var _ = factory;
         Guid foreign = await SeedAdminAsync(factory, dealerId: Guid.NewGuid());
 
-        var response = await client.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = foreign });
+        var response = await client.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = foreign, password = AdminPassword });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -135,7 +154,7 @@ public class OwnerTransferEndpointTests
         await SeedAdminAsync(factory);
         var other = await ClientFor(factory, TargetEmail, TargetPassword);
 
-        var response = await other.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = Guid.NewGuid() });
+        var response = await other.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = Guid.NewGuid(), password = AdminPassword });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -157,7 +176,7 @@ public class OwnerTransferEndpointTests
         (await OwnerAsync(factory)).Should().Be(targetId);
 
         // The former owner kept access and is no longer the owner: it cannot start another transfer.
-        var former = await client.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = targetId });
+        var former = await client.PostAsJsonAsync("/api/v1/dealer/owner-transfer", new { targetUserId = targetId, password = AdminPassword });
         former.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 

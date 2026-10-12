@@ -15,7 +15,7 @@ namespace Web.Api.Endpoints.Users;
 /// </summary>
 internal sealed class OwnerTransfer : IEndpoint
 {
-    public sealed record InitiateRequest(Guid TargetUserId);
+    public sealed record InitiateRequest(Guid TargetUserId, string? Password);
 
     public sealed record AcceptRequest(string Token);
 
@@ -26,7 +26,7 @@ internal sealed class OwnerTransfer : IEndpoint
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
-                Result result = await sender.Send(new InitiateOwnerTransferCommand(request.TargetUserId), cancellationToken);
+                Result result = await sender.Send(new InitiateOwnerTransferCommand(request.TargetUserId, request.Password ?? string.Empty), cancellationToken);
 
                 return result.Match(
                     () => Results.Ok(new { message = "Enviamos un email de confirmación al destinatario." }),

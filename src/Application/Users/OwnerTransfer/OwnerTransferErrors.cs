@@ -10,6 +10,9 @@ public static class OwnerTransferErrors
     public static readonly Error TargetNotFound = Error.NotFound(
         "OwnerTransfer.TargetNotFound", "No se encontró el usuario de destino.");
 
+    public static readonly Error ReauthenticationFailed = Error.Forbidden(
+        "OwnerTransfer.ReauthenticationFailed", "La contraseña no es correcta.");
+
     public static readonly Error SameUser = Error.Validation(
         "OwnerTransfer.SameUser", "Ya sos el titular de la cuenta.");
 
