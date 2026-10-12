@@ -118,12 +118,36 @@ public class ProcessStripeWebhooksJob : IJob
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to process outbox Stripe webhook message {MessageId}", message.Id);
+
+                // Fail closed: drop everything this message tracked (idempotency row, subscription state and the
+                // provider-event watermark) so only the failure record below is persisted. Stripe's redelivery of
+                // the same event is then applied instead of being discarded as duplicate or out-of-order.
+                DiscardTrackedChangesExceptOutbox();
+
                 message.ProcessedOnUtc = DateTime.UtcNow;
                 message.Error = ex.ToString();
             }
 
             // Save after each event so subsequent events can query the persisted state
             await _dbContext.SaveChangesAsync(context.CancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Per-message unit of work without a transaction: detaches every tracked entity except the outbox
+    /// messages of the current batch, whose pending bookkeeping must survive. Unlike a full ChangeTracker.Clear()
+    /// it keeps the not-yet-processed messages of the batch attached.
+    /// </summary>
+    private void DiscardTrackedChangesExceptOutbox()
+    {
+        if (_dbContext is not DbContext efContext)
+        {
+            throw new InvalidOperationException("ProcessStripeWebhooksJob requires an EF Core DbContext to discard failed changes.");
+        }
+
+        foreach (var entry in efContext.ChangeTracker.Entries().Where(e => e.Entity is not OutboxMessage).ToList())
+        {
+            entry.State = EntityState.Detached;
         }
     }
 }
