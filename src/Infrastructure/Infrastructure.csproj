@@ -48,6 +48,7 @@
   <ItemGroup>
         <InternalsVisibleTo Include="ArchitectureTests" />
         <InternalsVisibleTo Include="InfrastructureTests" />
+        <InternalsVisibleTo Include="InfrastructureEfTests" />
         <InternalsVisibleTo Include="Application.UnitTests" />
   </ItemGroup>
 

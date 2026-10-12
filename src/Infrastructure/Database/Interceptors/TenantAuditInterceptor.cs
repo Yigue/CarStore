@@ -17,7 +17,7 @@ namespace Infrastructure.Database.Interceptors;
 /// <summary>
 /// sfc B2.2 / ADR C10 / RN-025: for every MODIFIED, allow-listed property it adds a <see cref="DealerAuditLogEntry"/> to the
 /// SAME unit of work (it runs inside <c>SaveChanges</c>, so the entry commits or rolls back with the change). Actor comes
-/// from <see cref="IUserContext"/> (the system actor when there is no signed-in user, e.g. a job), the business reason
+/// from <see cref="IUserContext"/> (the system actor only inside an explicit AsSystem scope; otherwise a missing user fails the save), the business reason
 /// from <see cref="IAuditContext.Reason"/>. Inserts and deletes are not audited here; a change that bypasses the change
 /// tracker (<c>ExecuteUpdate</c>/<c>ExecuteDelete</c>) is invisible to it, which an architecture ratchet forbids.
 /// </summary>
@@ -56,10 +56,38 @@ public sealed class TenantAuditInterceptor(
         return base.SavingChangesAsync(eventData, result, cancellationToken);
     }
 
+    public override int SavedChanges(SaveChangesCompletedEventData eventData, int result)
+    {
+        auditContext.ClearReason();
+        return base.SavedChanges(eventData, result);
+    }
+
+    public override ValueTask<int> SavedChangesAsync(
+        SaveChangesCompletedEventData eventData, int result, CancellationToken cancellationToken = default)
+    {
+        auditContext.ClearReason();
+        return base.SavedChangesAsync(eventData, result, cancellationToken);
+    }
+
+    public override void SaveChangesFailed(DbContextErrorEventData eventData)
+    {
+        auditContext.ClearReason();
+        base.SaveChangesFailed(eventData);
+    }
+
+    public override Task SaveChangesFailedAsync(
+        DbContextErrorEventData eventData, CancellationToken cancellationToken = default)
+    {
+        auditContext.ClearReason();
+        return base.SaveChangesFailedAsync(eventData, cancellationToken);
+    }
+
     private void Capture(DbContext? context)
     {
         if (context is null)
             return;
+
+        GuardAppendOnly(context);
 
         context.ChangeTracker.DetectChanges();
         var changes = new List<(Entity Owner, string Property, string? Old, string? New)>();
@@ -146,15 +174,34 @@ public sealed class TenantAuditInterceptor(
     private static string? FormatOriginal(EntityEntry owned) =>
         $"{FormatAmount((decimal)owned.Property(nameof(Money.Amount)).OriginalValue!)} {owned.Property(nameof(Money.Currency)).OriginalValue}";
 
+    /// <summary>
+    /// The signed-in user when there is one. The system actor ONLY inside an explicit <see cref="IAuditContext.AsSystem"/>
+    /// scope; otherwise a missing user context fails the save instead of recording the write as a system one.
+    /// </summary>
     private Guid ResolveActor()
     {
         try
         {
             return userContext.UserId;
         }
-        catch (ApplicationException)
+        catch (ApplicationException ex)
         {
-            return DealerAuditLogEntry.SystemActorId;
+            if (auditContext.IsSystem)
+                return DealerAuditLogEntry.SystemActorId;
+
+            throw new InvalidOperationException(
+                "An audited change was saved without a user context and outside an explicit system scope "
+                + "(IAuditContext.AsSystem()); refusing to record it as a system write.", ex);
+        }
+    }
+
+    /// <summary>The audit log is append-only: nothing may update or delete an existing entry through the tracker.</summary>
+    private static void GuardAppendOnly(DbContext context)
+    {
+        if (context.ChangeTracker.Entries<DealerAuditLogEntry>()
+            .Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+        {
+            throw new InvalidOperationException("DealerAuditLogEntry is append-only and cannot be modified or deleted.");
         }
     }
 

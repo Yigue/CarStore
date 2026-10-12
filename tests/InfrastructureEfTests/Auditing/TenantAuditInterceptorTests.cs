@@ -49,7 +49,15 @@ public class TenantAuditInterceptorTests
     {
         public string? Reason { get; private set; }
         public string CorrelationId => "corr-1";
+        public bool IsSystem => false;
         public void SetReason(string? reason) => Reason = reason;
+        public void ClearReason() => Reason = null;
+        public IDisposable AsSystem() => throw new NotSupportedException();
+    }
+
+    private sealed class NoUser : IUserContext
+    {
+        public Guid UserId => throw new ApplicationException("User context is unavailable");
     }
 
     private sealed class FakeClock : IDateTimeProvider
@@ -57,12 +65,13 @@ public class TenantAuditInterceptorTests
         public DateTime UtcNow => Now;
     }
 
-    private static ApplicationDbContext NewContext(SqliteConnection connection, FakeAuditContext audit)
+    private static ApplicationDbContext NewContext(
+        SqliteConnection connection, IAuditContext audit, IUserContext? user = null)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(new TenantAuditInterceptor(new FakeUser(), audit, new FakeClock()))
+            .AddInterceptors(new TenantAuditInterceptor(user ?? new FakeUser(), audit, new FakeClock()))
             .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
         return new ApplicationDbContext(options, new NoOpPublisher(), new FakeTenant());
@@ -231,5 +240,129 @@ public class TenantAuditInterceptorTests
         using var connection = new SqliteConnection("Filename=:memory:");
         using var ctx = NewContext(connection, new FakeAuditContext());
         ctx.Model.FindEntityType(typeof(DealerAuditLogEntry))!.GetTableName().Should().Be("dealer_audit_logs");
+    }
+
+    private static Infrastructure.Auditing.AuditContext RealAudit() => new();
+
+    [Fact]
+    public async Task ReasonOfChangeA_DoesNotLeakToChangeB_InALaterSaveOfTheSameContext()
+    {
+        await using var connection = await OpenAsync();
+        await using (var seed = NewContext(connection, new FakeAuditContext()))
+        {
+            seed.Cars.Add(NewCar());
+            await seed.SaveChangesAsync();
+        }
+
+        var audit = RealAudit();
+        await using (var ctx = NewContext(connection, audit))
+        {
+            var car = await ctx.Cars.SingleAsync();
+            audit.SetReason("Razon A");
+            car.UpdatePrice(11000m, Now);
+            await ctx.SaveChangesAsync();
+
+            car.UpdatePrice(12000m, Now);
+            await ctx.SaveChangesAsync();
+        }
+
+        await using var read = NewContext(connection, new FakeAuditContext());
+        var entries = await read.DealerAuditLogs.AsNoTracking().OrderBy(e => e.NewValue).ToListAsync();
+        entries.Should().HaveCount(2);
+        entries.Single(e => e.NewValue == "11000 ARS").Reason.Should().Be("Razon A");
+        entries.Single(e => e.NewValue == "12000 ARS").Reason.Should().BeNull();
+        audit.Reason.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UserWriteWithFailingUserContext_Throws_InsteadOfRecordingTheSystemActor()
+    {
+        await using var connection = await OpenAsync();
+        await using (var seed = NewContext(connection, new FakeAuditContext()))
+        {
+            seed.Cars.Add(NewCar());
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var ctx = NewContext(connection, RealAudit(), new NoUser()))
+        {
+            var car = await ctx.Cars.SingleAsync();
+            car.UpdatePrice(13000m, Now);
+            Func<Task> save = () => ctx.SaveChangesAsync();
+            await save.Should().ThrowAsync<InvalidOperationException>().WithMessage("*system*");
+        }
+
+        await using var read = NewContext(connection, new FakeAuditContext());
+        (await read.DealerAuditLogs.AsNoTracking().CountAsync()).Should().Be(0);
+        (await read.Cars.AsNoTracking().SingleAsync()).Price.Amount.Should().Be(10000m);
+    }
+
+    [Fact]
+    public async Task ExplicitSystemScope_RecordsTheSystemActor_AndEndsWithTheScope()
+    {
+        await using var connection = await OpenAsync();
+        await using (var seed = NewContext(connection, new FakeAuditContext()))
+        {
+            seed.Cars.Add(NewCar());
+            await seed.SaveChangesAsync();
+        }
+
+        var audit = RealAudit();
+        await using (var ctx = NewContext(connection, audit, new NoUser()))
+        {
+            var car = await ctx.Cars.SingleAsync();
+            using (audit.AsSystem())
+            {
+                audit.IsSystem.Should().BeTrue();
+                car.UpdatePrice(14000m, Now);
+                await ctx.SaveChangesAsync();
+            }
+
+            audit.IsSystem.Should().BeFalse();
+            car.UpdatePrice(15000m, Now);
+            Func<Task> save = () => ctx.SaveChangesAsync();
+            await save.Should().ThrowAsync<InvalidOperationException>();
+        }
+
+        await using var read = NewContext(connection, new FakeAuditContext());
+        var entry = await read.DealerAuditLogs.AsNoTracking().SingleAsync();
+        entry.ActorUserId.Should().Be(DealerAuditLogEntry.SystemActorId);
+    }
+
+    [Fact]
+    public void Reason_IsTrimmed_AndEmptyOrOverCapIsRejected()
+    {
+        var audit = RealAudit();
+        audit.SetReason("  motivo  ");
+        audit.Reason.Should().Be("motivo");
+
+        audit.SetReason(new string('x', IAuditContext.MaxReasonLength));
+        audit.Reason!.Length.Should().Be(IAuditContext.MaxReasonLength);
+
+        Action empty = () => audit.SetReason("   ");
+        empty.Should().Throw<ArgumentException>();
+
+        Action tooLong = () => audit.SetReason(new string('x', IAuditContext.MaxReasonLength + 1));
+        tooLong.Should().Throw<ArgumentException>();
+
+        IAuditContext.MaxReasonLength.Should().Be(DealerAuditLogEntry.MaxValueLength);
+    }
+
+    [Fact]
+    public async Task ExistingAuditEntry_CannotBeModifiedOrDeleted()
+    {
+        await using var connection = await OpenAsync();
+        await using (var seed = NewContext(connection, new FakeAuditContext()))
+        {
+            seed.DealerAuditLogs.Add(DealerAuditLogEntry.Record(
+                DealerId, "Car", Guid.NewGuid(), "Price", "1", "2", ActorId, null, "c", Now));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var ctx = NewContext(connection, new FakeAuditContext());
+        var entry = await ctx.DealerAuditLogs.SingleAsync();
+        ctx.DealerAuditLogs.Remove(entry);
+        Func<Task> save = () => ctx.SaveChangesAsync();
+        await save.Should().ThrowAsync<InvalidOperationException>().WithMessage("*append-only*");
     }
 }
