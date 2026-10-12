@@ -240,4 +240,32 @@ public class UpdateSaleCommandHandlerTests
             StatusServiceCar.Reservado,
             "cancelling one draft must not hand back a unit another live sale is holding");
     }
+
+    [Theory]
+    [InlineData(SaleStatus.Pending)]
+    [InlineData(SaleStatus.Cancelled)]
+    [InlineData(SaleStatus.Completed)]
+    public async Task Handle_Should_ReturnConflict_And_KeepSoldCar_When_SaleIsCompleted(SaleStatus target)
+    {
+        using var context = CreateContext();
+        var marca = new Marca("Toyota");
+        var modelo = new Modelo("Corolla", marca.Id);
+        var car = new Car(DealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New,
+            StatusServiceCar.Vendido, 4, 5, 1600, 1000, 2020, "AB123CD", "desc", 10000m, DateTime.UtcNow);
+        context.Marca.Add(marca);
+        context.Modelo.Add(modelo);
+        context.Cars.Add(car);
+        var sale = new Sale(DealerId, car.Id, Guid.NewGuid(), 10000m, PaymentMethod.Cash, "CN-1", "initial", DateTime.UtcNow);
+        sale.Complete();
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var result = await CreateHandler(context).Handle(
+            new UpdateSaleCommand(sale.Id, 999m, PaymentMethod.Cash, target, "CN-3", "y"), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(SalesErrors.CannotEditNonPending(sale.Id));
+        (await context.Sales.FirstAsync(s => s.Id == sale.Id)).Status.Should().Be(SaleStatus.Completed);
+        car.ServiceCar.Should().Be(StatusServiceCar.Vendido);
+    }
 }

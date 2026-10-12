@@ -32,7 +32,7 @@ public static class SalesErrors
 
     public static Error CannotDeleteCompleted(Guid saleId) => Error.Conflict(
         "Sales.CannotDeleteCompleted",
-        $"The sale with Id = '{saleId}' cannot be deleted because it is Completed. Completed sales have a linked financial transaction.");
+        $"The sale with Id = '{saleId}' cannot be deleted because it is Completed. Completed sales have a linked financial transaction and a sold vehicle; void the sale instead.");
 
     public static Error QuoteNotFound(Guid quoteId) => Error.NotFound(
         "Sales.QuoteNotFound",

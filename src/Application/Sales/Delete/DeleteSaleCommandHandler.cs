@@ -44,8 +44,20 @@ internal sealed class DeleteSaleCommandHandler(
         // sale outright — unlike Cancel(), which raises SaleCancelledDomainEvent to
         // release it — bypasses that release. Mirror it here so the car doesn't stay
         // stuck as Reservado with no sale referencing it.
-        Car? car = await context.Cars.FindAsync([sale.CarId], cancellationToken);
-        car?.Release(dateTimeProvider.UtcNow);
+        // Another live sale on the same unit (Pending or Completed) keeps the hold; releasing
+        // here would put that sale's car back on the floor.
+        bool stillHeld = await context.Sales
+            .AnyAsync(
+                s => s.CarId == sale.CarId
+                    && s.Id != sale.Id
+                    && (s.Status == SaleStatus.Pending || s.Status == SaleStatus.Completed),
+                cancellationToken);
+
+        if (!stillHeld)
+        {
+            Car? car = await context.Cars.FindAsync([sale.CarId], cancellationToken);
+            car?.Release(dateTimeProvider.UtcNow);
+        }
 
         context.Sales.Remove(sale);
 
