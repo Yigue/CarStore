@@ -32,6 +32,10 @@ public static class UserErrors
         "Users.InvalidResetToken",
         "El token de recuperación es inválido o ha expirado");
 
+    public static readonly Error InvalidVerificationToken = Error.Problem(
+        "Users.InvalidVerificationToken",
+        "El enlace de verificación es inválido o ha expirado");
+
     public static readonly Error SelfDeleteNotAllowed = Error.Failure(
         "Users.SelfDeleteNotAllowed",
         "No puedes eliminar tu propia cuenta");

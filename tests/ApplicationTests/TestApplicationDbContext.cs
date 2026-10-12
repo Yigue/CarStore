@@ -46,6 +46,20 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<UserActionToken> UserActionTokens => Set<UserActionToken>();
+
+    /// <summary>InMemory has no ExecuteUpdate: mirror the atomic rule through the domain method.</summary>
+    public async Task<bool> TryConsumeUserActionTokenAsync(Guid tokenId, DateTime nowUtc, CancellationToken cancellationToken = default)
+    {
+        UserActionToken? token = await UserActionTokens.FirstOrDefaultAsync(t => t.Id == tokenId, cancellationToken);
+        if (token is null || !token.TryConsume(nowUtc))
+        {
+            return false;
+        }
+
+        await SaveChangesAsync(cancellationToken);
+        return true;
+    }
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<CarImage> CarImages => Set<CarImage>();
     public DbSet<ReconditioningTask> ReconditioningTasks => Set<ReconditioningTask>();

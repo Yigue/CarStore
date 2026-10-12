@@ -1,3 +1,5 @@
+using Application.Users.Verification.ResendVerification;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
@@ -5,9 +7,8 @@ using Web.Api.Infrastructure;
 namespace Web.Api.Endpoints.Users;
 
 /// <summary>
-/// Endpoint stub para reenviar el email de verificación.
-///
-/// TODO: integrar con SMTP y la tabla EmailVerificationTokens.
+/// sfc A4.1 / RN-030: re-sends the verification email. The answer is identical whether the account exists,
+/// is already verified, or the email could not be sent (no account enumeration).
 /// </summary>
 internal sealed class ResendVerification : IEndpoint
 {
@@ -15,20 +16,14 @@ internal sealed class ResendVerification : IEndpoint
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("users/resend-verification", (
+        app.MapPost("users/resend-verification", async (
             [FromBody] Request request,
-            ILoggerFactory loggerFactory) =>
+            ISender sender,
+            CancellationToken cancellationToken) =>
         {
-            var logger = loggerFactory.CreateLogger("ResendVerification");
-            logger.LogInformation(
-                "Reenvío de verificación solicitado para {Email}. STUB: aún no se envía email.",
-                request.Email);
+            await sender.Send(new ResendVerificationCommand(request.Email), cancellationToken);
 
-            return Results.Ok(new
-            {
-                message = "Si la cuenta existe y no está verificada, te reenviaremos el email.",
-                stub = true
-            });
+            return Results.Ok(new { message = "Si la cuenta existe y no está verificada, te reenviaremos el email." });
         })
         .WithTags(Tags.Users)
         .WithName("ResendVerification")

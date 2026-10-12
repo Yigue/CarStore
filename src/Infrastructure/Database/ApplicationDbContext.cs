@@ -51,6 +51,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Role> Roles { get; set; }
     public DbSet<RolePermission> RolePermissions { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+    public DbSet<UserActionToken> UserActionTokens { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
     public DbSet<CarImage> CarImages { get; set; }
     public DbSet<ReconditioningTask> ReconditioningTasks { get; set; }
@@ -218,6 +219,15 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         optionsBuilder.ConfigureWarnings(warnings =>
             warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)
                     .Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    }
+
+    public async Task<bool> TryConsumeUserActionTokenAsync(Guid tokenId, DateTime nowUtc, CancellationToken cancellationToken = default)
+    {
+        int rows = await UserActionTokens
+            .Where(t => t.Id == tokenId && t.ConsumedAtUtc == null && t.ExpiresAtUtc > nowUtc)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.ConsumedAtUtc, (DateTime?)nowUtc), cancellationToken);
+
+        return rows == 1;
     }
 
     public void DetachEntity(object entity)

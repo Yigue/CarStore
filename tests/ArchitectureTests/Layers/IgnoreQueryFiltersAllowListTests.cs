@@ -29,6 +29,8 @@ public class IgnoreQueryFiltersAllowListTests
         "Users/Register/",
         "Users/ResetPassword/",
         "Users/ChangePassword/",
+        // sfc A4.1: anonymous email verification; the token (looked up by SHA-256) identifies the user.
+        "Users/Verification/",
         // Outbox handlers run with no tenant context (HasTenant == false).
         "Sales/Events/",
         "Leads/CloseArtifacts/",

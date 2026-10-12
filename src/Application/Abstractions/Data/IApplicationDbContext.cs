@@ -33,6 +33,7 @@ public interface IApplicationDbContext
     DbSet<Role> Roles { get; }
     DbSet<RolePermission> RolePermissions { get; }
     DbSet<PasswordResetToken> PasswordResetTokens { get; }
+    DbSet<UserActionToken> UserActionTokens { get; }
     DbSet<OutboxMessage> OutboxMessages { get; }
     DbSet<CarImage> CarImages { get; }
     DbSet<ReconditioningTask> ReconditioningTasks { get; }
@@ -54,6 +55,12 @@ public interface IApplicationDbContext
     DbSet<WebhookSubscription> WebhookSubscriptions { get; }
     DbSet<WebhookDelivery> WebhookDeliveries { get; }
     DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; }
+
+    /// <summary>
+    /// Atomic single use of an action token: <c>UPDATE ... SET consumed_at = @now WHERE id = @id AND consumed_at IS NULL
+    /// AND expires_at &gt; @now</c>. True only for the one caller that sees rowcount = 1.
+    /// </summary>
+    Task<bool> TryConsumeUserActionTokenAsync(Guid tokenId, DateTime nowUtc, CancellationToken cancellationToken = default);
 
     void DetachEntity(object entity);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

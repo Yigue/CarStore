@@ -69,6 +69,11 @@ public sealed class User : Entity
     public string? Phone { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    /// <summary>sfc A4.1 / RN-030: when the user proved control of the address. Null = not verified.</summary>
+    public DateTime? EmailVerifiedAtUtc { get; private set; }
+
+    public bool IsEmailVerified => EmailVerifiedAtUtc is not null;
+
     /// <summary>
     /// Indicates whether the user is a platform-level SuperAdmin.
     /// SuperAdmin users are defined exclusively by DealerId == Guid.Empty.
@@ -85,6 +90,12 @@ public sealed class User : Entity
             throw new DomainException("Password hash cannot be empty");
 
         PasswordHash = passwordHash;
+    }
+
+    /// <summary>Idempotent: the first verification timestamp is kept.</summary>
+    public void MarkEmailVerified(DateTime nowUtc)
+    {
+        EmailVerifiedAtUtc ??= nowUtc;
     }
 
     public void UpdatePhone(string? phone)
