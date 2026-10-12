@@ -38,24 +38,35 @@ internal sealed class ResendVerificationCommandHandler(
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => (string)u.Email == email.Value && u.IsActive, cancellationToken);
 
-        if (user is null || user.IsEmailVerified || user.IsPlatformAdmin)
-        {
-            return Result.Success();
-        }
-
+        // Timing side channel (sfc A4.1): every branch below does the same lookups, the same token generation and
+        // hashing, and the same SaveChanges call, so the handler's cost does not reveal whether the account exists.
+        // The email send is not equalized and stays slower for real accounts (see residual risk in the change notes).
+        bool canIssue = user is not null && !user.IsEmailVerified && !user.IsPlatformAdmin;
         DateTime now = DateTime.UtcNow;
-        string address = user.Email.Value;
+        string address = user?.Email.Value ?? email.Value;
 
-        List<UserActionToken> pending = await context.UserActionTokens
+        DbSet<UserActionToken> tokens = context.UserActionTokens;
+        List<UserActionToken> pending = await tokens
             .Where(t => t.Purpose == UserActionPurpose.EmailVerification && t.ConsumedAtUtc == null
                 && t.Email == address)
             .ToListAsync(cancellationToken);
 
         string secret = UserActionTokenHasher.NewToken();
-        context.UserActionTokens.Add(UserActionToken.Issue(
-            pending, UserActionPurpose.EmailVerification, user.DealerId, address,
-            UserActionTokenHasher.Hash(secret), user.Id, null, null, now));
+        string secretHash = UserActionTokenHasher.Hash(secret);
+        if (canIssue)
+        {
+            tokens.Add(UserActionToken.Issue(
+                pending, UserActionPurpose.EmailVerification, user!.DealerId, address,
+                secretHash, user.Id, null, null, now));
+        }
+
+        // With nothing tracked this is a no-op for unknown or non-verifiable accounts; it is still called on every path.
         await context.SaveChangesAsync(cancellationToken);
+
+        if (!canIssue)
+        {
+            return Result.Success();
+        }
 
         string baseUrl = (configuration["Frontend:BaseUrl"] ?? "https://carstore-app.com").TrimEnd('/');
         try
@@ -65,7 +76,7 @@ internal sealed class ResendVerificationCommandHandler(
                 address,
                 new Dictionary<string, string>
                 {
-                    ["Name"] = user.FirstName,
+                    ["Name"] = user!.FirstName,
                     ["VerifyUrl"] = $"{baseUrl}/verificar?token={secret}",
                     ["ExpiresInHours"] = UserActionToken.LifetimeOf(UserActionPurpose.EmailVerification).TotalHours.ToString("0")
                 },
@@ -74,7 +85,7 @@ internal sealed class ResendVerificationCommandHandler(
         catch (Exception ex)
         {
             // Swallowed on purpose: surfacing a transport error would reveal that the account exists.
-            logger.LogError(ex, "Could not send the verification email for user {UserId}", user.Id);
+            logger.LogError(ex, "Could not send the verification email for user {UserId}", user!.Id);
         }
 
         return Result.Success();

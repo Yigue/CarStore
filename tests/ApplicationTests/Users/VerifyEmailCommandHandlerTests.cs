@@ -1,3 +1,4 @@
+using Application.Abstractions.Data;
 using Application.Abstractions.Email;
 using Application.UnitTests;
 using Application.Users.Verification;
@@ -44,7 +45,7 @@ public class VerifyEmailCommandHandlerTests
         }
     }
 
-    private static ResendVerificationCommandHandler CreateResend(TestApplicationDbContext context, CapturedEmail email)
+    private static ResendVerificationCommandHandler CreateResend(IApplicationDbContext context, CapturedEmail email)
     {
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Frontend:BaseUrl"] = "https://app.example.com/" })
@@ -148,6 +149,86 @@ public class VerifyEmailCommandHandlerTests
         Result result = await CreateResend(context, email).Handle(new ResendVerificationCommand("ana@test.com"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue("a transport error must not reveal that the account exists");
+    }
+
+    /// <summary>
+    /// Counts how often a handler touches each table set and calls SaveChanges. Each set access is one query
+    /// round-trip in the handler, so this compares the database work done per scenario.
+    /// </summary>
+    private sealed class WorkCounter
+    {
+        public int Queries { get; set; }
+        public int Saves { get; set; }
+    }
+
+    private static async Task<(Result Result, int Queries, int Saves, CapturedEmail Email)> ResendCountingAsync(
+        string databaseName, string address, bool transportFails = false)
+    {
+        var counter = new WorkCounter();
+        var options = new DbContextOptionsBuilder<TestApplicationDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+        using var real = new TestApplicationDbContext(options);
+        var context = new Mock<IApplicationDbContext>();
+        context.Setup(c => c.Users).Returns(() => { counter.Queries++; return real.Users; });
+        context.Setup(c => c.UserActionTokens).Returns(() => { counter.Queries++; return real.UserActionTokens; });
+        context.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns<CancellationToken>(ct => { counter.Saves++; return real.SaveChangesAsync(ct); });
+        var email = new CapturedEmail();
+        if (transportFails)
+        {
+            email.Mock.Setup(s => s.SendAsync(It.IsAny<EmailTemplate>(), It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("smtp down"));
+        }
+
+        Result result = await CreateResend(context.Object, email).Handle(new ResendVerificationCommand(address), CancellationToken.None);
+        return (result, counter.Queries, counter.Saves, email);
+    }
+
+    [Fact]
+    public async Task Resend_DoesTheSameDatabaseWorkForUnknownVerifiableAndVerifiedAccounts()
+    {
+        string db = Guid.NewGuid().ToString();
+        var seedOptions = new DbContextOptionsBuilder<TestApplicationDbContext>().UseInMemoryDatabase(db).Options;
+        using (var seed = new TestApplicationDbContext(seedOptions))
+        {
+            await SeedUserAsync(seed, "ana@test.com");
+            User verified = await SeedUserAsync(seed, "verified@test.com");
+            verified.MarkEmailVerified(DateTime.UtcNow);
+            await seed.SaveChangesAsync();
+        }
+
+        var unknown = await ResendCountingAsync(db, "nadie@test.com");
+        var verifiable = await ResendCountingAsync(db, "ana@test.com");
+        var alreadyVerified = await ResendCountingAsync(db, "verified@test.com");
+
+        verifiable.Queries.Should().BeGreaterThan(0);
+        unknown.Queries.Should().Be(verifiable.Queries, "an unknown email must cost the same reads as a verifiable one");
+        alreadyVerified.Queries.Should().Be(verifiable.Queries);
+        unknown.Saves.Should().Be(verifiable.Saves);
+        alreadyVerified.Saves.Should().Be(verifiable.Saves);
+        unknown.Result.Should().BeEquivalentTo(verifiable.Result);
+        alreadyVerified.Result.Should().BeEquivalentTo(verifiable.Result);
+        unknown.Email.Sent.Should().BeEmpty();
+        alreadyVerified.Email.Sent.Should().BeEmpty();
+        verifiable.Email.Sent.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Resend_TransportFailureLeavesTheResultIdenticalToTheUnknownAccountResult()
+    {
+        string db = Guid.NewGuid().ToString();
+        var seedOptions = new DbContextOptionsBuilder<TestApplicationDbContext>().UseInMemoryDatabase(db).Options;
+        using (var seed = new TestApplicationDbContext(seedOptions))
+        {
+            await SeedUserAsync(seed);
+        }
+
+        var failing = await ResendCountingAsync(db, "ana@test.com", transportFails: true);
+        var unknown = await ResendCountingAsync(db, "nadie@test.com");
+
+        failing.Result.Should().BeEquivalentTo(unknown.Result);
+        failing.Queries.Should().Be(unknown.Queries);
     }
 
     [Fact]
