@@ -171,4 +171,42 @@ public class ChargeRefundedHandlerTests : IDisposable
         await _t.Db.SaveChangesAsync();
         (await _t.Db.BillingRefundRecords.CountAsync()).Should().Be(1);
     }
+
+    [Fact]
+    public async Task Email_HtmlEncodesOwnerFirstName()
+    {
+        await _t.SeedAsync(ownerFirstName: "<img src=x onerror=alert(1)>");
+
+        await _handler.Handle(Refund(5000, 1250), CancellationToken.None);
+
+        var body = _t.Email.Sent.Single().Body;
+        body.Should().Contain("&lt;img").And.NotContain("<img");
+    }
+
+    [Fact]
+    public async Task Email_HtmlEncodesCurrency()
+    {
+        await _t.SeedAsync();
+
+        await _handler.Handle(
+            new ChargeRefunded("evt_c", T1, BillingHandlerTestDb.CustomerId, "ch_1", "in_1", 5000, 1250, "<b>&", null),
+            CancellationToken.None);
+
+        var body = _t.Email.Sent.Single().Body;
+        body.Should().Contain("&lt;B&gt;&amp;").And.NotContain("<B>");
+    }
+
+    [Fact]
+    public async Task Email_LeavesNormalNamesAndFixedSpanishTextUnchanged()
+    {
+        await _t.SeedAsync(ownerFirstName: "María");
+
+        await _handler.Handle(Refund(5000, 1250), CancellationToken.None);
+
+        _t.Email.Sent.Single().Body.Should().Be(
+            "Hola María,\n\n" +
+            "Registramos un reembolso parcial de 12,50 USD sobre el pago de la suscripción de tu concesionaria.\n\n" +
+            "El importe se acredita según los plazos de tu medio de pago. Si no esperabas este reembolso, escribinos.\n\n" +
+            "Equipo CarStore");
+    }
 }

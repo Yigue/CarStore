@@ -15,12 +15,14 @@ public class SendPaymentFailedEmailHandlerTests : IDisposable
     private readonly BillingHandlerTestDb _t = new();
     private readonly SendPaymentFailedEmailHandler _handler;
 
-    public SendPaymentFailedEmailHandlerTests()
+    public SendPaymentFailedEmailHandlerTests() => _handler = HandlerWithBaseUrl("https://app.test/");
+
+    private SendPaymentFailedEmailHandler HandlerWithBaseUrl(string baseUrl)
     {
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Frontend:BaseUrl"] = "https://app.test/" })
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Frontend:BaseUrl"] = baseUrl })
             .Build();
-        _handler = new SendPaymentFailedEmailHandler(
+        return new SendPaymentFailedEmailHandler(
             _t.Db, _t.Email, configuration, BillingHandlerTestLogger.For<SendPaymentFailedEmailHandler>());
     }
 
@@ -116,5 +118,56 @@ public class SendPaymentFailedEmailHandlerTests : IDisposable
         var act = () => _handler.Handle(Failed(1), CancellationToken.None);
 
         await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task PaymentFailed_HtmlEncodesOwnerFirstName()
+    {
+        await _t.SeedAsync(ownerFirstName: "<img src=x onerror=alert(1)>");
+
+        await _handler.Handle(Failed(1), CancellationToken.None);
+
+        _t.Email.Sent.Single().Body.Should().Contain("&lt;img").And.NotContain("<img");
+    }
+
+    [Fact]
+    public async Task TrialWillEnd_HtmlEncodesOwnerFirstName()
+    {
+        await _t.SeedAsync(ownerFirstName: "<script>x</script> & co");
+
+        await _handler.Handle(
+            new TrialWillEnd("evt_t2", T1, BillingHandlerTestDb.CustomerId, "sub_a22", T1.AddDays(3)), CancellationToken.None);
+
+        _t.Email.Sent.Single().Body.Should().Contain("&lt;script&gt;x&lt;/script&gt; &amp; co").And.NotContain("<script>");
+    }
+
+    [Fact]
+    public async Task PortalUrl_IsHtmlEncoded_InBothEmails()
+    {
+        await _t.SeedAsync();
+        var handler = HandlerWithBaseUrl("https://app.test/?a=1&b=<x>");
+
+        await handler.Handle(Failed(1), CancellationToken.None);
+        await handler.Handle(
+            new TrialWillEnd("evt_t3", T1, BillingHandlerTestDb.CustomerId, "sub_a22", T1.AddDays(3)), CancellationToken.None);
+
+        foreach (var mail in _t.Email.Sent)
+        {
+            mail.Body.Should().Contain("https://app.test/?a=1&amp;b=&lt;x&gt;/dashboard/configuracion").And.NotContain("<x>");
+        }
+    }
+
+    [Fact]
+    public async Task NormalNameAndFixedSpanishText_AreUnchanged()
+    {
+        await _t.SeedAsync(ownerFirstName: "María");
+
+        await _handler.Handle(Failed(2), CancellationToken.None);
+
+        _t.Email.Sent.Single().Body.Should().Be(
+            "Hola María,\n\n" +
+            "No pudimos procesar el pago de la suscripción de tu concesionaria (intento 2).\n\n" +
+            "Actualizá tu medio de pago para evitar la interrupción del servicio: https://app.test/dashboard/configuracion\n\n" +
+            "Si ya lo actualizaste, ignorá este mensaje.\n\nEquipo CarStore");
     }
 }

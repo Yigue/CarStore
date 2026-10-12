@@ -76,6 +76,7 @@ internal sealed class ChargeRefundedHandler : INotificationHandler<ChargeRefunde
 
         string kindText = record.Kind == BillingRefundKind.Full ? "total" : "parcial";
         string amountText = BillingNotificationSupport.FormatMoney(record.AmountRefundedMinor, record.Currency);
+        string amountHtml = BillingNotificationSupport.HtmlEncode(amountText);
 
         if (settings is not null)
         {
@@ -97,7 +98,7 @@ internal sealed class ChargeRefundedHandler : INotificationHandler<ChargeRefunde
             _emailService, _logger, recipients,
             $"Registramos un reembolso {kindText} de tu suscripción",
             r => $"{BillingNotificationSupport.Greeting(r)}\n\n" +
-                 $"Registramos un reembolso {kindText} de {amountText} sobre el pago de la suscripción de tu concesionaria.\n\n" +
+                 $"Registramos un reembolso {kindText} de {amountHtml} sobre el pago de la suscripción de tu concesionaria.\n\n" +
                  "El importe se acredita según los plazos de tu medio de pago. Si no esperabas este reembolso, escribinos.\n\n" +
                  "Equipo CarStore",
             cancellationToken);

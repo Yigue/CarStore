@@ -83,8 +83,16 @@ internal static class BillingNotificationSupport
         }
     }
 
+    /// <summary>
+    /// The transport sends the body as HTML (<c>SmtpEmailService</c> uses <c>HtmlBody</c>): every interpolated value must
+    /// go through this. Only the HTML-significant characters are escaped; <c>WebUtility.HtmlEncode</c> would also turn
+    /// accented letters ("María") into numeric entities, which is noise for a Spanish-language email.
+    /// </summary>
+    public static string HtmlEncode(string value) =>
+        value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&#39;");
+
     public static string Greeting(BillingRecipient recipient) =>
-        string.IsNullOrWhiteSpace(recipient.FirstName) ? "Hola," : $"Hola {recipient.FirstName},";
+        string.IsNullOrWhiteSpace(recipient.FirstName) ? "Hola," : $"Hola {HtmlEncode(recipient.FirstName)},";
 
     /// <summary>Minor units to "12,50 USD". Assumes a two-decimal currency (Stripe USD today).</summary>
     public static string FormatMoney(long minorUnits, string currency)

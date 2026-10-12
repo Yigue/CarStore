@@ -53,7 +53,7 @@ public sealed class SendPaymentFailedEmailHandler :
             return;
         }
 
-        string portalUrl = PortalUrl();
+        string portalUrl = BillingNotificationSupport.HtmlEncode(PortalUrl());
         int attempt = Math.Max(1, notification.Attempt);
 
         await BillingNotificationSupport.SendAsync(
@@ -75,8 +75,8 @@ public sealed class SendPaymentFailedEmailHandler :
         }
 
         DateTime endsAt = notification.TrialEndsAtUtc ?? notification.OccurredAtUtc.AddDays(TrialNoticeDays);
-        string endDate = endsAt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
-        string portalUrl = PortalUrl();
+        string endDate = BillingNotificationSupport.HtmlEncode(endsAt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
+        string portalUrl = BillingNotificationSupport.HtmlEncode(PortalUrl());
 
         await BillingNotificationSupport.SendAsync(
             _emailService, _logger, recipients,

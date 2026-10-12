@@ -41,7 +41,7 @@ internal sealed class BillingHandlerTestDb : IDisposable
     }
 
     /// <summary>Dealer with settings, an Admin role, an owner (oldest Admin), a newer Admin and a Seller; active subscription.</summary>
-    public async Task SeedAsync(string? billingEmail = null, string status = "active")
+    public async Task SeedAsync(string? billingEmail = null, string status = "active", string ownerFirstName = "Marta")
     {
         Settings = new DealerSettings(DealerId, "Autos del Sur", "contacto@autosdelsur.test");
         Settings.SetBillingEmail(billingEmail);
@@ -52,7 +52,7 @@ internal sealed class BillingHandlerTestDb : IDisposable
         Db.Roles.AddRange(adminRole, sellerRole);
         await Db.SaveChangesAsync();
 
-        Owner = new User(DealerId, "owner@autosdelsur.test", "Marta", "Gomez", "hash", adminRole.Id);
+        Owner = new User(DealerId, "owner@autosdelsur.test", ownerFirstName, "Gomez", "hash", adminRole.Id);
         Db.Users.Add(Owner);
         await Db.SaveChangesAsync();
         await Task.Delay(30);
