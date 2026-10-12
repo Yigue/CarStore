@@ -1,3 +1,4 @@
+using Application.Abstractions.Auditing;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Tenancy;
 using Application.Sales.Events;
@@ -34,6 +35,16 @@ public class VoidSaleCommandHandlerTests
             Armed ? throw new InvalidOperationException("boom") : base.SavingChangesAsync(eventData, result, cancellationToken);
     }
 
+    private sealed class RecordingSaveInterceptor(List<string> calls) : SaveChangesInterceptor
+    {
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            calls.Add("save");
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
+    }
+
     private static async Task<(Sale Sale, Car Car)> SeedCompletedSaleAsync(TestApplicationDbContext context, Car? car = null)
     {
         car ??= NewSoldCar();
@@ -45,14 +56,14 @@ public class VoidSaleCommandHandlerTests
         return (sale, car);
     }
 
-    private static VoidSaleCommandHandler CreateHandler(TestApplicationDbContext context, Guid? dealerId = null)
+    private static VoidSaleCommandHandler CreateHandler(TestApplicationDbContext context, Guid? dealerId = null, IAuditContext? audit = null)
     {
         var tenant = new Mock<ICurrentTenantService>();
         tenant.SetupGet(t => t.HasTenant).Returns(true);
         tenant.SetupGet(t => t.DealerId).Returns(dealerId ?? DealerId);
         var user = new Mock<IUserContext>();
         user.SetupGet(u => u.UserId).Returns(ActorId);
-        return new VoidSaleCommandHandler(context, user.Object, tenant.Object, new FakeDateTimeProvider());
+        return new VoidSaleCommandHandler(context, user.Object, tenant.Object, new FakeDateTimeProvider(), audit ?? new Mock<IAuditContext>().Object);
     }
 
     private static Car NewSoldCar() => new(DealerId, new Marca("Toyota"), new Modelo("Corolla", Guid.NewGuid()),
@@ -61,6 +72,40 @@ public class VoidSaleCommandHandlerTests
 
     private static Sale NewSale(Guid carId) => new(DealerId, carId, Guid.NewGuid(), 10000m,
         PaymentMethod.Cash, "CN-1", "", DateTime.UtcNow);
+
+    [Fact]
+    public async Task Handle_Should_SetTheBusinessReasonOnTheAuditContext_BeforeTheSingleSave()
+    {
+        // sfc B2.2.4: the void reason reaches TenantAuditInterceptor through IAuditContext, so the Sale.Status audit entry
+        // is written in the same SaveChanges as the void and the car revert.
+        var calls = new List<string>();
+        using var context = new TestApplicationDbContext(new DbContextOptionsBuilder<TestApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).AddInterceptors(new RecordingSaveInterceptor(calls)).Options);
+        (Sale sale, _) = await SeedCompletedSaleAsync(context);
+        calls.Clear();
+        var audit = new Mock<IAuditContext>();
+        audit.Setup(a => a.SetReason(It.IsAny<string?>())).Callback<string?>(r => calls.Add($"reason:{r}"));
+
+        var result = await CreateHandler(context, audit: audit.Object)
+            .Handle(new VoidSaleCommand(sale.Id, "  Cliente desistió "), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        calls.Should().Equal("reason:Sale.Void: Cliente desistió", "save");
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotSetAReason_WhenTheVoidIsRejected()
+    {
+        using var context = CreateContext();
+        (Sale sale, _) = await SeedCompletedSaleAsync(context);
+        var audit = new Mock<IAuditContext>();
+
+        var result = await CreateHandler(context, audit: audit.Object)
+            .Handle(new VoidSaleCommand(sale.Id, "  "), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        audit.Verify(a => a.SetReason(It.IsAny<string?>()), Times.Never);
+    }
 
     [Fact]
     public async Task Handle_Should_VoidCompletedSale_And_TakeActorFromTenantUserContext()

@@ -102,6 +102,76 @@ namespace Infrastructure.Migrations
                     b.ToTable("appointments", "public");
                 });
 
+            modelBuilder.Entity("Domain.Auditing.DealerAuditLogEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("NewValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("new_value");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<string>("OldValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("old_value");
+
+                    b.Property<string>("Property")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("property");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dealer_audit_logs");
+
+                    b.HasIndex("DealerId", "OccurredAtUtc")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_dealer_audit_logs_dealer_id_occurred_at_utc");
+
+                    b.HasIndex("DealerId", "EntityType", "OccurredAtUtc")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_dealer_audit_logs_dealer_id_entity_type_occurred_at_utc");
+
+                    b.ToTable("dealer_audit_logs", "public");
+                });
+
             modelBuilder.Entity("Domain.Billing.BillingReconciliationFlag", b =>
                 {
                     b.Property<Guid>("DealerId")

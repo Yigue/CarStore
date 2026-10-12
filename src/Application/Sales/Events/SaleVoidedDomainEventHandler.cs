@@ -9,9 +9,9 @@ namespace Application.Sales.Events;
 /// transaction (this handler no longer touches the car, so the revert is never applied twice). It stays as the hook for
 /// future listeners.
 /// <para>
-/// PLACEHOLDERS (explicit, not silent): (1) commission annulment is NOT done here, the commission entity belongs
-/// to B4 and does not exist yet; (2) the audit entry is NOT written here, the dealer audit log belongs to B2.2
-/// (B2.2.3/B2.2.4) and does not exist yet. Until then the actor and reason are only in the logs.
+/// PLACEHOLDER (explicit, not silent): commission annulment is NOT done here, the commission entity belongs to B4 and does
+/// not exist yet. The audit entry (sfc B2.2.4) is not written here either: <c>VoidSaleCommandHandler</c> sets the reason on
+/// <c>IAuditContext</c> and <c>TenantAuditInterceptor</c> writes the <c>Sale.Status</c> entry in the same transaction.
 /// </para>
 /// </summary>
 internal sealed class SaleVoidedDomainEventHandler(

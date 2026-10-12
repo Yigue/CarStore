@@ -107,6 +107,8 @@ public class PurgeTenantCommandHandlerTests
         _context.PlatformAuditLogs.Add(PlatformAuditLogEntry.Record(
             dealerId, dealerId, "Autos Sur SA", PlatformAuditAction.DealerProvisioned, Guid.NewGuid(), "a@a.com",
             PlatformAuditActorKind.SuperAdmin, Now, Now, $"evt-{dealerId}"));
+        _context.DealerAuditLogs.Add(Domain.Auditing.DealerAuditLogEntry.Record(
+            dealerId, "Car", Guid.NewGuid(), "Price", "1 ARS", "2 ARS", Guid.NewGuid(), "ajuste", "corr", Now));
         _context.ProcessedStripeEvents.Add(new ProcessedStripeEvent { StripeEventId = $"evt_{dealerId:N}", ProcessedOnUtc = Now, DealerId = dealerId });
         await _context.SaveChangesAsync();
     }
@@ -219,6 +221,8 @@ public class PurgeTenantCommandHandlerTests
         (await _context.DealerSubscriptions.IgnoreQueryFilters().CountAsync(x => x.DealerId == _dealerId)).Should().Be(1);
         (await _context.LegalAcceptances.IgnoreQueryFilters().CountAsync(x => x.DealerId == _dealerId)).Should().Be(1);
         (await _context.PlatformAuditLogs.IgnoreQueryFilters().CountAsync(x => x.DealerId == _dealerId)).Should().Be(1);
+        // sfc B2.2 / RN-025: the dealer audit trail is kept by policy, purge must not delete it.
+        (await _context.DealerAuditLogs.IgnoreQueryFilters().CountAsync(x => x.DealerId == _dealerId)).Should().Be(1);
         (await _context.ProcessedStripeEvents.CountAsync(x => x.DealerId == _dealerId)).Should().Be(1);
     }
 

@@ -53,6 +53,7 @@ internal static class UsersSeeder
             "leads:write", "leads:archive",
             "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
             "admin:backfill",
+            "audit:read",
             "webhooks:manage",
             // qa-p1-integridad PR6 (D7): granted by no role anywhere until now —
             // GET /documents/{id}/download-url has been 403 for every seeded user since it shipped.

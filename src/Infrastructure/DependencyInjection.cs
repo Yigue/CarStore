@@ -270,8 +270,12 @@ public static class DependencyInjection
 
         string? connectionString = configuration.GetConnectionString("Database") ?? throw new ArgumentNullException(nameof(configuration));
 
-services.AddDbContext<ApplicationDbContext>(
-                options => options
+            // sfc B2.2: the interceptor writes the DealerAuditLogEntry rows inside the same SaveChanges.
+            services.AddScoped<Database.Interceptors.TenantAuditInterceptor>();
+
+            services.AddDbContext<ApplicationDbContext>(
+                (serviceProvider, options) => options
+                    .AddInterceptors(serviceProvider.GetRequiredService<Database.Interceptors.TenantAuditInterceptor>())
                     .UseNpgsql(connectionString, npgsqlOptions =>
                     {
                         npgsqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Default);
@@ -366,6 +370,8 @@ services.AddDbContext<ApplicationDbContext>(
 
         services.AddHttpContextAccessor();
         services.AddScoped<IUserContext, UserContext>();
+        // sfc B2.2: carries the business reason of the current scope (also registered when the DB is replaced in tests).
+        services.AddScoped<Application.Abstractions.Auditing.IAuditContext, Auditing.AuditContext>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<ITokenProvider, TokenProvider>();
 

@@ -72,6 +72,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; }
     public DbSet<WebhookDelivery> WebhookDeliveries { get; set; }
     public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; set; }
+    public DbSet<Domain.Auditing.DealerAuditLogEntry> DealerAuditLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -208,6 +209,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<WebhookSubscription>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<WebhookDelivery>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Auditing.DealerAuditLogEntry>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<TransactionCategory>().HasQueryFilter(x =>
             x.DealerId == Guid.Empty || !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
