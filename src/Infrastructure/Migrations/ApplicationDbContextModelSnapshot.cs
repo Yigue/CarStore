@@ -830,6 +830,53 @@ namespace Infrastructure.Migrations
                     b.ToTable("clients", "public");
                 });
 
+            modelBuilder.Entity("Domain.Currency.DealerExchangeRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BaseCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("base_currency")
+                        .IsFixedLength();
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTime>("EffectiveAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_at_utc");
+
+                    b.Property<string>("QuoteCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("quote_currency")
+                        .IsFixedLength();
+
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("rate");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dealer_exchange_rates");
+
+                    b.HasIndex("DealerId", "BaseCurrency", "QuoteCurrency", "EffectiveAtUtc")
+                        .HasDatabaseName("ix_dealer_exchange_rates_dealer_pair_effective");
+
+                    b.ToTable("dealer_exchange_rates", "public");
+                });
+
             modelBuilder.Entity("Domain.DealerSettings.DealerSettings", b =>
                 {
                     b.Property<Guid>("Id")

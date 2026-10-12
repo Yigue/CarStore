@@ -73,6 +73,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<WebhookDelivery> WebhookDeliveries { get; set; }
     public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; set; }
     public DbSet<Domain.Auditing.DealerAuditLogEntry> DealerAuditLogs { get; set; }
+    public DbSet<Domain.Currency.DealerExchangeRate> DealerExchangeRates { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

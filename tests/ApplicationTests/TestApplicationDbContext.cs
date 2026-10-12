@@ -93,6 +93,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
     public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs => Set<Domain.Platform.PlatformAuditLogEntry>();
     public DbSet<Domain.Auditing.DealerAuditLogEntry> DealerAuditLogs => Set<Domain.Auditing.DealerAuditLogEntry>();
+    public DbSet<Domain.Currency.DealerExchangeRate> DealerExchangeRates => Set<Domain.Currency.DealerExchangeRate>();
 
     public void DetachEntity(object entity)
     {
