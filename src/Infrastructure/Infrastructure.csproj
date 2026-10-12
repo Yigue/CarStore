@@ -35,6 +35,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- sfc A2.3: transactional email templates, resolved by enum name (see TransactionalEmailSender). -->
+    <EmbeddedResource Include="Email\Templates\*.html" LogicalName="Email.Templates.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Application\Application.csproj" />
     <ProjectReference Include="..\Domain\Domain.csproj" />
   </ItemGroup>

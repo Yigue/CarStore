@@ -252,6 +252,9 @@ public static class DependencyInjection
                 provider.GetRequiredService<ILogger<NoOpEmailService>>());
         });
 
+        // sfc A2.3 / A18: template catalog on top of the IEmailService transport.
+        services.AddScoped<Application.Abstractions.Email.ITransactionalEmailSender, TransactionalEmail.TransactionalEmailSender>();
+
         return services;
     }
 
