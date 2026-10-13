@@ -73,7 +73,8 @@ public sealed class Car : Entity
         FuelType fuelType = FuelType.Gasolina,
         bool featured = false,
         Transmission transmission = Transmission.Manual,
-        decimal? purchaseCost = null
+        decimal? purchaseCost = null,
+        CurrencyCode? priceCurrency = null
         )
     {
         SetDealer(dealerId);
@@ -96,7 +97,10 @@ public sealed class Car : Entity
         Anio = anio;
         Patente = new LicensePlate(patente);
         Descripcion = descripcion;
-        Price = Money.Of(price, CurrencyCode.Ars);
+        // Phase 1 (sfc B0.2.3): the price currency is explicit when sent; without it the legacy ARS stays.
+        // The purchase cost keeps ARS on purpose: legacy costs are ARS, and a USD price against an ARS cost is exactly
+        // what the currency review (GET dealer/currency-review) exists to surface.
+        Price = Money.Of(price, priceCurrency ?? CurrencyCode.Ars);
 
         if (purchaseCost.HasValue)
             PurchaseCost = Money.Of(purchaseCost.Value, CurrencyCode.Ars);

@@ -5,6 +5,7 @@ using Application.Abstractions.Messaging;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Cars.Events;
+using Domain.Shared.ValueObjects;
 using Domain.Users;
 using Application.Abstractions.Caching;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,18 @@ internal sealed class CreateCarCommandHandler(
 {
     public async Task<Result<Guid>> Handle(CreateCarCommand command, CancellationToken cancellationToken)
     {
+        CurrencyCode? priceCurrency = null;
+        if (command.Currency is not null)
+        {
+            if (!CurrencyCode.TryParse(command.Currency, out CurrencyCode parsed))
+            {
+                return Result.Failure<Guid>(Error.Validation(
+                    "Currency.Unsupported", "Unsupported currency. Supported: ARS, USD."));
+            }
+
+            priceCurrency = parsed;
+        }
+
         // Validate unique license plate before insert within tenant
         var licensePlate = new Domain.Shared.ValueObjects.LicensePlate(command.Patente);
         var existingCar = await context.Cars
@@ -72,7 +85,8 @@ internal sealed class CreateCarCommandHandler(
             command.FuelType,
             command.Featured,
             command.Transmission,
-            command.PurchaseCost
+            command.PurchaseCost,
+            priceCurrency
             );
 
         context.Cars.Add(car);

@@ -21,4 +21,5 @@ public sealed record CreateCarCommand(
     FuelType FuelType = FuelType.Gasolina,
     bool Featured = false,
     Transmission Transmission = Transmission.Manual,
-    decimal? PurchaseCost = null) : ICommand<Guid>;
+    decimal? PurchaseCost = null,
+    string? Currency = null) : ICommand<Guid>;

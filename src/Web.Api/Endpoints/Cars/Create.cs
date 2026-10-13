@@ -30,6 +30,8 @@ internal sealed class Create : IEndpoint
         public bool Featured { get; set; }
         public int Transmission { get; set; }
         public decimal? PurchaseCost { get; set; }
+        // sfc B0.2.3 phase 1: optional; when omitted the price stays ARS. Phase 2 makes it required.
+        public string? Currency { get; set; }
         }
 
         public void MapEndpoint(IEndpointRouteBuilder app)
@@ -54,7 +56,8 @@ internal sealed class Create : IEndpoint
                 (FuelType)request.FuelType,
                 request.Featured,
                 (Transmission)request.Transmission,
-                request.PurchaseCost);
+                request.PurchaseCost,
+                request.Currency);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 
