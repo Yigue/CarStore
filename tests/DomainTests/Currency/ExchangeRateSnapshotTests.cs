@@ -69,6 +69,17 @@ public class ExchangeRateSnapshotTests
         result.IsFailure.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(1_000_000_000_000d)]   // above decimal(18,6) integer digits (12)
+    [InlineData(1.0000001d)]            // more than 6 decimals
+    public void Record_Should_RejectRatesThatDoNotFitTheColumn(double value)
+    {
+        var result = DealerExchangeRate.Record(DealerId, CurrencyCode.Usd, CurrencyCode.Ars, (decimal)value, T0, UserId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Currency.RateOutOfRange");
+    }
+
     [Fact]
     public void Snapshot_Should_NotChange_WhenANewRateIsLoadedLater()
     {

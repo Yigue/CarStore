@@ -213,6 +213,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.Auditing.DealerAuditLogEntry>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Currency.DealerExchangeRate>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<TransactionCategory>().HasQueryFilter(x =>
             x.DealerId == Guid.Empty || !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         // Note: Marca, Modelo, CarImage are shared across tenants (catalog data)

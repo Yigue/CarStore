@@ -16,6 +16,8 @@ public sealed class DealerExchangeRate : Entity
     public DateTime EffectiveAtUtc { get; private set; }
     public Guid CreatedBy { get; private set; }
 
+    private const decimal MaxRate = 999_999_999_999.999999m;
+
     // EF Core
     private DealerExchangeRate() { }
 
@@ -40,6 +42,11 @@ public sealed class DealerExchangeRate : Entity
         if (rate <= 0)
             return Result.Failure<DealerExchangeRate>(Error.Validation(
                 "Currency.RateNotPositive", "Exchange rate must be greater than zero."));
+
+        // Persisted as decimal(18,6): at most 12 integer digits and 6 decimals. Anything wider would fail at insert time.
+        if (rate > MaxRate || decimal.Round(rate, 6) != rate)
+            return Result.Failure<DealerExchangeRate>(Error.Validation(
+                "Currency.RateOutOfRange", "Exchange rate allows at most 12 integer digits and 6 decimals."));
 
         return Result.Success(new DealerExchangeRate(dealerId, baseCurrency, quoteCurrency, rate, effectiveAtUtc, createdBy));
     }
