@@ -91,4 +91,15 @@ public class ExchangeRateSnapshotTests
         snapshot.Rate.Should().Be(1000m);
         snapshot.SourceRateId.Should().Be(original.Id);
     }
+
+    // sfc B1.3: a deposit taken in one currency counts towards a sale in the other, converted with its own snapshot.
+    [Fact]
+    public void Convert_Should_UseTheSnapshotRate_InBothDirections_AndKeepTheSameCurrency()
+    {
+        var snapshot = new ExchangeRateSnapshot("USD", "ARS", 1100m, T0, Guid.NewGuid());
+
+        snapshot.Convert(Money.Of(10m, CurrencyCode.Usd), CurrencyCode.Ars).Should().Be(Money.Of(11_000m, CurrencyCode.Ars));
+        snapshot.Convert(Money.Of(11_000m, CurrencyCode.Ars), CurrencyCode.Usd).Should().Be(Money.Of(10m, CurrencyCode.Usd));
+        snapshot.Convert(Money.Of(5m, CurrencyCode.Usd), CurrencyCode.Usd).Should().Be(Money.Of(5m, CurrencyCode.Usd));
+    }
 }

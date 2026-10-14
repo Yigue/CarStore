@@ -36,6 +36,10 @@ public static class DepositErrors
     public static Error InvalidState(Guid depositId, DepositStatus current) => Error.Conflict(
         "Deposits.InvalidState", $"The deposit '{depositId}' is '{current}' and cannot perform this transition.");
 
+    /// <summary>Spec deposit-management: an Active deposit reserves the car for its buyer only.</summary>
+    public static Error BlocksOtherBuyer(Guid carId) => Error.Conflict(
+        "DEPOSIT_BLOCKS_OTHER_BUYER", $"The vehicle '{carId}' has an active deposit from another buyer.");
+
     public static Error NotFound(Guid depositId) => Error.NotFound(
         "Deposits.NotFound", $"The deposit '{depositId}' was not found.");
 

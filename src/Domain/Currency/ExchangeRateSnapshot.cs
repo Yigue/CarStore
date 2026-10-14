@@ -15,6 +15,24 @@ public sealed record ExchangeRateSnapshot(
     Guid SourceRateId)
 {
     /// <summary>
+    /// Converts an amount between the two currencies of this snapshot, rounded to cents. The same currency passes
+    /// through unchanged. <c>Rate</c> means 1 <c>Base</c> = <c>Rate</c> <c>Quote</c>.
+    /// </summary>
+    public Money Convert(Money amount, CurrencyCode target)
+    {
+        if (amount.Currency == target.Value)
+            return amount;
+
+        if (amount.Currency == Base && target.Value == Quote)
+            return Money.Of(Math.Round(amount.Amount * Rate, 2, MidpointRounding.ToEven), target);
+
+        if (amount.Currency == Quote && target.Value == Base)
+            return Money.Of(Math.Round(amount.Amount / Rate, 2, MidpointRounding.ToEven), target);
+
+        throw new DomainException($"The snapshot {Base}/{Quote} cannot convert {amount.Currency} to {target.Value}.");
+    }
+
+    /// <summary>
     /// Returns <c>null</c> when the operation is in the vehicle's currency (no conversion, no rate needed). Otherwise a
     /// rate for exactly that pair is required and is copied into the snapshot.
     /// </summary>

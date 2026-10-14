@@ -17,6 +17,7 @@ using SharedKernel;
 using Application.Common;
 using Application.Currency;
 using Domain.Currency;
+using Domain.Deposits;
 using Domain.Shared.ValueObjects;
 
 // Both namespaces define a PaymentMethod and this file has to speak about both: what the buyer
@@ -211,6 +212,30 @@ internal sealed class CreateSaleCommandHandler(
                 : carCurrency;
         }
 
+        // ── sfc B1.3 · an Active deposit reserves the car for its buyer ──────────────────────────
+        // Another buyer is refused. The deposit's buyer gets it counted as down payment unless one was stated, converted
+        // with the deposit's own snapshot when it was taken in the other currency.
+        Deposit? activeDeposit = await context.Deposits.FirstOrDefaultAsync(
+            d => d.CarId == car.Id && d.Status == DepositStatus.Active, cancellationToken);
+        decimal? downPayment = command.DownPayment;
+        if (activeDeposit is not null)
+        {
+            bool sameBuyer = activeDeposit.ClientId == command.ClientId
+                             || (activeDeposit.LeadId is not null && activeDeposit.LeadId == command.LeadId);
+            if (!sameBuyer)
+            {
+                return Result.Failure<Guid>(DepositErrors.BlocksOtherBuyer(car.Id));
+            }
+
+            if (downPayment is null)
+            {
+                Money? fromDeposit = activeDeposit.Amount.Currency == saleCurrency.Value
+                    ? activeDeposit.Amount
+                    : activeDeposit.ExchangeRate?.Convert(activeDeposit.Amount, saleCurrency);
+                downPayment = fromDeposit?.Amount;
+            }
+        }
+
         ExchangeRateSnapshot? exchangeRate;
         if (acceptedQuote?.ExchangeRate is { } quoteRate && acceptedQuote.ProposedPrice.Currency == saleCurrency.Value)
         {
@@ -251,7 +276,7 @@ internal sealed class CreateSaleCommandHandler(
         // VEN-03: how it is paid and what paperwork backs it. Both are optional — a cash sale
         // recorded in one line has nothing to add here.
         Result paymentTerms = sale.SetPaymentTerms(
-            command.DownPayment,
+            downPayment,
             command.TradeInCarId,
             command.TradeInValue,
             command.FinancedAmount,
