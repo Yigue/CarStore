@@ -2680,6 +2680,48 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_quotes_leads_lead_id");
 
+                    b.OwnsOne("Domain.Currency.ExchangeRateSnapshot", "ExchangeRate", b1 =>
+                        {
+                            b1.Property<Guid>("QuoteId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Base")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character(3)")
+                                .HasColumnName("exchange_rate_base")
+                                .IsFixedLength();
+
+                            b1.Property<DateTime>("CapturedAtUtc")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("exchange_rate_captured_at_utc");
+
+                            b1.Property<string>("Quote")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character(3)")
+                                .HasColumnName("exchange_rate_quote")
+                                .IsFixedLength();
+
+                            b1.Property<decimal>("Rate")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("exchange_rate");
+
+                            b1.Property<Guid>("SourceRateId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("exchange_rate_source_id");
+
+                            b1.HasKey("QuoteId");
+
+                            b1.ToTable("quotes", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("QuoteId")
+                                .HasConstraintName("fk_quotes_quotes_id");
+                        });
+
                     b.OwnsOne("Domain.Shared.ValueObjects.Money", "ProposedPrice", b1 =>
                         {
                             b1.Property<Guid>("QuoteId")
@@ -2708,6 +2750,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Car");
 
                     b.Navigation("Client");
+
+                    b.Navigation("ExchangeRate");
 
                     b.Navigation("Lead");
 

@@ -143,6 +143,50 @@ public class MoneyRoundTripTests
             .Should().Be(new Money(900m, "USD"));
     }
 
+    // sfc B0.2 / ADR C2: the exchange-rate snapshot is stored with the quote and read back exactly; absent stays null.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task QuoteExchangeRateSnapshot_Should_RoundTrip(bool withSnapshot)
+    {
+        await using var connection = await OpenSchemaAsync();
+        var capturedAt = new DateTime(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc);
+        var sourceRateId = Guid.NewGuid();
+        Guid quoteId;
+        await using (var write = NewContext(connection))
+        {
+            var marca = new Marca("Toyota");
+            var modelo = new Modelo("Corolla", marca.Id);
+            write.Marca.Add(marca);
+            write.Modelo.Add(modelo);
+            var car = NewCar(marca, modelo, withSnapshot ? "SNP001" : "SNP002");
+            var client = new Client(TenantId, "Ana", "Perez", "30111222", "ana@x.com", "1155550000", "Calle 1", DateTime.UtcNow);
+            write.Cars.Add(car);
+            write.Clients.Add(client);
+            var now = DateTime.UtcNow;
+            var snapshot = withSnapshot
+                ? new Domain.Currency.ExchangeRateSnapshot("USD", "ARS", 1050.123456m, capturedAt, sourceRateId)
+                : null;
+            var quote = new Quote(TenantId, car, client, null, 900m, Domain.Quotes.Attributes.PaymentMethod.Contado,
+                now.AddDays(5), "c", now, CurrencyCode.Usd, snapshot);
+            write.Quotes.Add(quote);
+            await write.SaveChangesAsync();
+            quoteId = quote.Id;
+        }
+
+        await using var read = NewContext(connection);
+        var loaded = await read.Quotes.AsNoTracking().SingleAsync(q => q.Id == quoteId);
+
+        if (withSnapshot)
+        {
+            loaded.ExchangeRate.Should().Be(new Domain.Currency.ExchangeRateSnapshot("USD", "ARS", 1050.123456m, capturedAt, sourceRateId));
+        }
+        else
+        {
+            loaded.ExchangeRate.Should().BeNull();
+        }
+    }
+
     [Fact]
     public async Task SaleAmounts_InUsd_Should_StayUsd_AndMissingPartsStayNull()
     {

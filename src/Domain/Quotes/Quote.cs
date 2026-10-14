@@ -1,6 +1,7 @@
 using SharedKernel;
 using Domain.Cars;
 using Domain.Clients;
+using Domain.Currency;
 using Domain.Leads;
 using Domain.Quotes.Attributes;
 using Domain.Quotes.Events;
@@ -14,6 +15,8 @@ public sealed class Quote : Entity, ISoftDeletable
     public Guid? ClientId { get; private set; }
     public Guid? LeadId { get; private set; }
     public Money ProposedPrice { get; private set; }
+    /// <summary>sfc B0.2 / ADR C2: set only when the quote currency differs from the vehicle's; immutable once captured.</summary>
+    public ExchangeRateSnapshot? ExchangeRate { get; private set; }
     public PaymentMethod PaymentMethod { get; private set; }
     public QuoteStatus Status { get; private set; }
     public DateTime ValidUntil { get; private set; }
@@ -38,8 +41,10 @@ public sealed class Quote : Entity, ISoftDeletable
         DateTime validUntil,
         string comments,
         DateTime date,
-        // sfc B0.2.3 phase 1: ARS when omitted; the exchange-rate snapshot for other currencies lands in the next phase.
-        CurrencyCode? proposedCurrency = null)
+        // sfc B0.2.3 phase 1: ARS when omitted.
+        CurrencyCode? proposedCurrency = null,
+        // ADR C2: the rate frozen when the quote currency differs from the vehicle's. Never recalculated.
+        ExchangeRateSnapshot? exchangeRate = null)
     {
         SetDealer(dealerId);
 
@@ -69,6 +74,7 @@ public sealed class Quote : Entity, ISoftDeletable
 
         
         ProposedPrice = Money.Of(proposedPrice, proposedCurrency ?? CurrencyCode.Ars);
+        ExchangeRate = exchangeRate;
         PaymentMethod = paymentMethod;
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;

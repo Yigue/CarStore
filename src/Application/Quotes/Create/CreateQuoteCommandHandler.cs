@@ -6,6 +6,7 @@ using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Clients;
 using Domain.Clients.Attributes;
+using Domain.Currency;
 using Domain.Leads;
 using Domain.Quotes;
 using Domain.Quotes.Attributes;
@@ -170,7 +171,10 @@ internal sealed class CreateQuoteCommandHandler(
             return Result.Failure<Guid>(QuoteErrors.ActiveQuoteAlreadyExists(command.CarId, liveQuote.Id));
         }
 
-        CurrencyCode? proposedCurrency = null;
+        // sfc B0.2.3 / ADR C2: without a currency the quote uses the vehicle's. A different currency needs the dealer's
+        // latest effective manual rate for that pair, frozen into the quote and never recalculated.
+        CurrencyCode carCurrency = CurrencyCode.Parse(car.Price.Currency);
+        CurrencyCode proposedCurrency = carCurrency;
         if (command.Currency is not null)
         {
             if (!CurrencyCode.TryParse(command.Currency, out CurrencyCode parsedCurrency))
@@ -182,6 +186,28 @@ internal sealed class CreateQuoteCommandHandler(
             proposedCurrency = parsedCurrency;
         }
 
+        DateTime now = dateTimeProvider.UtcNow;
+        DealerExchangeRate? rate = null;
+        if (proposedCurrency != carCurrency)
+        {
+            Guid dealerId = tenantService.DealerId;
+            string carCode = carCurrency.Value;
+            string quoteCode = proposedCurrency.Value;
+            rate = await context.DealerExchangeRates
+                .Where(r => r.DealerId == dealerId
+                            && r.EffectiveAtUtc <= now
+                            && ((r.BaseCurrency == carCode && r.QuoteCurrency == quoteCode)
+                                || (r.BaseCurrency == quoteCode && r.QuoteCurrency == carCode)))
+                .OrderByDescending(r => r.EffectiveAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        Result<ExchangeRateSnapshot?> snapshot = ExchangeRateSnapshot.Capture(carCurrency, proposedCurrency, rate, now);
+        if (snapshot.IsFailure)
+        {
+            return Result.Failure<Guid>(snapshot.Error);
+        }
+
         var quote = new Quote(
             tenantService.DealerId,
             car,
@@ -191,8 +217,9 @@ internal sealed class CreateQuoteCommandHandler(
             command.PaymentMethod,
             command.ValidUntil,
             command.Comments,
-            dateTimeProvider.UtcNow,
-            proposedCurrency);
+            now,
+            proposedCurrency,
+            snapshot.Value);
 
         context.Quotes.Add(quote);
 
