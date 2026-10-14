@@ -935,6 +935,12 @@ namespace Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("facebook_url");
 
+                    b.Property<int>("FollowUpCadenceDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3)
+                        .HasColumnName("follow_up_cadence_days");
+
                     b.Property<string>("FooterText")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")

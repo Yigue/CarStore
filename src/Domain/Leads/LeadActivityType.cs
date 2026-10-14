@@ -23,4 +23,6 @@ public enum LeadActivityType
     AppointmentScheduled = 8,
     ClientCreated = 9,
     SaleRegistered = 10,
+    // sfc B6.2 / RN-041: the lead went quiet for the dealer's cadence; RelatedEntityId is the assigned salesperson.
+    FollowUpReminder = 11,
 }

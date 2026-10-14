@@ -223,6 +223,22 @@ public sealed class DealerSettings : Entity
     /// <summary>sfc B1.3.1 / RN-002 / D-DEPOSIT: calendar days a new seña stays Active; 7 unless the dealer changes it.</summary>
     public int DepositValidityDays { get; private set; } = Domain.Deposits.Deposit.DefaultValidityDays;
 
+    /// <summary>sfc B6.2 / RN-041: days without activity before an open lead gets a follow-up reminder; 0 turns it off.</summary>
+    public int FollowUpCadenceDays { get; private set; } = DefaultFollowUpCadenceDays;
+
+    public const int DefaultFollowUpCadenceDays = 3;
+    public const int MaxFollowUpCadenceDays = 30;
+
+    public Result SetFollowUpCadenceDays(int days)
+    {
+        if (days < 0 || days > MaxFollowUpCadenceDays)
+            return Result.Failure(Error.Validation(
+                "DealerSettings.InvalidFollowUpCadence", $"La cadencia de seguimiento debe estar entre 0 y {MaxFollowUpCadenceDays} días."));
+
+        FollowUpCadenceDays = days;
+        return Result.Success();
+    }
+
     public Result SetDepositValidityDays(int days)
     {
         if (days <= 0 || days > Domain.Deposits.Deposit.DefaultMaxValidityDays)

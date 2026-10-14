@@ -55,6 +55,11 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
             .HasDefaultValue(0)
             .IsRequired();
 
+        // sfc B6.2: existing dealers get the RN-041 default cadence.
+        builder.Property(s => s.FollowUpCadenceDays)
+            .HasDefaultValue(Domain.DealerSettings.DealerSettings.DefaultFollowUpCadenceDays)
+            .IsRequired();
+
         // sfc B1.3.1: existing dealers get the D-DEPOSIT default of 7 days.
         builder.Property(s => s.DepositValidityDays)
             .HasDefaultValue(Domain.Deposits.Deposit.DefaultValidityDays)
