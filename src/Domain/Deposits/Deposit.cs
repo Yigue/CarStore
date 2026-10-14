@@ -126,6 +126,13 @@ public sealed class Deposit : Entity
         return true;
     }
 
+    /// <summary>
+    /// True when the deposit was taken for this client: directly, or for the lead this client was converted from.
+    /// <paramref name="clientOriginLeadId"/> must come from the stored client, never from the request.
+    /// </summary>
+    public bool BelongsTo(Guid clientId, Guid? clientOriginLeadId) =>
+        ClientId == clientId || (LeadId is not null && LeadId == clientOriginLeadId);
+
     /// <summary>Active → Applied when the sale over the car completes.</summary>
     public Result Apply(Guid saleId)
     {

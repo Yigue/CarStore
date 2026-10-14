@@ -220,9 +220,12 @@ internal sealed class CreateSaleCommandHandler(
         decimal? downPayment = command.DownPayment;
         if (activeDeposit is not null)
         {
-            bool sameBuyer = activeDeposit.ClientId == command.ClientId
-                             || (activeDeposit.LeadId is not null && activeDeposit.LeadId == command.LeadId);
-            if (!sameBuyer)
+            // The lead link is read from the stored client: a caller-supplied LeadId proves nothing.
+            Guid? clientOriginLeadId = await context.Clients
+                .Where(c => c.Id == command.ClientId)
+                .Select(c => c.OriginLeadId)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (!activeDeposit.BelongsTo(command.ClientId, clientOriginLeadId))
             {
                 return Result.Failure<Guid>(DepositErrors.BlocksOtherBuyer(car.Id));
             }

@@ -120,4 +120,39 @@ public class CreateSaleDepositTests
         deposit.Status.Should().Be(DepositStatus.Applied);
         deposit.AppliedSaleId.Should().Be(saleId);
     }
+
+    // Security review: the lead id comes from the caller, so it cannot by itself prove the buyer is the deposit's.
+    [Fact]
+    public async Task Handle_Should_RefuseAnotherBuyer_EvenWhenTheCallerSendsTheDepositsLeadId()
+    {
+        using var context = CreateContext();
+        var lead = Domain.Leads.Lead.Create(DealerId, "Ana", "ana@lead.com", "111", Domain.Leads.LeadSource.Web, Now.AddDays(-5));
+        context.Leads.Add(lead);
+        var (car, _, other) = await SeedReservedByDepositAsync(context);
+        var deposit = await context.Deposits.SingleAsync();
+        context.Deposits.Remove(deposit);
+        await context.SaveChangesAsync();
+        context.Deposits.Add(Deposit.Create(DealerId, car.Id, null, null, 1000m, "ARS", null, Now.AddDays(-1),
+            new DepositCarContext(StatusServiceCar.Disponible, null, false, "ARS"), leadId: lead.Id).Value);
+        await context.SaveChangesAsync();
+
+        var result = await Handler(context).Handle(
+            new CreateSaleCommand(car.Id, other.Id, 10000m, PaymentMethod.Cash, "CN-LEAD", "c", LeadId: lead.Id), CancellationToken.None);
+
+        result.Error.Code.Should().Be("DEPOSIT_BLOCKS_OTHER_BUYER");
+    }
+
+    // Security review: a deposit is applied only to a sale of its own buyer.
+    [Fact]
+    public async Task SaleCompleted_Should_NotApplyTheDeposit_OfAnotherBuyer()
+    {
+        using var context = CreateContext();
+        var (car, _, other) = await SeedReservedByDepositAsync(context);
+
+        await new ApplyDepositOnSaleCompletedHandler(context).Handle(
+            new SaleCompletedDomainEvent(Guid.NewGuid(), car.Id, other.Id, new Money(10000m, "ARS"), PaymentMethod.Cash),
+            CancellationToken.None);
+
+        (await context.Deposits.SingleAsync()).Status.Should().Be(DepositStatus.Active);
+    }
 }
