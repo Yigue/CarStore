@@ -19,7 +19,9 @@ public sealed record FinancialReportDto(
     DateTime To,
     string GroupBy,
     IReadOnlyList<FinancialReportSeriesDto> Series,
-    FinancialReportTotalsDto Totals);
+    FinancialReportTotalsDto Totals,
+    // sfc B0.3.1: every currency with movements in the window, so the client can offer the other report(s).
+    IReadOnlyList<string>? AvailableCurrencies = null);
 
 public sealed record FinancialReportSeriesDto(
     string Bucket,

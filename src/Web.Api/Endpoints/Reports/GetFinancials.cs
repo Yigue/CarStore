@@ -15,6 +15,7 @@ internal sealed class GetFinancials : IEndpoint
             [FromQuery] string? from,
             [FromQuery] string? to,
             [FromQuery] string? groupBy,
+            [FromQuery] string? currency,
             ISender sender,
             CancellationToken cancellationToken) =>
         {
@@ -49,7 +50,7 @@ internal sealed class GetFinancials : IEndpoint
             }
 
             Result<FinancialReportDto> result =
-                await sender.Send(new GetFinancialReportQuery(parsedFrom, parsedTo, grouping), cancellationToken);
+                await sender.Send(new GetFinancialReportQuery(parsedFrom, parsedTo, grouping, Currency: currency), cancellationToken);
 
             return result.Match(
                 report => Results.Ok(report),

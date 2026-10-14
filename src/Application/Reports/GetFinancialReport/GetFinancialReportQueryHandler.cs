@@ -4,6 +4,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
 using Application.Common;
 using Domain.Financial.Attributes;
+using Domain.Shared.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -35,14 +36,25 @@ internal sealed class GetFinancialReportQueryHandler(
             return Result.Failure<FinancialReportDto>(guard.Error);
         }
 
+        // sfc B0.3.1 / ADR C1: amounts in different currencies are never added together. One currency per report.
+        CurrencyCode currency = CurrencyCode.Ars;
+        if (query.Currency is not null && !CurrencyCode.TryParse(query.Currency, out currency))
+        {
+            return Result.Failure<FinancialReportDto>(Error.Validation(
+                "Currency.Unsupported", "Unsupported currency. Supported: ARS, USD."));
+        }
+
         // A ten-year window would build thousands of buckets: cut it to the maximum range.
         (DateTime from, DateTime to) = Pagination.ClampRange(query.From, query.To);
 
-        var rows = await context.Transactions.AsNoTracking()
+        var allRows = await context.Transactions.AsNoTracking()
             .Where(t => t.DealerId == tenantService.DealerId)
             .Where(t => t.TransactionDate >= from && t.TransactionDate <= to)
-            .Select(t => new TransactionRow(t.TransactionDate, t.Type, t.Amount.Amount))
+            .Select(t => new TransactionRow(t.TransactionDate, t.Type, t.Amount.Amount, t.Amount.Currency))
             .ToListAsync(cancellationToken);
+
+        List<string> availableCurrencies = allRows.Select(r => r.Currency).Distinct().Order(StringComparer.Ordinal).ToList();
+        var rows = allRows.Where(r => r.Currency == currency.Value).ToList();
 
         // Generate all period boundary start dates within [from, to] inclusive
         var allPeriods = new List<DateTime>();
@@ -89,12 +101,13 @@ internal sealed class GetFinancialReportQueryHandler(
         decimal totalExpense = series.Sum(p => p.Expense);
 
         var dto = new FinancialReportDto(
-            "ARS",
+            currency.Value,
             from,
             to,
             query.GroupBy.ToString(),
             series,
-            new FinancialReportTotalsDto(totalIncome, totalExpense, totalIncome - totalExpense));
+            new FinancialReportTotalsDto(totalIncome, totalExpense, totalIncome - totalExpense),
+            availableCurrencies);
 
         return Result.Success(dto);
     }
@@ -126,5 +139,5 @@ internal sealed class GetFinancialReportQueryHandler(
 
     private static int ISOYear(DateTime date) => ISOWeek.GetYear(date);
 
-    private readonly record struct TransactionRow(DateTime Date, TransactionType Type, decimal Amount);
+    private readonly record struct TransactionRow(DateTime Date, TransactionType Type, decimal Amount, string Currency);
 }
