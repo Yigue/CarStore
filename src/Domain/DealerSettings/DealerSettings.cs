@@ -220,6 +220,18 @@ public sealed class DealerSettings : Entity
     /// </summary>
     public Guid? OwnerUserId { get; private set; }
 
+    /// <summary>sfc B1.3.1 / RN-002 / D-DEPOSIT: calendar days a new seña stays Active; 7 unless the dealer changes it.</summary>
+    public int DepositValidityDays { get; private set; } = Domain.Deposits.Deposit.DefaultValidityDays;
+
+    public Result SetDepositValidityDays(int days)
+    {
+        if (days <= 0 || days > Domain.Deposits.Deposit.DefaultMaxValidityDays)
+            return Result.Failure(Domain.Deposits.DepositErrors.InvalidValidity(Domain.Deposits.Deposit.DefaultMaxValidityDays));
+
+        DepositValidityDays = days;
+        return Result.Success();
+    }
+
     public void SetOwner(Guid userId)
     {
         if (userId == Guid.Empty)

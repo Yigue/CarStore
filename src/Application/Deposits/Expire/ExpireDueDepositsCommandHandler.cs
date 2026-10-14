@@ -5,8 +5,6 @@ using Application.Abstractions.Messaging;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Deposits;
-using Domain.Quotes.Attributes;
-using Domain.Sales.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
@@ -50,11 +48,7 @@ internal sealed class ExpireDueDepositsCommandHandler(
                 continue;
 
             // H6: the deposit was not necessarily the only thing holding the car.
-            bool heldByQuote = await context.Quotes.AnyAsync(
-                q => q.CarId == car.Id && q.Status == QuoteStatus.Accepted, cancellationToken);
-            bool heldBySale = await context.Sales.AnyAsync(
-                s => s.CarId == car.Id && s.Status == SaleStatus.Pending, cancellationToken);
-            if (heldByQuote || heldBySale)
+            if (await context.IsHeldBeyondDepositsAsync(car.Id, cancellationToken))
                 continue;
 
             car.Release(now);

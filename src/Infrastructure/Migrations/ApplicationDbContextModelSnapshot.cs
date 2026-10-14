@@ -925,6 +925,12 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("dealer_name");
 
+                    b.Property<int>("DepositValidityDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(7)
+                        .HasColumnName("deposit_validity_days");
+
                     b.Property<string>("FacebookUrl")
                         .HasColumnType("text")
                         .HasColumnName("facebook_url");

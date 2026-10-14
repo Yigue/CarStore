@@ -36,6 +36,9 @@ public static class DepositErrors
     public static Error InvalidState(Guid depositId, DepositStatus current) => Error.Conflict(
         "Deposits.InvalidState", $"The deposit '{depositId}' is '{current}' and cannot perform this transition.");
 
+    public static Error NotFound(Guid depositId) => Error.NotFound(
+        "Deposits.NotFound", $"The deposit '{depositId}' was not found.");
+
     public static Error RefundReasonRequired() => Error.Validation(
         "Deposits.RefundReasonRequired", "A reason is required to refund a deposit.");
 
