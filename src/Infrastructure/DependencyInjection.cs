@@ -549,6 +549,14 @@ public static class DependencyInjection
                     trigger.ForJob(purgeJobKey)
                         .WithCronSchedule("0 0 3 * * ?"));
 
+            // sfc B1.3.3: deposit sweep (RN-002/RN-003), hourly at minute 5.
+            var depositJobKey = new JobKey(nameof(ExpireDepositsJob));
+            configure
+                .AddJob<ExpireDepositsJob>(opts => opts.WithIdentity(depositJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(depositJobKey)
+                        .WithCronSchedule("0 5 * * * ?"));
+
             // Job 9: retries storage deletes parked by the tenant purge (every 15 minutes). No feature flag: it only
             // deletes objects of tenants already purged.
             var storageRetryJobKey = new JobKey(nameof(StorageDeletionRetryJob));

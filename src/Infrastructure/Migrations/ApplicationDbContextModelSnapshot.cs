@@ -1114,6 +1114,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at_utc");
 
+                    b.Property<DateTime?>("ExpiryNoticeSentAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expiry_notice_sent_at_utc");
+
                     b.Property<Guid?>("LeadId")
                         .HasColumnType("uuid")
                         .HasColumnName("lead_id");

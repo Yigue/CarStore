@@ -36,6 +36,9 @@ public sealed class Deposit : Entity
     public DateTime? RefundedAtUtc { get; private set; }
     public Guid? AppliedSaleId { get; private set; }
 
+    /// <summary>sfc B1.3.3: when the "your deposit expires soon" email went out; it is sent at most once.</summary>
+    public DateTime? ExpiryNoticeSentAtUtc { get; private set; }
+
     private Deposit() { }
 
     public static Result<Deposit> Create(
@@ -108,6 +111,19 @@ public sealed class Deposit : Entity
         Status = DepositStatus.Expired;
         Raise(new DepositExpiredDomainEvent(Id, CarId));
         return Result.Success();
+    }
+
+    /// <summary>
+    /// sfc B1.3.3: records that the expiring notice was sent. False when it was already sent or the deposit is no
+    /// longer Active, so the caller never sends a duplicate.
+    /// </summary>
+    public bool MarkExpiryNoticeSent(DateTime nowUtc)
+    {
+        if (Status != DepositStatus.Active || ExpiryNoticeSentAtUtc is not null)
+            return false;
+
+        ExpiryNoticeSentAtUtc = nowUtc;
+        return true;
     }
 
     /// <summary>Active → Applied when the sale over the car completes.</summary>
