@@ -406,4 +406,29 @@ public class PurgeTenantCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         (await _context.PendingStorageDeletions.CountAsync()).Should().Be(0);
     }
+
+    // Security review (sfc B0.2/B1.3): tables added later must join the purge, or a purged dealer keeps business data.
+    [Fact]
+    public async Task Purge_DeletesDepositsAndExchangeRates_OfThePurgedDealerOnly()
+    {
+        SeedDealer(_dealerId, TenantLifecycleStatus.Locked);
+        var ctx = new Domain.Deposits.DepositCarContext(StatusServiceCar.Disponible, null, false, "ARS");
+        foreach (Guid dealer in new[] { _dealerId, _otherId })
+        {
+            _context.DealerExchangeRates.Add(Domain.Currency.DealerExchangeRate.Record(
+                dealer, Domain.Shared.ValueObjects.CurrencyCode.Usd, Domain.Shared.ValueObjects.CurrencyCode.Ars, 1000m, Now, Guid.NewGuid()).Value);
+            _context.Deposits.Add(Domain.Deposits.Deposit.Create(
+                dealer, Guid.NewGuid(), Guid.NewGuid(), null, 100m, "ARS", null, Now, ctx).Value);
+        }
+        await _context.SaveChangesAsync();
+
+        var result = await Handler().Handle(new PurgeTenantCommand(_dealerId, DryRun: false), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        (await _context.Deposits.IgnoreQueryFilters().Select(d => d.DealerId).ToListAsync()).Should().Equal(_otherId);
+        (await _context.DealerExchangeRates.IgnoreQueryFilters().Select(r => r.DealerId).ToListAsync()).Should().Equal(_otherId);
+        var record = await _context.TenantPurgeRecords.SingleAsync();
+        record.Counts["deposits"].Should().Be(1);
+        record.Counts["exchangeRates"].Should().Be(1);
+    }
 }
