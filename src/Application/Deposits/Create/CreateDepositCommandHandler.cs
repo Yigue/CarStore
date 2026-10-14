@@ -11,6 +11,8 @@ using Domain.Currency;
 using Domain.Deposits;
 using Domain.Financial;
 using Domain.Financial.Attributes;
+using Domain.Leads;
+using Domain.Quotes;
 using Domain.Quotes.Attributes;
 using Domain.Shared.ValueObjects;
 using Microsoft.EntityFrameworkCore;
@@ -51,6 +53,16 @@ internal sealed class CreateDepositCommandHandler(
             if (client is null || client.DealerId != dealerId)
                 return Result.Failure<Guid>(ClientErrors.NotFound(clientId));
         }
+
+        // Security review: a deposit may only reference this dealer's lead, and a quote of this dealer over this car.
+        // The expiry sweep runs without a tenant and emails the referenced buyer, so a foreign id must never get in.
+        if (command.LeadId is { } leadId
+            && !await context.Leads.AnyAsync(l => l.Id == leadId && l.DealerId == dealerId, cancellationToken))
+            return Result.Failure<Guid>(LeadErrors.NotFound(leadId));
+
+        if (command.QuoteId is { } quoteId
+            && !await context.Quotes.AnyAsync(q => q.Id == quoteId && q.DealerId == dealerId && q.CarId == car.Id, cancellationToken))
+            return Result.Failure<Guid>(QuoteErrors.NotFound(quoteId));
 
         if (string.IsNullOrWhiteSpace(command.Currency))
             return Result.Failure<Guid>(DepositErrors.CurrencyRequired());

@@ -155,4 +155,30 @@ public class CreateDepositCommandHandlerTests
         result.Error.Type.Should().Be(SharedKernel.ErrorType.NotFound);
         (await context.Deposits.CountAsync()).Should().Be(0);
     }
+
+    // Security review: every referenced id must belong to the caller's dealer (and the quote to the same car), or a
+    // deposit could point at another tenant's lead and the expiry sweep would email that lead.
+    [Fact]
+    public async Task Handle_Should_RejectALeadOrQuote_ThatIsNotTheCallers()
+    {
+        using var context = CreateContext();
+        var (car, client, _) = await SeedAsync(context);
+        var foreignLead = Domain.Leads.Lead.Create(OtherDealerId, "Eve", "eve@other.com", "222", Domain.Leads.LeadSource.Web, Now);
+        var otherCar = new Car(DealerId, car.Marca, car.Modelo, Color.Blue, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible,
+            4, 5, 1600, 1000, 2021, "DEP002", "desc", 10000m, Now.AddDays(-30));
+        var quoteOnOtherCar = new Quote(DealerId, otherCar, client, null, 10000m, QuotePaymentMethod.Contado, Now.AddDays(20), "q", Now.AddDays(-2));
+        context.Leads.Add(foreignLead);
+        context.Cars.Add(otherCar);
+        context.Quotes.Add(quoteOnOtherCar);
+        await context.SaveChangesAsync();
+
+        var withForeignLead = await Handler(context).Handle(
+            new CreateDepositCommand(car.Id, null, foreignLead.Id, null, 1000m, "ARS", PaymentMethod.Cash), CancellationToken.None);
+        var withQuoteOfAnotherCar = await Handler(context).Handle(
+            Command(car.Id, client.Id, quoteId: quoteOnOtherCar.Id), CancellationToken.None);
+
+        withForeignLead.Error.Type.Should().Be(SharedKernel.ErrorType.NotFound);
+        withQuoteOfAnotherCar.Error.Type.Should().Be(SharedKernel.ErrorType.NotFound);
+        (await context.Deposits.CountAsync()).Should().Be(0);
+    }
 }
