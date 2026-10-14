@@ -1,6 +1,7 @@
 using SharedKernel;
 using Domain.Cars;
 using Domain.Clients;
+using Domain.Currency;
 using Domain.Sales.Attributes;
 using Domain.Financial;
 using Domain.Financial.Attributes;
@@ -19,6 +20,9 @@ public sealed class Sale : Entity
     public Guid? LeadId { get; private set; }
     public Guid? SalespersonId { get; private set; }
     public Money FinalPrice { get; private set; }
+    /// <summary>sfc B0.2 / ADR C2: set only when the sale currency differs from the vehicle's; immutable once captured.</summary>
+    public ExchangeRateSnapshot? ExchangeRate { get; private set; }
+    private CurrencyCode SaleCurrency => CurrencyCode.Parse(FinalPrice.Currency);
     public SaleStatus Status { get; private set; }
     public PaymentMethod PaymentMethod { get; private set; }
     public string ContractNumber { get; private set; }
@@ -91,7 +95,11 @@ public sealed class Sale : Entity
         DateTime saleDate,
         Guid? leadId = null,
         Guid? quoteId = null,
-        Guid? salespersonId = null)
+        Guid? salespersonId = null,
+        // sfc B0.2.3 phase 1: ARS when omitted. Every amount of the sale uses this currency.
+        CurrencyCode? currency = null,
+        // ADR C2: the rate frozen when the sale currency differs from the vehicle's. Never recalculated.
+        ExchangeRateSnapshot? exchangeRate = null)
     {
         SetDealer(dealerId);
         Id = Guid.NewGuid();
@@ -100,7 +108,8 @@ public sealed class Sale : Entity
         LeadId = leadId;
         QuoteId = quoteId;
         SalespersonId = salespersonId;
-        FinalPrice = Money.Of(finalPrice, CurrencyCode.Ars);
+        FinalPrice = Money.Of(finalPrice, currency ?? CurrencyCode.Ars);
+        ExchangeRate = exchangeRate;
         PaymentMethod = paymentMethod;
         ContractNumber = contractNumber;
         Comments = comments;
@@ -157,8 +166,9 @@ public sealed class Sale : Entity
     {
         if (Status != SaleStatus.Pending)
             throw new DomainException("Only pending sales can be updated");
-        
-        FinalPrice = Money.Of(finalPrice, CurrencyCode.Ars);
+
+        // Keeps the sale's own currency; hard-coding ARS here converted USD sales silently.
+        FinalPrice = Money.Of(finalPrice, SaleCurrency);
         PaymentMethod = paymentMethod;
         ContractNumber = contractNumber;
         Comments = comments;
@@ -228,12 +238,14 @@ public sealed class Sale : Entity
             }
         }
 
-        DownPayment = downPayment.HasValue ? Money.Of(downPayment.Value, CurrencyCode.Ars) : null;
+        // Every part is in the sale's currency, so the "parts add up to the price" check above compares like with like.
+        CurrencyCode currency = SaleCurrency;
+        DownPayment = downPayment.HasValue ? Money.Of(downPayment.Value, currency) : null;
         TradeInCarId = tradeInCarId;
-        TradeInValue = tradeInValue.HasValue ? Money.Of(tradeInValue.Value, CurrencyCode.Ars) : null;
-        FinancedAmount = financedAmount.HasValue ? Money.Of(financedAmount.Value, CurrencyCode.Ars) : null;
+        TradeInValue = tradeInValue.HasValue ? Money.Of(tradeInValue.Value, currency) : null;
+        FinancedAmount = financedAmount.HasValue ? Money.Of(financedAmount.Value, currency) : null;
         InstallmentCount = installmentCount;
-        InstallmentAmount = installmentAmount.HasValue ? Money.Of(installmentAmount.Value, CurrencyCode.Ars) : null;
+        InstallmentAmount = installmentAmount.HasValue ? Money.Of(installmentAmount.Value, currency) : null;
         FinancingEntity = string.IsNullOrWhiteSpace(financingEntity) ? null : financingEntity.Trim();
 
         return Result.Success();

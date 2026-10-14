@@ -2,6 +2,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
 using Application.Common;
+using Application.Currency;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Clients;
@@ -190,16 +191,8 @@ internal sealed class CreateQuoteCommandHandler(
         DealerExchangeRate? rate = null;
         if (proposedCurrency != carCurrency)
         {
-            Guid dealerId = tenantService.DealerId;
-            string carCode = carCurrency.Value;
-            string quoteCode = proposedCurrency.Value;
-            rate = await context.DealerExchangeRates
-                .Where(r => r.DealerId == dealerId
-                            && r.EffectiveAtUtc <= now
-                            && ((r.BaseCurrency == carCode && r.QuoteCurrency == quoteCode)
-                                || (r.BaseCurrency == quoteCode && r.QuoteCurrency == carCode)))
-                .OrderByDescending(r => r.EffectiveAtUtc)
-                .FirstOrDefaultAsync(cancellationToken);
+            rate = await context.FindLatestEffectiveRateAsync(
+                tenantService.DealerId, carCurrency, proposedCurrency, now, cancellationToken);
         }
 
         Result<ExchangeRateSnapshot?> snapshot = ExchangeRateSnapshot.Capture(carCurrency, proposedCurrency, rate, now);

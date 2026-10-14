@@ -2812,6 +2812,48 @@ namespace Infrastructure.Migrations
                                 .HasConstraintName("fk_sales_sales_id");
                         });
 
+                    b.OwnsOne("Domain.Currency.ExchangeRateSnapshot", "ExchangeRate", b1 =>
+                        {
+                            b1.Property<Guid>("SaleId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Base")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character(3)")
+                                .HasColumnName("exchange_rate_base")
+                                .IsFixedLength();
+
+                            b1.Property<DateTime>("CapturedAtUtc")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("exchange_rate_captured_at_utc");
+
+                            b1.Property<string>("Quote")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character(3)")
+                                .HasColumnName("exchange_rate_quote")
+                                .IsFixedLength();
+
+                            b1.Property<decimal>("Rate")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("exchange_rate");
+
+                            b1.Property<Guid>("SourceRateId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("exchange_rate_source_id");
+
+                            b1.HasKey("SaleId");
+
+                            b1.ToTable("sales", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SaleId")
+                                .HasConstraintName("fk_sales_sales_id");
+                        });
+
                     b.OwnsOne("Domain.Shared.ValueObjects.Money", "FinalPrice", b1 =>
                         {
                             b1.Property<Guid>("SaleId")
@@ -2917,6 +2959,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Client");
 
                     b.Navigation("DownPayment");
+
+                    b.Navigation("ExchangeRate");
 
                     b.Navigation("FinalPrice")
                         .IsRequired();

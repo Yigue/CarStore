@@ -44,6 +44,11 @@ public sealed record CreateSaleCommand(
     string? InvoiceNumber = null,
     string? TransferFormNumber = null,
     string? RegistrationNumber = null,
-    DateTime? DeliveryDate = null
+    DateTime? DeliveryDate = null,
+
+    // ─── sfc B0.2.3 · currency ───────────────────────────────────────────────────────────────
+    // Optional. Null means: the accepted quote's currency, else the vehicle's. A currency different from the
+    // vehicle's needs the dealer's manual exchange rate, frozen into the sale.
+    string? Currency = null
     ) : ICommand<Guid>;
 

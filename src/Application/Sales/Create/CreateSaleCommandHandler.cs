@@ -15,6 +15,9 @@ using Domain.Sales.Events;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 using Application.Common;
+using Application.Currency;
+using Domain.Currency;
+using Domain.Shared.ValueObjects;
 
 // Both namespaces define a PaymentMethod and this file has to speak about both: what the buyer
 // INTENDED on the quote, and how the money actually moves on the sale. Bare `PaymentMethod` in
@@ -185,6 +188,50 @@ internal sealed class CreateSaleCommandHandler(
             return Result.Failure<Guid>(SalesErrors.PriceRequired());
         }
 
+        // ── sfc B0.2.3 / ADR C2: one currency for the whole sale ─────────────────────────────────
+        // Explicit, else the accepted quote's, else the vehicle's. A sale converted from a quote in the same currency
+        // keeps the quote's snapshot: the rate was agreed there and is never recalculated.
+        DateTime now = dateTimeProvider.UtcNow;
+        CurrencyCode carCurrency = CurrencyCode.Parse(car.Price.Currency);
+        CurrencyCode saleCurrency;
+        if (command.Currency is not null)
+        {
+            if (!CurrencyCode.TryParse(command.Currency, out CurrencyCode parsedCurrency))
+            {
+                return Result.Failure<Guid>(Error.Validation(
+                    "Currency.Unsupported", "Unsupported currency. Supported: ARS, USD."));
+            }
+
+            saleCurrency = parsedCurrency;
+        }
+        else
+        {
+            saleCurrency = acceptedQuote is not null
+                ? CurrencyCode.Parse(acceptedQuote.ProposedPrice.Currency)
+                : carCurrency;
+        }
+
+        ExchangeRateSnapshot? exchangeRate;
+        if (acceptedQuote?.ExchangeRate is { } quoteRate && acceptedQuote.ProposedPrice.Currency == saleCurrency.Value)
+        {
+            // A fresh instance: EF owned values cannot be shared between two owners.
+            exchangeRate = quoteRate with { };
+        }
+        else
+        {
+            DealerExchangeRate? rate = saleCurrency != carCurrency
+                ? await context.FindLatestEffectiveRateAsync(tenantService.DealerId, carCurrency, saleCurrency, now, cancellationToken)
+                : null;
+
+            Result<ExchangeRateSnapshot?> captured = ExchangeRateSnapshot.Capture(carCurrency, saleCurrency, rate, now);
+            if (captured.IsFailure)
+            {
+                return Result.Failure<Guid>(captured.Error);
+            }
+
+            exchangeRate = captured.Value;
+        }
+
         var sale = new Sale(
             tenantService.DealerId,
             command.CarId,
@@ -193,10 +240,12 @@ internal sealed class CreateSaleCommandHandler(
             agreedMethod,
             command.ContractNumber,
             command.Comments,
-            dateTimeProvider.UtcNow,
+            now,
             command.LeadId,
             command.QuoteId,
-            command.SalespersonId
+            command.SalespersonId,
+            saleCurrency,
+            exchangeRate
             );
 
         // VEN-03: how it is paid and what paperwork backs it. Both are optional — a cash sale

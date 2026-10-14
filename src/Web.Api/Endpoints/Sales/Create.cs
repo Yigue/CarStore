@@ -44,7 +44,9 @@ internal sealed class Create : IEndpoint
         string? InvoiceNumber = null,
         string? TransferFormNumber = null,
         string? RegistrationNumber = null,
-        DateTime? DeliveryDate = null);
+        DateTime? DeliveryDate = null,
+        // sfc B0.2.3: optional; null means the accepted quote's currency, else the vehicle's.
+        string? Currency = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -77,7 +79,8 @@ internal sealed class Create : IEndpoint
                 InvoiceNumber: request.InvoiceNumber,
                 TransferFormNumber: request.TransferFormNumber,
                 RegistrationNumber: request.RegistrationNumber,
-                DeliveryDate: request.DeliveryDate);
+                DeliveryDate: request.DeliveryDate,
+                Currency: request.Currency);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

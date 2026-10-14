@@ -143,6 +143,43 @@ public class MoneyRoundTripTests
             .Should().Be(new Money(900m, "USD"));
     }
 
+    // sfc B0.2 / ADR C2: a sale converted from a quote stores its own copy of the quote's snapshot in the same save.
+    [Fact]
+    public async Task SaleExchangeRateSnapshot_CopiedFromQuote_Should_RoundTripOnBoth()
+    {
+        await using var connection = await OpenSchemaAsync();
+        var snapshot = new Domain.Currency.ExchangeRateSnapshot(
+            "USD", "ARS", 980.5m, new DateTime(2026, 9, 28, 0, 0, 0, DateTimeKind.Utc), Guid.NewGuid());
+        Guid quoteId, saleId;
+        await using (var write = NewContext(connection))
+        {
+            var marca = new Marca("Toyota");
+            var modelo = new Modelo("Corolla", marca.Id);
+            write.Marca.Add(marca);
+            write.Modelo.Add(modelo);
+            var car = NewCar(marca, modelo, "SNP003");
+            var client = new Client(TenantId, "Ana", "Perez", "30111222", "ana@x.com", "1155550000", "Calle 1", DateTime.UtcNow);
+            write.Cars.Add(car);
+            write.Clients.Add(client);
+            var now = DateTime.UtcNow;
+            var quote = new Quote(TenantId, car, client, null, 9000m, Domain.Quotes.Attributes.PaymentMethod.Contado,
+                now.AddDays(5), "c", now, CurrencyCode.Usd, snapshot);
+            var sale = new Sale(TenantId, car.Id, client.Id, 9000m, PaymentMethod.Cash, "CN-SNP", "c", now,
+                currency: CurrencyCode.Usd, exchangeRate: snapshot with { });
+            write.Quotes.Add(quote);
+            write.Sales.Add(sale);
+            await write.SaveChangesAsync();
+            quoteId = quote.Id;
+            saleId = sale.Id;
+        }
+
+        await using var read = NewContext(connection);
+        (await read.Quotes.AsNoTracking().SingleAsync(q => q.Id == quoteId)).ExchangeRate.Should().Be(snapshot);
+        var loadedSale = await read.Sales.AsNoTracking().SingleAsync(s => s.Id == saleId);
+        loadedSale.ExchangeRate.Should().Be(snapshot);
+        loadedSale.FinalPrice.Should().Be(new Money(9000m, "USD"));
+    }
+
     // sfc B0.2 / ADR C2: the exchange-rate snapshot is stored with the quote and read back exactly; absent stays null.
     [Theory]
     [InlineData(true)]

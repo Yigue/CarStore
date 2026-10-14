@@ -12,6 +12,7 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.HasKey(s => s.Id);
 
         builder.OwnsRequiredMoney(s => s.FinalPrice, "final_price", "final_price_currency");
+        builder.OwnsOptionalExchangeRate(s => s.ExchangeRate);
 
         builder.Property(s => s.Status)
             .HasConversion<string>();
