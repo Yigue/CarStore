@@ -11,4 +11,6 @@ public sealed record CreateQuoteCommand(
     decimal ProposedPrice,
     PaymentMethod PaymentMethod,
     DateTime ValidUntil,
-    string Comments) : ICommand<Guid>;
+    string Comments,
+    // sfc B0.2.3 phase 1: optional price currency; ARS when omitted.
+    string? Currency = null) : ICommand<Guid>;

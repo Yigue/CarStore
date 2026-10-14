@@ -37,7 +37,9 @@ public sealed class Quote : Entity, ISoftDeletable
         PaymentMethod paymentMethod,
         DateTime validUntil,
         string comments,
-        DateTime date)
+        DateTime date,
+        // sfc B0.2.3 phase 1: ARS when omitted; the exchange-rate snapshot for other currencies lands in the next phase.
+        CurrencyCode? proposedCurrency = null)
     {
         SetDealer(dealerId);
 
@@ -66,7 +68,7 @@ public sealed class Quote : Entity, ISoftDeletable
         }
 
         
-        ProposedPrice = Money.Of(proposedPrice, CurrencyCode.Ars);
+        ProposedPrice = Money.Of(proposedPrice, proposedCurrency ?? CurrencyCode.Ars);
         PaymentMethod = paymentMethod;
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
@@ -81,15 +83,17 @@ public sealed class Quote : Entity, ISoftDeletable
         decimal proposedPrice,
         DateTime validUntil,
         string comments,
-        DateTime updatedAt)
+        DateTime updatedAt,
+        CurrencyCode? proposedCurrency = null)
     {
         if (Status != QuoteStatus.Pending)
             throw new DomainException("Only pending quotes can be updated");
-        
+
         if (validUntil <= updatedAt)
             throw new DomainException("ValidUntil must be in the future");
-        
-        ProposedPrice = Money.Of(proposedPrice, CurrencyCode.Ars);
+
+        // Without an explicit currency the quote keeps its own; hard-coding ARS here converted USD quotes silently.
+        ProposedPrice = Money.Of(proposedPrice, proposedCurrency ?? CurrencyCode.Parse(ProposedPrice.Currency));
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
         UpdatedAt = updatedAt;

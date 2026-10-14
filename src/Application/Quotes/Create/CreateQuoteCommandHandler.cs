@@ -9,6 +9,7 @@ using Domain.Clients.Attributes;
 using Domain.Leads;
 using Domain.Quotes;
 using Domain.Quotes.Attributes;
+using Domain.Shared.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -169,6 +170,18 @@ internal sealed class CreateQuoteCommandHandler(
             return Result.Failure<Guid>(QuoteErrors.ActiveQuoteAlreadyExists(command.CarId, liveQuote.Id));
         }
 
+        CurrencyCode? proposedCurrency = null;
+        if (command.Currency is not null)
+        {
+            if (!CurrencyCode.TryParse(command.Currency, out CurrencyCode parsedCurrency))
+            {
+                return Result.Failure<Guid>(Error.Validation(
+                    "Currency.Unsupported", "Unsupported currency. Supported: ARS, USD."));
+            }
+
+            proposedCurrency = parsedCurrency;
+        }
+
         var quote = new Quote(
             tenantService.DealerId,
             car,
@@ -178,7 +191,8 @@ internal sealed class CreateQuoteCommandHandler(
             command.PaymentMethod,
             command.ValidUntil,
             command.Comments,
-            dateTimeProvider.UtcNow);
+            dateTimeProvider.UtcNow,
+            proposedCurrency);
 
         context.Quotes.Add(quote);
 
