@@ -248,9 +248,13 @@ public sealed class Car : Entity
     /// </summary>
     public void Sell(DateTime updatedAt) => MarkAsSold(updatedAt);
     
-    public void UpdatePrice(decimal newPrice, DateTime updatedAt)
+    /// <summary>
+    /// sfc B0.2.3: without an explicit currency the car keeps the one it already has. Hard-coding ARS here used to
+    /// convert a USD car to ARS silently on every price edit.
+    /// </summary>
+    public void UpdatePrice(decimal newPrice, DateTime updatedAt, CurrencyCode? currency = null)
     {
-        Price = Money.Of(newPrice, CurrencyCode.Ars);
+        Price = Money.Of(newPrice, currency ?? CurrencyCode.Parse(Price.Currency));
         UpdatedAt = updatedAt;
     }
     

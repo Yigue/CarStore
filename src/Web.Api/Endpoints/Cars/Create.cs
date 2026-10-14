@@ -39,25 +39,25 @@ internal sealed class Create : IEndpoint
         app.MapPost("cars", async (Request request, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new CreateCarCommand(
-                request.Marca,
-                request.Modelo,
-                (Color)request.Color,
-                (TypeCar)request.CarType,
-                (StatusCar)request.CarStatus,
-                (StatusServiceCar)request.ServiceCar,
-                request.CantidadPuertas,
-                request.CantidadAsientos,
-                request.Cilindrada,
-                request.Kilometraje,
-                request.Anio,
-                request.Patente,
-                request.Descripcion,
-                request.Precio,
-                (FuelType)request.FuelType,
-                request.Featured,
-                (Transmission)request.Transmission,
-                request.PurchaseCost,
-                request.Currency);
+                Marca: request.Marca,
+                Modelo: request.Modelo,
+                Color: (Color)request.Color,
+                CarType: (TypeCar)request.CarType,
+                CarStatus: (StatusCar)request.CarStatus,
+                ServiceCar: (StatusServiceCar)request.ServiceCar,
+                CantidadPuertas: request.CantidadPuertas,
+                CantidadAsientos: request.CantidadAsientos,
+                Cilindrada: request.Cilindrada,
+                Kilometraje: request.Kilometraje,
+                Anio: request.Anio,
+                Patente: request.Patente,
+                Descripcion: request.Descripcion,
+                Price: request.Precio,
+                FuelType: (FuelType)request.FuelType,
+                Featured: request.Featured,
+                Transmission: (Transmission)request.Transmission,
+                PurchaseCost: request.PurchaseCost,
+                Currency: request.Currency);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

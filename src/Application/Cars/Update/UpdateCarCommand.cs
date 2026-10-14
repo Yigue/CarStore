@@ -29,4 +29,8 @@ public sealed record UpdateCarCommand(
     /// the field is optional so every existing caller keeps working unchanged, and an update
     /// that says nothing about images never disturbs them.
     /// </summary>
-    Guid? CoverImageId = null) : ICommand<Guid>;
+    Guid? CoverImageId = null,
+    /// <summary>
+    /// sfc B0.2.3 (phase 1): optional price currency. Null keeps the car's current currency; it never falls back to ARS.
+    /// </summary>
+    string? Currency = null) : ICommand<Guid>;

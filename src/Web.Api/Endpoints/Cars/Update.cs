@@ -35,6 +35,8 @@ internal sealed class Update : IEndpoint
         /// to leave the gallery exactly as it is.
         /// </summary>
         public Guid? CoverImageId { get; set; }
+        // sfc B0.2.3 phase 1: optional; null keeps the car's current price currency.
+        public string? Currency { get; set; }
     }
 
     public void MapEndpoint(IEndpointRouteBuilder app)
@@ -66,7 +68,8 @@ internal sealed class Update : IEndpoint
                 Featured: request.Featured,
                 Transmission: (Transmission)request.Transmission,
                 PurchaseCost: request.PurchaseCost,
-                CoverImageId: request.CoverImageId
+                CoverImageId: request.CoverImageId,
+                Currency: request.Currency
             );
 
             Result<Guid> result = await sender.Send(command, cancellationToken);

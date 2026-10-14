@@ -94,10 +94,25 @@ internal sealed class UpdateCarCommandHandler(
             command.Transmission,
             command.PurchaseCost);
         
-        // Use domain method for price update
-        if (car.Price.Amount != command.Price)
+        // sfc B0.2.3 phase 1: an explicit currency is validated; null keeps the car's current currency.
+        CurrencyCode? priceCurrency = null;
+        if (command.Currency is not null)
         {
-            car.UpdatePrice(command.Price, dateTimeProvider.UtcNow);
+            if (!CurrencyCode.TryParse(command.Currency, out CurrencyCode parsedCurrency))
+            {
+                return Result.Failure<Guid>(Error.Validation(
+                    "Currency.Unsupported", "Unsupported currency. Supported: ARS, USD."));
+            }
+
+            priceCurrency = parsedCurrency;
+        }
+
+        bool currencyChanged = priceCurrency is not null && priceCurrency.Value != car.Price.Currency;
+
+        // Use domain method for price update
+        if (car.Price.Amount != command.Price || currencyChanged)
+        {
+            car.UpdatePrice(command.Price, dateTimeProvider.UtcNow, priceCurrency);
         }
         
         // INV-01: the cover travels with the rest of the vehicle's data.
