@@ -94,6 +94,8 @@ internal sealed class BuildTenantExportCommandHandler(
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "cotizaciones", context.Quotes.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
+        files.Add(await AddCsvAsync(zip, "senas", context.Deposits.IgnoreQueryFilters().AsNoTracking()
+            .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "ventas", context.Sales.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "turnos", context.Appointments.IgnoreQueryFilters().AsNoTracking()
@@ -178,8 +180,6 @@ internal sealed class BuildTenantExportCommandHandler(
         ZipArchive zip, TenantExport export, List<FileEntry> files, AttachmentResult attachments, CancellationToken ct)
     {
         var counts = files.ToDictionary(f => Path.GetFileNameWithoutExtension(f.Name), f => f.Rows);
-        // Seña (deposit) has no persistence yet (sfc B1); the key is kept so the manifest schema is stable.
-        counts["senas"] = 0;
 
         var manifest = new
         {
@@ -190,7 +190,7 @@ internal sealed class BuildTenantExportCommandHandler(
             counts,
             files = files.Select(f => new { name = f.Name, rows = f.Rows, sha256 = f.Sha256, bytes = f.Bytes }),
             attachments = new { included = attachments.Included, missing = attachments.Missing, skippedLegacy = attachments.SkippedLegacy },
-            notIncluded = new[] { "senas" }
+            notIncluded = Array.Empty<string>()
         };
 
         ZipArchiveEntry entry = zip.CreateEntry("manifest.json", CompressionLevel.Optimal);

@@ -135,6 +135,28 @@ public class BuildTenantExportCommandHandlerTests
             zip.GetEntry(file).Should().NotBeNull(file);
     }
 
+    // sfc B1.3: deposits are persisted now, so the export carries them (RN-014) instead of listing them as not included.
+    [Fact]
+    public async Task Handle_ExportsTheTenantsDeposits()
+    {
+        var rig = CreateRig();
+        var export = SeedRequestedExport(rig.Context);
+        var car = new Domain.Deposits.DepositCarContext(Domain.Cars.Attributes.StatusServiceCar.Disponible, null, false, "ARS");
+        rig.Context.Deposits.AddRange(
+            Domain.Deposits.Deposit.Create(_dealerId, Guid.NewGuid(), Guid.NewGuid(), null, 100m, "ARS", null, Now, car).Value,
+            Domain.Deposits.Deposit.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, 200m, "ARS", null, Now, car).Value);
+        rig.Context.SaveChanges();
+
+        var result = await rig.Handler.Handle(new BuildTenantExportCommand(export.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        using var zip = Open(rig.UploadedZip!);
+        zip.GetEntry("senas.csv").Should().NotBeNull();
+        using var manifest = JsonDocument.Parse(ReadEntry(zip, "manifest.json"));
+        manifest.RootElement.GetProperty("counts").GetProperty("senas").GetInt32().Should().Be(1);
+        manifest.RootElement.GetProperty("notIncluded").EnumerateArray().Select(e => e.GetString()).Should().NotContain("senas");
+    }
+
     [Fact]
     public async Task Handle_WritesCsvAsRfc4180_Utf8WithBom_QuotingSpecialCharacters()
     {
