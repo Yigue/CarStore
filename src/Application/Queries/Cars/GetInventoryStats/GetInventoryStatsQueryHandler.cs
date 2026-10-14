@@ -28,7 +28,8 @@ internal sealed class GetInventoryStatsQueryHandler
         var totalCount = cars.Count;
         var totalValue = cars.Sum(c => c.Price.Amount);
 
-        var available = cars.Count(c => c.ServiceCar == StatusServiceCar.Disponible);
+        // sfc B6.1 / RN-042: EnVenta is on sale too; it used to fall through every bucket.
+        var available = cars.Count(c => c.ServiceCar is StatusServiceCar.Disponible or StatusServiceCar.EnVenta);
         var reserved = cars.Count(c => c.ServiceCar == StatusServiceCar.Reservado);
         var sold = cars.Count(c => c.ServiceCar == StatusServiceCar.Vendido);
 
