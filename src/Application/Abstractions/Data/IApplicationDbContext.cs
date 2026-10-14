@@ -57,6 +57,7 @@ public interface IApplicationDbContext
     DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; }
     DbSet<Domain.Auditing.DealerAuditLogEntry> DealerAuditLogs { get; }
     DbSet<Domain.Currency.DealerExchangeRate> DealerExchangeRates { get; }
+    DbSet<Domain.Deposits.Deposit> Deposits { get; }
 
     /// <summary>
     /// Atomic single use of an action token: <c>UPDATE ... SET consumed_at = @now WHERE id = @id AND consumed_at IS NULL

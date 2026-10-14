@@ -1,4 +1,5 @@
 using Domain.Cars.Attributes;
+using Domain.Currency;
 using Domain.Deposits.Events;
 using Domain.Shared.ValueObjects;
 using SharedKernel;
@@ -24,8 +25,8 @@ public sealed class Deposit : Entity
     public Guid? LeadId { get; private set; }
     public Money Amount { get; private set; } = null!;
 
-    /// <summary>D-CURRENCY: rate at creation, set when the deposit currency differs from the car's.</summary>
-    public decimal? ExchangeRateSnapshot { get; private set; }
+    /// <summary>D-CURRENCY / ADR C2: rate frozen at creation, set when the deposit currency differs from the car's.</summary>
+    public ExchangeRateSnapshot? ExchangeRate { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime ExpiresAtUtc { get; private set; }
@@ -44,7 +45,7 @@ public sealed class Deposit : Entity
         Guid? quoteId,
         decimal amount,
         string currency,
-        decimal? exchangeRateSnapshot,
+        ExchangeRateSnapshot? exchangeRate,
         DateTime nowUtc,
         DepositCarContext car,
         int validityDays = DefaultValidityDays,
@@ -74,7 +75,7 @@ public sealed class Deposit : Entity
 
         string normalizedCurrency = currency.Trim().ToUpperInvariant();
         bool differs = !string.Equals(normalizedCurrency, car.CarCurrency?.Trim(), StringComparison.OrdinalIgnoreCase);
-        if (differs && exchangeRateSnapshot is not > 0)
+        if (differs && exchangeRate is null)
             return Result.Failure<Deposit>(DepositErrors.ExchangeRateRequired());
 
         var deposit = new Deposit
@@ -85,7 +86,7 @@ public sealed class Deposit : Entity
             ClientId = clientId,
             LeadId = leadId,
             Amount = new Money(amount, normalizedCurrency),
-            ExchangeRateSnapshot = differs ? exchangeRateSnapshot : null,
+            ExchangeRate = differs ? exchangeRate : null,
             CreatedAtUtc = nowUtc,
             ExpiresAtUtc = nowUtc.AddDays(validityDays),
             Status = DepositStatus.Active,

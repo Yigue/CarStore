@@ -74,6 +74,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; set; }
     public DbSet<Domain.Auditing.DealerAuditLogEntry> DealerAuditLogs { get; set; }
     public DbSet<Domain.Currency.DealerExchangeRate> DealerExchangeRates { get; set; }
+    public DbSet<Domain.Deposits.Deposit> Deposits { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -214,6 +215,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Domain.Auditing.DealerAuditLogEntry>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.Currency.DealerExchangeRate>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Deposits.Deposit>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<TransactionCategory>().HasQueryFilter(x =>
             x.DealerId == Guid.Empty || !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);

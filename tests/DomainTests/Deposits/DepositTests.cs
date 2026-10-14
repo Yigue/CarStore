@@ -1,4 +1,5 @@
 using Domain.Cars.Attributes;
+using Domain.Currency;
 using Domain.Deposits;
 using Domain.Deposits.Events;
 
@@ -46,10 +47,13 @@ public class DepositTests
     [Fact]
     public void RN001_Create_StoresExchangeRateSnapshot_WhenCurrencyDiffersFromCar()
     {
-        Result<Deposit> result = Deposit.Create(DealerId, CarId, Guid.NewGuid(), null, 400m, "USD", 1200m, Now, Available("ARS"));
+        // ADR C2: the same immutable snapshot value object as quotes and sales, not a bare decimal.
+        var snapshot = new ExchangeRateSnapshot("USD", "ARS", 1200m, Now, Guid.NewGuid());
+
+        Result<Deposit> result = Deposit.Create(DealerId, CarId, Guid.NewGuid(), null, 400m, "USD", snapshot, Now, Available("ARS"));
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.ExchangeRateSnapshot.Should().Be(1200m);
+        result.Value.ExchangeRate.Should().Be(snapshot);
     }
 
     [Fact]

@@ -1083,6 +1083,77 @@ namespace Infrastructure.Migrations
                     b.ToTable("dealer_settings", "public");
                 });
 
+            modelBuilder.Entity("Domain.Deposits.Deposit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AppliedSaleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("applied_sale_id");
+
+                    b.Property<Guid>("CarId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("car_id");
+
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<Guid?>("QuoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("quote_id");
+
+                    b.Property<string>("RefundReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("refund_reason");
+
+                    b.Property<DateTime?>("RefundedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("refunded_at_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_deposits");
+
+                    b.HasIndex("CarId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_deposits_one_active_per_car")
+                        .HasFilter("status = 'Active'");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_deposits_dealer_id");
+
+                    b.HasIndex("Status", "ExpiresAtUtc")
+                        .HasDatabaseName("ix_deposits_status_expires_at_utc");
+
+                    b.ToTable("deposits", "public");
+                });
+
             modelBuilder.Entity("Domain.Documents.Document", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2517,6 +2588,108 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("OriginLeadId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_clients_leads_origin_lead_id");
+                });
+
+            modelBuilder.Entity("Domain.Deposits.Deposit", b =>
+                {
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "Amount", b1 =>
+                        {
+                            b1.Property<Guid>("DepositId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("amount_currency");
+
+                            b1.HasKey("DepositId");
+
+                            b1.ToTable("deposits", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("DepositId")
+                                .HasConstraintName("fk_deposits_deposits_id");
+                        });
+
+                    b.OwnsOne("Domain.Currency.ExchangeRateSnapshot", "ExchangeRate", b1 =>
+                        {
+                            b1.Property<Guid>("DepositId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Base")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character(3)")
+                                .HasColumnName("exchange_rate_base")
+                                .IsFixedLength();
+
+                            b1.Property<DateTime>("CapturedAtUtc")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("exchange_rate_captured_at_utc");
+
+                            b1.Property<string>("Quote")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character(3)")
+                                .HasColumnName("exchange_rate_quote")
+                                .IsFixedLength();
+
+                            b1.Property<decimal>("Rate")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("exchange_rate");
+
+                            b1.Property<Guid>("SourceRateId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("exchange_rate_source_id");
+
+                            b1.HasKey("DepositId");
+
+                            b1.ToTable("deposits", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("DepositId")
+                                .HasConstraintName("fk_deposits_deposits_id");
+                        });
+
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "RefundedAmount", b1 =>
+                        {
+                            b1.Property<Guid>("DepositId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("refunded_amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("refunded_amount_currency");
+
+                            b1.HasKey("DepositId");
+
+                            b1.ToTable("deposits", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("DepositId")
+                                .HasConstraintName("fk_deposits_deposits_id");
+                        });
+
+                    b.Navigation("Amount")
+                        .IsRequired();
+
+                    b.Navigation("ExchangeRate");
+
+                    b.Navigation("RefundedAmount");
                 });
 
             modelBuilder.Entity("Domain.Documents.Document", b =>

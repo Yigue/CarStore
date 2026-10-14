@@ -94,6 +94,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs => Set<Domain.Platform.PlatformAuditLogEntry>();
     public DbSet<Domain.Auditing.DealerAuditLogEntry> DealerAuditLogs => Set<Domain.Auditing.DealerAuditLogEntry>();
     public DbSet<Domain.Currency.DealerExchangeRate> DealerExchangeRates => Set<Domain.Currency.DealerExchangeRate>();
+    public DbSet<Domain.Deposits.Deposit> Deposits => Set<Domain.Deposits.Deposit>();
 
     public void DetachEntity(object entity)
     {
