@@ -431,4 +431,25 @@ public class PurgeTenantCommandHandlerTests
         record.Counts["deposits"].Should().Be(1);
         record.Counts["exchangeRates"].Should().Be(1);
     }
+
+    // sfc B5.3: user preferences go with the dealer's users; another dealer's stay.
+    [Fact]
+    public async Task Purge_DeletesThePreferencesOfTheDealersUsersOnly()
+    {
+        SeedDealer(_dealerId, TenantLifecycleStatus.Locked);
+        var mine = new User(_dealerId, "mine@dealer.com", "U", "S", "hash", Guid.NewGuid());
+        var theirs = new User(_otherId, "theirs@dealer.com", "U", "S", "hash", Guid.NewGuid());
+        _context.Users.AddRange(mine, theirs);
+        await _context.SaveChangesAsync();
+        _context.UserPreferences.AddRange(
+            UserPreferences.Create(mine.Id, PreferencesV1.Default),
+            UserPreferences.Create(theirs.Id, PreferencesV1.Default));
+        await _context.SaveChangesAsync();
+
+        var result = await Handler().Handle(new PurgeTenantCommand(_dealerId, DryRun: false), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        (await _context.UserPreferences.Select(p => p.UserId).ToListAsync()).Should().Equal(theirs.Id);
+        (await _context.TenantPurgeRecords.SingleAsync()).Counts["userPreferences"].Should().Be(1);
+    }
 }

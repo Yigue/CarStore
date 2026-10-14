@@ -75,6 +75,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Domain.Auditing.DealerAuditLogEntry> DealerAuditLogs { get; set; }
     public DbSet<Domain.Currency.DealerExchangeRate> DealerExchangeRates { get; set; }
     public DbSet<Domain.Deposits.Deposit> Deposits { get; set; }
+    public DbSet<Domain.Users.UserPreferences> UserPreferences { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

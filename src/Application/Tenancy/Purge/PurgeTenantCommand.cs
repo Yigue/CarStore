@@ -127,6 +127,7 @@ internal sealed class PurgeTenantCommandHandler(
         counts["transactionCategories"] = await DeleteAsync(context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.TransactionCategories, null, ct);
         counts["userPermissions"] = await DeleteAsync(context.UserPermissions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.UserPermissions, null, ct);
         counts["passwordResetTokens"] = await DeleteAsync(PasswordResetTokensOf(dealerId), context.PasswordResetTokens, null, ct);
+        counts["userPreferences"] = await DeleteAsync(UserPreferencesOf(dealerId), context.UserPreferences, null, ct);
         counts["users"] = await DeleteAsync(context.Users.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Users, null, ct);
         counts["rolePermissions"] = await DeleteAsync(RolePermissionsOf(dealerId), context.RolePermissions, null, ct);
         counts["roles"] = await DeleteAsync(context.Roles.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Roles, null, ct);
@@ -206,6 +207,7 @@ internal sealed class PurgeTenantCommandHandler(
         yield return ("transactionCategories", context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("userPermissions", context.UserPermissions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("passwordResetTokens", PasswordResetTokensOf(dealerId));
+        yield return ("userPreferences", UserPreferencesOf(dealerId));
         yield return ("users", context.Users.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("rolePermissions", RolePermissionsOf(dealerId));
         yield return ("roles", context.Roles.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
@@ -218,6 +220,9 @@ internal sealed class PurgeTenantCommandHandler(
 
     private IQueryable<Domain.Users.PasswordResetToken> PasswordResetTokensOf(Guid dealerId) =>
         context.PasswordResetTokens.Where(t => context.Users.IgnoreQueryFilters().Any(u => u.Id == t.UserId && u.DealerId == dealerId));
+
+    private IQueryable<Domain.Users.UserPreferences> UserPreferencesOf(Guid dealerId) =>
+        context.UserPreferences.Where(p => context.Users.IgnoreQueryFilters().Any(u => u.Id == p.UserId && u.DealerId == dealerId));
 
     private IQueryable<Domain.Users.RolePermission> RolePermissionsOf(Guid dealerId) =>
         context.RolePermissions.Where(p => context.Roles.IgnoreQueryFilters().Any(r => r.Id == p.RoleId && r.DealerId == dealerId));

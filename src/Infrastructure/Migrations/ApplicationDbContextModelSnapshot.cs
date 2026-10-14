@@ -2305,6 +2305,27 @@ namespace Infrastructure.Migrations
                     b.ToTable("UserPermissions", "public");
                 });
 
+            modelBuilder.Entity("Domain.Users.UserPreferences", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Preferences")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("preferences");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_user_preferences");
+
+                    b.ToTable("user_preferences", "public");
+                });
+
             modelBuilder.Entity("Domain.Webhooks.WebhookDelivery", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3185,6 +3206,16 @@ namespace Infrastructure.Migrations
                         .HasConstraintName("fk_user_permissions_users_user_id");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Domain.Users.UserPreferences", b =>
+                {
+                    b.HasOne("Domain.Users.User", null)
+                        .WithOne()
+                        .HasForeignKey("Domain.Users.UserPreferences", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_preferences_users_user_id");
                 });
 
             modelBuilder.Entity("Domain.Webhooks.WebhookDelivery", b =>
