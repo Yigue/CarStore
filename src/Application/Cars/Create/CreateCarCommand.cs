@@ -22,4 +22,6 @@ public sealed record CreateCarCommand(
     bool Featured = false,
     Transmission Transmission = Transmission.Manual,
     decimal? PurchaseCost = null,
-    string? Currency = null) : ICommand<Guid>;
+    string? Currency = null,
+    // sfc B7.4: one of the dealer's suppliers.
+    Guid? SupplierId = null) : ICommand<Guid>;

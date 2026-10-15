@@ -88,6 +88,8 @@ internal sealed class BuildTenantExportCommandHandler(
         // IgnoreQueryFilters keeps soft-deleted / archived rows: the dealer asked for ALL its data.
         files.Add(await AddCsvAsync(zip, "vehiculos", context.Cars.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
+        files.Add(await AddCsvAsync(zip, "proveedores", context.Suppliers.IgnoreQueryFilters().AsNoTracking()
+            .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "clientes", context.Clients.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "leads", context.Leads.IgnoreQueryFilters().AsNoTracking()

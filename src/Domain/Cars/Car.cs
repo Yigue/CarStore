@@ -252,6 +252,11 @@ public sealed class Car : Entity
     /// sfc B0.2.3: without an explicit currency the car keeps the one it already has. Hard-coding ARS here used to
     /// convert a USD car to ARS silently on every price edit.
     /// </summary>
+    /// <summary>sfc B7.4 / RN-039: the supplier the vehicle was bought from (null when unknown).</summary>
+    public Guid? SupplierId { get; private set; }
+
+    public void AssignSupplier(Guid? supplierId) => SupplierId = supplierId;
+
     public void UpdatePrice(decimal newPrice, DateTime updatedAt, CurrencyCode? currency = null)
     {
         Price = Money.Of(newPrice, currency ?? CurrencyCode.Parse(Price.Currency));

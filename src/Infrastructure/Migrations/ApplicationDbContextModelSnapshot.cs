@@ -563,6 +563,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("service_car");
 
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
                     b.Property<string>("Transmission")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1961,6 +1965,49 @@ namespace Infrastructure.Migrations
                         .HasDatabaseName("ix_outbox_type_occurred");
 
                     b.ToTable("OutboxMessages", "public");
+                });
+
+            modelBuilder.Entity("Domain.Suppliers.Supplier", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("contact_email");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NameNormalized")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name_normalized");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("phone");
+
+                    b.HasKey("Id")
+                        .HasName("pk_suppliers");
+
+                    b.HasIndex("DealerId", "NameNormalized")
+                        .IsUnique()
+                        .HasDatabaseName("ux_suppliers_dealer_id_name_normalized");
+
+                    b.ToTable("suppliers", "public");
                 });
 
             modelBuilder.Entity("Domain.Tenancy.PendingStorageDeletion", b =>

@@ -123,6 +123,7 @@ internal sealed class PurgeTenantCommandHandler(
         counts["leads"] = await DeleteAsync(context.Leads.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Leads, null, ct);
         counts["carImages"] = await DeleteAsync(CarImagesOf(dealerId), context.CarImages, i => i.ObjectKey, ct, storageKeys);
         counts["cars"] = await DeleteAsync(context.Cars.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Cars, null, ct);
+        counts["suppliers"] = await DeleteAsync(context.Suppliers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Suppliers, null, ct);
         counts["clients"] = await DeleteAsync(context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Clients, null, ct);
         counts["exchangeRates"] = await DeleteAsync(context.DealerExchangeRates.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.DealerExchangeRates, null, ct);
         counts["transactionCategories"] = await DeleteAsync(context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.TransactionCategories, null, ct);
@@ -204,6 +205,7 @@ internal sealed class PurgeTenantCommandHandler(
         yield return ("leads", context.Leads.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("carImages", CarImagesOf(dealerId));
         yield return ("cars", context.Cars.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("suppliers", context.Suppliers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("clients", context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("exchangeRates", context.DealerExchangeRates.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("transactionCategories", context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));

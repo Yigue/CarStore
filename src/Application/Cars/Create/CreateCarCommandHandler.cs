@@ -36,6 +36,13 @@ internal sealed class CreateCarCommandHandler(
             priceCurrency = parsed;
         }
 
+        // sfc B7.4: only one of the caller's own suppliers.
+        if (command.SupplierId is { } supplierId
+            && !await context.Suppliers.AnyAsync(s => s.Id == supplierId && s.DealerId == tenantService.DealerId, cancellationToken))
+        {
+            return Result.Failure<Guid>(Domain.Suppliers.SupplierErrors.NotFound(supplierId));
+        }
+
         // Validate unique license plate before insert within tenant
         var licensePlate = new Domain.Shared.ValueObjects.LicensePlate(command.Patente);
         var existingCar = await context.Cars
@@ -89,6 +96,7 @@ internal sealed class CreateCarCommandHandler(
             priceCurrency
             );
 
+        car.AssignSupplier(command.SupplierId);
         context.Cars.Add(car);
 
         try

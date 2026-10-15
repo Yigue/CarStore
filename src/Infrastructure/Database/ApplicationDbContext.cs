@@ -77,6 +77,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Domain.Deposits.Deposit> Deposits { get; set; }
     public DbSet<Domain.Users.UserPreferences> UserPreferences { get; set; }
     public DbSet<Domain.Cars.VehicleLien> VehicleLiens { get; set; }
+    public DbSet<Domain.Suppliers.Supplier> Suppliers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -221,6 +222,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Domain.Deposits.Deposit>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.Cars.VehicleLien>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Suppliers.Supplier>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<TransactionCategory>().HasQueryFilter(x =>
             x.DealerId == Guid.Empty || !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
