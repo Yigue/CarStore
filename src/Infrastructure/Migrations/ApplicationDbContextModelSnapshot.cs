@@ -690,6 +690,58 @@ namespace Infrastructure.Migrations
                     b.ToTable("reconditioning_tasks", "public");
                 });
 
+            modelBuilder.Entity("Domain.Cars.VehicleLien", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CarId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("car_id");
+
+                    b.Property<string>("Creditor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("creditor");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTime?>("LiquidatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("liquidated_at_utc");
+
+                    b.Property<DateTime>("RegisteredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registered_at_utc");
+
+                    b.Property<string>("RegistrationNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("registration_number");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_vehicle_liens");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_vehicle_liens_dealer_id");
+
+                    b.HasIndex("CarId", "Status")
+                        .HasDatabaseName("ix_vehicle_liens_car_id_status");
+
+                    b.ToTable("vehicle_liens", "public");
+                });
+
             modelBuilder.Entity("Domain.Clients.Client", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2615,6 +2667,37 @@ namespace Infrastructure.Migrations
                         });
 
                     b.Navigation("Cost")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.Cars.VehicleLien", b =>
+                {
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "Amount", b1 =>
+                        {
+                            b1.Property<Guid>("VehicleLienId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("amount_currency");
+
+                            b1.HasKey("VehicleLienId");
+
+                            b1.ToTable("vehicle_liens", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("VehicleLienId")
+                                .HasConstraintName("fk_vehicle_liens_vehicle_liens_id");
+                        });
+
+                    b.Navigation("Amount")
                         .IsRequired();
                 });
 

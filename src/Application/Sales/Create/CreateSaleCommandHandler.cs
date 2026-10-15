@@ -15,6 +15,7 @@ using Domain.Sales.Events;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 using Application.Common;
+using Application.Cars.Liens;
 using Application.Currency;
 using Domain.Currency;
 using Domain.Deposits;
@@ -305,6 +306,12 @@ internal sealed class CreateSaleCommandHandler(
 
         if (requestedStatus == SaleStatus.Completed)
         {
+            // sfc B7.2 / RN-037: an Active lien blocks the transfer until it is liquidated.
+            if (await context.HasActiveLienAsync(car.Id, cancellationToken))
+            {
+                return Result.Failure<Guid>(VehicleLienErrors.ActiveLienBlocksTransfer(car.Id));
+            }
+
             context.Sales.Add(sale);
 
             // Complete the sale to trigger financial transaction and domain events

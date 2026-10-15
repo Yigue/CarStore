@@ -1,4 +1,5 @@
 using Application.Abstractions.Data;
+using Application.Cars.Liens;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
 using Application.Common;
@@ -59,6 +60,12 @@ internal sealed class UpdateSaleCommandHandler(
                 break;
 
             case SaleStatus.Completed:
+                // sfc B7.2 / RN-037: an Active lien blocks the transfer until it is liquidated.
+                if (await context.HasActiveLienAsync(sale.CarId, cancellationToken))
+                {
+                    return Result.Failure<Guid>(VehicleLienErrors.ActiveLienBlocksTransfer(sale.CarId));
+                }
+
                 sale.Update(
                     command.FinalPrice,
                     command.PaymentMethod,

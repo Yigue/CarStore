@@ -419,6 +419,8 @@ public class PurgeTenantCommandHandlerTests
                 dealer, Domain.Shared.ValueObjects.CurrencyCode.Usd, Domain.Shared.ValueObjects.CurrencyCode.Ars, 1000m, Now, Guid.NewGuid()).Value);
             _context.Deposits.Add(Domain.Deposits.Deposit.Create(
                 dealer, Guid.NewGuid(), Guid.NewGuid(), null, 100m, "ARS", null, Now, ctx).Value);
+            _context.VehicleLiens.Add(VehicleLien.Register(
+                dealer, Guid.NewGuid(), "Banco", Domain.Shared.ValueObjects.Money.Of(10m, Domain.Shared.ValueObjects.CurrencyCode.Ars), null, Now).Value);
         }
         await _context.SaveChangesAsync();
 
@@ -430,6 +432,8 @@ public class PurgeTenantCommandHandlerTests
         var record = await _context.TenantPurgeRecords.SingleAsync();
         record.Counts["deposits"].Should().Be(1);
         record.Counts["exchangeRates"].Should().Be(1);
+        record.Counts["vehicleLiens"].Should().Be(1);
+        (await _context.VehicleLiens.IgnoreQueryFilters().Select(l => l.DealerId).ToListAsync()).Should().Equal(_otherId);
     }
 
     // sfc B5.3: user preferences go with the dealer's users; another dealer's stay.
