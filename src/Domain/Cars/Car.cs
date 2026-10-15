@@ -257,6 +257,41 @@ public sealed class Car : Entity
 
     public void AssignSupplier(Guid? supplierId) => SupplierId = supplierId;
 
+    /// <summary>sfc B7.1 / RN-036: the third party (a client) that owns a consigned vehicle; null for own stock.</summary>
+    public Guid? ConsignmentOwnerClientId { get; private set; }
+
+    /// <summary>sfc B7.1: the dealer's share of the sale price, between 0 (exclusive) and 1.</summary>
+    public decimal? ConsignmentCommissionRate { get; private set; }
+
+    public bool IsConsigned => ConsignmentOwnerClientId is not null;
+
+    public Result PlaceOnConsignment(Guid ownerClientId, decimal commissionRate)
+    {
+        if (ownerClientId == Guid.Empty)
+            return Result.Failure(Error.Validation("Car.ConsignmentOwnerRequired", "Indicá el dueño del vehículo en consignación."));
+        if (commissionRate <= 0 || commissionRate > 1)
+            return Result.Failure(Error.Validation("Car.ConsignmentRateInvalid", "La comisión de consignación debe estar entre 0 y 100 %."));
+
+        ConsignmentOwnerClientId = ownerClientId;
+        ConsignmentCommissionRate = commissionRate;
+        return Result.Success();
+    }
+
+    public void EndConsignment()
+    {
+        ConsignmentOwnerClientId = null;
+        ConsignmentCommissionRate = null;
+    }
+
+    /// <summary>
+    /// sfc B7.1 / RN-036: what the dealer actually earns from selling this vehicle: the whole price for own stock, only
+    /// the consignment commission (rounded to cents) for a consigned one.
+    /// </summary>
+    public Money DealerIncomeFrom(Money salePrice) =>
+        ConsignmentCommissionRate is { } rate
+            ? Money.Of(Math.Round(salePrice.Amount * rate, 2, MidpointRounding.ToEven), CurrencyCode.Parse(salePrice.Currency))
+            : salePrice;
+
     public void UpdatePrice(decimal newPrice, DateTime updatedAt, CurrencyCode? currency = null)
     {
         Price = Money.Of(newPrice, currency ?? CurrencyCode.Parse(Price.Currency));

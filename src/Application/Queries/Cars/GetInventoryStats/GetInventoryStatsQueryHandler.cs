@@ -26,7 +26,8 @@ internal sealed class GetInventoryStatsQueryHandler
             .ToListAsync(cancellationToken);
 
         var totalCount = cars.Count;
-        var totalValue = cars.Sum(c => c.Price.Amount);
+        // sfc B7.1 / RN-036: consigned vehicles belong to third parties, not to the dealer's own inventory value.
+        var totalValue = cars.Where(c => !c.IsConsigned).Sum(c => c.Price.Amount);
 
         // sfc B6.1 / RN-042: EnVenta is on sale too; it used to fall through every bucket.
         var available = cars.Count(c => c.ServiceCar is StatusServiceCar.Disponible or StatusServiceCar.EnVenta);

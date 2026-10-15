@@ -507,6 +507,14 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("color");
 
+                    b.Property<decimal?>("ConsignmentCommissionRate")
+                        .HasColumnType("numeric")
+                        .HasColumnName("consignment_commission_rate");
+
+                    b.Property<Guid?>("ConsignmentOwnerClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("consignment_owner_client_id");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
