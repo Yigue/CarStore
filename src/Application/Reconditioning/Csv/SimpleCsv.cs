@@ -51,6 +51,15 @@ internal static class SimpleCsv
         return rows;
     }
 
-    public static string Quote(string value) =>
-        value.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
+    /// <summary>
+    /// RFC 4180 quoting, after neutralizing CSV formula injection: a value a spreadsheet would run as a formula
+    /// (starting with = + - @, tab or CR) gets a leading apostrophe so it is shown as text.
+    /// </summary>
+    public static string Quote(string value)
+    {
+        if (value.Length > 0 && value[0] is '=' or '+' or '-' or '@' or '\t' or '\r')
+            value = "'" + value;
+
+        return value.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
+    }
 }

@@ -1,6 +1,7 @@
 using System.Text;
 using Application.Reconditioning.Csv;
 using MediatR;
+using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
@@ -35,6 +36,9 @@ internal sealed class ReconditioningCsv : IEndpoint
             Result<ReconditioningImportResult> result = await sender.Send(new ImportReconditioningCsvCommand(id, content), cancellationToken);
             return result.Match(Results.Ok, CustomResults.Problem);
         })
+        // Enforced by Kestrel/form parsing before the body is read, unlike the file.Length check below.
+        .WithMetadata(new RequestSizeLimitAttribute(ImportReconditioningCsvCommand.MaxBytes + 64 * 1024))
+        .WithMetadata(new RequestFormLimitsAttribute { MultipartBodyLengthLimit = ImportReconditioningCsvCommand.MaxBytes + 64 * 1024 })
         .DisableAntiforgery()
         .Accepts<IFormFile>("multipart/form-data")
         .HasPermission("cars:update")

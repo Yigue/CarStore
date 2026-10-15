@@ -113,4 +113,33 @@ public class ImportCsvCommandHandlerTests
         lines[0].Should().Be("description,cost,currency,status");
         lines.Skip(1).Should().BeEquivalentTo("Pintura,1000.00,ARS,Pending", "\"Tapizado, asientos\",800.00,ARS,Pending");
     }
+
+    // Security review: a description that starts like a formula must not run when the export is opened in a spreadsheet.
+    [Fact]
+    public async Task Export_neutralizes_values_that_a_spreadsheet_would_run_as_formulas()
+    {
+        var (context, car) = await SeedAsync();
+        using var _ = context;
+        await Import(context).Handle(new ImportReconditioningCsvCommand(car.Id, "description,cost\n=HYPERLINK(\"http://x\"),10\n@SUM(A1),10\n+cmd,10\n-2+3,10\n"), CancellationToken.None);
+
+        var csv = await new GetReconditioningCsvQueryHandler(context, Tenant(DealerId))
+            .Handle(new GetReconditioningCsvQuery(car.Id), CancellationToken.None);
+
+        csv.Value.Split('\n').Skip(1).Where(l => l.Length > 0)
+            .Should().OnlyContain(l => l.StartsWith("'") || l.StartsWith("\"'"));
+    }
+
+    // Security review: the import is capped in rows, not only in bytes.
+    [Fact]
+    public async Task A_file_with_too_many_rows_is_rejected_without_creating_anything()
+    {
+        var (context, car) = await SeedAsync();
+        using var _ = context;
+        string csv = "description,cost\n" + string.Concat(Enumerable.Range(0, ImportReconditioningCsvCommand.MaxRows + 1).Select(i => $"T{i},1\n"));
+
+        var result = await Import(context).Handle(new ImportReconditioningCsvCommand(car.Id, csv), CancellationToken.None);
+
+        result.Error.Code.Should().Be("CSV_TOO_MANY_ROWS");
+        (await TasksAsync(context)).Should().BeEmpty();
+    }
 }

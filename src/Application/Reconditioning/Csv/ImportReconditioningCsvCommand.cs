@@ -16,6 +16,9 @@ public sealed record ImportReconditioningCsvCommand(Guid CarId, string Content) 
 {
     /// <summary>Spec default: 2 MB.</summary>
     public const int MaxBytes = 2 * 1024 * 1024;
+
+    /// <summary>Security review: rows are capped too, so 2 MB cannot turn into tens of thousands of inserts.</summary>
+    public const int MaxRows = 1000;
 }
 
 public sealed record ReconditioningImportResult(int Created, IReadOnlyList<CsvRowError> Errors);
@@ -46,6 +49,10 @@ internal sealed class ImportReconditioningCsvCommandHandler(IApplicationDbContex
         if (descriptionAt < 0 || costAt < 0)
             return Result.Failure<ReconditioningImportResult>(Error.Validation(
                 "INVALID_CSV_HEADERS", "El CSV debe tener las columnas 'description' y 'cost'."));
+
+        if (rows.Count - 1 > ImportReconditioningCsvCommand.MaxRows)
+            return Result.Failure<ReconditioningImportResult>(Error.Validation(
+                "CSV_TOO_MANY_ROWS", $"El archivo supera el máximo de {ImportReconditioningCsvCommand.MaxRows} filas."));
 
         CurrencyCode currency = CurrencyCode.Parse(car.Price.Currency);
         var errors = new List<CsvRowError>();
