@@ -115,6 +115,8 @@ internal sealed class PurgeTenantCommandHandler(
         counts["documents"] = await DeleteAsync(context.Documents.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Documents, d => d.BlobName, ct, storageKeys);
         counts["transactions"] = await DeleteAsync(context.Transactions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Transactions, null, ct);
         counts["appointments"] = await DeleteAsync(context.Appointments.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Appointments, null, ct);
+        counts["serviceReminders"] = await DeleteAsync(context.ServiceReminders.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.ServiceReminders, null, ct);
+        counts["warrantyRecords"] = await DeleteAsync(context.WarrantyRecords.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.WarrantyRecords, null, ct);
         counts["vehicleLiens"] = await DeleteAsync(context.VehicleLiens.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.VehicleLiens, null, ct);
         counts["deposits"] = await DeleteAsync(context.Deposits.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Deposits, null, ct);
         counts["sales"] = await DeleteAsync(context.Sales.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Sales, null, ct);
@@ -197,6 +199,8 @@ internal sealed class PurgeTenantCommandHandler(
         yield return ("documents", context.Documents.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("transactions", context.Transactions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("appointments", context.Appointments.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("serviceReminders", context.ServiceReminders.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("warrantyRecords", context.WarrantyRecords.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("vehicleLiens", context.VehicleLiens.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("deposits", context.Deposits.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("sales", context.Sales.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));

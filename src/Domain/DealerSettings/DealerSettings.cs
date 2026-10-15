@@ -239,6 +239,20 @@ public sealed class DealerSettings : Entity
         return Result.Success();
     }
 
+    /// <summary>sfc C2.4 / RN-049: months between service reminders after delivery; 0 turns them off.</summary>
+    public int ServiceReminderMonths { get; private set; } = DefaultServiceReminderMonths;
+
+    public const int DefaultServiceReminderMonths = 6;
+
+    public Result SetServiceReminderMonths(int months)
+    {
+        if (months < 0 || months > 24)
+            return Result.Failure(Error.Validation("DealerSettings.InvalidServiceCadence", "La cadencia de service debe estar entre 0 y 24 meses."));
+
+        ServiceReminderMonths = months;
+        return Result.Success();
+    }
+
     public Result SetDepositValidityDays(int days)
     {
         if (days <= 0 || days > Domain.Deposits.Deposit.DefaultMaxValidityDays)

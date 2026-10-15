@@ -55,6 +55,11 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
             .HasDefaultValue(0)
             .IsRequired();
 
+        // sfc C2.4: existing dealers get the RN-049 default service cadence.
+        builder.Property(s => s.ServiceReminderMonths)
+            .HasDefaultValue(Domain.DealerSettings.DealerSettings.DefaultServiceReminderMonths)
+            .IsRequired();
+
         // sfc B6.2: existing dealers get the RN-041 default cadence.
         builder.Property(s => s.FollowUpCadenceDays)
             .HasDefaultValue(Domain.DealerSettings.DealerSettings.DefaultFollowUpCadenceDays)

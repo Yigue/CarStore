@@ -23,6 +23,109 @@ namespace Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Domain.AfterSales.ServiceReminder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("ClientContactAllowed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("client_contact_allowed");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTime>("DueOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_on_utc");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sale_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_service_reminders");
+
+                    b.HasIndex("DealerId", "DueOnUtc")
+                        .HasDatabaseName("ix_service_reminders_dealer_due");
+
+                    b.HasIndex("SaleId", "Kind", "DueOnUtc")
+                        .IsUnique()
+                        .HasDatabaseName("ux_service_reminders_sale_kind_due");
+
+                    b.ToTable("service_reminders", "public");
+                });
+
+            modelBuilder.Entity("Domain.AfterSales.WarrantyRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CarId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("car_id");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
+                    b.Property<string>("Conditions")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("conditions");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTime>("EndsOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_on_utc");
+
+                    b.Property<int>("Months")
+                        .HasColumnType("integer")
+                        .HasColumnName("months");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sale_id");
+
+                    b.Property<DateTime>("StartsOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_on_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_warranty_records");
+
+                    b.HasIndex("SaleId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_warranty_records_sale_id");
+
+                    b.HasIndex("DealerId", "EndsOnUtc")
+                        .HasDatabaseName("ix_warranty_records_dealer_ends_on");
+
+                    b.ToTable("warranty_records", "public");
+                });
+
             modelBuilder.Entity("Domain.Appointments.Appointment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -761,6 +864,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("AcceptsServiceReminders")
+                        .HasColumnType("boolean")
+                        .HasColumnName("accepts_service_reminders");
+
                     b.Property<string>("AcquisitionSource")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -1091,6 +1198,12 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)")
                         .HasColumnName("secondary_color");
+
+                    b.Property<int>("ServiceReminderMonths")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(6)
+                        .HasColumnName("service_reminder_months");
 
                     b.Property<string>("Slug")
                         .HasMaxLength(63)

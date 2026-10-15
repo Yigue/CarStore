@@ -549,6 +549,14 @@ public static class DependencyInjection
                     trigger.ForJob(purgeJobKey)
                         .WithCronSchedule("0 0 3 * * ?"));
 
+            // sfc C2.4: after-sales reminders (RN-049), daily at 10:30 UTC.
+            var serviceReminderJobKey = new JobKey(nameof(ServiceReminderJob));
+            configure
+                .AddJob<ServiceReminderJob>(opts => opts.WithIdentity(serviceReminderJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(serviceReminderJobKey)
+                        .WithCronSchedule("0 30 10 * * ?"));
+
             // sfc B6.2: follow-up reminders (RN-041), daily at 11:00 UTC (08:00 in Argentina).
             var followUpJobKey = new JobKey(nameof(FollowUpCadenceJob));
             configure
