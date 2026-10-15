@@ -127,6 +127,7 @@ internal sealed class PurgeTenantCommandHandler(
         counts["cars"] = await DeleteAsync(context.Cars.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Cars, null, ct);
         counts["branches"] = await DeleteAsync(context.Branches.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Branches, null, ct);
         counts["suppliers"] = await DeleteAsync(context.Suppliers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Suppliers, null, ct);
+        counts["subscribers"] = await DeleteAsync(context.Subscribers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Subscribers, null, ct);
         counts["clients"] = await DeleteAsync(context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Clients, null, ct);
         counts["exchangeRates"] = await DeleteAsync(context.DealerExchangeRates.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.DealerExchangeRates, null, ct);
         counts["transactionCategories"] = await DeleteAsync(context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.TransactionCategories, null, ct);
@@ -213,6 +214,7 @@ internal sealed class PurgeTenantCommandHandler(
         yield return ("cars", context.Cars.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("branches", context.Branches.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("suppliers", context.Suppliers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("subscribers", context.Subscribers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("clients", context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("exchangeRates", context.DealerExchangeRates.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("transactionCategories", context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));

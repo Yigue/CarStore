@@ -31,6 +31,9 @@ public class IgnoreQueryFiltersAllowListTests
         "Users/ChangePassword/",
         // sfc A4.1: anonymous email verification; the token (looked up by SHA-256) identifies the user.
         "Users/Verification/",
+        // sfc B5.1 / RFC 8058: one-click unsubscribe is POSTed by the mail client with no dealer headers;
+        // the 256-bit token (looked up by SHA-256) identifies the subscriber.
+        "Marketing/Newsletter/Tokens/",
         // Outbox handlers run with no tenant context (HasTenant == false).
         "Sales/Events/",
         "Leads/CloseArtifacts/",

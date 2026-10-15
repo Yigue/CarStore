@@ -23,5 +23,6 @@ internal static class TransactionalEmailTokens
         EmailTemplate.PurgeWarning => ["Name", "PurgeDate", "ExportUrl"],
         EmailTemplate.QuoteSent => ["Name", "DealerName", "QuoteNumber", "QuoteUrl"],
         EmailTemplate.DepositExpiring => ["Name", "VehicleName", "DealerName", "ExpiresAt"],
+        EmailTemplate.NewsletterConfirm => ["ConfirmUrl", "UnsubscribeUrl", "ExpiresInDays"],
     };
 }

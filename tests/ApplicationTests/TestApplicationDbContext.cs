@@ -102,6 +102,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<Domain.AfterSales.ServiceReminder> ServiceReminders => Set<Domain.AfterSales.ServiceReminder>();
     public DbSet<Domain.Branches.Branch> Branches => Set<Domain.Branches.Branch>();
     public DbSet<Domain.Branches.UserBranch> UserBranches => Set<Domain.Branches.UserBranch>();
+    public DbSet<Domain.Marketing.Subscriber> Subscribers => Set<Domain.Marketing.Subscriber>();
 
     public void DetachEntity(object entity)
     {

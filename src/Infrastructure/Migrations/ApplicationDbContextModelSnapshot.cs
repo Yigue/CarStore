@@ -1811,6 +1811,86 @@ namespace Infrastructure.Migrations
                     b.ToTable("legal_acceptances", "public");
                 });
 
+            modelBuilder.Entity("Domain.Marketing.Subscriber", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ConfirmTokenExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirm_token_expires_at_utc");
+
+                    b.Property<string>("ConfirmTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("confirm_token_hash");
+
+                    b.Property<DateTime?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at_utc");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("EmailNormalized")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email_normalized");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("UnsubscribeTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("unsubscribe_token_hash");
+
+                    b.Property<DateTime?>("UnsubscribedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unsubscribed_at_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subscribers");
+
+                    b.HasIndex("ConfirmTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_subscribers_confirm_token_hash");
+
+                    b.HasIndex("UnsubscribeTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_subscribers_unsubscribe_token_hash");
+
+                    b.HasIndex("DealerId", "EmailNormalized")
+                        .IsUnique()
+                        .HasDatabaseName("ux_subscribers_dealer_id_email_normalized");
+
+                    b.ToTable("subscribers", "public");
+                });
+
             modelBuilder.Entity("Domain.Platform.PlatformAuditLogEntry", b =>
                 {
                     b.Property<Guid>("Id")

@@ -18,4 +18,5 @@ public enum EmailTemplate
     PurgeWarning,
     QuoteSent,
     DepositExpiring,
+    NewsletterConfirm,
 }

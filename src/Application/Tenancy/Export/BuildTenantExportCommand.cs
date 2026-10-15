@@ -92,6 +92,11 @@ internal sealed class BuildTenantExportCommandHandler(
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "proveedores", context.Suppliers.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
+        // sfc B5.1: the token digests stay out of the export; they are credentials, not the dealer's data.
+        files.Add(await AddCsvAsync(zip, "suscriptores", context.Subscribers.IgnoreQueryFilters().AsNoTracking()
+            .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id)
+            .Select(x => new { x.Id, x.Email, x.Status, x.Source, x.CreatedAtUtc, x.ConfirmedAtUtc, x.UnsubscribedAtUtc })
+            .AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "clientes", context.Clients.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "leads", context.Leads.IgnoreQueryFilters().AsNoTracking()
