@@ -42,12 +42,27 @@ internal sealed class GetInventoryStatsQueryHandler
             .GroupBy(c => c.CarType.ToString())
             .ToDictionary(g => g.Key, g => g.Count());
 
+        List<BranchInventory>? byBranch = null;
+        if (query.GroupByBranch)
+        {
+            var names = await _context.Branches.AsNoTracking()
+                .ToDictionaryAsync(b => b.Id, b => b.Name, cancellationToken);
+            byBranch = cars
+                .Where(c => c.BranchId is not null)
+                .GroupBy(c => c.BranchId!.Value)
+                .Select(g => new BranchInventory(
+                    g.Key, names.GetValueOrDefault(g.Key, string.Empty), g.Count(), g.Where(c => !c.IsConsigned).Sum(c => c.Price.Amount)))
+                .OrderByDescending(b => b.Count)
+                .ToList();
+        }
+
         var response = new InventoryStatsResponse(
             totalCount,
             totalValue,
             new InventoryByStatus(available, reserved, sold),
             byBrand,
-            byType);
+            byType,
+            byBranch);
 
         return Result.Success(response);
     }

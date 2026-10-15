@@ -34,6 +34,8 @@ internal sealed class Create : IEndpoint
         public string? Currency { get; set; }
         // sfc B7.4: one of the dealer's suppliers.
         public Guid? SupplierId { get; set; }
+        // sfc C2.1: one of the dealer's branches.
+        public Guid? BranchId { get; set; }
         }
 
         public void MapEndpoint(IEndpointRouteBuilder app)
@@ -60,7 +62,8 @@ internal sealed class Create : IEndpoint
                 Transmission: (Transmission)request.Transmission,
                 PurchaseCost: request.PurchaseCost,
                 Currency: request.Currency,
-                SupplierId: request.SupplierId);
+                SupplierId: request.SupplierId,
+                BranchId: request.BranchId);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

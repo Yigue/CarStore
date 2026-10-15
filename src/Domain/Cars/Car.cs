@@ -257,6 +257,11 @@ public sealed class Car : Entity
 
     public void AssignSupplier(Guid? supplierId) => SupplierId = supplierId;
 
+    /// <summary>sfc C2.1 / RN-048: the branch holding the vehicle (a data scope inside the dealer).</summary>
+    public Guid? BranchId { get; private set; }
+
+    public void AssignBranch(Guid? branchId) => BranchId = branchId;
+
     /// <summary>sfc B7.1 / RN-036: the third party (a client) that owns a consigned vehicle; null for own stock.</summary>
     public Guid? ConsignmentOwnerClientId { get; private set; }
 

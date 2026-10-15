@@ -43,6 +43,13 @@ internal sealed class CreateCarCommandHandler(
             return Result.Failure<Guid>(Domain.Suppliers.SupplierErrors.NotFound(supplierId));
         }
 
+        // sfc C2.1: only one of the caller's own branches.
+        if (command.BranchId is { } branchId
+            && !await context.Branches.AnyAsync(b => b.Id == branchId && b.DealerId == tenantService.DealerId, cancellationToken))
+        {
+            return Result.Failure<Guid>(Domain.Branches.BranchErrors.NotFound(branchId));
+        }
+
         // Validate unique license plate before insert within tenant
         var licensePlate = new Domain.Shared.ValueObjects.LicensePlate(command.Patente);
         var existingCar = await context.Cars
@@ -97,6 +104,7 @@ internal sealed class CreateCarCommandHandler(
             );
 
         car.AssignSupplier(command.SupplierId);
+        car.AssignBranch(command.BranchId);
         context.Cars.Add(car);
 
         try

@@ -469,6 +469,62 @@ namespace Infrastructure.Migrations
                     b.ToTable("processed_stripe_events", "public");
                 });
 
+            modelBuilder.Entity("Domain.Branches.Branch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<bool>("IsMain")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_main");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NameNormalized")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name_normalized");
+
+                    b.HasKey("Id")
+                        .HasName("pk_branches");
+
+                    b.HasIndex("DealerId", "NameNormalized")
+                        .IsUnique()
+                        .HasDatabaseName("ux_branches_dealer_id_name_normalized");
+
+                    b.ToTable("branches", "public");
+                });
+
+            modelBuilder.Entity("Domain.Branches.UserBranch", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.HasKey("UserId", "BranchId")
+                        .HasName("pk_user_branches");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_user_branches_branch_id");
+
+                    b.ToTable("user_branches", "public");
+                });
+
             modelBuilder.Entity("Domain.Cars.Attributes.Marca", b =>
                 {
                     b.Property<Guid>("Id")
@@ -583,6 +639,10 @@ namespace Infrastructure.Migrations
                     b.Property<int>("Anio")
                         .HasColumnType("integer")
                         .HasColumnName("año");
+
+                    b.Property<Guid?>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
 
                     b.Property<int>("CantidadAsientos")
                         .HasColumnType("integer")

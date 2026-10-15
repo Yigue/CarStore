@@ -24,4 +24,6 @@ public sealed record CreateCarCommand(
     decimal? PurchaseCost = null,
     string? Currency = null,
     // sfc B7.4: one of the dealer's suppliers.
-    Guid? SupplierId = null) : ICommand<Guid>;
+    Guid? SupplierId = null,
+    // sfc C2.1: one of the dealer's branches.
+    Guid? BranchId = null) : ICommand<Guid>;

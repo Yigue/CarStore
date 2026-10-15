@@ -80,6 +80,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Domain.Suppliers.Supplier> Suppliers { get; set; }
     public DbSet<Domain.AfterSales.WarrantyRecord> WarrantyRecords { get; set; }
     public DbSet<Domain.AfterSales.ServiceReminder> ServiceReminders { get; set; }
+    public DbSet<Domain.Branches.Branch> Branches { get; set; }
+    public DbSet<Domain.Branches.UserBranch> UserBranches { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -230,6 +232,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Domain.AfterSales.WarrantyRecord>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.AfterSales.ServiceReminder>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Branches.Branch>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<TransactionCategory>().HasQueryFilter(x =>
             x.DealerId == Guid.Empty || !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
