@@ -11,6 +11,8 @@ public sealed class Lead : Entity
     public string Phone { get; private set; }
     public LeadStatus Status { get; private set; }
     public Guid? AssignedAgentId { get; private set; }
+    /// <summary>sfc C0.1 / RN-045: the first touch that brought this lead; set once, never overwritten.</summary>
+    public LeadAttribution? Attribution { get; private set; }
     public string? Notes { get; private set; }
     public LeadSource Source { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -65,6 +67,12 @@ public sealed class Lead : Entity
 
         lead.Raise(new LeadCreatedDomainEvent(lead.Id, null));
         return lead;
+    }
+
+    /// <summary>sfc C0.1: stores the first touch. A returning lead keeps the one it already has.</summary>
+    public void SetFirstTouch(LeadAttribution attribution)
+    {
+        Attribution ??= attribution;
     }
 
     public void AssignAgent(Guid agentId)

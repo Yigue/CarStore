@@ -2857,6 +2857,72 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("InterestedVehicleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_leads_cars_interested_vehicle_id");
+
+                    b.OwnsOne("Domain.Leads.LeadAttribution", "Attribution", b1 =>
+                        {
+                            b1.Property<Guid>("LeadId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Fbclid")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("attribution_fbclid");
+
+                            b1.Property<DateTime>("FirstTouchAtUtc")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("attribution_first_touch_at_utc");
+
+                            b1.Property<string>("Gclid")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("attribution_gclid");
+
+                            b1.Property<string>("LandingPath")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("attribution_landing_path");
+
+                            b1.Property<string>("Referrer")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("attribution_referrer");
+
+                            b1.Property<string>("UtmCampaign")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("attribution_utm_campaign");
+
+                            b1.Property<string>("UtmContent")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("attribution_utm_content");
+
+                            b1.Property<string>("UtmMedium")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("attribution_utm_medium");
+
+                            b1.Property<string>("UtmSource")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("attribution_utm_source");
+
+                            b1.Property<string>("UtmTerm")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("attribution_utm_term");
+
+                            b1.HasKey("LeadId");
+
+                            b1.ToTable("leads", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("LeadId")
+                                .HasConstraintName("fk_leads_leads_id");
+                        });
+
+                    b.Navigation("Attribution");
                 });
 
             modelBuilder.Entity("Domain.Leads.LeadActivity", b =>

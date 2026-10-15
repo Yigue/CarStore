@@ -15,6 +15,8 @@ internal sealed class CreateInquiry : IEndpoint
         public string Email { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
         public string Comments { get; set; } = string.Empty;
+        // sfc C0.1 / RN-045: first-touch attribution captured by the public site; optional.
+        public InquiryAttribution? Attribution { get; set; }
     }
 
     public void MapEndpoint(IEndpointRouteBuilder app)
@@ -25,12 +27,13 @@ internal sealed class CreateInquiry : IEndpoint
             CancellationToken cancellationToken) =>
         {
             var command = new CreateInquiryCommand(
-                request.CarId,
-                request.FirstName,
-                request.LastName,
-                request.Email,
-                request.Phone,
-                request.Comments);
+                CarId: request.CarId,
+                FirstName: request.FirstName,
+                LastName: request.LastName,
+                Email: request.Email,
+                Phone: request.Phone,
+                Comments: request.Comments,
+                Attribution: request.Attribution);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

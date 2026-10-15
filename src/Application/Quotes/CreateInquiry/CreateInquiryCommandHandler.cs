@@ -133,17 +133,28 @@ internal sealed class CreateInquiryCommandHandler(
                 existing.LinkVehicle(car.Id);
             }
 
+            // sfc C0.1: a returning lead keeps its original first touch; only a lead without one gets it now.
+            if (ToAttribution(command.Attribution) is { } returningTouch)
+            {
+                existing.SetFirstTouch(returningTouch);
+            }
+
             return existing;
         }
 
+        LeadAttribution? attribution = ToAttribution(command.Attribution);
         var lead = Lead.Create(
             dealerId,
             $"{command.FirstName} {command.LastName}".Trim(),
             command.Email,
             command.Phone,
-            LeadSource.Web,
+            attribution?.ResolveSource(LeadSource.Web) ?? LeadSource.Web,
             dateTimeProvider.UtcNow,
             car?.Id);
+        if (attribution is not null)
+        {
+            lead.SetFirstTouch(attribution);
+        }
 
         if (!string.IsNullOrWhiteSpace(command.Comments))
         {
@@ -176,4 +187,11 @@ internal sealed class CreateInquiryCommandHandler(
             ? entry
             : $"{lead.Notes}\n{entry}");
     }
+
+    private static LeadAttribution? ToAttribution(InquiryAttribution? input) =>
+        input is null
+            ? null
+            : LeadAttribution.Create(
+                input.UtmSource, input.UtmMedium, input.UtmCampaign, input.UtmTerm, input.UtmContent,
+                input.Referrer, input.LandingPath, input.Gclid, input.Fbclid, input.FirstTouchAtUtc);
 }
