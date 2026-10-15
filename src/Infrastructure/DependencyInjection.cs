@@ -254,6 +254,10 @@ public static class DependencyInjection
 
         // sfc A2.3 / A18: template catalog on top of the IEmailService transport.
         services.AddScoped<Application.Abstractions.Email.ITransactionalEmailSender, TransactionalEmail.TransactionalEmailSender>();
+        // sfc B5.1: anonymous endpoints queue their emails so the response time does not reveal whether one was sent.
+        services.AddSingleton<TransactionalEmail.BackgroundEmailQueue>();
+        services.AddSingleton<Application.Abstractions.Email.IBackgroundEmailQueue>(sp => sp.GetRequiredService<TransactionalEmail.BackgroundEmailQueue>());
+        services.AddHostedService<TransactionalEmail.BackgroundEmailWorker>();
 
         return services;
     }

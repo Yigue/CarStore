@@ -21,15 +21,16 @@ public class SubscribeCommandHandlerTests
     private static readonly Guid DealerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly DateTime Now = new(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc);
 
-    private readonly Mock<ITransactionalEmailSender> _email = new();
+    // The email is queued, never sent on the request path: the answer time must not depend on whether one goes out.
+    private readonly Mock<IBackgroundEmailQueue> _email = new();
     private readonly List<IReadOnlyDictionary<string, string>> _sent = [];
 
     public SubscribeCommandHandlerTests()
     {
-        _email.Setup(e => e.SendAsync(EmailTemplate.NewsletterConfirm, It.IsAny<string>(),
-                It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CancellationToken>()))
-            .Callback<EmailTemplate, string, IReadOnlyDictionary<string, string>, CancellationToken>((_, _, model, _) => _sent.Add(model))
-            .Returns(Task.CompletedTask);
+        _email.Setup(e => e.TryEnqueue(EmailTemplate.NewsletterConfirm, It.IsAny<string>(),
+                It.IsAny<IReadOnlyDictionary<string, string>>()))
+            .Callback<EmailTemplate, string, IReadOnlyDictionary<string, string>>((_, _, model) => _sent.Add(model))
+            .Returns(true);
     }
 
     private static TestApplicationDbContext CreateContext() =>
@@ -92,6 +93,18 @@ public class SubscribeCommandHandlerTests
         (await context.Set<Subscriber>().CountAsync()).Should().Be(1);
         _sent.Should().HaveCount(2);
         TokenFrom(_sent[1]["ConfirmUrl"]).Should().NotBe(TokenFrom(_sent[0]["ConfirmUrl"]));
+    }
+
+    [Fact]
+    public async Task A_full_email_queue_still_answers_success()
+    {
+        using var context = CreateContext();
+        _email.Setup(e => e.TryEnqueue(It.IsAny<EmailTemplate>(), It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>()))
+            .Returns(false);
+
+        var result = await Handler(context).Handle(new SubscribeCommand("a@b.com"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]

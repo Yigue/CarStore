@@ -17,13 +17,14 @@ public sealed record SubscribeCommand(string Email, string Source = "web") : ICo
 /// <summary>
 /// Creates a pending <see cref="Subscriber"/> and emails the double opt-in link. Every outcome for a well-formed
 /// address answers the same (new, pending, confirmed, a lost race, a failed email), so the endpoint does not reveal
-/// who is subscribed. A confirmed address gets no email.
+/// who is subscribed. A confirmed address gets no email. The email is queued, not sent here, so the response time
+/// does not reveal it either; the remaining difference is one database write (residual risk, as in ResendVerification).
 /// </summary>
 internal sealed class SubscribeCommandHandler(
     IApplicationDbContext context,
     ICurrentTenantService tenantService,
     IDateTimeProvider dateTimeProvider,
-    ITransactionalEmailSender emailSender,
+    IBackgroundEmailQueue emailQueue,
     IConfiguration configuration,
     ILogger<SubscribeCommandHandler> logger)
     : ICommandHandler<SubscribeCommand>
@@ -61,6 +62,8 @@ internal sealed class SubscribeCommandHandler(
         {
             if (!existing.Resubscribe(UserActionTokenHasher.Hash(confirmSecret), now))
             {
+                // Same calls as the other paths; with nothing tracked this is a no-op.
+                await context.SaveChangesAsync(cancellationToken);
                 return Result.Success();
             }
 
@@ -80,23 +83,19 @@ internal sealed class SubscribeCommandHandler(
         }
 
         string baseUrl = (configuration["Frontend:BaseUrl"] ?? "https://carstore-app.com").TrimEnd('/');
-        try
+        bool queued = emailQueue.TryEnqueue(
+            EmailTemplate.NewsletterConfirm,
+            subscriber.Email,
+            new Dictionary<string, string>
+            {
+                ["ConfirmUrl"] = $"{baseUrl}/newsletter/confirmar?t={confirmSecret}",
+                ["UnsubscribeUrl"] = $"{baseUrl}/newsletter/baja?t={unsubscribeSecret}",
+                ["ExpiresInDays"] = Subscriber.ConfirmationLifetime.TotalDays.ToString("0")
+            });
+        if (!queued)
         {
-            await emailSender.SendAsync(
-                EmailTemplate.NewsletterConfirm,
-                subscriber.Email,
-                new Dictionary<string, string>
-                {
-                    ["ConfirmUrl"] = $"{baseUrl}/newsletter/confirmar?t={confirmSecret}",
-                    ["UnsubscribeUrl"] = $"{baseUrl}/newsletter/baja?t={unsubscribeSecret}",
-                    ["ExpiresInDays"] = Subscriber.ConfirmationLifetime.TotalDays.ToString("0")
-                },
-                cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            // Swallowed on purpose: the answer must not depend on whether the address existed.
-            logger.LogError(ex, "Could not send the newsletter confirmation for subscriber {SubscriberId}", subscriber.Id);
+            // The answer must not depend on it; the person can sign up again to get a new link.
+            logger.LogWarning("Email queue full: newsletter confirmation for subscriber {SubscriberId} dropped", subscriber.Id);
         }
 
         return Result.Success();
