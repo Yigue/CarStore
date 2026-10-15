@@ -1,4 +1,6 @@
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Branches;
+using Application.Branches;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
@@ -10,7 +12,11 @@ using SharedKernel;
 
 namespace Application.Cars.GetById;
 
-internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context, IStorageService storage, IUserContext userContext)
+internal sealed class GetCarByIdQueryHandler(
+    IApplicationDbContext context,
+    IStorageService storage,
+    IUserContext userContext,
+    IBranchScope? branchScope = null)
     : IQueryHandler<GetCarByIdQuery, CarGetByIdResponse>
 {
     public async Task<Result<CarGetByIdResponse>> Handle(GetCarByIdQuery query, CancellationToken cancellationToken)
@@ -25,6 +31,11 @@ internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context, ISto
         {
             return Result.Failure<CarGetByIdResponse>(CarErrors.NotFound(query.CarId));
         }
+
+        // sfc C2.2: a scoped user sees another branch's vehicle like the public catalog does, without the plate.
+        IReadOnlyCollection<Guid>? restrictedTo = branchScope is null
+            ? null
+            : await branchScope.GetRestrictedBranchIdsAsync(cancellationToken);
 
         var imageResponses = new List<CarImageResponse>(car.Images.Count);
         foreach (var img in car.Images.OrderBy(i => i.DisplayOrder))
@@ -65,7 +76,7 @@ internal sealed class GetCarByIdQueryHandler(IApplicationDbContext context, ISto
             // es AllowAnonymous, así que viajaba a cualquiera que pidiera el id
             // — y el catálogo público la metía además en el título de compartir.
             // Se corta en "logueado", no en "admin": un vendedor la necesita.
-            userContext.IsAuthenticated ? car.Patente.Value : null,
+            userContext.IsAuthenticated && car.IsInBranchScope(restrictedTo) ? car.Patente.Value : null,
             car.Descripcion,
             car.Price.Amount,
             car.CreatedAt,

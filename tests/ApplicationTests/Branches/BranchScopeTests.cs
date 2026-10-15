@@ -2,6 +2,8 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Branches;
 using Application.Abstractions.Storage;
 using Application.Cars.GetAll;
+using Application.Cars.GetById;
+using Application.Cars.GetByIds;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using FluentAssertions;
@@ -65,5 +67,45 @@ public class BranchScopeTests
         var result = await Handler(context, restrictedTo: null).Handle(new GetAllCarsQuery(1, 50), CancellationToken.None);
 
         result.Value.TotalCount.Should().Be(4);
+    }
+
+    private static Mock<IBranchScope> Scope(IReadOnlyCollection<Guid>? restrictedTo)
+    {
+        var scope = new Mock<IBranchScope>();
+        scope.Setup(s => s.GetRestrictedBranchIdsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(restrictedTo);
+        return scope;
+    }
+
+    private static Mock<IUserContext> SignedIn()
+    {
+        var user = new Mock<IUserContext>();
+        user.SetupGet(u => u.IsAuthenticated).Returns(true);
+        return user;
+    }
+
+    // Sibling read paths are anonymous (public catalog), so the vehicle itself stays visible; what the scope
+    // withholds is the plate, which only signed-in staff see and which a scoped user must not get for another branch.
+    [Fact]
+    public async Task The_vehicle_detail_hides_the_plate_of_another_branch_from_a_scoped_user()
+    {
+        using var context = await SeedAsync();
+        Guid centroCar = context.Cars.Single(c => c.BranchId == Centro).Id;
+        Guid norteCar = context.Cars.First(c => c.BranchId == Norte).Id;
+        var handler = new GetCarByIdQueryHandler(context, new Mock<IStorageService>().Object, SignedIn().Object, Scope([Norte]).Object);
+
+        (await handler.Handle(new GetCarByIdQuery(centroCar), CancellationToken.None)).Value.Patente.Should().BeNull();
+        (await handler.Handle(new GetCarByIdQuery(norteCar), CancellationToken.None)).Value.Patente.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task The_bulk_lookup_hides_the_plate_of_another_branch_from_a_scoped_user()
+    {
+        using var context = await SeedAsync();
+        List<Guid> ids = context.Cars.Select(c => c.Id).ToList();
+        var handler = new GetCarsByIdsQueryHandler(context, new Mock<IStorageService>().Object, SignedIn().Object, Scope([Norte]).Object);
+
+        var result = await handler.Handle(new GetCarsByIdsQuery(ids), CancellationToken.None);
+
+        result.Value.Where(c => c.Patente != null).Should().HaveCount(2);
     }
 }

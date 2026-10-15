@@ -1,4 +1,6 @@
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Branches;
+using Application.Branches;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
@@ -12,7 +14,8 @@ namespace Application.Cars.GetByIds;
 internal sealed class GetCarsByIdsQueryHandler(
     IApplicationDbContext context,
     IStorageService storage,
-    IUserContext userContext)
+    IUserContext userContext,
+    IBranchScope? branchScope = null)
     : IQueryHandler<GetCarsByIdsQuery, List<CarResponse>>
 {
     public async Task<Result<List<CarResponse>>> Handle(GetCarsByIdsQuery query, CancellationToken cancellationToken)
@@ -23,6 +26,11 @@ internal sealed class GetCarsByIdsQueryHandler(
             .Include(c => c.Images)
             .Where(c => query.Ids.Contains(c.Id))
             .ToListAsync(cancellationToken);
+
+        // sfc C2.2: a scoped user sees another branch's vehicle like the public catalog does, without the plate.
+        IReadOnlyCollection<Guid>? restrictedTo = branchScope is null
+            ? null
+            : await branchScope.GetRestrictedBranchIdsAsync(cancellationToken);
 
         var response = new List<CarResponse>(cars.Count);
         foreach (var car in cars)
@@ -68,7 +76,7 @@ internal sealed class GetCarsByIdsQueryHandler(
                 Cilindrada = car.Cilindrada,
                 Kilometraje = car.Kilometraje,
                 Anio = car.Anio,
-                Patente = userContext.IsAuthenticated ? car.Patente.Value : null,
+                Patente = userContext.IsAuthenticated && car.IsInBranchScope(restrictedTo) ? car.Patente.Value : null,
                 Description = car.Descripcion,
                 Precio = car.Price.Amount,
                 CreatedAt = car.CreatedAt,
