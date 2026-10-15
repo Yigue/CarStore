@@ -39,6 +39,19 @@ public class NewsletterSubscribeTests
             .Should().BeFalse("a newsletter sign-up is not a client");
     }
 
+    // RFC 8058: link scanners and prefetchers issue GETs, so a GET must never unsubscribe; only the POST does.
+    [Fact]
+    public async Task Unsubscribe_DoesNotAnswerGet()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        factory.SeedDatabase();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/v1/newsletter/unsubscribe?t=bogus");
+
+        response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+    }
+
     [Fact]
     public async Task UnknownUnsubscribeToken_Returns400()
     {

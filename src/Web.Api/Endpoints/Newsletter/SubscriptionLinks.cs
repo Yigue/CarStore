@@ -6,8 +6,9 @@ using Web.Api.Infrastructure;
 namespace Web.Api.Endpoints.Newsletter;
 
 /// <summary>
-/// sfc B5.1: the two emailed links. Unsubscribe answers GET (the page) and POST (RFC 8058 one-click, sent by the mail
-/// client with a <c>List-Unsubscribe=One-Click</c> body that carries nothing the request needs).
+/// sfc B5.1: the two emailed links. Both act only on POST: mail scanners and link prefetchers issue GETs, so a GET must
+/// never confirm or unsubscribe (RFC 8058). The pages behind the links POST on an explicit click, and the mail client
+/// POSTs the one-click unsubscribe with a <c>List-Unsubscribe=One-Click</c> body that carries nothing the request needs.
 /// </summary>
 internal sealed class SubscriptionLinks : IEndpoint
 {
@@ -27,7 +28,7 @@ internal sealed class SubscriptionLinks : IEndpoint
         .Produces(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest);
 
-        app.MapMethods("newsletter/unsubscribe", ["GET", "POST"], async (string? t, ISender sender, CancellationToken cancellationToken) =>
+        app.MapPost("newsletter/unsubscribe", async (string? t, ISender sender, CancellationToken cancellationToken) =>
         {
             Result result = await sender.Send(new UnsubscribeCommand(t ?? string.Empty), cancellationToken);
             return result.Match(() => Results.Ok(new { success = true }), CustomResults.Problem);
