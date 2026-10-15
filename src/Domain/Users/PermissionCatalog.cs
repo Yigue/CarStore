@@ -99,6 +99,7 @@ public static class PermissionCatalog
         new("webhooks:manage", ModuleAdministration, "Administrar webhooks"),
         new("admin:backfill", ModuleAdministration, "Ejecutar tareas de mantenimiento de datos"),
         new("audit:read", ModuleAdministration, "Ver el historial de auditoría"),
+        new("branch:scoped", ModuleAdministration, "Ver solo los vehículos de sus sucursales"),
     ];
 
     /// <summary>Every grantable permission, in the order the matrix should render them.</summary>

@@ -1,3 +1,4 @@
+using Application.Branches;
 using Application.Abstractions.Authentication;
 using Application.Common;
 using Application.Abstractions.Data;
@@ -9,16 +10,26 @@ using SharedKernel;
 
 namespace Application.Cars.GetAll;
 
-internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, IStorageService storage, IUserContext userContext)
+internal sealed class GetAllCarsQueryHandler(
+    IApplicationDbContext context,
+    IStorageService storage,
+    IUserContext userContext,
+    Application.Abstractions.Branches.IBranchScope? branchScope = null)
     : IQueryHandler<GetAllCarsQuery, PaginatedResult<CarsResponses>>
 {
     public async Task<Result<PaginatedResult<CarsResponses>>> Handle(GetAllCarsQuery query, CancellationToken cancellationToken)
     {
-        var carsQuery = context.Cars
+        // sfc C2.2: a branch-scoped role only lists its own branches.
+        IReadOnlyCollection<Guid>? restrictedTo = branchScope is null
+            ? null
+            : await branchScope.GetRestrictedBranchIdsAsync(cancellationToken);
+
+        IQueryable<Car> carsQuery = context.Cars
             .AsNoTracking()
             .Include(c => c.Marca)
             .Include(c => c.Modelo)
-            .Include(c => c.Images);
+            .Include(c => c.Images)
+            .ForBranchScope(restrictedTo);
 
         Result<IOrderedQueryable<Car>> ordering = CarSortOrder.Apply(carsQuery, query.SortBy, query.SortOrder);
 

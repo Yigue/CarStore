@@ -383,6 +383,8 @@ public static class DependencyInjection
         services.AddAuthorization();
 
         services.AddScoped<PermissionProvider>();
+        // sfc C2.2 / ADR C26: branch data scope for listings.
+        services.AddScoped<Application.Abstractions.Branches.IBranchScope, BranchScope>();
 
         // Without this, a permission change waits out PermissionProvider's 30-minute cache: a
         // granted permission looks ignored, and a REVOKED one keeps working.
