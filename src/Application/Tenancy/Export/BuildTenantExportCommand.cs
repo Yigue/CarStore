@@ -97,6 +97,11 @@ internal sealed class BuildTenantExportCommandHandler(
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id)
             .Select(x => new { x.Id, x.Email, x.Status, x.Source, x.CreatedAtUtc, x.ConfirmedAtUtc, x.UnsubscribedAtUtc })
             .AsAsyncEnumerable(), ct));
+        // sfc C1.1: connections are exported without credentials; integration_commands payloads stay out.
+        files.Add(await AddCsvAsync(zip, "integraciones", context.DealerIntegrations.IgnoreQueryFilters().AsNoTracking()
+            .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id)
+            .Select(x => new { x.Id, x.Provider, x.Status, x.Scopes, x.TokenExpiresAtUtc, x.LastError, x.CreatedAtUtc, x.UpdatedAtUtc })
+            .AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "clientes", context.Clients.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "leads", context.Leads.IgnoreQueryFilters().AsNoTracking()

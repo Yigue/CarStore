@@ -24,7 +24,7 @@ using Domain.Webhooks;
 
 namespace Infrastructure.Database;
 
-public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
+public sealed class ApplicationDbContext : DbContext, IApplicationDbContext, Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.IDataProtectionKeyContext
 {
     private readonly IPublisher publisher;
     private readonly ICurrentTenantService _tenantService;
@@ -79,6 +79,10 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Domain.Cars.VehicleLien> VehicleLiens { get; set; }
     public DbSet<Domain.Suppliers.Supplier> Suppliers { get; set; }
     public DbSet<Domain.Marketing.Subscriber> Subscribers { get; set; }
+    public DbSet<Domain.Integrations.DealerIntegration> DealerIntegrations { get; set; }
+    public DbSet<Domain.Integrations.IntegrationCommand> IntegrationCommands { get; set; }
+    // sfc C1.1 / ADR C22: Data Protection key ring (not tenant data).
+    public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
     public DbSet<Domain.AfterSales.WarrantyRecord> WarrantyRecords { get; set; }
     public DbSet<Domain.AfterSales.ServiceReminder> ServiceReminders { get; set; }
     public DbSet<Domain.Branches.Branch> Branches { get; set; }
@@ -231,6 +235,10 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Domain.Suppliers.Supplier>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.Marketing.Subscriber>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Integrations.DealerIntegration>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Integrations.IntegrationCommand>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.AfterSales.WarrantyRecord>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);

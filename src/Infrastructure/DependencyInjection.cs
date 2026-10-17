@@ -5,6 +5,8 @@ using Application.Abstractions;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
+using Application.Abstractions.Integrations;
+using Infrastructure.Integrations;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
 using Application.Abstractions.Webhooks;
@@ -64,7 +66,45 @@ public static class DependencyInjection
             .AddAuthorizationInternal()
             .ConfigureOpenTelemetry()
             .AddBackgroundJobs(configuration)
-            .AddBilling(configuration);
+            .AddBilling(configuration)
+            .AddIntegrations(configuration, environment);
+
+    /// <summary>sfc C1.1 / ADR C22: encrypted credentials, command queue dispatcher and rate limiter. No provider client is registered yet (C1.2+).</summary>
+    private static IServiceCollection AddIntegrations(
+        this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment? environment)
+    {
+        services.AddIntegrationDataProtection(configuration);
+        if (environment?.IsProduction() == true)
+        {
+            services.AddTransient<IStartupFilter, DataProtectionProductionGuard>();
+        }
+
+        services.AddSingleton<ICredentialProtector, DataProtectionCredentialProtector>();
+        services.AddSingleton<IIntegrationProviderSettings, IntegrationProviderSettings>();
+
+        var rateLimit = configuration.GetSection(RateLimiterOptions.SectionName).Get<RateLimiterOptions>() ?? new RateLimiterOptions();
+        services.AddSingleton(rateLimit);
+
+        string? redisConnectionString = configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrEmpty(redisConnectionString))
+        {
+            services.AddSingleton<IConnectionMultiplexer>(_ =>
+            {
+                ConfigurationOptions options = ConfigurationOptions.Parse(redisConnectionString);
+                options.AbortOnConnectFail = false;
+                return ConnectionMultiplexer.Connect(options);
+            });
+            services.AddSingleton<IRateLimiter, RedisRateLimiter>();
+        }
+        else
+        {
+            services.AddSingleton<IRateLimiter, InMemoryRateLimiter>();
+        }
+
+        services.AddScoped<IntegrationCommandDispatcher>();
+
+        return services;
+    }
 
     private static IServiceCollection AddBilling(this IServiceCollection services, IConfiguration configuration)
     {
@@ -525,6 +565,16 @@ public static class DependencyInjection
                     trigger.ForJob(webhookDispatchJobKey)
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(15)
+                                .RepeatForever()));
+
+            // sfc C1.1 / ADR C22: integration command queue (providers opt in via Integrations:{Provider}:Enabled).
+            var integrationJobKey = new JobKey(nameof(DispatchIntegrationCommandsJob));
+            configure
+                .AddJob<DispatchIntegrationCommandsJob>(opts => opts.WithIdentity(integrationJobKey))
+                .AddTrigger(trigger =>
+                    trigger.ForJob(integrationJobKey)
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInSeconds(10)
                                 .RepeatForever()));
 
             // Job 5: Lost-lead re-engagement (disabled by default — Crm:Reengagement:Enabled).
