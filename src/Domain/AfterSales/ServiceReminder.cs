@@ -20,6 +20,8 @@ public sealed class ServiceReminder : Entity
     public DateTime DueOnUtc { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public bool ClientContactAllowed { get; private set; }
+    /// <summary>sfc C2.4.2: when the client was emailed; null while pending, so a run never sends twice.</summary>
+    public DateTime? NotifiedAtUtc { get; private set; }
 
     private ServiceReminder() { }
 
@@ -38,5 +40,14 @@ public sealed class ServiceReminder : Entity
         };
         reminder.SetDealer(dealerId);
         return reminder;
+    }
+
+    public bool MarkNotified(DateTime nowUtc)
+    {
+        if (NotifiedAtUtc is not null)
+            return false;
+
+        NotifiedAtUtc = nowUtc;
+        return true;
     }
 }

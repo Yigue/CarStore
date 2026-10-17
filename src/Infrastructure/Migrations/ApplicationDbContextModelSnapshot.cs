@@ -56,6 +56,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("kind");
 
+                    b.Property<DateTime?>("NotifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("notified_at_utc");
+
                     b.Property<Guid>("SaleId")
                         .HasColumnType("uuid")
                         .HasColumnName("sale_id");
