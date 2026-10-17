@@ -12,6 +12,8 @@ internal sealed class AfterSales : IEndpoint
 {
     public sealed record WarrantyRequest(int Months, string? Conditions);
 
+    public sealed record ConsentRequest(bool Accepts);
+
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("sales/{id:guid}/warranty", async (Guid id, WarrantyRequest request, ISender sender, CancellationToken cancellationToken) =>
@@ -31,5 +33,14 @@ internal sealed class AfterSales : IEndpoint
         .HasPermission("sales:read")
         .WithTags(Tags.Sales)
         .WithName("GetServiceReminders");
+
+        app.MapPut("clients/{id:guid}/service-reminder-consent", async (Guid id, ConsentRequest request, ISender sender, CancellationToken cancellationToken) =>
+        {
+            Result result = await sender.Send(new SetServiceReminderConsentCommand(id, request.Accepts), cancellationToken);
+            return result.Match(Results.NoContent, CustomResults.Problem);
+        })
+        .HasPermission("clients:write")
+        .WithTags(Tags.Clients)
+        .WithName("SetServiceReminderConsent");
     }
 }

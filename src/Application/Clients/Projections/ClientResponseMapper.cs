@@ -51,6 +51,7 @@ internal static class ClientResponseMapper
             lastPurchaseDate,
             client.CreatedAt,
             client.UpdateAt,
-            client.IsDeleted);
+            client.IsDeleted,
+            client.AcceptsServiceReminders);
     }
 }

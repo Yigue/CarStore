@@ -31,6 +31,8 @@ public sealed record ClientResponse(
     DateTime? LastPurchaseDate,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    bool IsDeleted);
+    bool IsDeleted,
+    // sfc C2.4 / RN-047: opt-in to after-sales service reminders.
+    bool AcceptsServiceReminders = false);
 
 public sealed record PurchaseHistoryEntry(Guid SaleId, DateTime Date, decimal Amount);
