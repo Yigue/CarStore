@@ -122,7 +122,7 @@ public class RescheduleAppointmentCommandHandlerTests
             Appointment moving = SeedAppointment(context, TestDealerId);
             var blockingStart = Now.AddDays(2);
             var blocking = Appointment.Create(
-                TestDealerId, Guid.NewGuid(), Guid.NewGuid(), leadId: null, moving.AgentId,
+                TestDealerId, Guid.NewGuid(), Guid.NewGuid(), leadId: null, moving.AgentId!.Value,
                 blockingStart, blockingStart.AddHours(1), AppointmentType.Service, null, Now);
             blocking.ClearDomainEvents();
             context.Appointments.Add(blocking);

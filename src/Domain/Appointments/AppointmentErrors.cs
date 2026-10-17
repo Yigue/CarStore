@@ -8,6 +8,10 @@ public static class AppointmentErrors
         "Appointments.NotFound",
         $"The appointment with the Id = '{appointmentId}' was not found.");
 
+    public static Error AgentNotFound(Guid agentId) => Error.NotFound(
+        "Appointments.AgentNotFound",
+        $"The agent with the Id = '{agentId}' was not found or is not active.");
+
     public static readonly Error Conflict = Error.Problem(
         "Appointments.Conflict",
         "El vehículo o el agente ya tiene una cita en ese horario.");

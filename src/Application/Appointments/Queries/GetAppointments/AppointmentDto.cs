@@ -16,7 +16,7 @@ public sealed record AppointmentDto(
     // de modo que el campo estaba tipado y siempre indefinido.
     Guid? LeadId,
     string? ClientName,
-    Guid AgentId,
+    Guid? AgentId,
     string? AgentName,
     DateTime Start,
     DateTime End,

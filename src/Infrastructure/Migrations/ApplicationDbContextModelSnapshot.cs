@@ -133,7 +133,7 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("AgentId")
+                    b.Property<Guid?>("AgentId")
                         .HasColumnType("uuid")
                         .HasColumnName("agent_id");
 
@@ -2967,7 +2967,6 @@ namespace Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("AgentId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_appointments_users_agent_id");
 
                     b.HasOne("Domain.Clients.Client", null)

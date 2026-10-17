@@ -31,15 +31,14 @@ internal sealed class RescheduleAppointmentCommandHandler(
         if (appointment is null)
             return Result.Failure(AppointmentErrors.NotFound(command.AppointmentId));
 
-        bool hasConflict = await context.Appointments
-            .AsNoTracking()
-            .AnyAsync(a =>
-                a.Id != command.AppointmentId &&
-                a.DealerId == dealerId &&
-                (a.VehicleId == appointment.VehicleId || a.AgentId == appointment.AgentId) &&
-                a.StartDateTime < command.End &&
-                a.EndDateTime > command.Start,
-                cancellationToken);
+        bool hasConflict = await context.Appointments.HasConflictAsync(
+            dealerId,
+            appointment.VehicleId,
+            appointment.AgentId,
+            command.Start,
+            command.End,
+            excludeAppointmentId: appointment.Id,
+            cancellationToken);
 
         if (hasConflict)
             return Result.Failure(AppointmentErrors.Conflict);
