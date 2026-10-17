@@ -78,6 +78,7 @@ internal sealed class GetCarsByIdsQueryHandler(
                 Anio = car.Anio,
                 Patente = userContext.IsAuthenticated && car.IsInBranchScope(restrictedTo) ? car.Patente.Value : null,
                 Description = car.Descripcion,
+                Currency = car.Price.Currency,
                 Precio = car.Price.Amount,
                 CreatedAt = car.CreatedAt,
                 UpdatedAt = car.UpdatedAt,

@@ -95,7 +95,8 @@ internal sealed class GetAllCarsQueryHandler(
                 // endpoint ya exige cars:read, pero eso lo tiene también un
                 // vendedor: sólo el admin ve el costo. La misma regla que
                 // VehicleForm aplica al guardar, ahora también al leer.
-                userContext.IsAdmin ? car.PurchaseCost?.Amount : null
+                userContext.IsAdmin ? car.PurchaseCost?.Amount : null,
+                car.Price.Currency
             ));
         }
 

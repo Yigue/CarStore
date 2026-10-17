@@ -185,6 +185,7 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
                 Modelo = c.Modelo?.Nombre ?? "N/A",
                 Anio = c.Anio,
                 Precio = c.Price?.Amount ?? 0,
+                Currency = c.Price?.Currency ?? "ARS",
                 Descripcion = c.Descripcion ?? string.Empty,
                 ImagenPrincipal = await GetPrimaryImageUrl(c, cancellationToken),
                 CantidadPuertas = c.CantidadPuertas,

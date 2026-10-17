@@ -87,7 +87,8 @@ internal sealed class GetCarByIdQueryHandler(
             // público. PurchaseCost es el costo de compra: el margen de la
             // concesionaria, no un dato del vehículo. Sólo un admin lo ve; para
             // cualquier otro — incluido el visitante anónimo — viaja como null.
-            userContext.IsAdmin ? car.PurchaseCost?.Amount : null
+            userContext.IsAdmin ? car.PurchaseCost?.Amount : null,
+            car.Price.Currency
         );
 
         return response;

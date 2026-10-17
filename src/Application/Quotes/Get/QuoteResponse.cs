@@ -7,6 +7,8 @@ public sealed class QuoteResponse
     public Guid? ClientId { get; init; }
     public Guid? LeadId { get; init; }
     public decimal ProposedPrice { get; init; }
+    // sfc B0.3.3: ISO code of ProposedPrice (ARS, USD).
+    public string Currency { get; init; } = "ARS";
     public string PaymentMethod { get; init; }
     public string Status { get; init; }
     public DateTime ValidUntil { get; init; }

@@ -59,6 +59,8 @@ public class CarDto
     public string Modelo { get; set; }
     public int Anio { get; set; }
     public decimal Precio { get; set; }
+    // sfc B0.3.3: ISO code of Precio (ARS, USD).
+    public string Currency { get; set; } = "ARS";
     public string Descripcion { get; set; }
     public string ImagenPrincipal { get; set; }
     public int CantidadPuertas { get; set; }

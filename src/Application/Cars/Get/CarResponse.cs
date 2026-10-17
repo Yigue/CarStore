@@ -21,6 +21,8 @@ public sealed class CarResponse
     public string? Patente { get; init; }
     public string Description { get; init; } = string.Empty;
     public decimal Precio { get; init; }
+    // sfc B0.3.3: ISO code of Precio (ARS, USD).
+    public string Currency { get; init; } = "ARS";
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
     public List<CarImageResponse> Images { get; init; } = new();

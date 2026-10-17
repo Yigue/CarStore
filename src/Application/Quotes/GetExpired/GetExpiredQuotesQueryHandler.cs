@@ -33,6 +33,7 @@ internal sealed class GetExpiredQuotesQueryHandler(
             CarId = quote.CarId,
             ClientId = quote.ClientId ?? Guid.Empty,
             ProposedPrice = quote.ProposedPrice.Amount,
+            Currency = quote.ProposedPrice.Currency,
             PaymentMethod = quote.PaymentMethod.ToString(),
             Status = quote.Status.ToString(),
             ValidUntil = quote.ValidUntil,
