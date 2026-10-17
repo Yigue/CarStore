@@ -60,7 +60,8 @@ internal sealed class SaleCompletedDomainEventHandler(
             car: sale.Car,
             client: sale.Client,
             sale: sale,
-            transactionDate: dateTimeProvider.UtcNow);
+            transactionDate: dateTimeProvider.UtcNow,
+            exchangeRate: sale.ExchangeRate); // sfc B0.3.1 / ADR C2
         
         context.Transactions.Add(transaction);
         await context.SaveChangesAsync(cancellationToken);

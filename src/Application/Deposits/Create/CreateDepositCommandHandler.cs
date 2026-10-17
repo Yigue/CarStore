@@ -121,7 +121,8 @@ internal sealed class CreateDepositCommandHandler(
             car: car,
             client: client,
             transactionDate: now,
-            sourceId: deposit.Id));
+            sourceId: deposit.Id,
+            exchangeRate: deposit.ExchangeRate)); // sfc B0.3.1 / ADR C2
 
         try
         {

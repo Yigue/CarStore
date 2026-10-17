@@ -130,6 +130,25 @@ public class CreateDepositCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_CopyTheFrozenRate_OntoTheIncomeTransaction()
+    {
+        using var context = CreateContext();
+        var (car, client, _) = await SeedAsync(context);
+        var rate = DealerExchangeRate.Record(DealerId, CurrencyCode.Usd, CurrencyCode.Ars, 1100m, Now.AddDays(-1), Guid.NewGuid()).Value;
+        context.DealerExchangeRates.Add(rate);
+        await context.SaveChangesAsync();
+
+        (await Handler(context).Handle(Command(car.Id, client.Id, "USD"), CancellationToken.None)).IsSuccess.Should().BeTrue();
+
+        // sfc B0.3.1 / ADR C2: the income carries the deposit's own snapshot, not a later rate.
+        var deposit = await context.Deposits.SingleAsync();
+        var transaction = await context.Transactions.SingleAsync();
+        transaction.ExchangeRate.Should().NotBeNull();
+        transaction.ExchangeRate.Should().Be(deposit.ExchangeRate);
+        transaction.ExchangeRate!.SourceRateId.Should().Be(rate.Id);
+    }
+
+    [Fact]
     public async Task Handle_Should_UseTheDealersConfiguredValidity()
     {
         using var context = CreateContext();

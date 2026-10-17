@@ -3376,6 +3376,48 @@ namespace Infrastructure.Migrations
                                 .HasConstraintName("fk_transactions_transactions_id");
                         });
 
+                    b.OwnsOne("Domain.Currency.ExchangeRateSnapshot", "ExchangeRate", b1 =>
+                        {
+                            b1.Property<Guid>("FinancialTransactionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Base")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character(3)")
+                                .HasColumnName("exchange_rate_base")
+                                .IsFixedLength();
+
+                            b1.Property<DateTime>("CapturedAtUtc")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("exchange_rate_captured_at_utc");
+
+                            b1.Property<string>("Quote")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character(3)")
+                                .HasColumnName("exchange_rate_quote")
+                                .IsFixedLength();
+
+                            b1.Property<decimal>("Rate")
+                                .HasPrecision(18, 6)
+                                .HasColumnType("numeric(18,6)")
+                                .HasColumnName("exchange_rate");
+
+                            b1.Property<Guid>("SourceRateId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("exchange_rate_source_id");
+
+                            b1.HasKey("FinancialTransactionId");
+
+                            b1.ToTable("transactions", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("FinancialTransactionId")
+                                .HasConstraintName("fk_transactions_transactions_id");
+                        });
+
                     b.Navigation("Amount")
                         .IsRequired();
 
@@ -3384,6 +3426,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Category");
 
                     b.Navigation("Client");
+
+                    b.Navigation("ExchangeRate");
 
                     b.Navigation("Sale");
                 });

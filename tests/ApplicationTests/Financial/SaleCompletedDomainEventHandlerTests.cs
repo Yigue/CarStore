@@ -5,6 +5,7 @@ using Application.UnitTests;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Clients;
+using Domain.Currency;
 using Domain.Financial;
 using Domain.Financial.Attributes;
 using Domain.Sales;
@@ -213,5 +214,32 @@ public class SaleCompletedDomainEventHandlerTests
             .Where(t => t.CategoryId == category.Id)
             .ToListAsync();
         transactions.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Handle_Should_CopyTheSaleSnapshot_OntoTheIncomeTransaction()
+    {
+        var context = CreateContext();
+        var (car, client, _) = SeedEntities(context);
+        var snapshot = new ExchangeRateSnapshot("USD", "ARS", 1000m, DateTime.UtcNow, Guid.NewGuid());
+        var sale = new Sale(
+            TestDealerId, car.Id, client.Id, 20000m, PaymentMethod.BankTransfer, "CTR-FX", "n", DateTime.UtcNow,
+            currency: CurrencyCode.Usd, exchangeRate: snapshot);
+        sale.ClearDomainEvents();
+        context.Sales.Add(sale);
+        context.SaveChanges();
+        var cached = new Mock<ICachedCategoryService>();
+        cached.Setup(s => s.GetByNameAsync("Venta de Auto", It.IsAny<CancellationToken>())).ReturnsAsync((TransactionCategory?)null);
+        cached.Setup(s => s.InvalidateCacheAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var handler = new SaleCompletedDomainEventHandler(context, new FakeDateTimeProvider(), cached.Object);
+
+        await handler.Handle(
+            new SaleCompletedDomainEvent(sale.Id, car.Id, client.Id, sale.FinalPrice, PaymentMethod.BankTransfer),
+            CancellationToken.None);
+
+        // sfc B0.3.1 / ADR C2
+        var transaction = await context.Transactions.SingleAsync();
+        transaction.Amount.Currency.Should().Be("USD");
+        transaction.ExchangeRate.Should().Be(snapshot);
     }
 }

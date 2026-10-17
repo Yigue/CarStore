@@ -21,7 +21,15 @@ public sealed record FinancialReportDto(
     IReadOnlyList<FinancialReportSeriesDto> Series,
     FinancialReportTotalsDto Totals,
     // sfc B0.3.1: every currency with movements in the window, so the client can offer the other report(s).
-    IReadOnlyList<string>? AvailableCurrencies = null);
+    IReadOnlyList<string>? AvailableCurrencies = null,
+    // sfc B0.3.1 / ADR C2: only with a presentation currency. Transactions with no usable frozen rate are left out of
+    // the totals and listed here, never converted with today's rate.
+    FinancialReportUnconvertedDto? Unconverted = null);
+
+public sealed record FinancialReportUnconvertedDto(int Count, IReadOnlyList<FinancialReportUnconvertedDto.Entry> ByCurrency)
+{
+    public sealed record Entry(string Currency, decimal Income, decimal Expense);
+}
 
 public sealed record FinancialReportSeriesDto(
     string Bucket,

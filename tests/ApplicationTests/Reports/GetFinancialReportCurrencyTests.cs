@@ -1,5 +1,6 @@
 using Application.Abstractions.Tenancy;
 using Application.Reports.GetFinancialReport;
+using Domain.Currency;
 using Domain.Financial;
 using Domain.Financial.Attributes;
 using Domain.Shared.ValueObjects;
@@ -79,5 +80,90 @@ public class GetFinancialReportCurrencyTests
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Currency.Unsupported");
+    }
+
+    // --- sfc B0.3.1 / ADR C2: presentation currency converts with each operation's own frozen rate ---
+
+    private static GetFinancialReportQuery PresentationQuery(string presentation) =>
+        new(Day.AddDays(-10), Day.AddDays(10), ReportGroupBy.Month, PresentationCurrency: presentation);
+
+    private static async Task<TestApplicationDbContext> SeedPresentationAsync()
+    {
+        var ctx = new TestApplicationDbContext(
+            new DbContextOptionsBuilder<TestApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options,
+            DealerId);
+        var income = new TransactionCategory("Ventas", "d", TransactionType.Income);
+        ctx.TransactionCategories.Add(income);
+        await ctx.SaveChangesAsync();
+        var frozen = new ExchangeRateSnapshot("USD", "ARS", 1000m, Day, Guid.NewGuid());
+        ctx.Transactions.AddRange(
+            new FinancialTransaction(DealerId, TransactionType.Income, Money.Of(1000m, CurrencyCode.Ars), "ars in", PaymentMethod.Cash, income, transactionDate: Day),
+            new FinancialTransaction(DealerId, TransactionType.Income, Money.Of(50m, CurrencyCode.Usd), "usd sale", PaymentMethod.Cash, income, transactionDate: Day, exchangeRate: frozen),
+            new FinancialTransaction(DealerId, TransactionType.Income, Money.Of(20m, CurrencyCode.Usd), "usd manual", PaymentMethod.Cash, income, transactionDate: Day));
+        // The dealer's rate today differs from the frozen one: it must not matter.
+        ctx.DealerExchangeRates.Add(DealerExchangeRate.Record(DealerId, CurrencyCode.Usd, CurrencyCode.Ars, 1500m, Day.AddDays(5), Guid.NewGuid()).Value);
+        await ctx.SaveChangesAsync();
+        return ctx;
+    }
+
+    [Fact]
+    public async Task Handle_Should_ConvertWithTheFrozenRate_NotTheCurrentOne()
+    {
+        await using var ctx = await SeedPresentationAsync();
+
+        var result = await Handler(ctx).Handle(PresentationQuery("ars"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Currency.Should().Be("ARS");
+        // 1000 ARS as is + 50 USD * 1000 (frozen), not * 1500 (today's).
+        result.Value.Totals.Should().Be(new FinancialReportTotalsDto(51_000m, 0m, 51_000m));
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReportWhatCouldNotBeConverted_InsteadOfUsingTodaysRate()
+    {
+        await using var ctx = await SeedPresentationAsync();
+
+        var result = await Handler(ctx).Handle(PresentationQuery("ARS"), CancellationToken.None);
+
+        result.Value.Unconverted.Should().NotBeNull();
+        result.Value.Unconverted!.Count.Should().Be(1);
+        result.Value.Unconverted.ByCurrency.Should().ContainSingle()
+            .Which.Should().Be(new FinancialReportUnconvertedDto.Entry("USD", 20m, 0m));
+    }
+
+    [Fact]
+    public async Task Handle_Should_CountNativeUsdAsIs_AndLeaveArsWithoutSnapshotUnconverted_InUsd()
+    {
+        await using var ctx = await SeedPresentationAsync();
+
+        var inUsd = await Handler(ctx).Handle(PresentationQuery("USD"), CancellationToken.None);
+
+        // 50 USD as is (+20 USD manual, native); the ARS row has no snapshot so it is unconverted.
+        inUsd.Value.Totals.Should().Be(new FinancialReportTotalsDto(70m, 0m, 70m));
+        inUsd.Value.Unconverted!.Count.Should().Be(1);
+        inUsd.Value.Unconverted.ByCurrency.Single().Currency.Should().Be("ARS");
+    }
+
+    [Fact]
+    public async Task Handle_Should_RejectAnUnsupportedPresentationCurrency()
+    {
+        await using var ctx = await SeedPresentationAsync();
+
+        var result = await Handler(ctx).Handle(PresentationQuery("EUR"), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Currency.Unsupported");
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotAddUnconverted_WithoutAPresentationCurrency()
+    {
+        await using var ctx = await SeedPresentationAsync();
+
+        var result = await Handler(ctx).Handle(Query(currency: null), CancellationToken.None);
+
+        result.Value.Unconverted.Should().BeNull();
+        result.Value.Totals.Income.Should().Be(1000m);
     }
 }
