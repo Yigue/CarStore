@@ -82,7 +82,7 @@ public static class DependencyInjection
         services.AddSingleton<ICredentialProtector, DataProtectionCredentialProtector>();
         services.AddSingleton<IIntegrationProviderSettings, IntegrationProviderSettings>();
 
-        var rateLimit = configuration.GetSection(RateLimiterOptions.SectionName).Get<RateLimiterOptions>() ?? new RateLimiterOptions();
+        var rateLimit = (configuration.GetSection(RateLimiterOptions.SectionName).Get<RateLimiterOptions>() ?? new RateLimiterOptions()).Validate();
         services.AddSingleton(rateLimit);
 
         string? redisConnectionString = configuration.GetConnectionString("Redis");

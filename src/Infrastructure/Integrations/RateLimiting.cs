@@ -13,6 +13,18 @@ public sealed class RateLimiterOptions
 
     public int Capacity { get; set; } = 10;
     public double RefillPerSecond { get; set; } = 1;
+
+    /// <summary>A zero capacity or refill would block forever or divide by zero; refuse it at startup.</summary>
+    public RateLimiterOptions Validate()
+    {
+        if (Capacity < 1 || RefillPerSecond <= 0 || double.IsNaN(RefillPerSecond) || double.IsInfinity(RefillPerSecond))
+        {
+            throw new InvalidOperationException(
+                $"{SectionName} needs Capacity >= 1 and a finite RefillPerSecond > 0 (got {Capacity} and {RefillPerSecond}).");
+        }
+
+        return this;
+    }
 }
 
 /// <summary>Single-process token bucket for dev/tests (no Redis configured).</summary>
@@ -94,7 +106,9 @@ public sealed class RedisRateLimiter(
                 ? new RateLimitDecision(true, TimeSpan.Zero)
                 : new RateLimitDecision(false, TimeSpan.FromMilliseconds(values[1]));
         }
-        catch (RedisException ex)
+        // RedisTimeoutException derives from TimeoutException, not RedisException: both must defer, never escape to the
+        // dispatcher, which would count the outage as a provider failure and burn the command's attempts.
+        catch (Exception ex) when (ex is RedisException or TimeoutException)
         {
             // Fail closed: nothing is sent while the limiter is unreachable, and the command keeps its attempts.
             logger.LogWarning(ex, "Rate limiter unavailable for {Provider}; deferring", provider);
