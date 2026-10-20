@@ -99,33 +99,11 @@ internal sealed class ProvisionDealerCommandHandler(
 
             context.DealerSettings.Add(settings);
 
-            var adminRole = new Role(dealerId, "Admin", "Administrador del Sistema");
-            var defaultPermissions = new[]
-            {
-                "cars:read", "cars:create", "cars:update", "cars:delete",
-                "clients:read", "clients:write", "clients:delete",
-                "sales:read", "sales:create", "sales:update", "sales:delete",
-                "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
-                "financial:read", "financial:create", "financial:update", "financial:delete",
-                "users:read", "users:create", "users:access", "CanManageUsers", "CanManageRoles",
-                "CanManageSettings",
-                "leads:read", "leads:create", "leads:update", "leads:delete",
-                "leads:write", "leads:archive",
-                "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
-                "admin:backfill",
-                "webhooks:manage",
-                // qa-p1-integridad PR6 (D7): grant at both seed sites — see UsersSeeder.cs.
-                "documents:read", "documents:create"
-            };
-
-            foreach (var permission in defaultPermissions)
-            {
-                adminRole.AddPermission(permission);
-            }
-
+            // spr PR 4.1 (SPR-18): the permission set lives once in DefaultRoleCatalog, not inlined here.
+            var adminRole = DefaultRoleCatalog.BuildRole(dealerId, DefaultRoleCatalog.Admin);
             context.Roles.Add(adminRole);
 
-            var clienteRole = new Role(dealerId, "Cliente", "Cliente registrado");
+            var clienteRole = DefaultRoleCatalog.BuildRole(dealerId, DefaultRoleCatalog.Cliente);
             context.Roles.Add(clienteRole);
 
             user = new User(

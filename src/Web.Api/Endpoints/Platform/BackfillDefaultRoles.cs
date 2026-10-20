@@ -10,8 +10,10 @@ namespace Web.Api.Endpoints.Platform;
 /// <summary>
 /// spr PR 4.1 (SPR-18, D6): platform-admin backfill that converges every dealer's
 /// Admin/Empleado/Cliente roles onto <c>DefaultRoleCatalog</c>. <c>dryRun=true</c> previews the
-/// per-dealer drift without writing; <c>dryRun=false</c> creates missing roles and fully syncs
-/// existing ones. Pattern follows <c>Endpoints/Cars/BackfillSaleCompletedCarStatus.cs</c>.
+/// per-dealer drift without writing; <c>dryRun=false</c> creates missing roles and adds any
+/// permission an existing one is missing — it never removes one, since a role sharing one of
+/// these names may have been deliberately customized by the dealer. Pattern follows
+/// <c>Endpoints/Cars/BackfillSaleCompletedCarStatus.cs</c>.
 /// </summary>
 internal sealed class BackfillDefaultRoles : IEndpoint
 {

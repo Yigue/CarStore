@@ -40,25 +40,13 @@ internal static class UsersSeeder
                 adminPassword);
         }
 
-        var adminRole = await SeedRoleAsync(context, dealerId, "Admin", "Administrador del Sistema", new[]
-        {
-            "cars:read", "cars:create", "cars:update", "cars:delete",
-            "clients:read", "clients:write", "clients:delete",
-            "sales:read", "sales:create", "sales:update", "sales:delete",
-            "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
-            "financial:read", "financial:create", "financial:update", "financial:delete",
-            "users:read", "users:create", "users:access", "CanManageUsers", "CanManageRoles",
-            "CanManageSettings",
-            "leads:read", "leads:create", "leads:update", "leads:delete",
-            "leads:write", "leads:archive",
-            "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
-            "admin:backfill",
-            "audit:read",
-            "webhooks:manage",
-            // qa-p1-integridad PR6 (D7): granted by no role anywhere until now —
-            // GET /documents/{id}/download-url has been 403 for every seeded user since it shipped.
-            "documents:read", "documents:create"
-        }, cancellationToken);
+        // spr PR 4.1 (SPR-18): the permission set lives once in DefaultRoleCatalog. It used to carry an
+        // extra "audit:read" that ProvisionDealerCommandHandler never granted — drift, not an intentional
+        // grant; the catalog converges on onboarding's set, so a brand-new dev seed no longer gets it (an
+        // already-seeded one keeps it, since SeedRoleAsync below only adds, never revokes, on re-seed).
+        var adminRole = await SeedRoleAsync(
+            context, dealerId, DefaultRoleCatalog.Admin, DefaultRoleCatalog.GetDescription(DefaultRoleCatalog.Admin),
+            DefaultRoleCatalog.GetPermissions(DefaultRoleCatalog.Admin).ToArray(), cancellationToken);
 
         var admin = context.Users
             .IgnoreQueryFilters()
@@ -87,7 +75,9 @@ internal static class UsersSeeder
         Guid dealerId,
         CancellationToken cancellationToken)
     {
-        await SeedRoleAsync(context, dealerId, "Cliente", "Cliente registrado", [], cancellationToken);
+        await SeedRoleAsync(
+            context, dealerId, DefaultRoleCatalog.Cliente, DefaultRoleCatalog.GetDescription(DefaultRoleCatalog.Cliente),
+            DefaultRoleCatalog.GetPermissions(DefaultRoleCatalog.Cliente).ToArray(), cancellationToken);
     }
 
     private static async Task<Role> SeedRoleAsync(
@@ -155,19 +145,10 @@ internal static class UsersSeeder
         // Both only affect fresh seeds / new dealers: SeedRoleAsync only adds
         // missing permissions on re-seed, it never revokes existing grants
         // (ADR-8/ADR-9, accepted risk — see design.md §2).
-        var empleadoRole = await SeedRoleAsync(context, dealerId, "Empleado", "Empleado Demo", new[]
-        {
-            "cars:read",
-            "clients:read",
-            "sales:read",
-            "sales:create",
-            "leads:read",
-            "appointments:read",
-            // qa-p1-integridad PR6 (D7): Empleado uploads/downloads documents in normal
-            // operation — must not be silently 403'd once PR7 requires the permission.
-            "documents:read",
-            "documents:create"
-        }, cancellationToken);
+        // spr PR 4.1 (SPR-18): same single source as Admin/Cliente above.
+        var empleadoRole = await SeedRoleAsync(
+            context, dealerId, DefaultRoleCatalog.Empleado, DefaultRoleCatalog.GetDescription(DefaultRoleCatalog.Empleado),
+            DefaultRoleCatalog.GetPermissions(DefaultRoleCatalog.Empleado).ToArray(), cancellationToken);
 
         var empleado = context.Users
             .IgnoreQueryFilters()
@@ -228,7 +209,9 @@ internal static class UsersSeeder
             "platform:dealers:read",
             "platform:dealers:suspend",
             "platform:dealers:activate",
-            "platform:metrics:read"
+            "platform:metrics:read",
+            // spr PR 4.1 (SPR-18): reaches POST platform/backfill/default-roles.
+            "platform:roles:backfill"
         };
 
         var existingPermissions = context.UserPermissions
