@@ -10,7 +10,7 @@ namespace ArchitectureTests;
 
 public class ProducesProblemBudgetTests : BaseTest
 {
-    private const int FrozenBudget = 109; // spr PR 4.1: +1 for BackfillDefaultRoles.cs (a genuinely new endpoint)
+    private const int FrozenBudget = 108; // spr PR 4.2: -1, UpdatePermissions.cs (legacy permission-grant endpoint) deleted
 
     [Fact]
     public void ProducesProblem500_DeclarationCount_MatchesFrozenBudget()

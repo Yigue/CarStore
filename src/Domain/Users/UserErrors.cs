@@ -44,10 +44,6 @@ public static class UserErrors
         "Users.OwnerProtected",
         "El titular de la cuenta no puede desactivarse, eliminarse ni cambiar de rol: transfiere la titularidad primero");
 
-    public static readonly Error CannotRevokeOwnPermission = Error.Failure(
-        "Users.CannotRevokeOwnPermission",
-        "No puedes revocar tus propios permisos de administrador");
-
     public static readonly Error TenantRequired = Error.Problem(
         "Users.TenantRequired",
         "A valid tenant context is required to register a user.");
