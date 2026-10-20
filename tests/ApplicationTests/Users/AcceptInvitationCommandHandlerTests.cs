@@ -119,6 +119,67 @@ public class AcceptInvitationCommandHandlerTests
         (await _context.Users.CountAsync()).Should().Be(0);
     }
 
+    // Security review (sfc A4.2): a token must not be burned on a doomed accept — Email has a global unique
+    // index, so without this check the token-consume would succeed and the User insert would then throw,
+    // locking the invitee out with no way to retry (the one-time secret is gone).
+    [Fact]
+    public async Task Accept_WhenTheEmailWasClaimedSinceTheInviteWentOut_IsRejected_AndDoesNotConsumeTheToken()
+    {
+        string plain = await IssueTokenAsync("invitado@afuera.com");
+        _context.Users.Add(new User(_dealerId, "invitado@afuera.com", "Otro", "Dueño", "hash", _role.Id));
+        await _context.SaveChangesAsync();
+
+        Result<Guid> result = await Handler().Handle(new AcceptInvitationCommand(plain, Password, "Nuevo", "Invitado"), CancellationToken.None);
+
+        result.Error.Should().Be(InvitationErrors.InvalidToken);
+        (await _context.UserActionTokens.SingleAsync()).ConsumedAtUtc.Should().BeNull("a doomed accept must not spend the one-time token");
+        (await _context.Users.CountAsync()).Should().Be(1);
+    }
+
+    // Security review (sfc A4.2): a stale grant must not resurrect. The role or the inviter's own standing may
+    // have changed in the days between the invite email going out and it being accepted.
+    [Fact]
+    public async Task Accept_WhenTheInvitedRoleWasDeletedSinceTheInviteWentOut_IsRejected()
+    {
+        var role = new Role(_dealerId, "Temporal", "Temporal");
+        _context.Roles.Add(role);
+        await _context.SaveChangesAsync();
+        string plain = await IssueTokenAsync("invitado@afuera.com", roleId: role.Id);
+        _context.Roles.Remove(role);
+        await _context.SaveChangesAsync();
+
+        Result<Guid> result = await Handler().Handle(new AcceptInvitationCommand(plain, Password, "Nuevo", "Invitado"), CancellationToken.None);
+
+        result.Error.Should().Be(InvitationErrors.InvalidToken);
+        (await _context.Users.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Accept_WhenTheInviterNoLongerCanManageUsers_IsRejected()
+    {
+        var adminRole = new Role(_dealerId, "Admin", "Admin");
+        adminRole.AddPermission("CanManageUsers");
+        _context.Roles.Add(adminRole);
+        var inviter = new User(_dealerId, "admin@dealer.com", "Admin", "Uno", "hash", adminRole.Id);
+        _context.Users.Add(inviter);
+        await _context.SaveChangesAsync();
+        Guid inviterId = inviter.Id;
+        string plain = UserActionTokenHasher.NewToken();
+        _context.UserActionTokens.Add(UserActionToken.Issue(
+            [], UserActionPurpose.Invitation, _dealerId, "invitado@afuera.com", UserActionTokenHasher.Hash(plain),
+            userId: null, roleId: _role.Id, createdBy: inviterId, nowUtc: Now));
+        await _context.SaveChangesAsync();
+
+        // The inviter is deactivated after sending the invite (left the team, was removed).
+        (await _context.Users.FirstAsync(u => u.Id == inviterId)).Deactivate();
+        await _context.SaveChangesAsync();
+
+        Result<Guid> result = await Handler().Handle(new AcceptInvitationCommand(plain, Password, "Nuevo", "Invitado"), CancellationToken.None);
+
+        result.Error.Should().Be(InvitationErrors.InvalidToken);
+        (await _context.Users.CountAsync()).Should().Be(1, "only the inviter, no invitee created");
+    }
+
     [Fact]
     public void Validator_RejectsAWeakPasswordOrAnEmptyName()
     {

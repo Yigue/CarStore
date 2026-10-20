@@ -32,6 +32,33 @@ internal sealed class AcceptInvitationCommandHandler(IApplicationDbContext conte
         if (token is null || token.RoleId is null || !token.IsPending(now))
             return Result.Failure<Guid>(InvitationErrors.InvalidToken);
 
+        // Security review (sfc A4.2): a stale grant must not resurrect days later. The role, or the inviter's own
+        // standing to grant it, may have changed since the email went out; re-check both before honoring the token.
+        bool roleStillBelongsToDealer = await context.Roles
+            .AnyAsync(r => r.Id == token.RoleId.Value && r.DealerId == token.DealerId, cancellationToken);
+        if (!roleStillBelongsToDealer)
+            return Result.Failure<Guid>(InvitationErrors.InvalidToken);
+
+        if (token.CreatedBy is { } inviterId)
+        {
+            bool inviterCanStillManageUsers = await context.Users
+                .Where(u => u.Id == inviterId && u.DealerId == token.DealerId && u.IsActive)
+                .Join(context.RolePermissions, u => u.RoleId, rp => rp.RoleId, (u, rp) => rp.Permission)
+                .AnyAsync(p => p == "CanManageUsers", cancellationToken);
+            if (!inviterCanStillManageUsers)
+                return Result.Failure<Guid>(InvitationErrors.InvalidToken);
+        }
+
+        // Security review (sfc A4.2): Email has a global unique index. Without this check a row claimed since the
+        // invite went out — by any means, not only a race — would consume the token and then throw on SaveChanges,
+        // locking the invitee out with no way to retry (the one-time secret would already be spent). A narrow
+        // concurrent-request race between this check and the final SaveChanges below remains (same residual risk
+        // accepted elsewhere in this codebase, e.g. ResendVerification's documented timing side channel).
+        bool emailAlreadyClaimed = await context.Users.IgnoreQueryFilters()
+            .AnyAsync(u => (string)u.Email == token.Email, cancellationToken);
+        if (emailAlreadyClaimed)
+            return Result.Failure<Guid>(InvitationErrors.InvalidToken);
+
         // Atomic single use: of N concurrent accepts exactly one gets rowcount = 1.
         if (!await context.TryConsumeUserActionTokenAsync(token.Id, now, cancellationToken))
             return Result.Failure<Guid>(InvitationErrors.InvalidToken);
