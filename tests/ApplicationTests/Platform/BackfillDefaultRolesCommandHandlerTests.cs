@@ -36,7 +36,7 @@ public class BackfillDefaultRolesCommandHandlerTests
         // Arrange
         using var context = CreateContext();
         Guid dealerId = SeedDealer(context);
-        var handler = new BackfillDefaultRolesCommandHandler(context, new FakeDateTimeProvider());
+        var handler = new BackfillDefaultRolesCommandHandler(context, new FakeDateTimeProvider(), new RecordingPermissionCacheInvalidator());
 
         // Act
         var result = await handler.Handle(new BackfillDefaultRolesCommand(DryRun: true, ActorUserId), CancellationToken.None);
@@ -60,7 +60,7 @@ public class BackfillDefaultRolesCommandHandlerTests
         // Arrange
         using var context = CreateContext();
         Guid dealerId = SeedDealer(context);
-        var handler = new BackfillDefaultRolesCommandHandler(context, new FakeDateTimeProvider());
+        var handler = new BackfillDefaultRolesCommandHandler(context, new FakeDateTimeProvider(), new RecordingPermissionCacheInvalidator());
 
         // Act
         var result = await handler.Handle(new BackfillDefaultRolesCommand(DryRun: false, ActorUserId), CancellationToken.None);
@@ -82,8 +82,11 @@ public class BackfillDefaultRolesCommandHandlerTests
         audits.Should().ContainSingle(a => a.DealerId == dealerId && a.Action == BackfillAction.Apply);
     }
 
+    // Security review (spr PR 4.1): "extra" cannot be told apart from a dealer's own customization of its Admin
+    // role through the normal role-editing screen, so an unattended, platform-wide run must only ever add what a
+    // role is missing — never remove anything, even something that looks like code drift.
     [Fact]
-    public async Task Handle_Confirmed_OnRoleWithDriftedPermissions_SyncsToExactCatalogSet()
+    public async Task Handle_Confirmed_OnRoleWithDriftedPermissions_AddsWhatIsMissing_ButKeepsTheExtraGrant()
     {
         // Arrange — Admin role missing a catalog permission and holding an extra one.
         using var context = CreateContext();
@@ -96,7 +99,8 @@ public class BackfillDefaultRolesCommandHandlerTests
         context.Roles.Add(DefaultRoleCatalog.BuildRole(dealerId, DefaultRoleCatalog.Cliente));
         context.SaveChanges();
 
-        var handler = new BackfillDefaultRolesCommandHandler(context, new FakeDateTimeProvider());
+        var invalidator = new RecordingPermissionCacheInvalidator();
+        var handler = new BackfillDefaultRolesCommandHandler(context, new FakeDateTimeProvider(), invalidator);
 
         // Act
         var result = await handler.Handle(new BackfillDefaultRolesCommand(DryRun: false, ActorUserId), CancellationToken.None);
@@ -106,8 +110,28 @@ public class BackfillDefaultRolesCommandHandlerTests
 
         Role syncedAdmin = await context.Roles.IgnoreQueryFilters().Include(r => r.Permissions)
             .SingleAsync(r => r.Id == driftedAdmin.Id);
-        syncedAdmin.Permissions.Select(p => p.Permission)
-            .Should().BeEquivalentTo(DefaultRoleCatalog.GetPermissions(DefaultRoleCatalog.Admin));
+        var expected = DefaultRoleCatalog.GetPermissions(DefaultRoleCatalog.Admin).Append("some:legacy:grant");
+        syncedAdmin.Permissions.Select(p => p.Permission).Should().BeEquivalentTo(expected,
+            "the missing grant is added, but the extra one stays — it may be a deliberate dealer customization");
+        invalidator.InvalidatedRoleIds.Should().Contain(driftedAdmin.Id);
+    }
+
+    private sealed class RecordingPermissionCacheInvalidator : Application.Abstractions.Authorization.IPermissionCacheInvalidator
+    {
+        public List<Guid> InvalidatedRoleIds { get; } = [];
+        public List<Guid> InvalidatedUserIds { get; } = [];
+
+        public Task InvalidateUserAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            InvalidatedUserIds.Add(userId);
+            return Task.CompletedTask;
+        }
+
+        public Task InvalidateRoleAsync(Guid roleId, CancellationToken cancellationToken = default)
+        {
+            InvalidatedRoleIds.Add(roleId);
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]
@@ -116,7 +140,7 @@ public class BackfillDefaultRolesCommandHandlerTests
         // Arrange
         using var context = CreateContext();
         SeedDealer(context);
-        var handler = new BackfillDefaultRolesCommandHandler(context, new FakeDateTimeProvider());
+        var handler = new BackfillDefaultRolesCommandHandler(context, new FakeDateTimeProvider(), new RecordingPermissionCacheInvalidator());
 
         // Act — first confirmed run converges the dealer.
         var first = await handler.Handle(new BackfillDefaultRolesCommand(DryRun: false, ActorUserId), CancellationToken.None);

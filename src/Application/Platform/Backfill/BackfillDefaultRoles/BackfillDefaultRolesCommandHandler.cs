@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars;
@@ -12,20 +13,33 @@ namespace Application.Platform.Backfill.BackfillDefaultRoles;
 /// <summary>
 /// spr PR 4.1 (SPR-18, D6): walks every dealer, compares its Admin/Empleado/Cliente roles
 /// against <see cref="DefaultRoleCatalog"/>, and either reports the drift (<c>DryRun</c>) or
-/// converges it (confirmed) — creating missing roles and fully syncing existing ones
-/// (<see cref="DefaultRoleCatalog.Sync"/> adds missing permissions AND removes extras, unlike
-/// the additive-only seed-time behavior in <c>UsersSeeder</c>, per design.md Fase 4).
+/// closes it (confirmed) — creating any missing role from the catalogue and adding any
+/// permission an existing one is missing.
+///
+/// <para>
+/// Security review: it does NOT remove a permission the catalogue does not list. A role named
+/// exactly Admin/Empleado/Cliente can be a dealer's own customization of that role through the
+/// normal role-editing screen — this job cannot tell "drifted by the seeding bug this PR fixes"
+/// apart from "a dealer deliberately added a permission afterward", so an unattended,
+/// platform-wide run must never delete one. <see cref="DefaultRoleCatalog.Sync"/> (full
+/// add-and-remove) stays available as a primitive for a human to apply to one reviewed role; this
+/// handler only ever adds. Any extra permission is still reported in the diff, in both modes, for
+/// a person to act on deliberately.
+/// </para>
 ///
 /// <para>
 /// Platform-wide, not tenant-scoped: iterates every <c>DealerSettings</c> row regardless of the
 /// caller's own tenant. One <see cref="BackfillAudit"/> row is appended per dealer that actually
 /// had a difference (dealers already converged write nothing — the audit table would otherwise
-/// grow by one row per dealer on every no-op re-run).
+/// grow by one row per dealer on every no-op re-run). Every role created or topped up has its
+/// holders' cached permissions invalidated, the same way <c>UpdateRoleCommandHandler</c> does for
+/// a manual edit — otherwise the fix sits unused for up to the cache's TTL.
 /// </para>
 /// </summary>
 internal sealed class BackfillDefaultRolesCommandHandler(
     IApplicationDbContext context,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IPermissionCacheInvalidator permissionCacheInvalidator)
     : ICommandHandler<BackfillDefaultRolesCommand, BackfillDefaultRolesResult>
 {
     public async Task<Result<BackfillDefaultRolesResult>> Handle(
@@ -42,6 +56,7 @@ internal sealed class BackfillDefaultRolesCommandHandler(
             .ToListAsync(cancellationToken);
 
         var diffs = new List<DealerRoleDiff>();
+        var touchedRoleIds = new List<Guid>();
 
         foreach (Guid dealerId in dealerIds)
         {
@@ -63,7 +78,9 @@ internal sealed class BackfillDefaultRolesCommandHandler(
                     missingRoles.Add(roleName);
                     if (!command.DryRun)
                     {
-                        context.Roles.Add(DefaultRoleCatalog.BuildRole(dealerId, roleName));
+                        var created = DefaultRoleCatalog.BuildRole(dealerId, roleName);
+                        context.Roles.Add(created);
+                        touchedRoleIds.Add(created.Id);
                     }
 
                     continue;
@@ -76,9 +93,15 @@ internal sealed class BackfillDefaultRolesCommandHandler(
                 }
 
                 rolePermissionDiffs.Add(new RolePermissionDiff(roleName, missing, extra));
-                if (!command.DryRun)
+                if (!command.DryRun && missing.Count > 0)
                 {
-                    DefaultRoleCatalog.Sync(role);
+                    // Additive only — see the class remarks. `extra` is reported above but never removed here.
+                    foreach (string permission in missing)
+                    {
+                        role.AddPermission(permission);
+                    }
+
+                    touchedRoleIds.Add(role.Id);
                 }
             }
 
@@ -91,6 +114,11 @@ internal sealed class BackfillDefaultRolesCommandHandler(
         if (!command.DryRun && diffs.Count > 0)
         {
             await context.SaveChangesAsync(cancellationToken);
+
+            foreach (Guid roleId in touchedRoleIds)
+            {
+                await permissionCacheInvalidator.InvalidateRoleAsync(roleId, cancellationToken);
+            }
         }
 
         stopwatch.Stop();
