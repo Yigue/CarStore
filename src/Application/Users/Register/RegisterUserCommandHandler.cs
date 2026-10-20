@@ -37,14 +37,16 @@ internal sealed class RegisterUserCommandHandler(
             return Result.Failure<Guid>(UserErrors.TenantRequired);
         }
 
-        // Find or create "Cliente" role for this dealer idempotently
+        // Find or create "Cliente" role for this dealer idempotently.
+        // spr PR 4.1 (SPR-18, D6): permission set comes from DefaultRoleCatalog, the single
+        // source of truth — not an inline list.
         var clienteRole = await context.Roles
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(r => r.DealerId == dealerId && r.Name == "Cliente", cancellationToken);
+            .FirstOrDefaultAsync(r => r.DealerId == dealerId && r.Name == DefaultRoleCatalog.Cliente, cancellationToken);
 
         if (clienteRole is null)
         {
-            clienteRole = new Role(dealerId, "Cliente", "Cliente registrado");
+            clienteRole = DefaultRoleCatalog.BuildRole(dealerId, DefaultRoleCatalog.Cliente);
             context.Roles.Add(clienteRole);
         }
 

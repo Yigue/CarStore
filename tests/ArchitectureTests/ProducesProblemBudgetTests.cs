@@ -10,7 +10,7 @@ namespace ArchitectureTests;
 
 public class ProducesProblemBudgetTests : BaseTest
 {
-    private const int FrozenBudget = 108; // CFG-06: +1 for UpdateLanding.cs (a genuinely new endpoint)
+    private const int FrozenBudget = 109; // spr PR 4.1: +1 for BackfillDefaultRoles.cs (a genuinely new endpoint)
 
     [Fact]
     public void ProducesProblem500_DeclarationCount_MatchesFrozenBudget()

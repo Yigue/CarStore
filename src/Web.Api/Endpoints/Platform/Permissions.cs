@@ -7,4 +7,7 @@ internal static class Permissions
     internal const string DealersActivate = "platform:dealers:activate";
     internal const string MetricsRead = "platform:metrics:read";
     internal const string AuditLogsRead = "platform:audit-logs:read";
+
+    /// <summary>spr PR 4.1 (SPR-18, D6): default-role catalog backfill, platform-admin only.</summary>
+    internal const string RolesBackfill = "platform:roles:backfill";
 }
