@@ -456,4 +456,27 @@ public class PurgeTenantCommandHandlerTests
         (await _context.UserPreferences.Select(p => p.UserId).ToListAsync()).Should().Equal(theirs.Id);
         (await _context.TenantPurgeRecords.SingleAsync()).Counts["userPreferences"].Should().Be(1);
     }
+
+    // Security review (spr PR 4.2 / REV-SDD-01): UserPermission never calls SetDealer(), so its own DealerId
+    // column is always Guid.Empty — filtering by `.DealerId == dealerId` (as every other table here correctly
+    // does) matches nothing, and purge has never actually deleted any dealer's UserPermissions rows.
+    [Fact]
+    public async Task Purge_DeletesTheLegacyPermissionsOfTheDealersUsersOnly()
+    {
+        SeedDealer(_dealerId, TenantLifecycleStatus.Locked);
+        var mine = new User(_dealerId, "mine@dealer.com", "U", "S", "hash", Guid.NewGuid());
+        var theirs = new User(_otherId, "theirs@dealer.com", "U", "S", "hash", Guid.NewGuid());
+        _context.Users.AddRange(mine, theirs);
+        await _context.SaveChangesAsync();
+        _context.UserPermissions.AddRange(
+            new UserPermission(mine.Id, "cars:read", mine.Id),
+            new UserPermission(theirs.Id, "cars:read", theirs.Id));
+        await _context.SaveChangesAsync();
+
+        var result = await Handler().Handle(new PurgeTenantCommand(_dealerId, DryRun: false), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        (await _context.UserPermissions.Select(p => p.UserId).ToListAsync()).Should().Equal(theirs.Id);
+        (await _context.TenantPurgeRecords.SingleAsync()).Counts["userPermissions"].Should().Be(1);
+    }
 }

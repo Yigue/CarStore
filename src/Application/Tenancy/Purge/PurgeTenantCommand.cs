@@ -133,7 +133,9 @@ internal sealed class PurgeTenantCommandHandler(
         counts["clients"] = await DeleteAsync(context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Clients, null, ct);
         counts["exchangeRates"] = await DeleteAsync(context.DealerExchangeRates.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.DealerExchangeRates, null, ct);
         counts["transactionCategories"] = await DeleteAsync(context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.TransactionCategories, null, ct);
-        counts["userPermissions"] = await DeleteAsync(context.UserPermissions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.UserPermissions, null, ct);
+        // spr PR 4.2 / REV-SDD-01: UserPermission.DealerId is always Guid.Empty (never set); scope by the owning
+        // User's dealer instead, like userBranches/passwordResetTokens/userPreferences below.
+        counts["userPermissions"] = await DeleteAsync(UserPermissionsOf(dealerId), context.UserPermissions, null, ct);
         counts["passwordResetTokens"] = await DeleteAsync(PasswordResetTokensOf(dealerId), context.PasswordResetTokens, null, ct);
         counts["userBranches"] = await DeleteAsync(context.UserBranches.Where(ub => context.Users.IgnoreQueryFilters().Any(u => u.Id == ub.UserId && u.DealerId == dealerId)), context.UserBranches, null, ct);
         counts["userPreferences"] = await DeleteAsync(UserPreferencesOf(dealerId), context.UserPreferences, null, ct);
@@ -222,7 +224,7 @@ internal sealed class PurgeTenantCommandHandler(
         yield return ("clients", context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("exchangeRates", context.DealerExchangeRates.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("transactionCategories", context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
-        yield return ("userPermissions", context.UserPermissions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("userPermissions", UserPermissionsOf(dealerId));
         yield return ("passwordResetTokens", PasswordResetTokensOf(dealerId));
         yield return ("userBranches", context.UserBranches.Where(ub => context.Users.IgnoreQueryFilters().Any(u => u.Id == ub.UserId && u.DealerId == dealerId)));
         yield return ("userPreferences", UserPreferencesOf(dealerId));
@@ -244,6 +246,9 @@ internal sealed class PurgeTenantCommandHandler(
 
     private IQueryable<Domain.Users.RolePermission> RolePermissionsOf(Guid dealerId) =>
         context.RolePermissions.Where(p => context.Roles.IgnoreQueryFilters().Any(r => r.Id == p.RoleId && r.DealerId == dealerId));
+
+    private IQueryable<Domain.Users.UserPermission> UserPermissionsOf(Guid dealerId) =>
+        context.UserPermissions.Where(p => context.Users.IgnoreQueryFilters().Any(u => u.Id == p.UserId && u.DealerId == dealerId));
 
     private async Task ClearClientOriginLeadsAsync(Guid dealerId, CancellationToken ct)
     {
