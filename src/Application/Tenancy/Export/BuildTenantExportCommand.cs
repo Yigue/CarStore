@@ -116,6 +116,9 @@ internal sealed class BuildTenantExportCommandHandler(
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "ventas", context.Sales.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
+        // sfc B4.1 security review: commissions are the dealer's own data, same as sales.
+        files.Add(await AddCsvAsync(zip, "comisiones", context.SaleCommissions.IgnoreQueryFilters().AsNoTracking()
+            .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "turnos", context.Appointments.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "transacciones", context.Transactions.IgnoreQueryFilters().AsNoTracking()
