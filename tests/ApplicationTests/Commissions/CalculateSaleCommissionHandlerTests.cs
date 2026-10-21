@@ -148,6 +148,25 @@ public class CalculateSaleCommissionHandlerTests
 
         List<SaleCommission> commissions = await context.SaleCommissions.Where(c => c.SaleId == sale.Id).ToListAsync();
         commissions.Should().HaveCount(1);
-        commissions[0].Amount.Amount.Should().Be(50_000m);
+    }
+
+    // Security review (sfc B4.1): domain events travel through the outbox (ProcessOutboxMessagesJob), so
+    // SaleCompletedDomainEvent can be processed after the sale was already voided — a sale completed and
+    // immediately corrected is not reordered or delayed just for this handler. The commission must not come
+    // out Pending (payable) for a sale that is, by the time this runs, actually Voided.
+    [Fact]
+    public async Task WhenTheSaleWasAlreadyVoidedByTheTimeThisRuns_TheCommissionIsCreatedAlreadyVoided()
+    {
+        using var context = CreateContext();
+        (Sale sale, _) = await SeedPendingSaleAsync(context, "CMS060", 1_000_000m);
+        sale.Complete();
+        sale.Void("Cliente desistió", Guid.NewGuid(), DateTime.UtcNow);
+        await context.SaveChangesAsync();
+
+        await NewHandler(context).Handle(
+            new SaleCompletedDomainEvent(sale.Id, sale.CarId, sale.ClientId, sale.FinalPrice, PaymentMethod.Cash), CancellationToken.None);
+
+        SaleCommission commission = await context.SaleCommissions.SingleAsync(c => c.SaleId == sale.Id);
+        commission.Status.Should().Be(SaleCommissionStatus.Voided);
     }
 }

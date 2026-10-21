@@ -119,6 +119,10 @@ internal sealed class PurgeTenantCommandHandler(
         counts["warrantyRecords"] = await DeleteAsync(context.WarrantyRecords.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.WarrantyRecords, null, ct);
         counts["vehicleLiens"] = await DeleteAsync(context.VehicleLiens.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.VehicleLiens, null, ct);
         counts["deposits"] = await DeleteAsync(context.Deposits.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Deposits, null, ct);
+        // sfc B4.1 security review: these carry the dealer's own DealerId (unlike the legacy UserPermissions
+        // bug above), so the direct filter is correct here.
+        counts["saleCommissions"] = await DeleteAsync(context.SaleCommissions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.SaleCommissions, null, ct);
+        counts["commissionPolicies"] = await DeleteAsync(context.CommissionPolicies.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.CommissionPolicies, null, ct);
         counts["sales"] = await DeleteAsync(context.Sales.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Sales, null, ct);
         counts["quotes"] = await DeleteAsync(context.Quotes.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Quotes, null, ct);
         counts["reconditioningTasks"] = await DeleteAsync(context.ReconditioningTasks.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.ReconditioningTasks, null, ct);
@@ -210,6 +214,8 @@ internal sealed class PurgeTenantCommandHandler(
         yield return ("warrantyRecords", context.WarrantyRecords.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("vehicleLiens", context.VehicleLiens.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("deposits", context.Deposits.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("saleCommissions", context.SaleCommissions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("commissionPolicies", context.CommissionPolicies.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("sales", context.Sales.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("quotes", context.Quotes.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("reconditioningTasks", context.ReconditioningTasks.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));

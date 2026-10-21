@@ -1,6 +1,7 @@
 using Application.Abstractions.Data;
 using Domain.Commissions;
 using Domain.Sales;
+using Domain.Sales.Attributes;
 using Domain.Sales.Events;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,11 @@ internal sealed class CalculateSaleCommissionHandler(
             return;
         }
 
+        // Security review: domain events travel through the outbox, so this can run after the sale was
+        // already voided (completed-then-corrected in quick succession). The row must come out already
+        // Voided, never Pending/payable, for a sale that is Voided by the time this runs.
+        bool saleWasAlreadyVoided = sale.Status == SaleStatus.Voided;
+
         CommissionPolicy? policy = await context.CommissionPolicies
             .FirstOrDefaultAsync(p => p.DealerId == sale.DealerId, cancellationToken);
 
@@ -62,6 +68,11 @@ internal sealed class CalculateSaleCommissionHandler(
 
         SaleCommission commission = SaleCommission.Create(
             sale.DealerId, sale.Id, sale.SalespersonId, calculation.Value, dateTimeProvider.UtcNow);
+        if (saleWasAlreadyVoided)
+        {
+            commission.Void();
+        }
+
         context.SaleCommissions.Add(commission);
 
         try
@@ -70,6 +81,19 @@ internal sealed class CalculateSaleCommissionHandler(
         }
         catch (DbUpdateException)
         {
+            // Security review: this handler runs inside ProcessOutboxMessagesJob, which reuses one DbContext
+            // across a whole batch of up to 20 messages and calls SaveChangesAsync again, unconditionally,
+            // after every handler has run. A failed insert that stays tracked as Added would fail that
+            // trailing save too and poison every other message in the batch — detach it first, always.
+            context.DetachEntity(commission);
+
+            bool raceWasTheCause = await context.SaleCommissions
+                .AnyAsync(c => c.SaleId == notification.SaleId, cancellationToken);
+            if (!raceWasTheCause)
+            {
+                throw;
+            }
+
             // Lost the race on the SaleId unique index: another call already inserted it. Idempotent no-op.
             logger.LogInformation(
                 "SaleCommission unique-index race for Sale {SaleId}; treated as idempotent no-op.", notification.SaleId);

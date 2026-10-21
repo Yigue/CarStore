@@ -457,6 +457,34 @@ public class PurgeTenantCommandHandlerTests
         (await _context.TenantPurgeRecords.SingleAsync()).Counts["userPreferences"].Should().Be(1);
     }
 
+    // Security review (sfc B4.1): SaleCommission/CommissionPolicy were missing from purge entirely — a
+    // dealer's commission data would have survived its own tenant purge.
+    [Fact]
+    public async Task Purge_DeletesSaleCommissionsAndCommissionPolicies_OfThePurgedDealerOnly()
+    {
+        SeedDealer(_dealerId, TenantLifecycleStatus.Locked);
+        foreach (Guid dealer in new[] { _dealerId, _otherId })
+        {
+            _context.CommissionPolicies.Add(Domain.Commissions.CommissionPolicy.CreateDefault(dealer));
+            _context.SaleCommissions.Add(Domain.Commissions.SaleCommission.Create(
+                dealer, Guid.NewGuid(), Guid.NewGuid(),
+                new Domain.Commissions.CommissionResult(
+                    Domain.Shared.ValueObjects.Money.Of(100m, Domain.Shared.ValueObjects.CurrencyCode.Ars), null,
+                    Domain.Shared.ValueObjects.Money.Of(0m, Domain.Shared.ValueObjects.CurrencyCode.Ars), IsConfigured: false),
+                Now));
+        }
+        await _context.SaveChangesAsync();
+
+        var result = await Handler().Handle(new PurgeTenantCommand(_dealerId, DryRun: false), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        (await _context.SaleCommissions.IgnoreQueryFilters().Select(c => c.DealerId).ToListAsync()).Should().Equal(_otherId);
+        (await _context.CommissionPolicies.IgnoreQueryFilters().Select(p => p.DealerId).ToListAsync()).Should().Equal(_otherId);
+        var record = await _context.TenantPurgeRecords.SingleAsync();
+        record.Counts["saleCommissions"].Should().Be(1);
+        record.Counts["commissionPolicies"].Should().Be(1);
+    }
+
     // Security review (spr PR 4.2 / REV-SDD-01): UserPermission never calls SetDealer(), so its own DealerId
     // column is always Guid.Empty — filtering by `.DealerId == dealerId` (as every other table here correctly
     // does) matches nothing, and purge has never actually deleted any dealer's UserPermissions rows.
