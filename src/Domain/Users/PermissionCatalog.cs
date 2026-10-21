@@ -41,6 +41,7 @@ public static class PermissionCatalog
     public const string ModuleAgenda = "Agenda";
     public const string ModuleDocuments = "Documentación";
     public const string ModuleAdministration = "Administración";
+    public const string ModuleCommissions = "Comisiones";
 
     private static readonly PermissionDefinition[] Definitions =
     [
@@ -100,6 +101,11 @@ public static class PermissionCatalog
         new("admin:backfill", ModuleAdministration, "Ejecutar tareas de mantenimiento de datos"),
         new("audit:read", ModuleAdministration, "Ver el historial de auditoría"),
         new("branch:scoped", ModuleAdministration, "Ver solo los vehículos de sus sucursales"),
+
+        // ── Comisiones (sfc B4.2 / RN-010) ──────────────────────────────────────────────────────
+        new("commissions:read-own", ModuleCommissions, "Ver la propia comisión"),
+        new("commissions:read-all", ModuleCommissions, "Ver la comisión de cualquier vendedor"),
+        new("commissions:manage", ModuleCommissions, "Configurar las comisiones (tasas y overrides)"),
     ];
 
     /// <summary>Every grantable permission, in the order the matrix should render them.</summary>

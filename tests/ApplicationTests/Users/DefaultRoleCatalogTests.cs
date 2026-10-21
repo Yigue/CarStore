@@ -83,4 +83,30 @@ public class DefaultRoleCatalogTests
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
+
+    // sfc B4.2 / RN-010: Admin gets every commission permission; Empleado (a salesperson) only
+    // sees their own by default; Cliente gets none.
+    [Fact]
+    public void Admin_HasAllThreeCommissionPermissions()
+    {
+        DefaultRoleCatalog.GetPermissions(DefaultRoleCatalog.Admin)
+            .Should().Contain(["commissions:read-own", "commissions:read-all", "commissions:manage"]);
+    }
+
+    [Fact]
+    public void Empleado_HasOnlyReadOwnCommissionPermission()
+    {
+        IReadOnlyList<string> permissions = DefaultRoleCatalog.GetPermissions(DefaultRoleCatalog.Empleado);
+
+        permissions.Should().Contain("commissions:read-own");
+        permissions.Should().NotContain("commissions:read-all");
+        permissions.Should().NotContain("commissions:manage");
+    }
+
+    [Fact]
+    public void Cliente_HasNoCommissionPermissions()
+    {
+        DefaultRoleCatalog.GetPermissions(DefaultRoleCatalog.Cliente)
+            .Should().NotContain(p => p.StartsWith("commissions:", StringComparison.Ordinal));
+    }
 }

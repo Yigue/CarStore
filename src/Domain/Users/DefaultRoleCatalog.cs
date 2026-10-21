@@ -61,6 +61,8 @@ public static class DefaultRoleCatalog
         "webhooks:manage",
         // qa-p1-integridad PR6 (D7): grant at both seed sites.
         "documents:read", "documents:create",
+        // sfc B4.2 / RN-010: Admin sees/manages every salesperson's commission.
+        "commissions:read-own", "commissions:read-all", "commissions:manage",
     ];
 
     /// <summary>
@@ -77,6 +79,8 @@ public static class DefaultRoleCatalog
         "appointments:read",
         "documents:read",
         "documents:create",
+        // sfc B4.2 / RN-010: a salesperson sees their own commission by default, never another's.
+        "commissions:read-own",
     ];
 
     /// <summary>
