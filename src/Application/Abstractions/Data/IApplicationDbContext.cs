@@ -68,6 +68,8 @@ public interface IApplicationDbContext
     DbSet<Domain.Marketing.Subscriber> Subscribers { get; }
     DbSet<Domain.Integrations.DealerIntegration> DealerIntegrations { get; }
     DbSet<Domain.Integrations.IntegrationCommand> IntegrationCommands { get; }
+    DbSet<Domain.Commissions.SaleCommission> SaleCommissions { get; }
+    DbSet<Domain.Commissions.CommissionPolicy> CommissionPolicies { get; }
 
     /// <summary>
     /// Atomic single use of an action token: <c>UPDATE ... SET consumed_at = @now WHERE id = @id AND consumed_at IS NULL

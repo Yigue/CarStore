@@ -1065,6 +1065,90 @@ namespace Infrastructure.Migrations
                     b.ToTable("clients", "public");
                 });
 
+            modelBuilder.Entity("Domain.Commissions.CommissionPolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<decimal>("DefaultCommissionRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("default_commission_rate");
+
+                    b.Property<string>("OverridesJson")
+                        .HasColumnType("text")
+                        .HasColumnName("overrides_json");
+
+                    b.HasKey("Id")
+                        .HasName("pk_commission_policies");
+
+                    b.HasIndex("DealerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_commission_policies_dealer_id");
+
+                    b.ToTable("commission_policies", "public");
+                });
+
+            modelBuilder.Entity("Domain.Commissions.SaleCommission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CalculatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("calculated_at_utc");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<bool>("IsConfigured")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_configured");
+
+                    b.Property<decimal?>("Rate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("rate");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sale_id");
+
+                    b.Property<Guid?>("SalespersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("salesperson_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sale_commissions");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_sale_commissions_dealer_id");
+
+                    b.HasIndex("SaleId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_sale_commissions_sale_id");
+
+                    b.HasIndex("DealerId", "SalespersonId")
+                        .HasDatabaseName("ix_sale_commissions_dealer_id_salesperson_id");
+
+                    b.ToTable("sale_commissions", "public");
+                });
+
             modelBuilder.Entity("Domain.Currency.DealerExchangeRate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3169,6 +3253,65 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("OriginLeadId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_clients_leads_origin_lead_id");
+                });
+
+            modelBuilder.Entity("Domain.Commissions.SaleCommission", b =>
+                {
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "Amount", b1 =>
+                        {
+                            b1.Property<Guid>("SaleCommissionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("amount_currency");
+
+                            b1.HasKey("SaleCommissionId");
+
+                            b1.ToTable("sale_commissions", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SaleCommissionId")
+                                .HasConstraintName("fk_sale_commissions_sale_commissions_id");
+                        });
+
+                    b.OwnsOne("Domain.Shared.ValueObjects.Money", "Base", b1 =>
+                        {
+                            b1.Property<Guid>("SaleCommissionId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("base_amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("base_currency");
+
+                            b1.HasKey("SaleCommissionId");
+
+                            b1.ToTable("sale_commissions", "public");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SaleCommissionId")
+                                .HasConstraintName("fk_sale_commissions_sale_commissions_id");
+                        });
+
+                    b.Navigation("Amount")
+                        .IsRequired();
+
+                    b.Navigation("Base")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Deposits.Deposit", b =>

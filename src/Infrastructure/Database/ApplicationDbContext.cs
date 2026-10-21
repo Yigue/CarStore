@@ -81,6 +81,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext, Mic
     public DbSet<Domain.Marketing.Subscriber> Subscribers { get; set; }
     public DbSet<Domain.Integrations.DealerIntegration> DealerIntegrations { get; set; }
     public DbSet<Domain.Integrations.IntegrationCommand> IntegrationCommands { get; set; }
+    public DbSet<Domain.Commissions.SaleCommission> SaleCommissions { get; set; }
+    public DbSet<Domain.Commissions.CommissionPolicy> CommissionPolicies { get; set; }
     // sfc C1.1 / ADR C22: Data Protection key ring (not tenant data).
     public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
     public DbSet<Domain.AfterSales.WarrantyRecord> WarrantyRecords { get; set; }
@@ -239,6 +241,10 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext, Mic
         modelBuilder.Entity<Domain.Integrations.DealerIntegration>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.Integrations.IntegrationCommand>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Commissions.SaleCommission>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Commissions.CommissionPolicy>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.AfterSales.WarrantyRecord>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);

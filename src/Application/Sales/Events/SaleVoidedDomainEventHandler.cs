@@ -9,9 +9,10 @@ namespace Application.Sales.Events;
 /// transaction (this handler no longer touches the car, so the revert is never applied twice). It stays as the hook for
 /// future listeners.
 /// <para>
-/// PLACEHOLDER (explicit, not silent): commission annulment is NOT done here, the commission entity belongs to B4 and does
-/// not exist yet. The audit entry (sfc B2.2.4) is not written here either: <c>VoidSaleCommandHandler</c> sets the reason on
-/// <c>IAuditContext</c> and <c>TenantAuditInterceptor</c> writes the <c>Sale.Status</c> entry in the same transaction.
+/// sfc B4.1: commission annulment is a SEPARATE handler, <c>VoidSaleCommissionOnSaleVoidedHandler</c> (own
+/// <c>SaveChanges</c>) — the placeholder that used to be here is closed. The audit entry (sfc B2.2.4) is not written
+/// here either: <c>VoidSaleCommandHandler</c> sets the reason on <c>IAuditContext</c> and <c>TenantAuditInterceptor</c>
+/// writes the <c>Sale.Status</c> entry in the same transaction.
 /// </para>
 /// </summary>
 internal sealed class SaleVoidedDomainEventHandler(
