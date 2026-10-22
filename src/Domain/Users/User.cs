@@ -80,7 +80,9 @@ public sealed class User : Entity
     /// </summary>
     public bool IsPlatformAdmin => DealerId == Guid.Empty;
 
-    // Navigation property for permissions (configured in EF Core)
+    // spr PR 4.2 / H9: this legacy grant table has no write path left for a tenant user (AddPermission/
+    // RemovePermission were removed as dead code) — it is always empty for one. UsersSeeder still writes
+    // to it directly, bypassing this aggregate, for the platform SuperAdmin's platform:* permissions.
     private readonly List<UserPermission> _permissions;
     public IReadOnlyCollection<UserPermission> Permissions => _permissions;
 
@@ -130,20 +132,4 @@ public sealed class User : Entity
         IsActive = true;
     }
 
-    public void AddPermission(string permission, Guid? grantedBy = null)
-    {
-        if (_permissions.Any(p => p.Permission == permission))
-            return;
-
-        _permissions.Add(new UserPermission(Id, permission, grantedBy));
-    }
-
-    public void RemovePermission(string permission)
-    {
-        var existing = _permissions.Find(p => p.Permission == permission);
-        if (existing is not null)
-        {
-            _permissions.Remove(existing);
-        }
-    }
 }
