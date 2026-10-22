@@ -70,6 +70,9 @@ public interface IApplicationDbContext
     DbSet<Domain.Integrations.IntegrationCommand> IntegrationCommands { get; }
     DbSet<Domain.Commissions.SaleCommission> SaleCommissions { get; }
     DbSet<Domain.Commissions.CommissionPolicy> CommissionPolicies { get; }
+    /// <summary>sfc B4.3 / RN-018: backs only the InMemory test-provider allocator fallback and the
+    /// AddQuoteNumbers migration backfill — the real allocation path bypasses the change tracker.</summary>
+    DbSet<Domain.Common.DealerSequence> DealerSequences { get; }
 
     /// <summary>
     /// Atomic single use of an action token: <c>UPDATE ... SET consumed_at = @now WHERE id = @id AND consumed_at IS NULL

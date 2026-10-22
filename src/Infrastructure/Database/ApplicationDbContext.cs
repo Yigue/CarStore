@@ -89,6 +89,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext, Mic
     public DbSet<Domain.AfterSales.ServiceReminder> ServiceReminders { get; set; }
     public DbSet<Domain.Branches.Branch> Branches { get; set; }
     public DbSet<Domain.Branches.UserBranch> UserBranches { get; set; }
+    public DbSet<Domain.Common.DealerSequence> DealerSequences { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -251,6 +252,11 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext, Mic
         modelBuilder.Entity<Domain.AfterSales.ServiceReminder>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.Branches.Branch>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        // sfc B4.3: tenant-scoped like DealerSettings/Branch; the real allocation path bypasses
+        // this filter entirely via raw SQL (DealerSequenceAllocator), so it only matters for the
+        // InMemory fallback and any future admin tooling that queries the DbSet directly.
+        modelBuilder.Entity<Domain.Common.DealerSequence>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<TransactionCategory>().HasQueryFilter(x =>
             x.DealerId == Guid.Empty || !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);

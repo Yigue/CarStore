@@ -38,6 +38,12 @@ public class CreateQuoteCommandHandlerTests
         return tenantMock.Object;
     }
 
+    // sfc B4.3 / RN-018: the real allocator against the InMemory provider — exercises its
+    // non-atomic fallback path, not a mock, since Infrastructure's internals are visible here
+    // (Infrastructure.csproj InternalsVisibleTo "Application.UnitTests").
+    private static Infrastructure.Common.DealerSequenceAllocator CreateAllocator(TestApplicationDbContext context) =>
+        new(context);
+
     private static async Task<Car> SeedCarAsync(TestApplicationDbContext context)
     {
         var marca = new Marca("Peugeot");
@@ -89,7 +95,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var client = await SeedClientAsync(context, ClientStatus.Lost);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
@@ -103,7 +109,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var lead = await SeedLeadAsync(context, LeadStatus.Perdido);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
 
@@ -117,7 +123,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var lead = await SeedLeadAsync(context, LeadStatus.Archivado);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
 
@@ -131,7 +137,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var client = await SeedClientAsync(context, ClientStatus.Lost);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
@@ -147,7 +153,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var client = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
@@ -164,7 +170,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var lead = await SeedLeadAsync(context, LeadStatus.Negociacion);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
 
@@ -186,7 +192,7 @@ public class CreateQuoteCommandHandlerTests
         var car = await SeedCarAsync(context);
         var otherDealerId = Guid.NewGuid();
         var foreignLead = await SeedLeadAsync(context, LeadStatus.Negociacion, otherDealerId);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, null, foreignLead.Id), CancellationToken.None);
 
@@ -209,7 +215,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var first = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var firstResult = await handler.Handle(BuildCommand(car.Id, first.Id, null), CancellationToken.None);
         firstResult.IsSuccess.Should().BeTrue();
@@ -230,7 +236,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var buyer = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var accepted = await handler.Handle(BuildCommand(car.Id, buyer.Id, null), CancellationToken.None);
         var acceptedQuote = await context.Quotes.SingleAsync(q => q.Id == accepted.Value);
@@ -257,7 +263,7 @@ public class CreateQuoteCommandHandlerTests
         await context.SaveChangesAsync();
 
         var client = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
@@ -286,7 +292,7 @@ public class CreateQuoteCommandHandlerTests
         lead.MarkConverted(client.Id);
         await context.SaveChangesAsync();
 
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -307,7 +313,7 @@ public class CreateQuoteCommandHandlerTests
         lead.MarkConverted(client.Id);
         await context.SaveChangesAsync();
 
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
         await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
         // Committed by this handler, not ten seconds later by a background job.
@@ -327,7 +333,7 @@ public class CreateQuoteCommandHandlerTests
         lead.MarkConverted(client.Id);
         await context.SaveChangesAsync();
 
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
         var result = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -342,7 +348,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var lead = await SeedLeadAsync(context, LeadStatus.Ganado);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
 
@@ -358,7 +364,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var first = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
         first.IsSuccess.Should().BeTrue();
@@ -376,7 +382,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var client = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
         var second = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
@@ -399,7 +405,7 @@ public class CreateQuoteCommandHandlerTests
         lead.MarkConverted(client.Id);
         await context.SaveChangesAsync();
 
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
         var second = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
@@ -416,7 +422,7 @@ public class CreateQuoteCommandHandlerTests
         var car = await SeedCarAsync(context);
         var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
         var otherBuyer = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
         var second = await handler.Handle(BuildCommand(car.Id, otherBuyer.Id, null), CancellationToken.None);
@@ -432,7 +438,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var client = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var first = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
         var firstQuote = await context.Quotes.SingleAsync(q => q.Id == first.Value);
@@ -453,7 +459,7 @@ public class CreateQuoteCommandHandlerTests
         var car = await SeedCarAsync(context);
         var client = await SeedClientAsync(context, ClientStatus.Active);
         var clock = new FakeDateTimeProvider { UtcNow = new DateTime(2024, 1, 1) };
-        var handler = new CreateQuoteCommandHandler(context, clock, CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, clock, CreateTenantService(), CreateAllocator(context));
 
         var first = await handler.Handle(
             new CreateQuoteCommand(car.Id, client.Id, null, 14000m, PaymentMethod.Contado, new DateTime(2024, 1, 5), "c"),
@@ -478,7 +484,7 @@ public class CreateQuoteCommandHandlerTests
         var tenantMock = new Mock<ICurrentTenantService>();
         tenantMock.SetupGet(t => t.HasTenant).Returns(false);
 
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), tenantMock.Object);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), tenantMock.Object, CreateAllocator(context));
         var command = new CreateQuoteCommand(
             Guid.NewGuid(),
             Guid.NewGuid(),

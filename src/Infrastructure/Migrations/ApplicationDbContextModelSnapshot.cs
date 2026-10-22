@@ -1149,6 +1149,37 @@ namespace Infrastructure.Migrations
                     b.ToTable("sale_commissions", "public");
                 });
 
+            modelBuilder.Entity("Domain.Common.DealerSequence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("kind");
+
+                    b.Property<long>("NextValue")
+                        .HasColumnType("bigint")
+                        .HasColumnName("next_value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dealer_sequences");
+
+                    b.HasIndex("DealerId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dealer_sequences_dealer_id_kind");
+
+                    b.ToTable("dealer_sequences", "public");
+                });
+
             modelBuilder.Entity("Domain.Currency.DealerExchangeRate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2232,6 +2263,11 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("lead_id");
 
+                    b.Property<string>("Number")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("number");
+
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -2265,6 +2301,11 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex(new[] { "CarId" }, "ix_quotes_car_id")
                         .HasDatabaseName("ix_quotes_car_id");
+
+                    b.HasIndex(new[] { "DealerId", "Number" }, "ux_quotes_dealer_id_number")
+                        .IsUnique()
+                        .HasDatabaseName("ux_quotes_dealer_id_number")
+                        .HasFilter("number IS NOT NULL");
 
                     b.HasIndex(new[] { "CarId" }, "ux_quotes_one_accepted_per_car")
                         .IsUnique()

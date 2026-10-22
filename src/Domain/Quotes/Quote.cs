@@ -14,6 +14,10 @@ public sealed class Quote : Entity, ISoftDeletable
     public Guid CarId { get; private set; }
     public Guid? ClientId { get; private set; }
     public Guid? LeadId { get; private set; }
+    /// <summary>sfc B4.3 / RN-018: per-dealer folio (`COT-{yyyy}-{n:D6}`), null until assigned by
+    /// <see cref="AssignNumber"/>. Nullable so existing quotes can be backfilled by a migration
+    /// instead of breaking every pre-existing <c>new Quote(...)</c> call site.</summary>
+    public string? Number { get; private set; }
     public Money ProposedPrice { get; private set; }
     /// <summary>sfc B0.2 / ADR C2: set only when the quote currency differs from the vehicle's; immutable once captured.</summary>
     public ExchangeRateSnapshot? ExchangeRate { get; private set; }
@@ -83,6 +87,26 @@ public sealed class Quote : Entity, ISoftDeletable
         UpdatedAt = date;
 
         Raise(new QuoteCreatedDomainEvent(Id, CarId, ClientId ?? Guid.Empty, ProposedPrice));
+    }
+
+    /// <summary>sfc B4.3 / RN-018: formats the per-dealer folio. Pure — the sequence value itself
+    /// comes from IDealerSequenceAllocator, a DB side effect this aggregate cannot own.</summary>
+    public static string FormatNumber(int year, long sequenceValue) => $"COT-{year:D4}-{sequenceValue:D6}";
+
+    /// <summary>
+    /// Assigns this quote's folio, once, right after a sequence value has been allocated for a
+    /// NEW quote. Existing quotes get their Number from the AddQuoteNumbers migration backfill
+    /// instead — that path writes the column directly, it does not call this method.
+    /// </summary>
+    public void AssignNumber(string number)
+    {
+        if (string.IsNullOrWhiteSpace(number))
+            throw new DomainException("Quote number cannot be empty");
+
+        if (Number is not null)
+            throw new DomainException("Quote number is already assigned");
+
+        Number = number;
     }
 
     public void Update(

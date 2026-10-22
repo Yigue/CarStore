@@ -34,7 +34,8 @@ public class CreateQuoteExchangeRateTests
         var tenant = new Mock<ICurrentTenantService>();
         tenant.SetupGet(t => t.HasTenant).Returns(true);
         tenant.SetupGet(t => t.DealerId).Returns(DealerId);
-        return new CreateQuoteCommandHandler(context, new FakeDateTimeProvider { UtcNow = Now }, tenant.Object);
+        return new CreateQuoteCommandHandler(
+            context, new FakeDateTimeProvider { UtcNow = Now }, tenant.Object, new Infrastructure.Common.DealerSequenceAllocator(context));
     }
 
     private static async Task<(Car Car, Client Client)> SeedAsync(TestApplicationDbContext context, CurrencyCode carCurrency)

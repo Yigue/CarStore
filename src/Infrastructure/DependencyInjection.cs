@@ -228,6 +228,8 @@ public static class DependencyInjection
         services.AddScoped<IUserNotificationService, UserNotificationService>();
         services.AddScoped<IDealerNotificationService, DealerNotificationService>();
         services.AddScoped<IRoundRobinLeadAllocator, RoundRobinLeadAllocator>();
+        // sfc B4.3 / RN-018: per-dealer quote folios.
+        services.AddScoped<Application.Abstractions.Data.IDealerSequenceAllocator, Common.DealerSequenceAllocator>();
 
         // REQ-FIN-LEDGER-001: real EF-backed ledger. Replaces NoOpFinancialLedgerService
         // (deleted with this change). Idempotency is enforced via the partial

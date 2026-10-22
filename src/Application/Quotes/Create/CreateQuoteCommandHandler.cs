@@ -20,7 +20,8 @@ namespace Application.Quotes.Create;
 internal sealed class CreateQuoteCommandHandler(
     IApplicationDbContext context,
     IDateTimeProvider dateTimeProvider,
-    ICurrentTenantService tenantService)
+    ICurrentTenantService tenantService,
+    IDealerSequenceAllocator dealerSequenceAllocator)
     : ICommandHandler<CreateQuoteCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateQuoteCommand command, CancellationToken cancellationToken)
@@ -213,6 +214,12 @@ internal sealed class CreateQuoteCommandHandler(
             now,
             proposedCurrency,
             snapshot.Value);
+
+        // sfc B4.3 / RN-018: folio assigned right after the aggregate exists, not inside the
+        // constructor — the sequence value is a DB side effect the constructor cannot own, and
+        // every other call site constructing a Quote would otherwise have had to supply one.
+        long sequenceValue = await dealerSequenceAllocator.NextAsync(tenantService.DealerId, "quote", cancellationToken);
+        quote.AssignNumber(Quote.FormatNumber(now.Year, sequenceValue));
 
         context.Quotes.Add(quote);
 
