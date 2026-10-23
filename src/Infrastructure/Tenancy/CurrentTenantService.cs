@@ -58,6 +58,15 @@ public class CurrentTenantService : ICurrentTenantService
     {
         get
         {
+            // sfc B6.3 / RN-043 (security review): a password-verified but not-yet-dealer-scoped token
+            // still authenticates (Identity.IsAuthenticated is true), so it would otherwise reach step 2
+            // below and resolve to WHATEVER dealer a spoofed X-Tenant-Host/Origin/Host header names —
+            // before the caller ever proved membership in it. Refuse unconditionally, before any fallback.
+            if (_httpContextAccessor.HttpContext?.User?.IsPendingDealerSelection() == true)
+            {
+                return Guid.Empty;
+            }
+
             // 1. Authenticated user — JWT dealer_id claim wins.
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("dealer_id");
             if (claim is not null && Guid.TryParse(claim.Value, out var dealerIdFromClaim))
@@ -109,6 +118,12 @@ public class CurrentTenantService : ICurrentTenantService
     {
         get
         {
+            // sfc B6.3: same guard as DealerId above — a pending-dealer-selection token never has a tenant.
+            if (_httpContextAccessor.HttpContext?.User?.IsPendingDealerSelection() == true)
+            {
+                return false;
+            }
+
             // ADR-1: positive-claim gate. A SuperAdmin JWT carries platform_role=super_admin
             // AND dealer_id == Guid.Empty; that explicit check flips HasTenant to false (cross-tenant context).
             // The host-header fallback branch MUST NOT execute for SuperAdmin requests.

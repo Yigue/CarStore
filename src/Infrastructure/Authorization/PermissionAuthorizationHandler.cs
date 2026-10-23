@@ -37,10 +37,17 @@ public sealed class PermissionAuthorizationHandler(
             return;
         }
 
+        // sfc B6.3: permissions are dealer-scoped — read the SAME claim CurrentTenantService reads, so
+        // "which role applies" and "which tenant's data is visible" can never disagree. Guid.Empty for a
+        // missing/invalid claim resolves to "no role-based permissions" below, never the home role's.
+        Guid dealerId = Guid.TryParse(context.User.FindFirst("dealer_id")?.Value, out Guid parsedDealerId)
+            ? parsedDealerId
+            : Guid.Empty;
+
         using IServiceScope scope = serviceScopeFactory.CreateScope();
         PermissionProvider permissionProvider = scope.ServiceProvider.GetRequiredService<PermissionProvider>();
 
-        HashSet<string> permissions = await permissionProvider.GetForUserIdAsync(userId);
+        HashSet<string> permissions = await permissionProvider.GetForUserIdAsync(userId, dealerId);
 
         if (permissions.Contains(requirement.Permission))
         {

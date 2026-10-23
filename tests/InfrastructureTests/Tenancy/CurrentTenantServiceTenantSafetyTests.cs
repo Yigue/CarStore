@@ -233,6 +233,51 @@ public class CurrentTenantServiceTenantSafetyTests : IDisposable
         sut.DealerId.Should().Be(Guid.Empty);
     }
 
+    // ── 5: A pending-dealer-selection token (sfc B6.3, security review) must never resolve a tenant ──
+    //
+    // Password-verified but no dealer chosen yet: Identity.IsAuthenticated is true (the JWT is validly
+    // signed), so this principal passes any bare [Authorize] gate. Without this guard, a request that
+    // also set X-Tenant-Host to ANY dealer's real hostname would resolve DealerId to that dealer via
+    // the header path — letting a multi-dealer user (or anyone who has merely logged in and not yet
+    // picked a dealer) read a completely unrelated dealer's data before ever proving membership in it.
+
+    [Fact]
+    public void DealerId_PendingDealerSelectionToken_WithASpoofedTenantHeader_ReturnsGuidEmpty_NotTheHeaderDealer()
+    {
+        var services = BuildSeededContextProvider();
+        var accessor = BuildAccessor(xTenantHost: "xyz.carstore.com", services: services);
+        SetAuthenticatedPendingSelectionUser(accessor, Guid.NewGuid());
+
+        var sut = NewService(accessor.Object, ProdEnv());
+
+        sut.DealerId.Should().Be(Guid.Empty,
+            "a pending-dealer-selection token must never resolve a tenant via any path, including headers");
+    }
+
+    [Fact]
+    public void HasTenant_PendingDealerSelectionToken_WithASpoofedTenantHeader_IsFalse()
+    {
+        var services = BuildSeededContextProvider();
+        var accessor = BuildAccessor(xTenantHost: "xyz.carstore.com", services: services);
+        SetAuthenticatedPendingSelectionUser(accessor, Guid.NewGuid());
+
+        var sut = NewService(accessor.Object, ProdEnv());
+
+        sut.HasTenant.Should().BeFalse();
+    }
+
+    private static void SetAuthenticatedPendingSelectionUser(Mock<IHttpContextAccessor> accessor, Guid userId)
+    {
+        var claims = new List<System.Security.Claims.Claim>
+        {
+            new(Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(Infrastructure.Authentication.TokenProvider.LoginStageClaimType,
+                Infrastructure.Authentication.TokenProvider.PendingDealerSelectionStage)
+        };
+        var identity = new System.Security.Claims.ClaimsIdentity(claims, "TestAuth");
+        accessor.Object.HttpContext!.User = new System.Security.Claims.ClaimsPrincipal(identity);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private sealed class StubHostEnv : IHostEnvironment

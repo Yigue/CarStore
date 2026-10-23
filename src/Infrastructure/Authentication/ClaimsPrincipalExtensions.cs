@@ -47,4 +47,17 @@ public static class ClaimsPrincipalExtensions
 
         return true;
     }
+
+    /// <summary>
+    /// sfc B6.3 / RN-043 (security review): true for a password-verified but not-yet-dealer-scoped
+    /// token (<see cref="TokenProvider.LoginStageClaimType"/>). Such a token still authenticates
+    /// (<c>Identity.IsAuthenticated</c> is true) but every tenant-scoped consumer MUST refuse it —
+    /// see <c>CurrentTenantService.DealerId</c>, which never falls through to header resolution for one.
+    /// Ordinal comparison: an internal machine value, not user-facing, so there is no casing drift to tolerate.
+    /// </summary>
+    public static bool IsPendingDealerSelection(this ClaimsPrincipal? principal) =>
+        string.Equals(
+            principal?.FindFirst(TokenProvider.LoginStageClaimType)?.Value,
+            TokenProvider.PendingDealerSelectionStage,
+            StringComparison.Ordinal);
 }

@@ -5,8 +5,8 @@ namespace Infrastructure.Caching;
 /// </summary>
 public static class CacheKeys
 {
-    // Permisos
-    public static string UserPermissions(Guid userId) => $"permissions:user:{userId}";
+    // Permisos (sfc B6.3: dealer-scoped — the same user can hold a different role per dealer).
+    public static string UserPermissions(Guid userId, Guid dealerId) => $"permissions:user:{userId}:dealer:{dealerId}";
     
     // Marcas
     public static string AllBrands() => "brands:all";
