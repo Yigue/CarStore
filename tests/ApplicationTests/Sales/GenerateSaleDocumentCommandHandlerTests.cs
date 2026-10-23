@@ -143,6 +143,9 @@ public class GenerateSaleDocumentCommandHandlerTests
         document!.SaleId.Should().Be(sale.Id);
         document.Type.Should().Be(DocumentType.SaleContract);
         document.BlobName.Should().Be($"documents/{DealerId}/sales/{sale.Id}/boleto-v1.pdf");
+        // sfc B3.2 follow-up: the hash is not just returned to the caller — it is persisted on the row,
+        // so a generated legal document's integrity can be checked later from the database alone.
+        document.Sha256Hash.Should().Be(result.Value.Sha256Hash);
     }
 
     [Fact]

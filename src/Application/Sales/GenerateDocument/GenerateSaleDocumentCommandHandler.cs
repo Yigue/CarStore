@@ -119,7 +119,8 @@ internal sealed class GenerateSaleDocumentCommandHandler(
             fileName: $"{blobSlug}-v{version}.pdf",
             contentType: "application/pdf",
             dealerId: dealerId,
-            saleId: sale.Id);
+            saleId: sale.Id,
+            sha256Hash: sha256Hash);
 
         context.Documents.Add(document);
         await context.SaveChangesAsync(cancellationToken);

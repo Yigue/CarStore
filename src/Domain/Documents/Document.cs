@@ -31,6 +31,14 @@ public sealed class Document : Entity
     public DateTime? VerifiedAtUtc { get; private set; }
     public string? DiscrepancyNotes { get; private set; }
 
+    /// <summary>
+    /// sfc B3.2: SHA-256 of the file's bytes, hex-encoded. Null for an uploaded/scanned document
+    /// (nothing computed it); set for a system-generated one (<see cref="DocumentType.SaleContract"/>,
+    /// <see cref="DocumentType.Formulario08"/>) so its integrity can be checked later from the row
+    /// alone, without re-downloading the blob.
+    /// </summary>
+    public string? Sha256Hash { get; private set; }
+
     private Document() { }
 
     public static Document Create(
@@ -40,7 +48,8 @@ public sealed class Document : Entity
         string fileName,
         string contentType,
         Guid dealerId,
-        Guid? saleId = null)
+        Guid? saleId = null,
+        string? sha256Hash = null)
     {
         var doc = new Document
         {
@@ -57,6 +66,7 @@ public sealed class Document : Entity
             UploadedAtUtc = DateTime.UtcNow,
             VerifiedAtUtc = null,
             DiscrepancyNotes = null,
+            Sha256Hash = sha256Hash,
         };
         doc.SetDealer(dealerId);
         doc.Raise(new DocumentUploadedEvent(doc.Id, clientId));

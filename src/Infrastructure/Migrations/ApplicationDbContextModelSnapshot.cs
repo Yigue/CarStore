@@ -1577,6 +1577,11 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("sale_id");
 
+                    b.Property<string>("Sha256Hash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256hash");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("text")

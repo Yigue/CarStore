@@ -45,6 +45,8 @@ public sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
         builder.Property(x => x.UploadedAtUtc).IsRequired();
         builder.Property(x => x.VerifiedAtUtc);
         builder.Property(x => x.DiscrepancyNotes).HasMaxLength(1000);
+        // sfc B3.2: hex-encoded SHA-256, null for an uploaded/scanned document.
+        builder.Property(x => x.Sha256Hash).HasMaxLength(64);
 
         // Backward-compatibility aliases on the entity must not be mapped as columns.
         builder.Ignore(x => x.Status);
