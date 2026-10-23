@@ -107,6 +107,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<Domain.Integrations.IntegrationCommand> IntegrationCommands => Set<Domain.Integrations.IntegrationCommand>();
     public DbSet<Domain.Commissions.SaleCommission> SaleCommissions => Set<Domain.Commissions.SaleCommission>();
     public DbSet<Domain.Commissions.CommissionPolicy> CommissionPolicies => Set<Domain.Commissions.CommissionPolicy>();
+    public DbSet<Domain.Users.UserDealerMembership> UserDealerMemberships => Set<Domain.Users.UserDealerMembership>();
     public DbSet<Domain.Common.DealerSequence> DealerSequences => Set<Domain.Common.DealerSequence>();
 
     public void DetachEntity(object entity)

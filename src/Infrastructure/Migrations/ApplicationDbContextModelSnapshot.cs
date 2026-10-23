@@ -2888,6 +2888,42 @@ namespace Infrastructure.Migrations
                     b.ToTable("user_action_tokens", "public");
                 });
 
+            modelBuilder.Entity("Domain.Users.UserDealerMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTime>("GrantedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at_utc");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_dealer_memberships");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_dealer_memberships_user_id");
+
+                    b.HasIndex("UserId", "DealerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_user_dealer_memberships_user_id_dealer_id");
+
+                    b.ToTable("user_dealer_memberships", "public");
+                });
+
             modelBuilder.Entity("Domain.Users.UserPermission", b =>
                 {
                     b.Property<Guid>("Id")

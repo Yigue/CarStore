@@ -24,7 +24,7 @@ public class TokenProviderTests
         var provider = new TokenProvider(configuration);
                 var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "test@example.com", "Test", "User", "hash", Guid.NewGuid());
 
-        string token = provider.Create(user, "empleado");
+        string token = provider.Create(user, user.DealerId, "empleado");
 
         var handler = new JsonWebTokenHandler();
         var jwt = handler.ReadJsonWebToken(token);
@@ -51,7 +51,7 @@ public class TokenProviderTests
         var provider = new TokenProvider(configuration);
                 var user = new User(Guid.Parse("11111111-1111-1111-1111-111111111111"), "test@example.com", "Test", "User", "hash", Guid.NewGuid());
 
-        Action act = () => provider.Create(user, "empleado");
+        Action act = () => provider.Create(user, user.DealerId, "empleado");
 
         act.Should().Throw<ArgumentNullException>();
     }
@@ -72,7 +72,7 @@ public class TokenProviderTests
         // User with DealerId and empty RoleId (e.g. legacy or orphan user)
         var user = new User(dealerId, "tenant@example.com", "Tenant", "User", "hash", Guid.Empty);
 
-        string token = provider.Create(user, "Cliente");
+        string token = provider.Create(user, user.DealerId, "Cliente");
 
         var handler = new JsonWebTokenHandler();
         var jwt = handler.ReadJsonWebToken(token);
@@ -95,7 +95,7 @@ public class TokenProviderTests
         var provider = new TokenProvider(configuration);
         var superAdmin = User.CreateSuperAdmin("superadmin@carstore.com", "Super", "Admin", "hash");
 
-        string token = provider.Create(superAdmin, "SuperAdmin");
+        string token = provider.Create(superAdmin, superAdmin.DealerId, "SuperAdmin");
 
         var handler = new JsonWebTokenHandler();
         var jwt = handler.ReadJsonWebToken(token);

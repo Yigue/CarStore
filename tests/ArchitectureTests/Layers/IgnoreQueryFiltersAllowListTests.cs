@@ -33,6 +33,13 @@ public class IgnoreQueryFiltersAllowListTests
         "Users/Verification/",
         // sfc A4.2: inviting checks for a VERIFIED email anywhere on the platform (409), not just this dealer.
         "Users/Invitations/",
+        // sfc B6.3 / RN-043: a pending-dealer-selection token carries no dealer_id claim yet, and
+        // select-dealer/switch-dealer/grant must resolve the user's effective membership set (home
+        // dealer + UserDealerMembership grants) across dealers explicitly, same as Login.
+        "Users/DealerAccessResolver.cs",
+        "Users/SelectDealer/",
+        "Users/SwitchDealer/",
+        "Users/Commands/GrantDealerMembership/",
         // sfc B5.1 / RFC 8058: one-click unsubscribe is POSTed by the mail client with no dealer headers;
         // the 256-bit token (looked up by SHA-256) identifies the subscriber.
         "Marketing/Newsletter/Tokens/",

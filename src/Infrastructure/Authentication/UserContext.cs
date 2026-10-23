@@ -41,4 +41,15 @@ internal sealed class UserContext : IUserContext
     /// </summary>
     public bool IsAuthenticated =>
         _httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated == true;
+
+    /// <summary>
+    /// sfc B6.3 / RN-043: reads the <c>login_stage</c> claim TokenProvider writes only on a
+    /// pending-dealer-selection token. Ordinal comparison — this is an internal machine value, not a
+    /// user-facing one, so there is no casing drift to tolerate.
+    /// </summary>
+    public bool IsPendingDealerSelection =>
+        string.Equals(
+            _httpContextAccessor.HttpContext?.User?.FindFirst(TokenProvider.LoginStageClaimType)?.Value,
+            TokenProvider.PendingDealerSelectionStage,
+            StringComparison.Ordinal);
 }

@@ -39,7 +39,7 @@ public class LoginUserCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Be(UserErrors.InvalidCredentials);
-        tokenProvider.Verify(t => t.Create(It.IsAny<User>(), It.IsAny<string>()), Times.Never);
+        tokenProvider.Verify(t => t.Create(It.IsAny<User>(), It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public class LoginUserCommandHandlerTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Be(UserErrors.InvalidCredentials);
-        tokenProvider.Verify(t => t.Create(It.IsAny<User>(), It.IsAny<string>()), Times.Never);
+        tokenProvider.Verify(t => t.Create(It.IsAny<User>(), It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -70,15 +70,18 @@ public class LoginUserCommandHandlerTests
         var passwordHasher = new Mock<IPasswordHasher>();
         passwordHasher.Setup(p => p.Verify("correct", "hash")).Returns(true);
         var tokenProvider = new Mock<ITokenProvider>();
-        tokenProvider.Setup(t => t.Create(It.IsAny<User>(), It.IsAny<string>())).Returns("token");
+        tokenProvider.Setup(t => t.Create(It.IsAny<User>(), It.IsAny<Guid>(), It.IsAny<string>())).Returns("token");
 
         var handler = new LoginUserCommandHandler(context, passwordHasher.Object, tokenProvider.Object);
 
         var result = await handler.Handle(new LoginUserCommand("user@test.com", "correct"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Be("token");
-        tokenProvider.Verify(t => t.Create(It.IsAny<User>(), It.IsAny<string>()), Times.Once);
+        // sfc B6.3: single-dealer user keeps getting a ready session token, never a selector.
+        result.Value.Token.Should().Be("token");
+        result.Value.PendingToken.Should().BeNull();
+        result.Value.AvailableDealers.Should().BeNull();
+        tokenProvider.Verify(t => t.Create(It.IsAny<User>(), It.IsAny<Guid>(), It.IsAny<string>()), Times.Once);
     }
 
     [Fact]
@@ -93,15 +96,16 @@ public class LoginUserCommandHandlerTests
         var passwordHasher = new Mock<IPasswordHasher>();
         passwordHasher.Setup(p => p.Verify("correct", "hash")).Returns(true);
         var tokenProvider = new Mock<ITokenProvider>();
-        tokenProvider.Setup(t => t.Create(It.IsAny<User>(), It.IsAny<string>())).Returns("token");
+        tokenProvider.Setup(t => t.Create(It.IsAny<User>(), It.IsAny<Guid>(), It.IsAny<string>())).Returns("token");
 
         var handler = new LoginUserCommandHandler(context, passwordHasher.Object, tokenProvider.Object);
 
         var result = await handler.Handle(new LoginUserCommand("legacy@test.com", "correct"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        tokenProvider.Verify(t => t.Create(It.Is<User>(u => u.Id == user.Id), "Cliente"), Times.Once);
-        tokenProvider.Verify(t => t.Create(It.Is<User>(u => u.Id == user.Id), "SuperAdmin"), Times.Never);
+        result.Value.Token.Should().Be("token");
+        tokenProvider.Verify(t => t.Create(It.Is<User>(u => u.Id == user.Id), dealerId, "Cliente"), Times.Once);
+        tokenProvider.Verify(t => t.Create(It.Is<User>(u => u.Id == user.Id), It.IsAny<Guid>(), "SuperAdmin"), Times.Never);
     }
 
     [Fact]
@@ -115,13 +119,14 @@ public class LoginUserCommandHandlerTests
         var passwordHasher = new Mock<IPasswordHasher>();
         passwordHasher.Setup(p => p.Verify("correct", "hash")).Returns(true);
         var tokenProvider = new Mock<ITokenProvider>();
-        tokenProvider.Setup(t => t.Create(It.IsAny<User>(), It.IsAny<string>())).Returns("token");
+        tokenProvider.Setup(t => t.Create(It.IsAny<User>(), It.IsAny<Guid>(), It.IsAny<string>())).Returns("token");
 
         var handler = new LoginUserCommandHandler(context, passwordHasher.Object, tokenProvider.Object);
 
         var result = await handler.Handle(new LoginUserCommand("superadmin@carstore.com", "correct"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        tokenProvider.Verify(t => t.Create(It.Is<User>(u => u.Id == superAdmin.Id), "SuperAdmin"), Times.Once);
+        result.Value.Token.Should().Be("token");
+        tokenProvider.Verify(t => t.Create(It.Is<User>(u => u.Id == superAdmin.Id), Guid.Empty, "SuperAdmin"), Times.Once);
     }
 }

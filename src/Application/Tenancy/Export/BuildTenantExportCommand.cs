@@ -102,6 +102,11 @@ internal sealed class BuildTenantExportCommandHandler(
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id)
             .Select(x => new { x.Id, x.Provider, x.Status, x.Scopes, x.TokenExpiresAtUtc, x.LastError, x.CreatedAtUtc, x.UpdatedAtUtc })
             .AsAsyncEnumerable(), ct));
+        // sfc B6.3: extra dealer access this dealer granted to someone — credentials/tokens are not part of this.
+        files.Add(await AddCsvAsync(zip, "membresias_dealer", context.UserDealerMemberships.IgnoreQueryFilters().AsNoTracking()
+            .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id)
+            .Select(x => new { x.Id, x.UserId, x.RoleId, x.GrantedAtUtc })
+            .AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "clientes", context.Clients.IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.DealerId == dealerId).OrderBy(x => x.Id).AsAsyncEnumerable(), ct));
         files.Add(await AddCsvAsync(zip, "leads", context.Leads.IgnoreQueryFilters().AsNoTracking()

@@ -10,7 +10,7 @@ namespace ArchitectureTests;
 
 public class ProducesProblemBudgetTests : BaseTest
 {
-    private const int FrozenBudget = 108; // spr PR 4.2: -1, UpdatePermissions.cs (legacy permission-grant endpoint) deleted
+    private const int FrozenBudget = 111; // sfc B6.3: +3, SelectDealer/SwitchDealer/GrantDealerMembership endpoints added
 
     [Fact]
     public void ProducesProblem500_DeclarationCount_MatchesFrozenBudget()

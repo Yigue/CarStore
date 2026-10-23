@@ -133,6 +133,9 @@ internal sealed class PurgeTenantCommandHandler(
         counts["suppliers"] = await DeleteAsync(context.Suppliers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Suppliers, null, ct);
         counts["integrationCommands"] = await DeleteAsync(context.IntegrationCommands.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.IntegrationCommands, null, ct);
         counts["dealerIntegrations"] = await DeleteAsync(context.DealerIntegrations.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.DealerIntegrations, null, ct);
+        // sfc B6.3: both directions — rows this dealer granted to someone else (DealerId == dealerId) AND rows
+        // where this dealer's own user was granted access elsewhere (the user is about to be deleted below).
+        counts["userDealerMemberships"] = await DeleteAsync(UserDealerMembershipsOf(dealerId), context.UserDealerMemberships, null, ct);
         counts["subscribers"] = await DeleteAsync(context.Subscribers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Subscribers, null, ct);
         counts["clients"] = await DeleteAsync(context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Clients, null, ct);
         counts["exchangeRates"] = await DeleteAsync(context.DealerExchangeRates.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.DealerExchangeRates, null, ct);
@@ -226,6 +229,7 @@ internal sealed class PurgeTenantCommandHandler(
         yield return ("suppliers", context.Suppliers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("integrationCommands", context.IntegrationCommands.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("dealerIntegrations", context.DealerIntegrations.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("userDealerMemberships", UserDealerMembershipsOf(dealerId));
         yield return ("subscribers", context.Subscribers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("clients", context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
         yield return ("exchangeRates", context.DealerExchangeRates.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
@@ -255,6 +259,12 @@ internal sealed class PurgeTenantCommandHandler(
 
     private IQueryable<Domain.Users.UserPermission> UserPermissionsOf(Guid dealerId) =>
         context.UserPermissions.Where(p => context.Users.IgnoreQueryFilters().Any(u => u.Id == p.UserId && u.DealerId == dealerId));
+
+    // sfc B6.3: own rows (this dealer granted someone access) plus orphan cleanup (this dealer's own user had
+    // an extra membership elsewhere, and that user is about to be deleted).
+    private IQueryable<Domain.Users.UserDealerMembership> UserDealerMembershipsOf(Guid dealerId) =>
+        context.UserDealerMemberships.IgnoreQueryFilters().Where(m =>
+            m.DealerId == dealerId || context.Users.IgnoreQueryFilters().Any(u => u.Id == m.UserId && u.DealerId == dealerId));
 
     private async Task ClearClientOriginLeadsAsync(Guid dealerId, CancellationToken ct)
     {

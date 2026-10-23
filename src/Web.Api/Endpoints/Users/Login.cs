@@ -15,18 +15,26 @@ internal sealed class Login : IEndpoint
         app.MapPost("users/login", async (Request request, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new LoginUserCommand(request.Email, request.Password);
-    
-            Result<string> result = await sender.Send(command, cancellationToken);
 
+            Result<LoginResult> result = await sender.Send(command, cancellationToken);
+
+            // sfc B6.3 / RN-043: single-dealer users keep the exact { token } shape as before this PR
+            // (regression-critical). A 2+ dealer user instead gets a pending token + the dealer list.
             return result.Match(
-                token => Results.Ok(new { token }),
+                loginResult => loginResult.Token is not null
+                    ? Results.Ok(new { token = loginResult.Token })
+                    : Results.Ok(new
+                    {
+                        pendingToken = loginResult.PendingToken,
+                        availableDealers = loginResult.AvailableDealers
+                    }),
                 CustomResults.Problem);
         })
         .WithTags(Tags.Users)
         .WithName("LoginUser")
         .AllowAnonymous()
         .RequireRateLimiting("login")
-        .Produces<string>(StatusCodes.Status200OK)
+        .Produces<object>(StatusCodes.Status200OK)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status429TooManyRequests)
