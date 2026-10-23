@@ -42,4 +42,9 @@ public class NoOpSubscriptionGateway : ISubscriptionGateway
     {
         return Task.FromResult($"cus_noop_{Guid.NewGuid():N}");
     }
+
+    public Task<string> CreatePortalSessionAsync(string stripeCustomerId, CancellationToken ct = default)
+    {
+        return Task.FromResult("https://billing.stripe.com/noop_session");
+    }
 }

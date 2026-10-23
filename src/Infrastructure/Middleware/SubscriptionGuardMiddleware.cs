@@ -24,6 +24,10 @@ public sealed class SubscriptionGuardMiddleware
         new Regex("^/health$", RegexOptions.Compiled | RegexOptions.IgnoreCase),
         new Regex("^/api/v1/subscriptions/status$", RegexOptions.Compiled | RegexOptions.IgnoreCase),
         new Regex("^/api/v1/subscriptions/checkout$", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        // spr PR 1.3 (D2): a dealer stuck behind the 402 gate (PastDue/Suspended/Incomplete) must still be
+        // able to reach the billing portal to fix their payment method — that is the whole point of the
+        // feature, not an oversight.
+        new Regex("^/api/v1/subscriptions/portal-session$", RegexOptions.Compiled | RegexOptions.IgnoreCase),
         // spr ADR B8: a dealer behind the 402 gate (Incomplete / no row / unpaid) must still be able to
         // sign in, recover its password and read its own profile so the UI can render the blocker with
         // the checkout CTA. None of these expose tenant data beyond the caller's own account.

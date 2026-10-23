@@ -188,6 +188,21 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
             live.Items?.Data?.FirstOrDefault()?.Price?.Id);
     }
 
+    public async Task<string> CreatePortalSessionAsync(string stripeCustomerId, CancellationToken ct = default)
+    {
+        var portalSessionService = new Stripe.BillingPortal.SessionService(_stripeClient);
+        string baseUrl = (_configuration["Frontend:BaseUrl"] ?? "http://localhost:3000").TrimEnd('/');
+
+        var options = new Stripe.BillingPortal.SessionCreateOptions
+        {
+            Customer = stripeCustomerId,
+            ReturnUrl = $"{baseUrl}/dashboard/settings"
+        };
+
+        var session = await portalSessionService.CreateAsync(options, cancellationToken: ct);
+        return session.Url;
+    }
+
     private static SubscriptionStatus MapStripeStatus(string stripeStatus)
     {
         return stripeStatus switch

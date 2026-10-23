@@ -18,7 +18,7 @@ public class StripeSubscriptionGatewayInterfaceContractTests
         var type = typeof(ISubscriptionGateway);
         var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance);
 
-        methods.Should().HaveCount(7);
+        methods.Should().HaveCount(8);
 
         // Method 1 (spr PR 1.1, ADR B1): CreateCheckoutSessionAsync — grew planCode + CheckoutReturn.
         var m1 = methods.SingleOrDefault(m => m.Name == "CreateCheckoutSessionAsync");
@@ -87,5 +87,14 @@ public class StripeSubscriptionGatewayInterfaceContractTests
         p7[0].ParameterType.Should().Be<string>(); // stripeCustomerId
         p7[1].ParameterType.Should().Be<string>(); // email
         p7[2].ParameterType.Should().Be<CancellationToken>();
+
+        // Method 8 (spr PR 1.3, D2): CreatePortalSessionAsync — Stripe-hosted billing portal.
+        var m8 = methods.SingleOrDefault(m => m.Name == "CreatePortalSessionAsync");
+        m8.Should().NotBeNull();
+        m8!.ReturnType.Should().Be<Task<string>>();
+        var p8 = m8.GetParameters();
+        p8.Should().HaveCount(2);
+        p8[0].ParameterType.Should().Be<string>(); // stripeCustomerId
+        p8[1].ParameterType.Should().Be<CancellationToken>();
     }
 }

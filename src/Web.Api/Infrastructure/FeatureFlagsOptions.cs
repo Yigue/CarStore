@@ -31,4 +31,7 @@ public sealed class FeatureFlagsOptions
 
     /// <summary>A0.2: When true, writes from users who have not accepted the current material Terms get 428.</summary>
     public bool LegalGate { get; set; } = false;
+
+    /// <summary>spr PR 1.3 (D2): When true, <c>POST subscriptions/portal-session</c> is enabled.</summary>
+    public bool BillingPortal { get; set; } = false;
 }

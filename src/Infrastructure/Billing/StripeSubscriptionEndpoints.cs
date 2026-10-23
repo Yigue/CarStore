@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using System;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Infrastructure.Billing;
@@ -12,8 +13,10 @@ public static class StripeSubscriptionEndpoints
 {
     public static IEndpointRouteBuilder MapBillingEndpoints(this IEndpointRouteBuilder builder)
     {
+        // spr PR 1.3 (SPR-06/07, B4): DealerId and Email MUST come from the authenticated token's claims,
+        // never from the request body — a caller must never be able to create a checkout session (or
+        // route invoices) for another dealer/email by sending it in the payload.
         builder.MapPost("subscriptions/checkout", async (
-            CreateCheckoutSessionRequest request,
             HttpContext context,
             ISender sender) =>
         {
@@ -23,7 +26,17 @@ public static class StripeSubscriptionEndpoints
                 return Results.Unauthorized();
             }
 
-            var command = new CreateCheckoutSessionCommand(dealerId, request.Email);
+            // JwtBearer's default inbound claim mapping rewrites the token's "email" claim to
+            // ClaimTypes.Email on deserialization (the same reason LegalAcceptanceGateMiddleware checks
+            // both "sub" and ClaimTypes.NameIdentifier for the user id) — check both forms defensively.
+            var email = context.User.FindFirst(ClaimTypes.Email)?.Value
+                ?? context.User.FindFirst("email")?.Value;
+            if (string.IsNullOrEmpty(email))
+            {
+                return Results.Unauthorized();
+            }
+
+            var command = new CreateCheckoutSessionCommand(dealerId, email);
             var result = await sender.Send(command);
 
             return result.IsSuccess
@@ -32,7 +45,7 @@ public static class StripeSubscriptionEndpoints
         })
         .WithName("CreateCheckoutSession")
         .WithTags("Billing")
-        .RequireAuthorization();
+        .RequireAuthorization("CanManageSettings");
 
         builder.MapGet("subscriptions/status", async (
             HttpContext context,

@@ -50,6 +50,13 @@ public interface ISubscriptionGateway
     /// </summary>
     Task<ExternalSubscription?> FindSubscriptionForDealerAsync(Guid dealerId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// spr PR 1.3 (D2): returns a Stripe-hosted billing portal session URL for an existing customer, so
+    /// the dealer can update their card and see invoices without CarStore handling payment data directly.
+    /// </summary>
+    Task<string> CreatePortalSessionAsync(string stripeCustomerId,
+        CancellationToken ct = default);
 }
 
 /// <summary>Provider-agnostic snapshot of a subscription held by the payment provider.</summary>

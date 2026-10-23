@@ -44,4 +44,9 @@ public sealed class FakeSubscriptionGateway : ISubscriptionGateway
     {
         return Task.FromResult($"cus_fake_{dealerId}");
     }
+
+    public Task<string> CreatePortalSessionAsync(string stripeCustomerId, CancellationToken ct = default)
+    {
+        return Task.FromResult($"https://billing.stripe.com/fake_session_{stripeCustomerId}");
+    }
 }
