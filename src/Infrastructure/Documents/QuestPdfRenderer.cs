@@ -41,6 +41,10 @@ internal sealed class QuestPdfRenderer : IDocumentRenderer
             (DocumentTemplate.Formulario08DataSheet, _) => throw new ArgumentException(
                 $"'{nameof(DocumentTemplate.Formulario08DataSheet)}' requires a '{nameof(Formulario08DataSheet)}' model.",
                 nameof(model)),
+            (DocumentTemplate.QuoteProposal, QuoteProposalDocument quoteProposal) => RenderQuoteProposal(quoteProposal),
+            (DocumentTemplate.QuoteProposal, _) => throw new ArgumentException(
+                $"'{nameof(DocumentTemplate.QuoteProposal)}' requires a '{nameof(QuoteProposalDocument)}' model.",
+                nameof(model)),
             _ => throw new NotSupportedException($"No QuestPDF layout registered for template '{template}'."),
         };
 
@@ -167,6 +171,54 @@ internal sealed class QuestPdfRenderer : IDocumentRenderer
                     column.Item().Text($"Nombre: {dataSheet.BuyerFullName}");
                     column.Item().Text($"DNI: {dataSheet.BuyerDni}");
                     column.Item().Text($"Domicilio: {dataSheet.BuyerAddress}");
+                });
+            });
+        }).GeneratePdf();
+
+    private static byte[] RenderQuoteProposal(QuoteProposalDocument document) =>
+        QuestPDF.Fluent.Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(30);
+                page.DefaultTextStyle(style => style.FontSize(11));
+
+                page.Content().Column(column =>
+                {
+                    column.Spacing(6);
+                    column.Item().Text("Propuesta de cotización").FontSize(18).Bold();
+                    // sfc B4.3 / RN-018: the folio must be visible in the header per spec scenario
+                    // "Descarga de PDF incluye el folio".
+                    column.Item().Text($"Folio: {document.QuoteNumber}").FontSize(13).Bold();
+                    column.Item().Text($"Válida hasta: {document.ValidUntil:yyyy-MM-dd}");
+
+                    column.Item().PaddingTop(10).Text("Vehículo").FontSize(13).Bold();
+                    column.Item().Text($"Marca: {document.CarBrand}");
+                    column.Item().Text($"Modelo: {document.CarModel}");
+                    column.Item().Text($"Año: {document.CarYear}");
+
+                    column.Item().PaddingTop(10).Text("Propuesta").FontSize(13).Bold();
+                    column.Item().Text($"Precio propuesto: {document.ProposedPrice:0.##} {document.Currency}");
+                    column.Item().Text($"Forma de pago: {document.PaymentMethod}");
+                    if (!string.IsNullOrWhiteSpace(document.Comments))
+                    {
+                        column.Item().Text($"Comentarios: {document.Comments}");
+                    }
+
+                    column.Item().PaddingTop(10).Text("Cliente").FontSize(13).Bold();
+                    column.Item().Text($"Nombre: {document.ClientFullName}");
+
+                    column.Item().PaddingTop(10).Text("Concesionaria").FontSize(13).Bold();
+                    column.Item().Text($"Nombre: {document.DealerName}");
+                    if (!string.IsNullOrWhiteSpace(document.DealerAddress))
+                    {
+                        column.Item().Text($"Domicilio: {document.DealerAddress}");
+                    }
+                    if (!string.IsNullOrWhiteSpace(document.DealerPhoneNumber))
+                    {
+                        column.Item().Text($"Teléfono: {document.DealerPhoneNumber}");
+                    }
                 });
             });
         }).GeneratePdf();

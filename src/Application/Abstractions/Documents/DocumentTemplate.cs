@@ -16,4 +16,13 @@ public enum DocumentTemplate
     /// data sheet with the same data, for the dealer's own use before presenting the real form.
     /// </summary>
     Formulario08DataSheet,
+
+    /// <summary>
+    /// Quote proposal PDF (sfc B4.3 / B10 / RN-018, <see cref="QuoteProposalDocument"/>),
+    /// rendered for <c>POST quotes/{id}/send</c>. This is this codebase's whole "PDF attached"
+    /// story: there is no MIME-attachment capability anywhere in the email transport, so the
+    /// rendered PDF is uploaded and its presigned URL is passed to the email template instead
+    /// (see <c>SendQuoteCommandHandler</c>).
+    /// </summary>
+    QuoteProposal,
 }

@@ -1573,6 +1573,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("ocr_status");
 
+                    b.Property<Guid?>("QuoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("quote_id");
+
                     b.Property<Guid?>("SaleId")
                         .HasColumnType("uuid")
                         .HasColumnName("sale_id");
@@ -1603,6 +1607,9 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("DealerId")
                         .HasDatabaseName("ix_documents_dealer_id");
+
+                    b.HasIndex("QuoteId")
+                        .HasDatabaseName("ix_documents_quote_id");
 
                     b.HasIndex("SaleId")
                         .HasDatabaseName("ix_documents_sale_id");
@@ -3505,6 +3512,12 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_documents_clients_client_id");
+
+                    b.HasOne("Domain.Quotes.Quote", null)
+                        .WithMany()
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_documents_quotes_quote_id");
 
                     b.HasOne("Domain.Sales.Sale", null)
                         .WithMany()

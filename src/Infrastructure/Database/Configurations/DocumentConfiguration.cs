@@ -67,8 +67,17 @@ public sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .OnDelete(DeleteBehavior.SetNull)
             .IsRequired(false);
 
+        // sfc B4.3 / B10 / RN-018: same shape as the SaleId relationship above, for the quote
+        // proposal PDF — no navigation property, SetNull on delete.
+        builder.HasOne<Domain.Quotes.Quote>()
+            .WithMany()
+            .HasForeignKey(x => x.QuoteId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
+
         builder.HasIndex(x => x.DealerId);
         builder.HasIndex(x => x.ClientId);
         builder.HasIndex(x => x.SaleId);
+        builder.HasIndex(x => x.QuoteId);
     }
 }

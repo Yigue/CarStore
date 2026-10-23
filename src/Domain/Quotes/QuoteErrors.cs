@@ -65,5 +65,32 @@ public static class QuoteErrors
     public static Error ActiveQuoteAlreadyExists(Guid carId, Guid quoteId) => Error.Conflict(
         "Quotes.ActiveQuoteAlreadyExists",
         $"There is already a pending quote ('{quoteId}') for the car with Id = '{carId}' and this same party. Update that quote instead of creating a second one.");
+
+    /// <summary>
+    /// sfc B4.3 / B10 / RN-018: <c>POST quotes/{id}/send</c> sends to the CLIENT's email, not the
+    /// lead's — see <c>SendQuoteCommandHandler</c>'s XML doc for why. Raised both when the quote
+    /// has no Client at all (lead-only) and, defensively, if a Client's email were ever blank —
+    /// provably unreachable today (see <c>SendQuoteCommandHandlerTests</c>'s class remarks), kept
+    /// because the check costs nothing and documents the invariant this error actually names.
+    /// <para>
+    /// The capability spec (quote-numbering-pdf) describes this as a 422
+    /// <c>MISSING_CONTACT_EMAIL</c> response; this codebase's <c>CustomResults.Problem</c> has no
+    /// 422 mapping for any <see cref="ErrorType"/> (only 400/404/409/403/500 exist), so this uses
+    /// <see cref="ErrorType.Validation"/> → 400, the same status every other validation gate in
+    /// this codebase returns (e.g. RN-028's InvoiceNumberRequiredForDocument).
+    /// </para>
+    /// </summary>
+    public static Error MissingContactEmail(Guid quoteId) => Error.Validation(
+        "Quotes.MissingContactEmail",
+        $"The quote with Id = '{quoteId}' cannot be sent because it has no client with an email on file.");
+
+    /// <summary>
+    /// sfc B4.3 / B10 / RN-018: a quote created before the AddQuoteNumbers backfill ran (or one
+    /// whose backfill is still pending in this environment) has no folio yet — sending it would
+    /// put an email token in the recipient's inbox with nothing a dealer could reconcile against.
+    /// </summary>
+    public static Error NotNumbered(Guid quoteId) => Error.Validation(
+        "Quotes.NotNumbered",
+        $"The quote with Id = '{quoteId}' must be assigned a folio number before it can be sent.");
 }
 
