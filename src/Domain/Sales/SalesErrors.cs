@@ -96,4 +96,16 @@ public static class SalesErrors
     public static Error OnlyCompletedCanBeVoided(Guid saleId) => Error.Conflict(
         "Sales.OnlyCompletedCanBeVoided",
         $"The sale with Id = '{saleId}' cannot be voided because it is not Completed.");
+
+    // ─── sfc B3.2 / B8 / RN-028 · legal documents (boleto, formulario 08) ──────────────────────
+
+    /// <summary>A legal document cannot be generated until the invoice number is on file.</summary>
+    public static Error InvoiceNumberRequiredForDocument(Guid saleId) => Error.Validation(
+        "Sales.InvoiceNumberRequiredForDocument",
+        $"The sale with Id = '{saleId}' needs InvoiceNumber set before generating a legal document.");
+
+    /// <summary>A legal document cannot be generated until the transfer form (08) number is on file.</summary>
+    public static Error TransferFormNumberRequiredForDocument(Guid saleId) => Error.Validation(
+        "Sales.TransferFormNumberRequiredForDocument",
+        $"The sale with Id = '{saleId}' needs TransferFormNumber set before generating a legal document.");
 }
