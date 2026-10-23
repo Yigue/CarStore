@@ -26,6 +26,8 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
     <PackageReference Include="Quartz.AspNetCore" />
+    <!-- sfc B3.1 / B8: QuestPDF-backed IDocumentRenderer -->
+    <PackageReference Include="QuestPDF" />
     <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="Stripe.net" />
   </ItemGroup>

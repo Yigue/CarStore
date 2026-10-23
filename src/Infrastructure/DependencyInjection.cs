@@ -172,6 +172,10 @@ public static class DependencyInjection
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddSingleton<Application.Legal.ILegalTermsProvider, Infrastructure.Legal.ConfigurationLegalTermsProvider>();
 
+        // sfc B3.1 / B8: QuestPDF-backed document renderer. License is set once via a
+        // static constructor on QuestPdfRenderer (see that class), not here.
+        services.AddSingleton<Application.Abstractions.Documents.IDocumentRenderer, Infrastructure.Documents.QuestPdfRenderer>();
+
         // PHASE-2 (Inventario-Overhaul): MinIO-backed storage for the Cars aggregate.
         // ADR-3: single production implementation (no factory, no multi-binding).
         // Coexists with IBlobStorageService (Documents) per ADR-2.

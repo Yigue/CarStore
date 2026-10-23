@@ -50,6 +50,8 @@
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="9.0.2" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.2" />
+    <!-- sfc B3.1 / B8: QuestPDF-backed document renderer (Community license, confirmed under revenue threshold) -->
+    <PackageVersion Include="QuestPDF" Version="2026.9.1" />
     <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
     <PackageVersion Include="Stripe.net" Version="45.10.0" />
     <!-- Web.Api -->
@@ -71,5 +73,10 @@
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.2" />
     <PackageVersion Include="Testcontainers" Version="3.9.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="3.9.0" />
+    <!-- sfc B3.1 / B8: test-only PDF text extraction to prove QuestPdfRenderer output carries real text.
+         NOTE: the NuGet package id is "PdfPig" (Apache-2.0, owners BobLd/UglyToad, actively maintained).
+         The similarly-named "UglyToad.PdfPig" package id on nuget.org is NOT the official package
+         (unverified owner, placeholder metadata, no repository link) — do not use it. -->
+    <PackageVersion Include="PdfPig" Version="0.1.16" />
   </ItemGroup>
 </Project>
