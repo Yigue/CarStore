@@ -17,6 +17,7 @@ internal sealed class ApplyBillingEventCommandHandler : ICommandHandler<ApplyBil
 {
     private static readonly EventId OutOfOrderEvent = new(2301, "BillingEventOutOfOrder");
     private static readonly EventId AppliedEvent = new(2302, "BillingEventApplied");
+    private static readonly EventId CheckoutLinkMismatchEvent = new(2303, "CheckoutSessionLinkMismatch");
 
     private readonly IDealerSubscriptionRepository _repository;
     private readonly IPublisher _publisher;
@@ -55,8 +56,14 @@ internal sealed class ApplyBillingEventCommandHandler : ICommandHandler<ApplyBil
                 await _publisher.Publish(e, cancellationToken);
                 LogApplied(e);
                 break;
+            case CheckoutCompleted e:
+                // spr PR 1.1 (REV-SDD-05): the subscription row itself arrives through SubscriptionChanged —
+                // this is only a cross-check. Never creates or updates a row (no AddAsync/Update call) so a
+                // checkout.session.completed can never duplicate ux_dealer_subscriptions_dealer_id.
+                await ValidateCheckoutLink(e, cancellationToken);
+                LogApplied(e);
+                break;
             default:
-                // Checkout acknowledgements: the subscription itself arrives through SubscriptionChanged.
                 LogApplied(request.Event);
                 break;
         }
@@ -92,7 +99,7 @@ internal sealed class ApplyBillingEventCommandHandler : ICommandHandler<ApplyBil
                 return;
             }
 
-            var created = DealerSubscription.Create(e.DealerId.Value, e.CustomerId, e.SubscriptionId, e.PriceId, e.TrialEnd);
+            var created = DealerSubscription.Create(e.DealerId.Value, e.CustomerId, e.SubscriptionId, e.PriceId, e.TrialEnd, e.PlanCode);
             created.TryRegisterProviderEvent(e.OccurredAtUtc);
             if (e.PeriodStart.HasValue && e.PeriodEnd.HasValue)
             {
@@ -166,6 +173,37 @@ internal sealed class ApplyBillingEventCommandHandler : ICommandHandler<ApplyBil
 
         // RN-022: one dunning email per accepted failed attempt (an out-of-order attempt was discarded above).
         await _publisher.Publish(e, ct);
+    }
+
+    /// <summary>
+    /// spr PR 1.1 (REV-SDD-05): logs a cross-check between the checkout session and the subscription row
+    /// already on file for the dealer. Never a source of truth — purely diagnostic, and never creates or
+    /// mutates the aggregate (that would risk a second row for the same dealer).
+    /// </summary>
+    private async Task ValidateCheckoutLink(CheckoutCompleted e, CancellationToken ct)
+    {
+        if (!e.DealerId.HasValue)
+        {
+            return;
+        }
+
+        var subscription = await _repository.GetByDealerIdAsync(e.DealerId.Value, ct);
+        if (subscription is null)
+        {
+            _logger.LogInformation(CheckoutLinkMismatchEvent,
+                "checkout.session.completed for dealer {DealerId} but no DealerSubscription row exists yet " +
+                "(the row is created by the matching SubscriptionChanged event).", e.DealerId);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(e.SubscriptionId) &&
+            !string.Equals(subscription.StripeSubscriptionId, e.SubscriptionId, StringComparison.Ordinal))
+        {
+            _logger.LogWarning(CheckoutLinkMismatchEvent,
+                "checkout.session.completed subscription {SessionSubscriptionId} does not match the " +
+                "DealerSubscription on file ({OnFileSubscriptionId}) for dealer {DealerId}.",
+                e.SubscriptionId, subscription.StripeSubscriptionId, e.DealerId);
+        }
     }
 
     /// <summary>RN-023: false (with a log) when the event is older than the newest one already applied.</summary>

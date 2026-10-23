@@ -8,7 +8,7 @@ namespace Infrastructure.Billing;
 
 public class NoOpSubscriptionGateway : ISubscriptionGateway
 {
-    public Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, CancellationToken ct = default)
+    public Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, string planCode, CheckoutReturn checkoutReturn, CancellationToken ct = default)
     {
         return Task.FromResult("https://checkout.stripe.com/noop_session");
     }

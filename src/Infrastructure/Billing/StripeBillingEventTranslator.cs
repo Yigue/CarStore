@@ -42,7 +42,8 @@ public sealed class StripeBillingEventTranslator : IBillingEventTranslator
                     GetUnix(obj, "current_period_end"),
                     GetUnix(obj, "trial_end"),
                     FirstPriceId(obj),
-                    DealerIdFromMetadata(obj));
+                    DealerIdFromMetadata(obj),
+                    PlanCodeFromMetadata(obj));
 
             case "customer.subscription.deleted":
                 return new SubscriptionChanged(
@@ -52,7 +53,8 @@ public sealed class StripeBillingEventTranslator : IBillingEventTranslator
                     "canceled",
                     null, null, null,
                     string.Empty,
-                    DealerIdFromMetadata(obj));
+                    DealerIdFromMetadata(obj),
+                    PlanCodeFromMetadata(obj));
 
             case "invoice.payment_succeeded":
                 return new PaymentSucceeded(
@@ -120,6 +122,26 @@ public sealed class StripeBillingEventTranslator : IBillingEventTranslator
         Guid.TryParse(GetString(metadata, "dealer_id"), out var dealerId)
             ? dealerId
             : null;
+
+    /// <summary>
+    /// spr PR 1.1 (ADR B1, D1): <c>metadata.planCode</c> set by <see cref="StripeSubscriptionGateway"/> at
+    /// checkout time. A legacy event predating this PR (or missing metadata for any other reason) falls
+    /// back to the single plan that has ever existed, instead of failing the whole webhook.
+    /// </summary>
+    private static string PlanCodeFromMetadata(JsonElement obj)
+    {
+        if (obj.TryGetProperty("metadata", out var metadata) &&
+            metadata.ValueKind == JsonValueKind.Object)
+        {
+            var code = GetString(metadata, "planCode");
+            if (!string.IsNullOrWhiteSpace(code))
+            {
+                return code;
+            }
+        }
+
+        return Domain.Billing.DealerSubscription.DefaultPlanCode;
+    }
 
     private static string FirstPriceId(JsonElement obj)
     {

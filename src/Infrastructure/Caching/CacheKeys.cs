@@ -37,6 +37,9 @@ public static class CacheKeys
             ? $"transaction-categories:name:{name.ToLowerInvariant()}:{dealerId.Value}"
             : $"transaction-categories:name:{name.ToLowerInvariant()}";
     
+    // Billing (spr PR 1.1, ADR B1): plan details read from the payment provider.
+    public static string BillingPlan(string code) => $"billing:plan:{code.ToLowerInvariant()}";
+
     // Patrones para invalidación
     public static string BrandsPattern() => "brands:*";
     public static string ModelsPattern() => "models:*";
@@ -57,5 +60,8 @@ public static class CacheTTL
     
     // Categorías: 2 horas (cambian muy raramente)
     public static TimeSpan TransactionCategories => TimeSpan.FromHours(2);
+
+    // Planes de Stripe (spr PR 1.1): 1 hora (ADR B1 / IPlanCatalog).
+    public static TimeSpan BillingPlan => TimeSpan.FromHours(1);
 }
 

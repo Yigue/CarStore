@@ -39,6 +39,51 @@ public class StripeBillingEventTranslatorTests
         evt.DealerId.Should().Be(dealerId);
     }
 
+    // --- spr PR 1.1 (ADR B1, D1): metadata.planCode → DealerSubscription.PlanCode ---
+
+    [Fact]
+    public void SubscriptionUpdated_WithPlanCodeMetadata_MapsPlanCode()
+    {
+        var dealerId = Guid.NewGuid();
+        var json = Event("customer.subscription.updated", $$"""
+            { "id": "sub_1", "customer": "cus_1", "status": "active",
+              "items": { "data": [ { "price": { "id": "price_1" } } ] },
+              "metadata": { "dealer_id": "{{dealerId}}", "planCode": "standard" } }
+            """);
+
+        var evt = _translator.Translate(json).Should().BeOfType<SubscriptionChanged>().Subject;
+
+        evt.PlanCode.Should().Be("standard");
+    }
+
+    [Fact]
+    public void SubscriptionUpdated_LegacyEventWithoutPlanCodeMetadata_FallsBackToDefaultPlanCode()
+    {
+        var dealerId = Guid.NewGuid();
+        var json = Event("customer.subscription.updated", $$"""
+            { "id": "sub_1", "customer": "cus_1", "status": "active",
+              "items": { "data": [ { "price": { "id": "price_1" } } ] },
+              "metadata": { "dealer_id": "{{dealerId}}" } }
+            """);
+
+        var evt = _translator.Translate(json).Should().BeOfType<SubscriptionChanged>().Subject;
+
+        evt.PlanCode.Should().Be(Domain.Billing.DealerSubscription.DefaultPlanCode);
+    }
+
+    [Fact]
+    public void SubscriptionUpdated_WithNoMetadataAtAll_FallsBackToDefaultPlanCode()
+    {
+        var json = Event("customer.subscription.updated", """
+            { "id": "sub_1", "customer": "cus_1", "status": "active",
+              "items": { "data": [ { "price": { "id": "price_1" } } ] } }
+            """);
+
+        var evt = _translator.Translate(json).Should().BeOfType<SubscriptionChanged>().Subject;
+
+        evt.PlanCode.Should().Be(Domain.Billing.DealerSubscription.DefaultPlanCode);
+    }
+
     [Fact]
     public void SubscriptionDeleted_MapsToSubscriptionChangedCanceled()
     {

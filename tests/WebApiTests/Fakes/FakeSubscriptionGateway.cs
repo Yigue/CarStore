@@ -8,7 +8,9 @@ namespace WebApiTests.Fakes;
 
 public sealed class FakeSubscriptionGateway : ISubscriptionGateway
 {
-    public Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, CancellationToken ct = default)
+    // spr PR 1.1: ISubscriptionGateway grew planCode/CheckoutReturn (ADR B1). This fake ignores both —
+    // it never talks to a real provider — but must match the interface to keep WebApiTests compiling.
+    public Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, string planCode, CheckoutReturn checkoutReturn, CancellationToken ct = default)
     {
         return Task.FromResult($"https://checkout.stripe.com/fake_session_{dealerId}");
     }

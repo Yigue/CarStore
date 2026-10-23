@@ -69,5 +69,12 @@ public class DealerSubscriptionConfiguration : IEntityTypeConfiguration<DealerSu
             .HasColumnName("plan_id")
             .HasMaxLength(64)
             .IsRequired();
+
+        // spr PR 1.1 (SPR-02/B1): nullable at the DB level on purpose — migration AddSubscriptionPlanCode
+        // backfills existing rows to "standard" but this PR does not promote the column to NOT NULL.
+        builder.Property(x => x.PlanCode)
+            .HasColumnName("plan_code")
+            .HasMaxLength(32)
+            .IsRequired(false);
     }
 }

@@ -31,7 +31,7 @@ public class CreateCheckoutSessionCrossDealerTests
 
         result.IsFailure.Should().BeTrue();
         gateway.Verify(g => g.CreateCheckoutSessionAsync(
-            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CheckoutReturn>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class CreateCheckoutSessionCrossDealerTests
         tenant.SetupGet(t => t.HasTenant).Returns(true);
 
         var gateway = new Mock<ISubscriptionGateway>();
-        gateway.Setup(g => g.CreateCheckoutSessionAsync(dealer, "x@y.com", It.IsAny<CancellationToken>()))
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(dealer, "x@y.com", It.IsAny<string>(), It.IsAny<CheckoutReturn>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("https://checkout.stripe.com/pay");
 
         var handler = new CreateCheckoutSessionCommandHandler(gateway.Object, tenant.Object);

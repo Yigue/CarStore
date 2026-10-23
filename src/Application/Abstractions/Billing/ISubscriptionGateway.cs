@@ -11,8 +11,11 @@ namespace Application.Abstractions.Billing;
 /// </summary>
 public interface ISubscriptionGateway
 {
-    /// <summary>Returns a hosted checkout URL for the given dealer. Trial per StripeOptions.TrialDays.</summary>
-    Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail,
+    /// <summary>
+    /// Returns a hosted checkout URL for the given dealer and plan. Trial per StripeOptions.TrialDays.
+    /// spr PR 1.1 (ADR B1): the session's metadata MUST carry <c>planCode</c> so the webhook can persist it.
+    /// </summary>
+    Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, string planCode, CheckoutReturn checkoutReturn,
         CancellationToken ct = default);
 
     /// <summary>Probes Stripe for the current subscription status (used only as a reconciliation

@@ -15,4 +15,9 @@ public static class DealerSubscriptionErrors
     public static readonly Error TerminalCancelled = Error.Problem(
         "DealerSubscription.TerminalCancelled",
         "The subscription is cancelled and cannot be modified.");
+
+    /// <summary>spr PR 1.1 (ADR B1): provisioning rejects a plan code that is not in <c>IPlanCatalog</c>.</summary>
+    public static readonly Error UnknownPlanCode = Error.Validation(
+        "DealerSubscription.UnknownPlanCode",
+        "The requested plan code is not sellable.");
 }

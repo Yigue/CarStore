@@ -40,9 +40,12 @@ public class ProvisionDealerSubscriptionRowTests
         var publisher = new Mock<MediatR.IPublisher>();
         publisher.Setup(p => p.Publish(It.IsAny<MediatR.INotification>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        var planCatalog = new Mock<IPlanCatalog>();
+        planCatalog.Setup(c => c.IsSellable(It.IsAny<string>())).Returns(true);
         return new ProvisionDealerCommandHandler(
             context, context, hasher.Object, publisher.Object, gateway.Object,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance,
+            Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), planCatalog.Object);
     }
 
     [Fact]
@@ -52,7 +55,7 @@ public class ProvisionDealerSubscriptionRowTests
         var gateway = new Mock<ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("cus_123");
-        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CheckoutReturn>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("https://checkout.stripe.com/x");
 
         var result = await Handler(context, gateway).Handle(Command(), CancellationToken.None);
@@ -71,7 +74,7 @@ public class ProvisionDealerSubscriptionRowTests
         var gateway = new Mock<ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("stripe unreachable"));
-        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CheckoutReturn>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("stripe unreachable"));
 
         var result = await Handler(context, gateway).Handle(Command(), CancellationToken.None);

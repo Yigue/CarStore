@@ -1,3 +1,4 @@
+using Domain.Billing;
 using MediatR;
 using System;
 
@@ -28,7 +29,9 @@ public sealed record SubscriptionChanged(
     DateTime? PeriodEnd,
     DateTime? TrialEnd,
     string PriceId,
-    Guid? DealerId) : BillingEvent(ProviderEventId, OccurredAtUtc);
+    Guid? DealerId,
+    /// <summary>spr PR 1.1 (ADR B1): <c>metadata.planCode</c>, or the provider's default when absent (legacy event).</summary>
+    string PlanCode = DealerSubscription.DefaultPlanCode) : BillingEvent(ProviderEventId, OccurredAtUtc);
 
 public sealed record PaymentSucceeded(
     string ProviderEventId,

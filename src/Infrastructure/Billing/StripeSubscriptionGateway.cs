@@ -18,17 +18,20 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
     private readonly IDealerSubscriptionRepository _repository;
     private readonly IConfiguration _configuration;
     private readonly StripeOptions _options;
+    private readonly IPlanCatalog _planCatalog;
 
     public StripeSubscriptionGateway(
         IStripeClient stripeClient,
         IDealerSubscriptionRepository repository,
         IConfiguration configuration,
-        IOptions<StripeOptions> options)
+        IOptions<StripeOptions> options,
+        IPlanCatalog planCatalog)
     {
         _stripeClient = stripeClient;
         _repository = repository;
         _configuration = configuration;
         _options = options.Value;
+        _planCatalog = planCatalog;
     }
 
     public async Task<string> CreateCustomerAsync(Guid dealerId, string email, CancellationToken ct = default)
@@ -65,12 +68,20 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
         return customer.Id;
     }
 
-    public async Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, CancellationToken ct = default)
+    public async Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, string planCode, CheckoutReturn checkoutReturn, CancellationToken ct = default)
     {
         string stripeCustomerId = await CreateCustomerAsync(dealerId, dealerEmail, ct);
 
+        // spr PR 1.1 (ADR B1): resolve the price through the catalog instead of _options.PriceId directly,
+        // so the gateway is plan-aware. Falls back to the legacy PriceId if the catalog has nothing for the
+        // code (should not happen once StripeOptionsValidator passes, but never block checkout on it).
+        var plan = await _planCatalog.GetAsync(planCode, ct);
+        string priceId = plan?.PriceId ?? _options.PriceId;
+
         var sessionService = new SessionService(_stripeClient);
         string baseUrl = (_configuration["Frontend:BaseUrl"] ?? "http://localhost:3000").TrimEnd('/');
+        string successUrl = checkoutReturn.SuccessUrl ?? $"{baseUrl}/dashboard?session_id={{CHECKOUT_SESSION_ID}}";
+        string cancelUrl = checkoutReturn.CancelUrl ?? $"{baseUrl}/dashboard";
 
         var options = new SessionCreateOptions
         {
@@ -80,7 +91,7 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
             {
                 new SessionLineItemOptions
                 {
-                    Price = _options.PriceId,
+                    Price = priceId,
                     Quantity = 1
                 }
             },
@@ -90,15 +101,17 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
                 TrialPeriodDays = _options.TrialDays > 0 ? _options.TrialDays : null,
                 Metadata = new Dictionary<string, string>
                 {
-                    { "dealer_id", dealerId.ToString() }
+                    { "dealer_id", dealerId.ToString() },
+                    { "planCode", planCode }
                 }
             },
             Metadata = new Dictionary<string, string>
             {
-                { "dealer_id", dealerId.ToString() }
+                { "dealer_id", dealerId.ToString() },
+                { "planCode", planCode }
             },
-            SuccessUrl = $"{baseUrl}/dashboard?session_id={{CHECKOUT_SESSION_ID}}",
-            CancelUrl = $"{baseUrl}/dashboard"
+            SuccessUrl = successUrl,
+            CancelUrl = cancelUrl
         };
 
         var session = await sessionService.CreateAsync(options, cancellationToken: ct);

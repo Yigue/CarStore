@@ -111,6 +111,9 @@ public static class DependencyInjection
         var stripe = services.AddOptions<StripeOptions>()
             .BindConfiguration(StripeOptions.SectionName);
 
+        // spr PR 1.1 (ADR B1, D1): "plan único" is validated whenever Stripe is actually wired up.
+        services.AddSingleton<IValidateOptions<StripeOptions>, StripeOptionsValidator>();
+
         var billingEnabled = configuration.GetValue<bool?>("Stripe:Enabled") ?? !string.IsNullOrWhiteSpace(configuration["Stripe:SecretKey"]);
         if (billingEnabled)
         {
@@ -118,10 +121,12 @@ public static class DependencyInjection
             stripe.ValidateOnStart();
             services.AddSingleton<IStripeClient>(new StripeClient(configuration["Stripe:SecretKey"]));
             services.AddScoped<ISubscriptionGateway, StripeSubscriptionGateway>();
+            services.AddScoped<IPlanCatalog, StripePlanCatalog>();
         }
         else
         {
             services.AddScoped<ISubscriptionGateway, NoOpSubscriptionGateway>();
+            services.AddScoped<IPlanCatalog, NoOpPlanCatalog>();
         }
 
         // Pure translation (no I/O): needed even when billing is disabled so queued events can still be applied.

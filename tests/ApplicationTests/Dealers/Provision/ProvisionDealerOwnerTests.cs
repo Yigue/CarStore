@@ -21,10 +21,12 @@ public class ProvisionDealerOwnerTests
         var publisher = new Mock<MediatR.IPublisher>();
         publisher.Setup(p => p.Publish(It.IsAny<MediatR.INotification>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var gateway = new Mock<ISubscriptionGateway>();
+        var planCatalog = new Mock<IPlanCatalog>();
+        planCatalog.Setup(c => c.IsSellable(It.IsAny<string>())).Returns(true);
         var handler = new ProvisionDealerCommandHandler(
             context, context, hasher.Object, publisher.Object, gateway.Object,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance,
-            Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+            Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), planCatalog.Object);
 
         var result = await handler.Handle(
             new ProvisionDealerCommand(

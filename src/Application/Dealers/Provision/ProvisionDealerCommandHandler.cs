@@ -42,7 +42,8 @@ internal sealed class ProvisionDealerCommandHandler(
     IPublisher publisher,
     ISubscriptionGateway subscriptionGateway,
     ILogger<ProvisionDealerCommandHandler> logger,
-    Application.Legal.LegalAcceptanceRecorder legalRecorder)
+    Application.Legal.LegalAcceptanceRecorder legalRecorder,
+    IPlanCatalog planCatalog)
     : ICommandHandler<ProvisionDealerCommand, ProvisionDealerResponse>
 {
     private const string DashboardBaseUrl = "carstore.com";
@@ -56,6 +57,16 @@ internal sealed class ProvisionDealerCommandHandler(
         if (termsCheck.IsFailure)
         {
             return Result.Failure<ProvisionDealerResponse>(termsCheck.Error);
+        }
+
+        // spr PR 1.1 (ADR B1, D1): never trust a caller-supplied plan code without checking it against the
+        // catalog first — validate BEFORE any write (Stripe customer, DealerSettings, User, subscription row).
+        // IsSellable is a pure config lookup (no provider call): provisioning must never fail because the
+        // payment provider is briefly unreachable — ADR B8 already makes provisioning resilient to that.
+        string planCode = command.PlanCode ?? DealerSubscription.DefaultPlanCode;
+        if (!planCatalog.IsSellable(planCode))
+        {
+            return Result.Failure<ProvisionDealerResponse>(DealerSubscriptionErrors.UnknownPlanCode);
         }
 
         // REQ: subdomain must be stored lowercase (TenantResolutionMiddleware
@@ -126,7 +137,7 @@ internal sealed class ProvisionDealerCommandHandler(
             // SubscriptionGuardMiddleware blocks it (402) until Stripe confirms a trial/payment, so
             // the product is not usable for free while checkout is pending.
             context.DealerSubscriptions.Add(
-                DealerSubscription.CreatePending(dealerId, stripeCustomerId, planId: string.Empty));
+                DealerSubscription.CreatePending(dealerId, stripeCustomerId, planId: string.Empty, planCode: planCode));
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -171,7 +182,7 @@ internal sealed class ProvisionDealerCommandHandler(
         string? checkoutUrl = null;
         try
         {
-            checkoutUrl = await subscriptionGateway.CreateCheckoutSessionAsync(dealerId, command.AdminEmail, cancellationToken);
+            checkoutUrl = await subscriptionGateway.CreateCheckoutSessionAsync(dealerId, command.AdminEmail, planCode, CheckoutReturn.None, cancellationToken);
         }
         catch (Exception ex)
         {

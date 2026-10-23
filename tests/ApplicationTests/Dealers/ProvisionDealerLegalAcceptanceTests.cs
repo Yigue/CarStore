@@ -38,10 +38,12 @@ public class ProvisionDealerLegalAcceptanceTests
         publisher.Setup(p => p.Publish(It.IsAny<MediatR.INotification>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var gateway = new Mock<ISubscriptionGateway>();
+        var planCatalog = new Mock<IPlanCatalog>();
+        planCatalog.Setup(c => c.IsSellable(It.IsAny<string>())).Returns(true);
         return new ProvisionDealerCommandHandler(
             context, context, hasher.Object, publisher.Object, gateway.Object,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance,
-            FakeLegalTermsProvider.Recorder(context));
+            FakeLegalTermsProvider.Recorder(context), planCatalog.Object);
     }
 
     [Theory]

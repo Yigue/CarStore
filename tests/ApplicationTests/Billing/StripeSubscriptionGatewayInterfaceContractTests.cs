@@ -20,15 +20,17 @@ public class StripeSubscriptionGatewayInterfaceContractTests
 
         methods.Should().HaveCount(7);
 
-        // Method 1: CreateCheckoutSessionAsync
+        // Method 1 (spr PR 1.1, ADR B1): CreateCheckoutSessionAsync — grew planCode + CheckoutReturn.
         var m1 = methods.SingleOrDefault(m => m.Name == "CreateCheckoutSessionAsync");
         m1.Should().NotBeNull();
         m1.ReturnType.Should().Be<Task<string>>();
         var p1 = m1.GetParameters();
-        p1.Should().HaveCount(3);
+        p1.Should().HaveCount(5);
         p1[0].ParameterType.Should().Be<Guid>(); // dealerId
         p1[1].ParameterType.Should().Be<string>(); // dealerEmail
-        p1[2].ParameterType.Should().Be<CancellationToken>();
+        p1[2].ParameterType.Should().Be<string>(); // planCode
+        p1[3].ParameterType.Should().Be<CheckoutReturn>();
+        p1[4].ParameterType.Should().Be<CancellationToken>();
 
         // Method 2: GetStatusAsync
         var m2 = methods.SingleOrDefault(m => m.Name == "GetStatusAsync");

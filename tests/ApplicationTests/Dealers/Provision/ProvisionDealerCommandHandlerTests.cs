@@ -28,6 +28,15 @@ public class ProvisionDealerCommandHandlerTests
         return hasher;
     }
 
+    // spr PR 1.1 (ADR B1): "standard" is always sellable in these tests — the catalog's provider-facing
+    // lookup is irrelevant to the behavior under test here.
+    private static Mock<Application.Abstractions.Billing.IPlanCatalog> PlanCatalogStub()
+    {
+        var catalog = new Mock<Application.Abstractions.Billing.IPlanCatalog>();
+        catalog.Setup(c => c.IsSellable(It.IsAny<string>())).Returns(true);
+        return catalog;
+    }
+
     private static ProvisionDealerCommand ValidCommand(string subdomain = "automotors") => new(
         DealerName: "Automotors del Sur",
         Subdomain: subdomain,
@@ -47,9 +56,9 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("https://checkout.stripe.com/123");
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Application.Abstractions.Billing.CheckoutReturn>(), It.IsAny<CancellationToken>())).ReturnsAsync("https://checkout.stripe.com/123");
 
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
         var command = ValidCommand();
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -85,7 +94,7 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -113,7 +122,7 @@ public class ProvisionDealerCommandHandlerTests
 
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         var act = async () => await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -133,7 +142,7 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         var result = await handler.Handle(ValidCommand("acme"), CancellationToken.None);
 
@@ -162,7 +171,7 @@ public class ProvisionDealerCommandHandlerTests
 
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
 
@@ -181,7 +190,7 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         var result = await handler.Handle(ValidCommand("AuToMoToRs"), CancellationToken.None);
 
@@ -204,10 +213,10 @@ public class ProvisionDealerCommandHandlerTests
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                .ThrowsAsync(new System.Net.Http.HttpRequestException("Stripe is unreachable"));
-        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Application.Abstractions.Billing.CheckoutReturn>(), It.IsAny<CancellationToken>()))
                .ThrowsAsync(new System.Net.Http.HttpRequestException("Stripe is unreachable"));
 
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         var result = await handler.Handle(ValidCommand("resilient"), CancellationToken.None);
 

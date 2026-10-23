@@ -15,4 +15,6 @@ public sealed record ProvisionDealerCommand(
     string AdminLastName,
     string? AcceptedTermsVersion = null,
     string? AcceptanceIp = null,
-    string? AcceptanceUserAgent = null) : ICommand<ProvisionDealerResponse>;
+    string? AcceptanceUserAgent = null,
+    /// <summary>spr PR 1.1 (ADR B1): optional plan code, validated against <c>IPlanCatalog</c>. Null → default plan.</summary>
+    string? PlanCode = null) : ICommand<ProvisionDealerResponse>;

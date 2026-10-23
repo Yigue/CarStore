@@ -410,6 +410,11 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_provider_event_at_utc");
 
+                    b.Property<string>("PlanCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("plan_code");
+
                     b.Property<string>("PlanId")
                         .IsRequired()
                         .HasMaxLength(64)

@@ -10,7 +10,7 @@ namespace ArchitectureTests;
 
 public class ProducesProblemBudgetTests : BaseTest
 {
-    private const int FrozenBudget = 112; // sfc B4.3: +1, Send (POST quotes/{id}/send) endpoint added
+    private const int FrozenBudget = 113; // spr PR 1.1: +1, GetPublicPlans (GET billing/plans) endpoint added
 
     [Fact]
     public void ProducesProblem500_DeclarationCount_MatchesFrozenBudget()

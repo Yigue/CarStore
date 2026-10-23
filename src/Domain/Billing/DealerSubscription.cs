@@ -6,6 +6,12 @@ namespace Domain.Billing;
 
 public sealed class DealerSubscription : Entity
 {
+    /// <summary>
+    /// spr ADR B1 (D1): "plan único" today — the only sellable plan code. Lives beside <see cref="PlanId"/>
+    /// (the Stripe price id) so multi-plan support can be added later without another migration.
+    /// </summary>
+    public const string DefaultPlanCode = "standard";
+
     private DealerSubscription()
     {
     }
@@ -19,6 +25,9 @@ public sealed class DealerSubscription : Entity
     public DateTime? CancelledAt { get; private set; }
     public string PlanId { get; private set; } = string.Empty;
 
+    /// <summary>spr PR 1.1 (SPR-02/B1): the plan code, independent of the Stripe price id.</summary>
+    public string PlanCode { get; private set; } = DefaultPlanCode;
+
     /// <summary>
     /// RN-023: provider timestamp (Stripe <c>evt.created</c>) of the newest state event applied to this row.
     /// Null until the first provider event is applied.
@@ -30,7 +39,8 @@ public sealed class DealerSubscription : Entity
         string? stripeCustomerId,
         string? stripeSubscriptionId,
         string planId,
-        DateTime? trialEndsAt = null)
+        DateTime? trialEndsAt = null,
+        string planCode = DefaultPlanCode)
     {
         var subscription = new DealerSubscription
         {
@@ -38,6 +48,7 @@ public sealed class DealerSubscription : Entity
             StripeCustomerId = stripeCustomerId,
             StripeSubscriptionId = stripeSubscriptionId,
             PlanId = planId,
+            PlanCode = string.IsNullOrWhiteSpace(planCode) ? DefaultPlanCode : planCode,
             Status = SubscriptionStatus.Trialing,
             TrialEndsAt = trialEndsAt ?? DateTime.UtcNow.AddDays(14),
             CurrentPeriodStart = DateTime.UtcNow,
@@ -52,7 +63,7 @@ public sealed class DealerSubscription : Entity
     /// until Stripe confirms a trial or a payment; <paramref name="stripeCustomerId"/> is null when
     /// Stripe was unreachable during provisioning.
     /// </summary>
-    public static DealerSubscription CreatePending(Guid dealerId, string? stripeCustomerId, string planId)
+    public static DealerSubscription CreatePending(Guid dealerId, string? stripeCustomerId, string planId, string planCode = DefaultPlanCode)
     {
         var now = DateTime.UtcNow;
         var subscription = new DealerSubscription
@@ -60,6 +71,7 @@ public sealed class DealerSubscription : Entity
             Id = Guid.NewGuid(),
             StripeCustomerId = stripeCustomerId,
             PlanId = planId,
+            PlanCode = string.IsNullOrWhiteSpace(planCode) ? DefaultPlanCode : planCode,
             Status = SubscriptionStatus.Incomplete,
             CurrentPeriodStart = now,
             CurrentPeriodEnd = now

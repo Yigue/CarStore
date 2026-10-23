@@ -68,6 +68,162 @@ public class StripeWebhookProcessorTests
         ), It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    // --- spr PR 1.1 (1.1.2, SPR-02/BE-BILLING-07, ADR B1, D1): PlanCode through the full webhook pipeline ---
+
+    [Fact]
+    public async Task Handle_SubscriptionCreated_WithPlanCodeMetadata_PersistsThatPlanCode()
+    {
+        var dealerId = Guid.NewGuid();
+        var rawJson = $@"{{
+            ""id"": ""evt_plan_1"",
+            ""type"": ""customer.subscription.created"",
+            ""data"": {{
+                ""object"": {{
+                    ""id"": ""sub_plan_1"",
+                    ""customer"": ""cus_plan_1"",
+                    ""status"": ""trialing"",
+                    ""items"": {{ ""data"": [ {{ ""price"": {{ ""id"": ""price_1"" }} }} ] }},
+                    ""metadata"": {{ ""dealer_id"": ""{dealerId}"", ""planCode"": ""standard"" }}
+                }}
+            }}
+        }}";
+
+        _repositoryMock.Setup(r => r.GetByStripeCustomerIdAsync("cus_plan_1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DealerSubscription?)null);
+        _repositoryMock.Setup(r => r.GetByDealerIdAsync(dealerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DealerSubscription?)null);
+
+        var command = new HandleStripeWebhookCommand("evt_plan_1", "customer.subscription.created", rawJson);
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _repositoryMock.Verify(r => r.AddAsync(It.Is<DealerSubscription>(s => s.PlanCode == "standard"), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_SubscriptionCreated_LegacyEventWithoutPlanCodeMetadata_UsesDefaultPlanCode()
+    {
+        var dealerId = Guid.NewGuid();
+        var rawJson = $@"{{
+            ""id"": ""evt_plan_2"",
+            ""type"": ""customer.subscription.created"",
+            ""data"": {{
+                ""object"": {{
+                    ""id"": ""sub_plan_2"",
+                    ""customer"": ""cus_plan_2"",
+                    ""status"": ""trialing"",
+                    ""items"": {{ ""data"": [ {{ ""price"": {{ ""id"": ""price_1"" }} }} ] }},
+                    ""metadata"": {{ ""dealer_id"": ""{dealerId}"" }}
+                }}
+            }}
+        }}";
+
+        _repositoryMock.Setup(r => r.GetByStripeCustomerIdAsync("cus_plan_2", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DealerSubscription?)null);
+        _repositoryMock.Setup(r => r.GetByDealerIdAsync(dealerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DealerSubscription?)null);
+
+        var command = new HandleStripeWebhookCommand("evt_plan_2", "customer.subscription.created", rawJson);
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _repositoryMock.Verify(r => r.AddAsync(
+            It.Is<DealerSubscription>(s => s.PlanCode == DealerSubscription.DefaultPlanCode),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_SubscriptionCreated_WhenRowAlreadyExistsForDealerId_NeverDuplicates()
+    {
+        // spr ADR B8: the pending row was created at provisioning time with no Stripe customer id yet
+        // (Stripe was unreachable), so the customer-id lookup misses — the dealer-id lookup must catch it.
+        var dealerId = Guid.NewGuid();
+        var existing = DealerSubscription.CreatePending(dealerId, null, string.Empty, "standard");
+
+        var rawJson = $@"{{
+            ""id"": ""evt_plan_3"",
+            ""type"": ""customer.subscription.created"",
+            ""data"": {{
+                ""object"": {{
+                    ""id"": ""sub_plan_3"",
+                    ""customer"": ""cus_plan_3"",
+                    ""status"": ""trialing"",
+                    ""items"": {{ ""data"": [ {{ ""price"": {{ ""id"": ""price_1"" }} }} ] }},
+                    ""metadata"": {{ ""dealer_id"": ""{dealerId}"", ""planCode"": ""standard"" }}
+                }}
+            }}
+        }}";
+
+        _repositoryMock.Setup(r => r.GetByStripeCustomerIdAsync("cus_plan_3", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DealerSubscription?)null);
+        _repositoryMock.Setup(r => r.GetByDealerIdAsync(dealerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var command = new HandleStripeWebhookCommand("evt_plan_3", "customer.subscription.created", rawJson);
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<DealerSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repositoryMock.Verify(r => r.Update(existing), Times.Once);
+        existing.StripeCustomerId.Should().Be("cus_plan_3");
+    }
+
+    // --- spr PR 1.1 (1.1.9b/1.1.9c, REV-SDD-05) ---
+
+    [Fact]
+    public async Task Handle_CheckoutSessionCompleted_WhenSubscriptionRowAlreadyExists_NeverCreatesDuplicateRow()
+    {
+        var dealerId = Guid.NewGuid();
+        var existing = DealerSubscription.Create(dealerId, "cus_checkout_1", "sub_checkout_1", "price_1");
+
+        var rawJson = $@"{{
+            ""id"": ""evt_checkout_1"",
+            ""type"": ""checkout.session.completed"",
+            ""data"": {{
+                ""object"": {{
+                    ""customer"": ""cus_checkout_1"",
+                    ""subscription"": ""sub_checkout_1"",
+                    ""metadata"": {{ ""dealer_id"": ""{dealerId}"" }}
+                }}
+            }}
+        }}";
+
+        _repositoryMock.Setup(r => r.GetByDealerIdAsync(dealerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var command = new HandleStripeWebhookCommand("evt_checkout_1", "checkout.session.completed", rawJson);
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<DealerSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repositoryMock.Verify(r => r.Update(It.IsAny<DealerSubscription>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_CustomerSubscriptionTrialWillEnd_IsAppliedSuccessfully_AndNeverTouchesTheRepository()
+    {
+        // The actual trial-ending email is out of scope here (saas-functional-completeness, A11);
+        // this only proves the normalized event reaches ApplyBillingEventCommand without error.
+        var rawJson = @"{
+            ""id"": ""evt_trial_1"",
+            ""type"": ""customer.subscription.trial_will_end"",
+            ""data"": {
+                ""object"": {
+                    ""id"": ""sub_trial_1"",
+                    ""customer"": ""cus_trial_1"",
+                    ""trial_end"": 1701209600
+                }
+            }
+        }";
+
+        var command = new HandleStripeWebhookCommand("evt_trial_1", "customer.subscription.trial_will_end", rawJson);
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<DealerSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repositoryMock.Verify(r => r.Update(It.IsAny<DealerSubscription>()), Times.Never);
+    }
+
     [Fact]
     public async Task Handle_InvoicePaymentFailed_MarksPastDue()
     {

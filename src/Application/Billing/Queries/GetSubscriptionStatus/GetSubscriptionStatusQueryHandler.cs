@@ -62,6 +62,8 @@ internal sealed class GetSubscriptionStatusQueryHandler : IQueryHandler<GetSubsc
                     reactivationUrl = await _subscriptionGateway.CreateCheckoutSessionAsync(
                         request.DealerId,
                         adminUser.Email.Value,
+                        subscription?.PlanCode ?? DealerSubscription.DefaultPlanCode,
+                        CheckoutReturn.None,
                         cancellationToken);
                 }
                 catch

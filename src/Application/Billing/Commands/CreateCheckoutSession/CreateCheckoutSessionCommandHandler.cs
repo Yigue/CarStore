@@ -1,6 +1,7 @@
 using Application.Abstractions.Billing;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Domain.Billing;
 using SharedKernel;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,7 +28,9 @@ internal sealed class CreateCheckoutSessionCommandHandler : ICommandHandler<Crea
             return Result.Failure<CheckoutSessionResponse>(CheckoutErrors.DealerMismatch);
         }
 
-        var checkoutUrl = await _subscriptionGateway.CreateCheckoutSessionAsync(request.DealerId, request.Email, cancellationToken);
+        // spr PR 1.1 (ADR B1, D1): "plan único" — the caller never chooses a plan yet, there is exactly one.
+        var checkoutUrl = await _subscriptionGateway.CreateCheckoutSessionAsync(
+            request.DealerId, request.Email, DealerSubscription.DefaultPlanCode, CheckoutReturn.None, cancellationToken);
         return Result.Success(new CheckoutSessionResponse(checkoutUrl));
     }
 }

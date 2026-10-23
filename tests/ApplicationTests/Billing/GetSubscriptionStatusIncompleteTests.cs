@@ -29,7 +29,7 @@ public class GetSubscriptionStatusIncompleteTests
         repo.Setup(r => r.GetByDealerIdAsync(dealerId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(DealerSubscription.CreatePending(dealerId, "cus_1", string.Empty));
         var gateway = new Mock<ISubscriptionGateway>();
-        gateway.Setup(g => g.CreateCheckoutSessionAsync(dealerId, "admin@x.com", It.IsAny<CancellationToken>()))
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(dealerId, "admin@x.com", It.IsAny<string>(), It.IsAny<CheckoutReturn>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("https://checkout.stripe.com/pay");
 
         var handler = new GetSubscriptionStatusQueryHandler(repo.Object, context, gateway.Object);
