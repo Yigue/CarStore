@@ -131,4 +131,54 @@ internal sealed class EntitlementServiceHandler(
     /// </summary>
     public Task<bool> RoleConsumesASeatAsync(Guid roleId, CancellationToken ct = default) =>
         context.RolePermissions.AnyAsync(rp => rp.RoleId == roleId, ct);
+
+    /// <summary>
+    /// Security review (sfc A3.1), third round: <see cref="RoleConsumesASeatAsync"/> alone still misses
+    /// a bulk route — a dealer can put several Cliente users into a brand-new, permission-less custom
+    /// role (never gated, since that role doesn't consume a seat YET), then call
+    /// <c>UpdateRoleCommandHandler</c> to grant that role its first permission. Every existing holder
+    /// becomes a seat in one step, with no per-user AssignRole/UpdateUser call for any of them to gate.
+    /// Call this BEFORE <c>Role.ReplacePermissions</c> whenever a role is about to go from zero
+    /// permissions to at least one, inside the same advisory-lock-guarded transaction as the save.
+    /// </summary>
+    public async Task<Result> EnsureRoleCanGainHoldersAsync(Guid dealerId, Guid roleId, CancellationToken ct = default)
+    {
+        if (dbContext.Database.IsRelational())
+        {
+            int dealerLockKey = dealerId.GetHashCode();
+            int resourceLockKey = (int)PlanResource.Users;
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock({dealerLockKey}, {resourceLockKey})", ct);
+        }
+
+        string planCode = await LoadPlanCodeAsync(dealerId, ct);
+        PlanLimits? limits = await planCatalog.GetEntitlementsAsync(planCode, ct);
+        int? limit = limits?.MaxUsers;
+        if (limit is null)
+        {
+            return Result.Success();
+        }
+
+        // The role still has zero permissions at this point (the caller checks that precondition
+        // before calling), so it contributes nothing to this count yet — every one of its holders is
+        // about to become NEW seat usage, on top of whatever every other role already accounts for.
+        int seatsFromOtherRoles = await CountStaffUsersAsync(dealerId, ct);
+        int aboutToBecomeSeats = await CountHoldersOfRoleAsync(dealerId, roleId, ct);
+        int projectedTotal = seatsFromOtherRoles + aboutToBecomeSeats;
+
+        return projectedTotal <= limit.Value
+            ? Result.Success()
+            : Result.Failure(SharedKernel.Error.Forbidden(
+                "PLAN_LIMIT_EXCEEDED",
+                $"Este cambio de rol haría que {aboutToBecomeSeats} usuario(s) pasen a ocupar un cupo del plan, superando el límite ({projectedTotal}/{limit.Value})."));
+    }
+
+    private async Task<int> CountHoldersOfRoleAsync(Guid dealerId, Guid roleId, CancellationToken ct)
+    {
+        int homeHolders = await context.Users.CountAsync(u => u.DealerId == dealerId && u.RoleId == roleId, ct);
+        int membershipHolders = await context.UserDealerMemberships
+            .IgnoreQueryFilters()
+            .CountAsync(m => m.DealerId == dealerId && m.RoleId == roleId, ct);
+        return homeHolders + membershipHolders;
+    }
 }

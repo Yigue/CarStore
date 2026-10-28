@@ -4,13 +4,16 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Abstractions.Authorization;
+using Application.Abstractions.Billing;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Roles.Create;
 using Application.Roles.Delete;
 using Application.Roles.Update;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 
 namespace Application.UnitTests.Roles;
 
@@ -43,6 +46,16 @@ public class RoleCrudHandlerTests
     }
 
     private static Mock<IPermissionCacheInvalidator> CacheInvalidator() => new();
+
+    /// <summary>sfc A3.1: these tests seed roles that already have permissions, so the "role gains its
+    /// first permission" gate never fires — this just satisfies the constructor.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureRoleCanGainHoldersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        return mock.Object;
+    }
 
     private static Role SeedRole(
         TestApplicationDbContext context,
@@ -136,7 +149,7 @@ public class RoleCrudHandlerTests
         await context.SaveChangesAsync();
 
         var invalidator = CacheInvalidator();
-        var handler = new UpdateRoleCommandHandler(context, invalidator.Object);
+        var handler = new UpdateRoleCommandHandler(context, context, invalidator.Object, AlwaysAllowEntitlements());
 
         var result = await handler.Handle(
             new UpdateRoleCommand(role.Id, "Vendedor Senior", "Cierra ventas", ["cars:read", "sales:create"]),
@@ -161,7 +174,7 @@ public class RoleCrudHandlerTests
         await context.SaveChangesAsync();
 
         var invalidator = CacheInvalidator();
-        var handler = new UpdateRoleCommandHandler(context, invalidator.Object);
+        var handler = new UpdateRoleCommandHandler(context, context, invalidator.Object, AlwaysAllowEntitlements());
 
         await handler.Handle(
             new UpdateRoleCommand(role.Id, "Vendedor", "", ["cars:read", "leads:read"]),
@@ -174,7 +187,7 @@ public class RoleCrudHandlerTests
     public async Task Update_Fails_WhenTheRoleDoesNotExist()
     {
         using var context = CreateContext();
-        var handler = new UpdateRoleCommandHandler(context, CacheInvalidator().Object);
+        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, AlwaysAllowEntitlements());
 
         var result = await handler.Handle(
             new UpdateRoleCommand(Guid.NewGuid(), "X", "", ["cars:read"]),
@@ -192,7 +205,7 @@ public class RoleCrudHandlerTests
         SeedRole(context, "Gerente", "cars:read");
         await context.SaveChangesAsync();
 
-        var handler = new UpdateRoleCommandHandler(context, CacheInvalidator().Object);
+        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, AlwaysAllowEntitlements());
         var result = await handler.Handle(
             new UpdateRoleCommand(vendedor.Id, "Gerente", "", ["cars:read"]),
             CancellationToken.None);
@@ -210,12 +223,68 @@ public class RoleCrudHandlerTests
         SeedRole(context, "Admin", "CanManageRoles");
         await context.SaveChangesAsync();
 
-        var handler = new UpdateRoleCommandHandler(context, CacheInvalidator().Object);
+        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, AlwaysAllowEntitlements());
         var result = await handler.Handle(
             new UpdateRoleCommand(role.Id, "Vendedor", "Otra descripción", ["cars:read"]),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
+    }
+
+    // Security review (sfc A3.1), third round: a role going from zero permissions to some permissions
+    // retroactively promotes every existing holder to a seat in one step. A dealer could park several
+    // Cliente users in a permission-less custom role (never gated) and then grant that role its first
+    // permission to bulk-promote them, bypassing the per-user AssignRole/UpdateUser gate entirely.
+    [Fact]
+    public async Task Update_GrantingARolesFirstPermission_WithTooManyExistingHolders_IsRejected()
+    {
+        using var context = CreateContext();
+        Role sinPermisos = SeedRole(context, "SinPermisos");
+        var holderOne = new User(DealerId, "uno@afuera.com", "Uno", "Holder", "hash", sinPermisos.Id);
+        var holderTwo = new User(DealerId, "dos@afuera.com", "Dos", "Holder", "hash", sinPermisos.Id);
+        context.Users.AddRange(holderOne, holderTwo);
+        context.DealerSubscriptions.Add(Domain.Billing.DealerSubscription.CreatePending(DealerId, null, planId: string.Empty, planCode: "standard"));
+        await context.SaveChangesAsync();
+
+        var planCatalog = new Mock<IPlanCatalog>();
+        planCatalog.Setup(p => p.GetEntitlementsAsync("standard", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlanLimits(null, MaxUsers: 1, null, null));
+        IEntitlementService realEntitlementService = new EntitlementServiceHandler(context, context, planCatalog.Object);
+
+        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, realEntitlementService);
+
+        // Limit is 1 seat; this role alone would bring 2 holders -> must be rejected, and the role
+        // must be left exactly as it was (no partial rename, no partial permission grant).
+        var result = await handler.Handle(
+            new UpdateRoleCommand(sinPermisos.Id, "SinPermisos", "", ["cars:delete"]),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue("bulk-promoting 2 holders past a 1-seat limit via a role permission change must be rejected");
+        Role reloaded = await context.Roles.Include(r => r.Permissions).AsNoTracking().SingleAsync(r => r.Id == sinPermisos.Id);
+        reloaded.Permissions.Should().BeEmpty("a rejected grant must not partially apply");
+    }
+
+    [Fact]
+    public async Task Update_GrantingARolesFirstPermission_WithinTheLimit_Succeeds()
+    {
+        using var context = CreateContext();
+        Role sinPermisos = SeedRole(context, "SinPermisos");
+        context.Users.Add(new User(DealerId, "uno@afuera.com", "Uno", "Holder", "hash", sinPermisos.Id));
+        context.DealerSubscriptions.Add(Domain.Billing.DealerSubscription.CreatePending(DealerId, null, planId: string.Empty, planCode: "standard"));
+        await context.SaveChangesAsync();
+
+        var planCatalog = new Mock<IPlanCatalog>();
+        planCatalog.Setup(p => p.GetEntitlementsAsync("standard", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlanLimits(null, MaxUsers: 1, null, null));
+        IEntitlementService realEntitlementService = new EntitlementServiceHandler(context, context, planCatalog.Object);
+
+        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, realEntitlementService);
+
+        var result = await handler.Handle(
+            new UpdateRoleCommand(sinPermisos.Id, "SinPermisos", "", ["cars:delete"]),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue("exactly 1 holder against a 1-seat limit must be allowed");
     }
 
     // ── The lock-out guard ───────────────────────────────────────────────────────────────────
@@ -227,7 +296,7 @@ public class RoleCrudHandlerTests
         Role onlyAdmin = SeedRole(context, "Admin", "CanManageRoles", "cars:read");
         await context.SaveChangesAsync();
 
-        var handler = new UpdateRoleCommandHandler(context, CacheInvalidator().Object);
+        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, AlwaysAllowEntitlements());
         var result = await handler.Handle(
             new UpdateRoleCommand(onlyAdmin.Id, "Admin", "", ["cars:read"]),
             CancellationToken.None);
@@ -247,7 +316,7 @@ public class RoleCrudHandlerTests
         SeedRole(context, "Co-Admin", "CanManageRoles");
         await context.SaveChangesAsync();
 
-        var handler = new UpdateRoleCommandHandler(context, CacheInvalidator().Object);
+        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, AlwaysAllowEntitlements());
         var result = await handler.Handle(
             new UpdateRoleCommand(first.Id, "Admin", "", ["cars:read"]),
             CancellationToken.None);

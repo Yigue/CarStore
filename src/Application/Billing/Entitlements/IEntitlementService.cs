@@ -45,4 +45,16 @@ public interface IEntitlementService
     /// anything to) never consumes a seat, regardless of what it is named.
     /// </summary>
     Task<bool> RoleConsumesASeatAsync(Guid roleId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Security review (sfc A3.1), third round: a role going from zero permissions to at least one
+    /// retroactively turns every one of its EXISTING holders into a seat at once — a bulk promotion
+    /// that <see cref="RoleConsumesASeatAsync"/> alone cannot catch, because no individual user's
+    /// <c>RoleId</c> changes when the role's own permission set does. Call this from
+    /// <c>UpdateRoleCommandHandler</c>, inside the same advisory-lock-guarded transaction as the save,
+    /// BEFORE <c>Role.ReplacePermissions</c>, whenever the role currently has zero permissions and the
+    /// requested set is non-empty. Never needed from role CREATION: a brand-new role structurally has
+    /// zero holders yet, so it can never retroactively promote anyone.
+    /// </summary>
+    Task<Result> EnsureRoleCanGainHoldersAsync(Guid dealerId, Guid roleId, CancellationToken ct = default);
 }

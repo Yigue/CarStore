@@ -1,15 +1,19 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Billing.Entitlements;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SharedKernel;
 
 namespace Application.Roles.Update;
 
 internal sealed class UpdateRoleCommandHandler(
     IApplicationDbContext context,
-    IPermissionCacheInvalidator permissionCacheInvalidator)
+    DbContext dbContext,
+    IPermissionCacheInvalidator permissionCacheInvalidator,
+    IEntitlementService entitlementService)
     : ICommandHandler<UpdateRoleCommand>
 {
     /// <summary>The permission that reaches this very screen. Losing the last of it is a one-way door.</summary>
@@ -70,10 +74,60 @@ internal sealed class UpdateRoleCommandHandler(
             }
         }
 
-        role.Rename(name, command.Description?.Trim() ?? string.Empty);
-        role.ReplacePermissions(requested);
+        // Security review (sfc A3.1), third round: a role gaining its FIRST permission promotes every
+        // existing holder to a seat in one step — nobody's own RoleId changes, so AssignRole/UpdateUser's
+        // per-user gate never sees it. Only the zero-to-some transition matters; a role that already had
+        // permissions can have them edited freely (its holders were already counted).
+        bool roleCurrentlyHasNoPermissions = role.Permissions.Count == 0;
+        bool wouldGainItsFirstPermission = roleCurrentlyHasNoPermissions && requested.Count > 0;
 
-        await context.SaveChangesAsync(cancellationToken);
+        IDbContextTransaction? transaction = wouldGainItsFirstPermission && dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        try
+        {
+            if (wouldGainItsFirstPermission)
+            {
+                Result entitlementCheck = await entitlementService.EnsureRoleCanGainHoldersAsync(
+                    role.DealerId, role.Id, cancellationToken);
+                if (entitlementCheck.IsFailure)
+                {
+                    if (transaction is not null)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                    }
+
+                    return Result.Failure(entitlementCheck.Error);
+                }
+            }
+
+            role.Rename(name, command.Description?.Trim() ?? string.Empty);
+            role.ReplacePermissions(requested);
+
+            await context.SaveChangesAsync(cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
 
         // What this role may do just changed for everyone holding it. Without this the change
         // waits out a thirty-minute cache — and a REVOKED permission keeps working meanwhile.
