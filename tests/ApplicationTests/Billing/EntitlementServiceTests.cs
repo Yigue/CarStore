@@ -4,6 +4,7 @@ using Application.UnitTests;
 using Application.Webhooks.Delete;
 using Application.Webhooks.Update;
 using Domain.Billing;
+using Domain.Users;
 using Domain.Webhooks;
 using Microsoft.EntityFrameworkCore;
 using Moq;
@@ -87,6 +88,37 @@ public class EntitlementServiceTests
             .EnsureCanAddAsync(dealerId, PlanResource.Webhooks, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
+    }
+
+    // Security review (sfc A3.1): PlanResource.Users is a staff-seat limit. A self-registered customer
+    // (Cliente role) is a User row too, but counting it would let an unauthenticated visitor consume the
+    // dealer's own staff quota just by signing up.
+    [Fact]
+    public async Task EnsureCanAddAsync_ForUsers_DoesNotCountCustomersWithTheClienteRole()
+    {
+        var dealerId = Guid.NewGuid();
+        var context = CreateContext(dealerId);
+        var clienteRole = new Role(dealerId, DefaultRoleCatalog.Cliente, "Cliente");
+        var adminRole = new Role(dealerId, "Admin", "Admin");
+        context.Roles.AddRange(clienteRole, adminRole);
+        context.Users.Add(new User(dealerId, "staff@autosdelsur.test", "Staff", "Uno", "hash", adminRole.Id));
+        // Five self-registered customers — none of them a staff seat.
+        for (int i = 0; i < 5; i++)
+        {
+            context.Users.Add(new User(dealerId, $"cliente{i}@afuera.com", "Cliente", $"{i}", "hash", clienteRole.Id));
+        }
+        context.DealerSubscriptions.Add(DealerSubscription.CreatePending(dealerId, null, planId: string.Empty, planCode: "standard"));
+        await context.SaveChangesAsync();
+
+        var planCatalog = new Mock<IPlanCatalog>();
+        planCatalog.Setup(p => p.GetEntitlementsAsync("standard", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlanLimits(null, MaxUsers: 2, null, null));
+
+        // 1 staff seat used, limit 2 -> still room for one more, even with 5 customers in the table.
+        Result result = await Handler(context, planCatalog.Object)
+            .EnsureCanAddAsync(dealerId, PlanResource.Users, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue("customers must never consume the dealer's staff-seat limit");
     }
 
     [Fact]

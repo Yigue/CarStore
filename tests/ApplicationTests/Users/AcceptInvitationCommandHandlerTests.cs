@@ -1,4 +1,5 @@
 using Application.Abstractions.Authentication;
+using Application.Billing.Entitlements;
 using Application.UnitTests;
 using Application.Users.Invitations;
 using Application.Users.Invitations.AcceptInvitation;
@@ -38,7 +39,17 @@ public class AcceptInvitationCommandHandlerTests
         _context.SaveChanges();
     }
 
-    private AcceptInvitationCommandHandler Handler() => new(_context, _hasher.Object, _clock.Object);
+    /// <summary>sfc A3.1: these tests exercise pre-existing accept behavior, not entitlements — always allow.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        return mock.Object;
+    }
+
+    private AcceptInvitationCommandHandler Handler(IEntitlementService? entitlements = null) =>
+        new(_context, _context, _hasher.Object, _clock.Object, entitlements ?? AlwaysAllowEntitlements());
 
     private async Task<string> IssueTokenAsync(
         string email, Guid? roleId = null, Guid? dealerId = null,
@@ -178,6 +189,26 @@ public class AcceptInvitationCommandHandlerTests
 
         result.Error.Should().Be(InvitationErrors.InvalidToken);
         (await _context.Users.CountAsync()).Should().Be(1, "only the inviter, no invitee created");
+    }
+
+    // Security review (sfc A3.1): InviteUserCommandHandler only checks the plan's seat limit at invite
+    // time — a dealer could send several invitations while under the limit and then accept more of them
+    // than seats allow. The authoritative check belongs here, where the User row is actually created.
+    [Fact]
+    public async Task Accept_WhenTheDealerIsAtItsPlanUserLimit_IsRejected_AndDoesNotConsumeTheToken()
+    {
+        string plain = await IssueTokenAsync("invitado@afuera.com");
+        var entitlements = new Mock<IEntitlementService>();
+        entitlements
+            .Setup(s => s.EnsureCanAddAsync(_dealerId, PlanResource.Users, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(Error.Forbidden("PLAN_LIMIT_EXCEEDED", "Alcanzaste el límite de usuarios de tu plan (5/5)")));
+
+        Result<Guid> result = await Handler(entitlements.Object).Handle(
+            new AcceptInvitationCommand(plain, Password, "Nuevo", "Invitado"), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        (await _context.UserActionTokens.SingleAsync()).ConsumedAtUtc.Should().BeNull("a doomed accept must not spend the one-time token");
+        (await _context.Users.CountAsync()).Should().Be(0);
     }
 
     [Fact]

@@ -1,9 +1,11 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Billing.Entitlements;
 using Application.Users.Verification;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SharedKernel;
 
 namespace Application.Users.Invitations.AcceptInvitation;
@@ -13,8 +15,19 @@ namespace Application.Users.Invitations.AcceptInvitation;
 /// generic error and do not spend the token. On success the user is created ALREADY verified: accepting the
 /// invitation email IS the verification. Looked up by SHA-256 hash with no tenant filter (there is no tenant
 /// yet), consumed atomically (single use).
+/// Security review (sfc A3.1): <c>InviteUserCommandHandler</c> also checks the plan's seat limit, but only
+/// at invite time — the <see cref="User"/> row this handler creates is the actual resource the limit is
+/// about, and nothing stops a dealer from sending N invitations (each individually under the limit, since
+/// none of them has created a User yet) and then accepting more of them than seats allow. The authoritative,
+/// TOCTOU-safe check is here, immediately before the token is consumed and the row inserted, inside the same
+/// advisory-lock-guarded transaction.
 /// </summary>
-internal sealed class AcceptInvitationCommandHandler(IApplicationDbContext context, IPasswordHasher passwordHasher, IDateTimeProvider clock)
+internal sealed class AcceptInvitationCommandHandler(
+    IApplicationDbContext context,
+    DbContext dbContext,
+    IPasswordHasher passwordHasher,
+    IDateTimeProvider clock,
+    IEntitlementService entitlementService)
     : ICommandHandler<AcceptInvitationCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(AcceptInvitationCommand command, CancellationToken cancellationToken)
@@ -59,24 +72,74 @@ internal sealed class AcceptInvitationCommandHandler(IApplicationDbContext conte
         if (emailAlreadyClaimed)
             return Result.Failure<Guid>(InvitationErrors.InvalidToken);
 
-        // Atomic single use: of N concurrent accepts exactly one gets rowcount = 1.
-        if (!await context.TryConsumeUserActionTokenAsync(token.Id, now, cancellationToken))
-            return Result.Failure<Guid>(InvitationErrors.InvalidToken);
+        // sfc A3.1: the transaction spans the entitlement check, the token consumption and the User
+        // insert — the advisory lock must still be held when the insert commits, or a second concurrent
+        // accept could pass the same check before the first one's row is visible.
+        IDbContextTransaction? transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
 
-        var user = new User(
-            token.DealerId,
-            token.Email,
-            command.FirstName.Trim(),
-            command.LastName.Trim(),
-            passwordHasher.Hash(command.Password),
-            token.RoleId.Value);
+        try
+        {
+            Result entitlementCheck = await entitlementService.EnsureCanAddAsync(
+                token.DealerId, PlanResource.Users, cancellationToken);
+            if (entitlementCheck.IsFailure)
+            {
+                if (transaction is not null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
 
-        // Accepting the emailed invitation already proves control of the address.
-        user.MarkEmailVerified(now);
+                return Result.Failure<Guid>(entitlementCheck.Error);
+            }
 
-        context.Users.Add(user);
-        await context.SaveChangesAsync(cancellationToken);
+            // Atomic single use: of N concurrent accepts exactly one gets rowcount = 1.
+            if (!await context.TryConsumeUserActionTokenAsync(token.Id, now, cancellationToken))
+            {
+                if (transaction is not null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
 
-        return Result.Success(user.Id);
+                return Result.Failure<Guid>(InvitationErrors.InvalidToken);
+            }
+
+            var user = new User(
+                token.DealerId,
+                token.Email,
+                command.FirstName.Trim(),
+                command.LastName.Trim(),
+                passwordHasher.Hash(command.Password),
+                token.RoleId.Value);
+
+            // Accepting the emailed invitation already proves control of the address.
+            user.MarkEmailVerified(now);
+
+            context.Users.Add(user);
+            await context.SaveChangesAsync(cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(user.Id);
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
     }
 }

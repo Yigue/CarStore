@@ -3,12 +3,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Users.Commands.CreateUser;
 using Application.Users.Commands.UpdateUser;
 using Domain.Users;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 using Xunit;
 
 namespace Application.UnitTests.Commands.Users;
@@ -35,6 +37,15 @@ public class UserRoleTenantTests
         return tenant;
     }
 
+    /// <summary>sfc A3.1: these tests exercise pre-existing tenant-isolation behavior, not entitlements.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        return mock.Object;
+    }
+
     [Fact]
     public async Task CreateUser_WithRoleFromAnotherDealer_IsRejected_AndNoUserIsCreated()
     {
@@ -46,7 +57,7 @@ public class UserRoleTenantTests
 
         var hasher = new Mock<IPasswordHasher>();
         hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hash");
-        var handler = new CreateUserCommandHandler(context, hasher.Object, Tenant(callerDealer).Object);
+        var handler = new CreateUserCommandHandler(context, context, hasher.Object, Tenant(callerDealer).Object, AlwaysAllowEntitlements());
 
         var result = await handler.Handle(
             new CreateUserCommand("nuevo@example.com", "Passw0rd!", "Nu", "Evo", null, foreignRole.Id),

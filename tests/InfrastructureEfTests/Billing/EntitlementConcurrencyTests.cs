@@ -90,7 +90,9 @@ public class EntitlementConcurrencyTests
         await migrationCtx.Database.MigrateAsync();
         migrationCtx.DealerSubscriptions.Add(
             DealerSubscription.CreatePending(DealerId, null, planId: string.Empty, planCode: "standard"));
-        var marca = new Marca("Toyota");
+        // Marca.Nombre has a globally-unique index — a fixed name would collide across repeated runs
+        // against the same persistent Postgres instance.
+        var marca = new Marca($"Toyota-{Guid.NewGuid():N}");
         var modelo = new Modelo("Corolla", marca.Id);
         migrationCtx.Marca.Add(marca);
         migrationCtx.Modelo.Add(modelo);
@@ -110,12 +112,14 @@ public class EntitlementConcurrencyTests
                 {
                     // Mirrors the real handler: the INSERT happens inside the same transaction, right
                     // after the check, before the lock-releasing commit.
-                    var marcaRef = Marca.WithId(marca.Id, marca.Nombre);
-                    var modeloRef = Modelo.WithId(modelo.Id, modelo.Nombre, marca.Id);
-                    modeloRef.Marca = marcaRef;
+                    // Marca/Modelo already exist (seeded once, above, on a different DbContext). Query
+                    // them fresh on THIS context so they come back properly tracked as Unchanged — Marca
+                    // has a globally-unique name index, so any re-INSERT attempt fails outright.
+                    var marcaRef = await ctx.Marca.FirstAsync(m => m.Id == marca.Id, cancellationToken: default);
+                    var modeloRef = await ctx.Modelo.FirstAsync(m => m.Id == modelo.Id, cancellationToken: default);
                     var car = new Car(
                         DealerId, marcaRef, modeloRef, Color.Blue, TypeCar.Sedan, StatusCar.New,
-                        StatusServiceCar.Disponible, 4, 5, 2000, 0, 2024, $"CONC{i:00}", "concurrency test",
+                        StatusServiceCar.Disponible, 4, 5, 2000, 0, 2024, $"AAA{i:000}", "concurrency test",
                         20000m, DateTime.UtcNow);
                     ctx.Cars.Add(car);
                     await ctx.SaveChangesAsync();

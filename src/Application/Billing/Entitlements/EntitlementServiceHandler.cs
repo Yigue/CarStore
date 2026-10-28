@@ -63,7 +63,7 @@ internal sealed class EntitlementServiceHandler(
             case PlanResource.Vehicles:
                 return new PlanUsage(await context.Cars.CountAsync(c => c.DealerId == dealerId, ct), 0, 0, 0);
             case PlanResource.Users:
-                return new PlanUsage(0, await context.Users.CountAsync(u => u.DealerId == dealerId, ct), 0, 0);
+                return new PlanUsage(0, await CountStaffUsersAsync(dealerId, ct), 0, 0);
             case PlanResource.Webhooks:
                 return new PlanUsage(0, 0, 0, await context.WebhookSubscriptions.CountAsync(w => w.DealerId == dealerId, ct));
             case PlanResource.ApiKeys:
@@ -79,8 +79,26 @@ internal sealed class EntitlementServiceHandler(
     private async Task<PlanUsage> LoadFullUsageAsync(Guid dealerId, CancellationToken ct)
     {
         int vehicles = await context.Cars.CountAsync(c => c.DealerId == dealerId, ct);
-        int users = await context.Users.CountAsync(u => u.DealerId == dealerId, ct);
+        int users = await CountStaffUsersAsync(dealerId, ct);
         int webhooks = await context.WebhookSubscriptions.CountAsync(w => w.DealerId == dealerId, ct);
         return new PlanUsage(vehicles, users, 0, webhooks);
+    }
+
+    /// <summary>
+    /// Security review (sfc A3.1): the plan's "users" limit is a staff-seat limit, not a row count.
+    /// Counting every <see cref="Domain.Users.User"/> row — including self-registered customers, who
+    /// hold the dealer-scoped <c>Cliente</c> role and never go through any seat-granting flow — would
+    /// let an unauthenticated visitor consume the dealer's own staff quota just by signing up. Exclude
+    /// that role explicitly rather than trying to enumerate every staff role name.
+    /// </summary>
+    private async Task<int> CountStaffUsersAsync(Guid dealerId, CancellationToken ct)
+    {
+        Guid? clienteRoleId = await context.Roles
+            .Where(r => r.DealerId == dealerId && r.Name == Domain.Users.DefaultRoleCatalog.Cliente)
+            .Select(r => (Guid?)r.Id)
+            .FirstOrDefaultAsync(ct);
+
+        return await context.Users
+            .CountAsync(u => u.DealerId == dealerId && u.RoleId != clienteRoleId, ct);
     }
 }

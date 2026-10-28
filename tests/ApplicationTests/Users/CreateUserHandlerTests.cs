@@ -1,5 +1,6 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Users.Commands.CreateUser;
 using Application.UnitTests;
 using Domain.Users;
@@ -34,7 +35,17 @@ public class CreateUserHandlerTests
         _context.SaveChanges();
     }
 
-    private CreateUserCommandHandler Handler() => new(_context, _hasher.Object, _tenant.Object);
+    /// <summary>sfc A3.1: these tests exercise pre-existing CreateUser behavior, not entitlements — always allow.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        return mock.Object;
+    }
+
+    private CreateUserCommandHandler Handler() =>
+        new(_context, _context, _hasher.Object, _tenant.Object, AlwaysAllowEntitlements());
 
     private static CreateUserCommand Command(Guid roleId) =>
         new($"nuevo-{Guid.NewGuid()}@autossur.com", "Passw0rd!", "Nu", "Evo", null, roleId);

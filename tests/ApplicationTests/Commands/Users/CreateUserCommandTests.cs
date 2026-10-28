@@ -4,11 +4,13 @@ using System.Threading.Tasks;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Users.Commands.CreateUser;
 using Domain.Shared.ValueObjects;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 using Xunit;
 
 namespace Application.UnitTests.Commands.Users;
@@ -42,10 +44,17 @@ public class CreateUserCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(context.TenantDealerId);
 
+        var mockEntitlements = new Mock<IEntitlementService>();
+        mockEntitlements
+            .Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+
         return new CreateUserCommandHandler(
             context,
+            context,
             passwordHasher ?? mockPasswordHasher.Object,
-            tenantService ?? mockTenantService.Object);
+            tenantService ?? mockTenantService.Object,
+            mockEntitlements.Object);
     }
 
     [Fact]
