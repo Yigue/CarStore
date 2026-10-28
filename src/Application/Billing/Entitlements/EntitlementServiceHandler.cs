@@ -86,19 +86,49 @@ internal sealed class EntitlementServiceHandler(
 
     /// <summary>
     /// Security review (sfc A3.1): the plan's "users" limit is a staff-seat limit, not a row count.
-    /// Counting every <see cref="Domain.Users.User"/> row — including self-registered customers, who
-    /// hold the dealer-scoped <c>Cliente</c> role and never go through any seat-granting flow — would
-    /// let an unauthenticated visitor consume the dealer's own staff quota just by signing up. Exclude
-    /// that role explicitly rather than trying to enumerate every staff role name.
+    /// Counting every <see cref="Domain.Users.User"/> row — including self-registered customers — would
+    /// let an unauthenticated visitor consume the dealer's own staff quota just by signing up.
     /// </summary>
+    /// <remarks>
+    /// Security review follow-up: an earlier version excluded users by <c>Role.Name == "Cliente"</c>.
+    /// That name is editable by the dealer (<c>Role.Rename</c>, CFG-03) — a dealer at the limit could
+    /// rename a permission-bearing role to literally "Cliente" to make its holders stop counting, or
+    /// rename the real Cliente role away so ordinary customers start counting (a self-inflicted outage,
+    /// but still the wrong classification). Classify by actual capability instead: a role grants at
+    /// least one permission, or it does not — <c>Cliente</c> is seeded with zero permissions
+    /// (<c>DefaultRoleCatalog.ClientePermissionsList</c>) and stays correctly excluded under renaming,
+    /// because renaming alone never changes what a role can actually do.
+    /// </remarks>
     private async Task<int> CountStaffUsersAsync(Guid dealerId, CancellationToken ct)
     {
-        Guid? clienteRoleId = await context.Roles
-            .Where(r => r.DealerId == dealerId && r.Name == Domain.Users.DefaultRoleCatalog.Cliente)
-            .Select(r => (Guid?)r.Id)
-            .FirstOrDefaultAsync(ct);
+        int homeSeats = await context.Users
+            .Where(u => u.DealerId == dealerId)
+            .Join(context.RolePermissions, u => u.RoleId, rp => rp.RoleId, (u, rp) => u.Id)
+            .Distinct()
+            .CountAsync(ct);
 
-        return await context.Users
-            .CountAsync(u => u.DealerId == dealerId && u.RoleId != clienteRoleId, ct);
+        // sfc B6.3: a multi-dealer membership (UserDealerMembership) is a seat in THIS dealer too,
+        // even though the member's home User.DealerId points elsewhere — otherwise
+        // GrantUserDealerMembershipCommandHandler's entitlement gate would check against a count
+        // that this exact operation can never move, making the gate a no-op.
+        int membershipSeats = await context.UserDealerMemberships
+            .IgnoreQueryFilters()
+            .Where(m => m.DealerId == dealerId)
+            .Join(context.RolePermissions, m => m.RoleId, rp => rp.RoleId, (m, rp) => m.UserId)
+            .Distinct()
+            .CountAsync(ct);
+
+        return homeSeats + membershipSeats;
     }
+
+    /// <summary>
+    /// Security review (sfc A3.1): whether assigning <paramref name="roleId"/> would make its holder
+    /// count toward the plan's "users" seat limit — i.e. whether the role grants at least one
+    /// permission. Exposed so role-change handlers (AssignRole, UpdateUser, GrantDealerMembership) can
+    /// gate the transition that actually creates a new seat holder, which <see cref="EnsureCanAddAsync"/>
+    /// alone cannot catch: no <see cref="Domain.Users.User"/> row is inserted when an existing Cliente is
+    /// promoted to a staff role, so the create-time check never fires for that path.
+    /// </summary>
+    public Task<bool> RoleConsumesASeatAsync(Guid roleId, CancellationToken ct = default) =>
+        context.RolePermissions.AnyAsync(rp => rp.RoleId == roleId, ct);
 }

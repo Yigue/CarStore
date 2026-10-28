@@ -1,4 +1,5 @@
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Users.Commands.AssignRole;
 using Application.UnitTests;
 using Domain.Users;
@@ -35,7 +36,18 @@ public class AssignRoleHandlerTests
         _context.SaveChanges();
     }
 
-    private AssignRoleCommandHandler Handler() => new(_context, _tenant.Object);
+    /// <summary>sfc A3.1: these tests exercise pre-existing IDOR behavior, not entitlements.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        mock.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        return mock.Object;
+    }
+
+    private AssignRoleCommandHandler Handler() => new(_context, _context, _tenant.Object, AlwaysAllowEntitlements());
 
     [Fact]
     public async Task AssignRole_WithARoleOfAnotherDealer_Is404()

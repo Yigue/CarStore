@@ -43,6 +43,8 @@ public class UserRoleTenantTests
         var mock = new Mock<IEntitlementService>();
         mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success());
+        mock.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
         return mock.Object;
     }
 
@@ -79,7 +81,7 @@ public class UserRoleTenantTests
         context.Roles.Add(foreignRole);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateUserCommandHandler(context, Tenant(callerDealer).Object);
+        var handler = new UpdateUserCommandHandler(context, context, Tenant(callerDealer).Object, AlwaysAllowEntitlements());
 
         var result = await handler.Handle(
             new UpdateUserCommand(user.Id, "Em", "Pleado", null, foreignRole.Id, true),

@@ -1,15 +1,19 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SharedKernel;
 
 namespace Application.Users.Commands.UpdateUser;
 
 internal sealed class UpdateUserCommandHandler(
     IApplicationDbContext context,
-    ICurrentTenantService tenantService)
+    DbContext dbContext,
+    ICurrentTenantService tenantService,
+    IEntitlementService entitlementService)
     : ICommandHandler<UpdateUserCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(UpdateUserCommand command, CancellationToken cancellationToken)
@@ -37,31 +41,81 @@ internal sealed class UpdateUserCommandHandler(
             return Result.Failure<Guid>(UserErrors.OwnerProtected);
         }
 
-        // Update user properties using domain methods
-        user.UpdateName(command.FirstName.Trim(), command.LastName.Trim());
+        // Security review (sfc A3.1): same gate as AssignRole — only the transition that NEWLY
+        // starts consuming a seat is checked; see AssignRoleCommandHandler for the full rationale.
+        bool roleChanged = user.RoleId != command.RoleId;
+        bool newlyConsumesASeat = roleChanged
+            && !await entitlementService.RoleConsumesASeatAsync(user.RoleId, cancellationToken)
+            && await entitlementService.RoleConsumesASeatAsync(command.RoleId, cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(command.Phone))
+        IDbContextTransaction? transaction = newlyConsumesASeat && dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        try
         {
-            user.UpdatePhone(command.Phone.Trim());
+            if (newlyConsumesASeat)
+            {
+                Result entitlementCheck = await entitlementService.EnsureCanAddAsync(
+                    tenantService.DealerId, PlanResource.Users, cancellationToken);
+                if (entitlementCheck.IsFailure)
+                {
+                    if (transaction is not null)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                    }
+
+                    return Result.Failure<Guid>(entitlementCheck.Error);
+                }
+            }
+
+            // Update user properties using domain methods
+            user.UpdateName(command.FirstName.Trim(), command.LastName.Trim());
+
+            if (!string.IsNullOrWhiteSpace(command.Phone))
+            {
+                user.UpdatePhone(command.Phone.Trim());
+            }
+            else
+            {
+                user.UpdatePhone(null);
+            }
+
+            user.UpdateRole(command.RoleId);
+
+            if (command.IsActive && !user.IsActive)
+            {
+                user.Activate();
+            }
+            else if (!command.IsActive && user.IsActive)
+            {
+                user.Deactivate();
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(user.Id);
         }
-        else
+        catch
         {
-            user.UpdatePhone(null);
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            throw;
         }
-
-        user.UpdateRole(command.RoleId);
-
-        if (command.IsActive && !user.IsActive)
+        finally
         {
-            user.Activate();
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
         }
-        else if (!command.IsActive && user.IsActive)
-        {
-            user.Deactivate();
-        }
-
-        await context.SaveChangesAsync(cancellationToken);
-
-        return Result.Success(user.Id);
     }
 }

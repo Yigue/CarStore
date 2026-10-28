@@ -2,10 +2,12 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Users.Commands.UpdateUser;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 using Xunit;
 
 namespace Application.UnitTests.Commands.Users;
@@ -30,6 +32,17 @@ public class UpdateUserCommandTests
         return role.Id;
     }
 
+    /// <summary>sfc A3.1: these tests exercise pre-existing update behavior, not entitlements.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        mock.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        return mock.Object;
+    }
+
     private static UpdateUserCommandHandler CreateHandler(
         TestApplicationDbContext context,
         ICurrentTenantService? tenantService = null)
@@ -39,7 +52,9 @@ public class UpdateUserCommandTests
 
         return new UpdateUserCommandHandler(
             context,
-            tenantService ?? mockTenantService.Object);
+            context,
+            tenantService ?? mockTenantService.Object,
+            AlwaysAllowEntitlements());
     }
 
     [Fact]

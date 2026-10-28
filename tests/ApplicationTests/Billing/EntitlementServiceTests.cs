@@ -1,6 +1,10 @@
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Billing;
+using Application.Abstractions.Tenancy;
 using Application.Billing.Entitlements;
 using Application.UnitTests;
+using Application.Users.Commands.AssignRole;
+using Application.Users.Commands.GrantDealerMembership;
 using Application.Webhooks.Delete;
 using Application.Webhooks.Update;
 using Domain.Billing;
@@ -119,6 +123,104 @@ public class EntitlementServiceTests
             .EnsureCanAddAsync(dealerId, PlanResource.Users, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue("customers must never consume the dealer's staff-seat limit");
+    }
+
+    // Security review (sfc A3.1) follow-up: a role is excluded from the seat count by what it can
+    // actually DO (any RolePermission row), not by its NAME. A dealer renaming an admin-permission role
+    // to literally "Cliente" must not make its holder stop counting as a seat.
+    [Fact]
+    public async Task EnsureCanAddAsync_ForUsers_ARolePermissionBearingRoleNamedClienteStillCounts()
+    {
+        var dealerId = Guid.NewGuid();
+        var context = CreateContext(dealerId);
+        var renamedAdminRole = new Role(dealerId, DefaultRoleCatalog.Cliente, "Renamed to dodge the seat count");
+        renamedAdminRole.AddPermission("cars:delete");
+        context.Roles.Add(renamedAdminRole);
+        context.Users.Add(new User(dealerId, "fake-customer@autosdelsur.test", "Admin", "EnDisfraz", "hash", renamedAdminRole.Id));
+        context.DealerSubscriptions.Add(DealerSubscription.CreatePending(dealerId, null, planId: string.Empty, planCode: "standard"));
+        await context.SaveChangesAsync();
+
+        var planCatalog = new Mock<IPlanCatalog>();
+        planCatalog.Setup(p => p.GetEntitlementsAsync("standard", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlanLimits(null, MaxUsers: 1, null, null));
+
+        // Already 1 seat used (the permission-bearing role, despite being named "Cliente") -> at the limit.
+        Result result = await Handler(context, planCatalog.Object)
+            .EnsureCanAddAsync(dealerId, PlanResource.Users, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue("a role's permissions decide seat status, not its editable name");
+    }
+
+    // Security review (sfc A3.1) follow-up: CreateUser/InviteUser/AcceptInvitation are not the only way
+    // to turn a non-seat user into a seat-consuming one. AssignRole must gate the same transition.
+    [Fact]
+    public async Task AssignRole_PromotingAClienteToAPermissionBearingRole_AtTheLimit_IsRejected()
+    {
+        var dealerId = Guid.NewGuid();
+        var context = CreateContext(dealerId);
+        var clienteRole = new Role(dealerId, DefaultRoleCatalog.Cliente, "Cliente");
+        var adminRole = new Role(dealerId, "Admin", "Admin");
+        adminRole.AddPermission("cars:delete");
+        context.Roles.AddRange(clienteRole, adminRole);
+        context.Users.Add(new User(dealerId, "staff@autosdelsur.test", "Staff", "Uno", "hash", adminRole.Id));
+        var customer = new User(dealerId, "cliente@afuera.com", "Cliente", "Uno", "hash", clienteRole.Id);
+        context.Users.Add(customer);
+        context.DealerSubscriptions.Add(DealerSubscription.CreatePending(dealerId, null, planId: string.Empty, planCode: "standard"));
+        await context.SaveChangesAsync();
+
+        var planCatalog = new Mock<IPlanCatalog>();
+        planCatalog.Setup(p => p.GetEntitlementsAsync("standard", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlanLimits(null, MaxUsers: 1, null, null));
+        var entitlementService = new EntitlementServiceHandler(context, context, planCatalog.Object);
+
+        var tenant = new Mock<ICurrentTenantService>();
+        tenant.SetupGet(t => t.DealerId).Returns(dealerId);
+        var handler = new AssignRoleCommandHandler(context, context, tenant.Object, entitlementService);
+
+        // 1 staff seat already used (the Admin), limit 1 -> promoting the customer must be rejected.
+        Result<Guid> result = await handler.Handle(new AssignRoleCommand(customer.Id, adminRole.Id), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue("promoting an existing Cliente to a seat-consuming role must respect the same limit as creating a new staff user");
+        var reloaded = await context.Users.AsNoTracking().FirstAsync(u => u.Id == customer.Id);
+        reloaded.RoleId.Should().Be(clienteRole.Id, "a rejected promotion must not partially apply");
+    }
+
+    // Security review (sfc A3.1) follow-up: granting a B6.3 multi-dealer membership is also a new seat
+    // in the GRANTING dealer, even though the member's home User.DealerId points elsewhere.
+    [Fact]
+    public async Task GrantDealerMembership_WithAPermissionBearingRole_AtTheLimit_IsRejected()
+    {
+        var dealerId = Guid.NewGuid();
+        var otherDealerId = Guid.NewGuid();
+        var context = CreateContext(dealerId);
+        var adminRole = new Role(dealerId, "Admin", "Admin");
+        adminRole.AddPermission("cars:delete");
+        context.Roles.Add(adminRole);
+        context.Users.Add(new User(dealerId, "staff@autosdelsur.test", "Staff", "Uno", "hash", adminRole.Id));
+        var outsider = new User(otherDealerId, "outsider@otradealer.test", "Afuera", "Uno", "hash", Guid.NewGuid());
+        context.Users.Add(outsider);
+        context.DealerSubscriptions.Add(DealerSubscription.CreatePending(dealerId, null, planId: string.Empty, planCode: "standard"));
+        await context.SaveChangesAsync();
+
+        var planCatalog = new Mock<IPlanCatalog>();
+        planCatalog.Setup(p => p.GetEntitlementsAsync("standard", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlanLimits(null, MaxUsers: 1, null, null));
+        var entitlementService = new EntitlementServiceHandler(context, context, planCatalog.Object);
+
+        var tenant = new Mock<ICurrentTenantService>();
+        tenant.SetupGet(t => t.DealerId).Returns(dealerId);
+        var clock = new Mock<IDateTimeProvider>();
+        clock.SetupGet(c => c.UtcNow).Returns(DateTime.UtcNow);
+        var handler = new GrantUserDealerMembershipCommandHandler(context, context, tenant.Object, clock.Object, entitlementService);
+
+        // 1 staff seat already used in this dealer, limit 1 -> granting a membership with a
+        // permission-bearing role must be rejected, even though the outsider's HOME dealer is different.
+        Result<Guid> result = await handler.Handle(
+            new GrantUserDealerMembershipCommand(outsider.Id, adminRole.Id), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue("a cross-dealer membership grant consumes a seat in the granting dealer too");
+        (await context.UserDealerMemberships.IgnoreQueryFilters().AnyAsync(m => m.UserId == outsider.Id)).Should().BeFalse(
+            "a rejected grant must not partially apply");
     }
 
     [Fact]

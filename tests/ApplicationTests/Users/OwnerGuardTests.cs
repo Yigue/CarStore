@@ -1,5 +1,6 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Users.Commands.AssignRole;
 using Application.Users.Commands.DeleteUser;
 using Application.Users.Commands.UpdateUser;
@@ -47,8 +48,19 @@ public class OwnerGuardTests
         _actor.SetupGet(u => u.UserId).Returns(_colleague.Id);
     }
 
-    private AssignRoleCommandHandler AssignRole() => new(_context, _tenant.Object);
-    private UpdateUserCommandHandler UpdateUser() => new(_context, _tenant.Object);
+    /// <summary>sfc A3.1: these tests exercise pre-existing owner-protection behavior, not entitlements.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        mock.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        return mock.Object;
+    }
+
+    private AssignRoleCommandHandler AssignRole() => new(_context, _context, _tenant.Object, AlwaysAllowEntitlements());
+    private UpdateUserCommandHandler UpdateUser() => new(_context, _context, _tenant.Object, AlwaysAllowEntitlements());
     private DeleteUserCommandHandler DeleteUser() => new(_context, _tenant.Object, _actor.Object);
 
     private UpdateUserCommand Update(User user, Guid roleId, bool isActive) =>

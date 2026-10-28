@@ -1,8 +1,10 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SharedKernel;
 
 namespace Application.Users.Commands.GrantDealerMembership;
@@ -17,8 +19,10 @@ namespace Application.Users.Commands.GrantDealerMembership;
 /// </summary>
 internal sealed class GrantUserDealerMembershipCommandHandler(
     IApplicationDbContext context,
+    DbContext dbContext,
     ICurrentTenantService tenant,
-    IDateTimeProvider clock) : ICommandHandler<GrantUserDealerMembershipCommand, Guid>
+    IDateTimeProvider clock,
+    IEntitlementService entitlementService) : ICommandHandler<GrantUserDealerMembershipCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(GrantUserDealerMembershipCommand command, CancellationToken cancellationToken)
     {
@@ -54,10 +58,57 @@ internal sealed class GrantUserDealerMembershipCommandHandler(
             return Result.Failure<Guid>(DealerAccessErrors.AlreadyGranted(command.UserId, dealerId));
         }
 
-        UserDealerMembership membership = UserDealerMembership.Grant(command.UserId, dealerId, command.RoleId, clock.UtcNow);
-        context.UserDealerMemberships.Add(membership);
-        await context.SaveChangesAsync(cancellationToken);
+        // Security review (sfc A3.1): this is a brand-new seat in THIS dealer (no prior membership
+        // existed here), so unlike AssignRole/UpdateUser there is no "old role" to compare against —
+        // gate whenever the granted role consumes a seat at all.
+        bool newlyConsumesASeat = await entitlementService.RoleConsumesASeatAsync(command.RoleId, cancellationToken);
 
-        return Result.Success(membership.Id);
+        IDbContextTransaction? transaction = newlyConsumesASeat && dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        try
+        {
+            if (newlyConsumesASeat)
+            {
+                Result entitlementCheck = await entitlementService.EnsureCanAddAsync(dealerId, PlanResource.Users, cancellationToken);
+                if (entitlementCheck.IsFailure)
+                {
+                    if (transaction is not null)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                    }
+
+                    return Result.Failure<Guid>(entitlementCheck.Error);
+                }
+            }
+
+            UserDealerMembership membership = UserDealerMembership.Grant(command.UserId, dealerId, command.RoleId, clock.UtcNow);
+            context.UserDealerMemberships.Add(membership);
+            await context.SaveChangesAsync(cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(membership.Id);
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
     }
 }

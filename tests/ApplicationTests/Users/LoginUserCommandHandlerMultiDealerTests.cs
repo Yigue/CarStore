@@ -1,5 +1,6 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.UnitTests;
 using Application.Users.Commands.GrantDealerMembership;
 using Application.Users.Login;
@@ -240,7 +241,7 @@ public class LoginUserCommandHandlerMultiDealerTests
         _context.Users.Add(targetUser);
         await _context.SaveChangesAsync();
 
-        var handler = new GrantUserDealerMembershipCommandHandler(_context, tenant.Object, clock.Object);
+        var handler = new GrantUserDealerMembershipCommandHandler(_context, _context, tenant.Object, clock.Object, AlwaysAllowEntitlements());
         Result<Guid> foreignResult = await handler.Handle(
             new GrantUserDealerMembershipCommand(targetUser.Id, foreignRole.Id), CancellationToken.None);
         Result<Guid> nonexistentResult = await handler.Handle(
@@ -266,7 +267,7 @@ public class LoginUserCommandHandlerMultiDealerTests
         _context.Users.Add(homeUser);
         await _context.SaveChangesAsync();
 
-        var handler = new GrantUserDealerMembershipCommandHandler(_context, tenant.Object, clock.Object);
+        var handler = new GrantUserDealerMembershipCommandHandler(_context, _context, tenant.Object, clock.Object, AlwaysAllowEntitlements());
         Result<Guid> result = await handler.Handle(
             new GrantUserDealerMembershipCommand(homeUser.Id, role.Id), CancellationToken.None);
 
@@ -289,7 +290,7 @@ public class LoginUserCommandHandlerMultiDealerTests
         _context.UserDealerMemberships.Add(UserDealerMembership.Grant(foreignUser.Id, dealerId, role.Id, Now));
         await _context.SaveChangesAsync();
 
-        var handler = new GrantUserDealerMembershipCommandHandler(_context, tenant.Object, clock.Object);
+        var handler = new GrantUserDealerMembershipCommandHandler(_context, _context, tenant.Object, clock.Object, AlwaysAllowEntitlements());
         Result<Guid> result = await handler.Handle(
             new GrantUserDealerMembershipCommand(foreignUser.Id, otherRole.Id), CancellationToken.None);
 
@@ -310,7 +311,7 @@ public class LoginUserCommandHandlerMultiDealerTests
         _context.Users.Add(foreignUser);
         await _context.SaveChangesAsync();
 
-        var handler = new GrantUserDealerMembershipCommandHandler(_context, tenant.Object, clock.Object);
+        var handler = new GrantUserDealerMembershipCommandHandler(_context, _context, tenant.Object, clock.Object, AlwaysAllowEntitlements());
         Result<Guid> result = await handler.Handle(
             new GrantUserDealerMembershipCommand(foreignUser.Id, role.Id), CancellationToken.None);
 
@@ -355,6 +356,17 @@ public class LoginUserCommandHandlerMultiDealerTests
         var clock = new Mock<IDateTimeProvider>();
         clock.SetupGet(c => c.UtcNow).Returns(now);
         return clock;
+    }
+
+    /// <summary>sfc A3.1: these tests exercise multi-dealer login/membership behavior, not entitlements.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        mock.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        return mock.Object;
     }
 
     /// <summary>Home dealer A (role A) + an extra <see cref="UserDealerMembership"/> grant in dealer B (role B).</summary>

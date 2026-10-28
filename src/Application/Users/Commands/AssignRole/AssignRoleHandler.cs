@@ -1,15 +1,19 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SharedKernel;
 
 namespace Application.Users.Commands.AssignRole;
 
 internal sealed class AssignRoleCommandHandler(
     IApplicationDbContext context,
-    ICurrentTenantService tenantService)
+    DbContext dbContext,
+    ICurrentTenantService tenantService,
+    IEntitlementService entitlementService)
     : ICommandHandler<AssignRoleCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(AssignRoleCommand command, CancellationToken cancellationToken)
@@ -37,10 +41,63 @@ internal sealed class AssignRoleCommandHandler(
             return Result.Failure<Guid>(UserErrors.OwnerProtected);
         }
 
-        user.UpdateRole(command.RoleId);
+        // Security review (sfc A3.1): promoting an existing user to a seat-consuming role must be
+        // gated exactly like creating a new one — EnsureCanAddAsync never fires here on its own
+        // because no User row is inserted. Only gate the transition that NEWLY starts consuming a
+        // seat; moving between two seat-consuming roles (e.g. Empleado -> Admin) changes nothing
+        // about headcount, and RN-012 still allows demoting someone off a seat unconditionally.
+        bool roleChanged = user.RoleId != command.RoleId;
+        bool newlyConsumesASeat = roleChanged
+            && !await entitlementService.RoleConsumesASeatAsync(user.RoleId, cancellationToken)
+            && await entitlementService.RoleConsumesASeatAsync(command.RoleId, cancellationToken);
 
-        await context.SaveChangesAsync(cancellationToken);
+        IDbContextTransaction? transaction = newlyConsumesASeat && dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
 
-        return Result.Success(user.Id);
+        try
+        {
+            if (newlyConsumesASeat)
+            {
+                Result entitlementCheck = await entitlementService.EnsureCanAddAsync(
+                    tenantService.DealerId, PlanResource.Users, cancellationToken);
+                if (entitlementCheck.IsFailure)
+                {
+                    if (transaction is not null)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                    }
+
+                    return Result.Failure<Guid>(entitlementCheck.Error);
+                }
+            }
+
+            user.UpdateRole(command.RoleId);
+
+            await context.SaveChangesAsync(cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(user.Id);
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
     }
 }
