@@ -1,9 +1,11 @@
 using Application.Abstractions.Caching;
+using Application.Billing.Entitlements;
 using Application.Cars.Create;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 using Application.Abstractions.Tenancy;
 
 namespace Application.UnitTests.Cars;
@@ -37,8 +39,12 @@ public class CreateCarCurrencyTests
         tenant.SetupGet(t => t.DealerId).Returns(DealerId);
         tenant.SetupGet(t => t.HasTenant).Returns(true);
 
+        var entitlementService = new Mock<IEntitlementService>();
+        entitlementService.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+
         var handler = new CreateCarCommandHandler(
-            context, new FakeDateTimeProvider { UtcNow = new DateTime(2026, 10, 1) }, brands.Object, models.Object, tenant.Object);
+            context, context, new FakeDateTimeProvider { UtcNow = new DateTime(2026, 10, 1) }, brands.Object, models.Object, tenant.Object, entitlementService.Object);
         return (handler, marca, modelo);
     }
 

@@ -1,4 +1,6 @@
 using Application.Abstractions.Billing;
+using Application.Billing.Entitlements;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -50,4 +52,20 @@ internal sealed class NoOpPlanCatalog : IPlanCatalog
 
     public bool IsSellable(string code) =>
         !string.IsNullOrWhiteSpace(code) && _options.ResolvePlans().ContainsKey(code);
+
+    /// <summary>Billing disabled (no-op): always unlimited — never calls Stripe, never blocks local/CI usage.</summary>
+    public Task<PlanLimits?> GetEntitlementsAsync(string code, CancellationToken ct = default) =>
+        Task.FromResult<PlanLimits?>(null);
+
+    /// <summary>Billing disabled (no-op): mirrors the config-only lookup so local/CI dev can still exercise feature gating.</summary>
+    public Task<IReadOnlyList<string>> GetFeaturesAsync(string code, CancellationToken ct = default)
+    {
+        var plans = _options.ResolvePlans();
+        if (string.IsNullOrWhiteSpace(code) || !plans.TryGetValue(code, out var plan))
+        {
+            return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        }
+
+        return Task.FromResult<IReadOnlyList<string>>(plan.Features);
+    }
 }

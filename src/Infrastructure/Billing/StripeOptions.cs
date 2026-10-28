@@ -61,4 +61,34 @@ public sealed class StripePlanOptions
 {
     [Required(AllowEmptyStrings = false)]
     public string PriceId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// sfc A3.1 (A1, A21, RN-011): optional numeric limits for this plan — <c>Billing:Plans:{code}:Limits</c>.
+    /// Absent (null) means the plan declares no limits at all (fail-open, unlimited); within a configured
+    /// <see cref="StripePlanLimitsOptions"/>, each individual <c>Max*</c> left unset is also unlimited for
+    /// that resource only — see <see cref="StripePlanLimitsOptions"/>.
+    /// </summary>
+    public StripePlanLimitsOptions? Limits { get; set; }
+
+    /// <summary>
+    /// sfc A3.2 (A2, A24, RN-020, RN-021): feature flags included in this plan — <c>Billing:Plans:{code}:Features</c>.
+    /// Empty by default (no deployment configures this yet).
+    /// </summary>
+    public List<string> Features { get; set; } = new();
+}
+
+/// <summary>
+/// sfc A3.1: numeric plan limits read from <c>Billing:Plans:{code}:Limits:*</c>. Every property is an
+/// optional int — unset (null) means "not declared" → unlimited for that resource (RN-011 fail-open),
+/// mirrored 1:1 onto <see cref="Application.Billing.Entitlements.PlanLimits"/>.
+/// </summary>
+public sealed class StripePlanLimitsOptions
+{
+    public int? MaxVehicles { get; set; }
+
+    public int? MaxUsers { get; set; }
+
+    public int? MaxApiKeys { get; set; }
+
+    public int? MaxWebhooks { get; set; }
 }

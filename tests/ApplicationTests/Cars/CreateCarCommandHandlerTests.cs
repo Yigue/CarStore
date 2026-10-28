@@ -2,11 +2,13 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using Application.Billing.Entitlements;
 using Application.Cars.Create;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 using Application.Abstractions.Caching;
 using Application.Abstractions.Tenancy;
 
@@ -20,6 +22,18 @@ public class CreateCarCommandHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         return new TestApplicationDbContext(options);
+    }
+
+    /// <summary>
+    /// sfc A3.1: these tests exercise CreateCar's pre-existing validation/persistence behavior, not
+    /// entitlements — always allow so the entitlement gate added in front of the handler is a no-op here.
+    /// </summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        return mock.Object;
     }
 
     [Fact]
@@ -44,7 +58,7 @@ public class CreateCarCommandHandlerTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(t => t.DealerId).Returns(Guid.NewGuid());
 
-        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object);
+        var handler = new CreateCarCommandHandler(context, context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object, AlwaysAllowEntitlements());
 
         var command = new CreateCarCommand(
             marca.Id,
@@ -83,7 +97,7 @@ public class CreateCarCommandHandlerTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(t => t.DealerId).Returns(Guid.NewGuid());
 
-        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object);
+        var handler = new CreateCarCommandHandler(context, context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object, AlwaysAllowEntitlements());
 
         var command = new CreateCarCommand(
             Guid.NewGuid(),
@@ -138,7 +152,7 @@ public class CreateCarCommandHandlerTests
         // Pre-attach the original marca to force identity collision if the handler attaches the detached graph
         context.Marca.Attach(marca);
 
-        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object);
+        var handler = new CreateCarCommandHandler(context, context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object, AlwaysAllowEntitlements());
 
         var command = new CreateCarCommand(
             marca.Id,
@@ -194,7 +208,7 @@ public class CreateCarCommandHandlerTests
         mockTenantService.Setup(t => t.DealerId).Returns(dealerId);
         mockTenantService.Setup(t => t.HasTenant).Returns(true);
 
-        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object);
+        var handler = new CreateCarCommandHandler(context, context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object, AlwaysAllowEntitlements());
 
         var command = new CreateCarCommand(
             marca.Id, modelo.Id, Color.Blue, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible,
@@ -254,7 +268,7 @@ public class CreateCarCommandHandlerTests
         mockTenantService.Setup(t => t.DealerId).Returns(dealerB);
         mockTenantService.Setup(t => t.HasTenant).Returns(true);
 
-        var handler = new CreateCarCommandHandler(context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object);
+        var handler = new CreateCarCommandHandler(context, context, dateProvider, mockBrandService.Object, mockModelService.Object, mockTenantService.Object, AlwaysAllowEntitlements());
 
         var command = new CreateCarCommand(
             marcaId, modeloId, Color.Blue, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible,

@@ -1,4 +1,5 @@
 using Application.Abstractions.Billing;
+using Application.Billing.Entitlements;
 using Infrastructure.Caching;
 using Microsoft.Extensions.Options;
 using Stripe;
@@ -77,4 +78,33 @@ internal sealed class StripePlanCatalog : IPlanCatalog
 
     public bool IsSellable(string code) =>
         !string.IsNullOrWhiteSpace(code) && _options.ResolvePlans().ContainsKey(code);
+
+    /// <summary>
+    /// sfc A3.1 (A1, A21, RN-011): config-only (no Stripe call) — a plan with no configured
+    /// <see cref="StripePlanOptions.Limits"/> section returns null (fail-open, unlimited).
+    /// </summary>
+    public Task<PlanLimits?> GetEntitlementsAsync(string code, CancellationToken ct = default)
+    {
+        var plans = _options.ResolvePlans();
+        if (string.IsNullOrWhiteSpace(code) || !plans.TryGetValue(code, out var plan) || plan.Limits is null)
+        {
+            return Task.FromResult<PlanLimits?>(null);
+        }
+
+        var limits = plan.Limits;
+        return Task.FromResult<PlanLimits?>(
+            new PlanLimits(limits.MaxVehicles, limits.MaxUsers, limits.MaxApiKeys, limits.MaxWebhooks));
+    }
+
+    /// <summary>sfc A3.2 (A2, A24, RN-020, RN-021): config-only — an unconfigured plan unlocks nothing.</summary>
+    public Task<IReadOnlyList<string>> GetFeaturesAsync(string code, CancellationToken ct = default)
+    {
+        var plans = _options.ResolvePlans();
+        if (string.IsNullOrWhiteSpace(code) || !plans.TryGetValue(code, out var plan))
+        {
+            return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        }
+
+        return Task.FromResult<IReadOnlyList<string>>(plan.Features);
+    }
 }

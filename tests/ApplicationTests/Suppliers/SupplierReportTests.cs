@@ -1,5 +1,6 @@
 using Application.Abstractions.Caching;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Cars.Create;
 using Application.Reports.GetPurchasesBySupplier;
 using Application.Suppliers.Create;
@@ -9,6 +10,7 @@ using Domain.Suppliers;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 
 namespace Application.UnitTests.Suppliers;
 
@@ -45,7 +47,10 @@ public class SupplierReportTests
         var models = new Mock<ICachedModelService>();
         models.Setup(s => s.GetByIdAsync(modelo.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ModeloCacheDto { Id = modelo.Id, Nombre = modelo.Nombre, MarcaId = marca.Id });
-        return (new CreateCarCommandHandler(context, new FakeDateTimeProvider { UtcNow = Now }, brands.Object, models.Object, Tenant(DealerId)),
+        var entitlementService = new Mock<IEntitlementService>();
+        entitlementService.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        return (new CreateCarCommandHandler(context, context, new FakeDateTimeProvider { UtcNow = Now }, brands.Object, models.Object, Tenant(DealerId), entitlementService.Object),
             marca, modelo);
     }
 

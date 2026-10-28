@@ -1,6 +1,7 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Email;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.UnitTests;
 using Application.Users.Invitations;
 using Application.Users.Invitations.InviteUser;
@@ -63,10 +64,19 @@ public class InviteUserCommandHandlerTests
         _context.SaveChanges();
     }
 
+    /// <summary>sfc A3.1: these tests exercise pre-existing invitation behavior, not entitlements — always allow.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        return mock.Object;
+    }
+
     private InviteUserCommandHandler Handler() =>
-        new(_context, _tenant.Object, _user.Object, _email.Object,
+        new(_context, _context, _tenant.Object, _user.Object, _email.Object,
             new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Frontend:BaseUrl"] = "https://app.example.com/" }).Build(),
-            _clock.Object, NullLogger<InviteUserCommandHandler>.Instance);
+            _clock.Object, NullLogger<InviteUserCommandHandler>.Instance, AlwaysAllowEntitlements());
 
     [Fact]
     public async Task Invite_WithARoleOfAnotherDealer_Is404_IdenticalToANonexistentRole()
@@ -184,9 +194,9 @@ public class InviteUserCommandHandlerTests
         await _context.SaveChangesAsync();
         otherUser.SetupGet(u => u.UserId).Returns(otherInviter.Id);
         var otherHandler = new InviteUserCommandHandler(
-            _context, otherTenant.Object, otherUser.Object, _email.Object,
+            _context, _context, otherTenant.Object, otherUser.Object, _email.Object,
             new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Frontend:BaseUrl"] = "https://app.example.com/" }).Build(),
-            _clock.Object, NullLogger<InviteUserCommandHandler>.Instance);
+            _clock.Object, NullLogger<InviteUserCommandHandler>.Instance, AlwaysAllowEntitlements());
         await otherHandler.Handle(new InviteUserCommand("compartido@afuera.com", otherRole.Id), CancellationToken.None);
         _sent.Clear();
 

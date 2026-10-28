@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Application.Billing.Entitlements;
 
 namespace Application.Abstractions.Billing;
 
@@ -23,6 +24,22 @@ public interface IPlanCatalog
     /// precondition for a check that is really "is this one of our configured codes".
     /// </summary>
     bool IsSellable(string code);
+
+    /// <summary>
+    /// sfc A3.1 (A1, A21, RN-011): config-only lookup (no provider call) of the numeric limits declared
+    /// for <paramref name="code"/> — <c>Billing:Plans:{code}:Limits:*</c>. Returns null when the code is
+    /// not configured or declares no limits section at all: fail-open, same philosophy as
+    /// <see cref="PlanEntitlementsEvaluator"/> (no limits row → unlimited, never an error).
+    /// </summary>
+    Task<PlanLimits?> GetEntitlementsAsync(string code, CancellationToken ct = default);
+
+    /// <summary>
+    /// sfc A3.2 (A2, A24, RN-020, RN-021): config-only lookup of the feature flags included in
+    /// <paramref name="code"/> — <c>Billing:Plans:{code}:Features</c>. Returns an empty list when the
+    /// code is not configured or declares no features (fail-closed for feature gating: an unknown plan
+    /// unlocks nothing, unlike the numeric limits which fail OPEN).
+    /// </summary>
+    Task<IReadOnlyList<string>> GetFeaturesAsync(string code, CancellationToken ct = default);
 }
 
 /// <summary>Provider-agnostic snapshot of a sellable plan. <see cref="AmountMinor"/> is in minor currency units.</summary>

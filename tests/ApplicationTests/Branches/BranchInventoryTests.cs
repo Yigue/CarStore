@@ -1,5 +1,6 @@
 using Application.Abstractions.Caching;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Branches;
 using Application.Cars.Create;
 using Application.Queries.Cars.GetInventoryStats;
@@ -8,6 +9,7 @@ using Domain.Cars.Attributes;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 
 namespace Application.UnitTests.Branches;
 
@@ -38,7 +40,10 @@ public class BranchInventoryTests
         var models = new Mock<ICachedModelService>();
         models.Setup(s => s.GetByIdAsync(modelo.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ModeloCacheDto { Id = modelo.Id, Nombre = modelo.Nombre, MarcaId = marca.Id });
-        var cars = new CreateCarCommandHandler(context, new FakeDateTimeProvider(), brands.Object, models.Object, Tenant(DealerId));
+        var entitlementService = new Mock<IEntitlementService>();
+        entitlementService.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        var cars = new CreateCarCommandHandler(context, context, new FakeDateTimeProvider(), brands.Object, models.Object, Tenant(DealerId), entitlementService.Object);
         return (context, cars, marca, modelo);
     }
 
