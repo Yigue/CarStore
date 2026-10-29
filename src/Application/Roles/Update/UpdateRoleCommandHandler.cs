@@ -1,6 +1,7 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
 using Application.Billing.Entitlements;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ namespace Application.Roles.Update;
 internal sealed class UpdateRoleCommandHandler(
     IApplicationDbContext context,
     DbContext dbContext,
+    ICurrentTenantService tenantService,
     IPermissionCacheInvalidator permissionCacheInvalidator,
     IEntitlementService entitlementService)
     : ICommandHandler<UpdateRoleCommand>
@@ -21,9 +23,11 @@ internal sealed class UpdateRoleCommandHandler(
 
     public async Task<Result> Handle(UpdateRoleCommand command, CancellationToken cancellationToken)
     {
+        // Security review (sfc A3.1): explicit scoping on top of Role's global query filter
+        // (defense in depth — this is exactly the check that filter's absence let slip through).
         Role? role = await context.Roles
             .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == command.RoleId, cancellationToken);
+            .FirstOrDefaultAsync(r => r.Id == command.RoleId && r.DealerId == tenantService.DealerId, cancellationToken);
 
         if (role is null)
         {
@@ -33,7 +37,7 @@ internal sealed class UpdateRoleCommandHandler(
         string name = command.Name.Trim();
 
         bool nameTaken = await context.Roles
-            .AnyAsync(r => r.Name == name && r.Id != role.Id, cancellationToken);
+            .AnyAsync(r => r.Name == name && r.Id != role.Id && r.DealerId == tenantService.DealerId, cancellationToken);
 
         if (nameTaken)
         {
@@ -63,10 +67,14 @@ internal sealed class UpdateRoleCommandHandler(
 
         if (wasAdministrator && !staysAdministrator)
         {
-            bool anotherAdministratorExists = await context.RolePermissions
-                .AnyAsync(
-                    rp => rp.Permission == RoleAdministration && rp.RoleId != role.Id,
-                    cancellationToken);
+            // Security review (sfc A3.1): RolePermissions carries no DealerId of its own — an
+            // unscoped check here would ask "does CanManageRoles exist on ANY role of ANY dealer",
+            // which is true on any populated system and makes this guard pass even when this role
+            // really is the last one with it IN THIS dealer. Join back to Roles to scope it.
+            bool anotherAdministratorExists = await context.Roles
+                .Where(r => r.DealerId == tenantService.DealerId && r.Id != role.Id)
+                .Join(context.RolePermissions, r => r.Id, rp => rp.RoleId, (r, rp) => rp.Permission)
+                .AnyAsync(p => p == RoleAdministration, cancellationToken);
 
             if (!anotherAdministratorExists)
             {
@@ -90,7 +98,7 @@ internal sealed class UpdateRoleCommandHandler(
             if (wouldGainItsFirstPermission)
             {
                 Result entitlementCheck = await entitlementService.EnsureRoleCanGainHoldersAsync(
-                    role.DealerId, role.Id, cancellationToken);
+                    tenantService.DealerId, role.Id, cancellationToken);
                 if (entitlementCheck.IsFailure)
                 {
                     if (transaction is not null)

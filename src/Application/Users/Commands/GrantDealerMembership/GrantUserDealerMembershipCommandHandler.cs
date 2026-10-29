@@ -60,15 +60,21 @@ internal sealed class GrantUserDealerMembershipCommandHandler(
 
         // Security review (sfc A3.1): this is a brand-new seat in THIS dealer (no prior membership
         // existed here), so unlike AssignRole/UpdateUser there is no "old role" to compare against —
-        // gate whenever the granted role consumes a seat at all.
-        bool newlyConsumesASeat = await entitlementService.RoleConsumesASeatAsync(command.RoleId, cancellationToken);
-
-        IDbContextTransaction? transaction = newlyConsumesASeat && dbContext.Database.IsRelational()
+        // gate whenever the granted role consumes a seat at all. Fourth round: the transaction/lock
+        // always opens here (every grant creates a membership that may consume a seat), and the lock
+        // is acquired BEFORE checking RoleConsumesASeatAsync, closing the same race as AssignRole/
+        // UpdateUser — a concurrent UpdateRoleCommandHandler call granting command.RoleId its first
+        // permission, in between an unlocked read and this handler's own commit, must not slip through.
+        IDbContextTransaction? transaction = dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
             : null;
 
         try
         {
+            await entitlementService.AcquireUsersLockAsync(dealerId, cancellationToken);
+
+            bool newlyConsumesASeat = await entitlementService.RoleConsumesASeatAsync(command.RoleId, cancellationToken);
+
             if (newlyConsumesASeat)
             {
                 Result entitlementCheck = await entitlementService.EnsureCanAddAsync(dealerId, PlanResource.Users, cancellationToken);

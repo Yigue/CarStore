@@ -1,5 +1,6 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Legal;
 using Application.UnitTests;
 using Application.UnitTests.Legal;
@@ -7,6 +8,7 @@ using Application.Users.Register;
 using Domain.Legal;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 
 namespace ApplicationTests.Users;
 
@@ -29,7 +31,14 @@ public class RegisterUserLegalAcceptanceTests
         var tenant = new Mock<ICurrentTenantService>();
         tenant.Setup(t => t.DealerId).Returns(DealerId);
         tenant.Setup(t => t.HasTenant).Returns(true);
-        return new RegisterUserCommandHandler(context, hasher.Object, tenant.Object, FakeLegalTermsProvider.Recorder(context));
+
+        var entitlements = new Mock<IEntitlementService>();
+        entitlements.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        entitlements.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        return new RegisterUserCommandHandler(context, context, hasher.Object, tenant.Object, FakeLegalTermsProvider.Recorder(context), entitlements.Object);
     }
 
     private static RegisterUserCommand Command(string? version) =>

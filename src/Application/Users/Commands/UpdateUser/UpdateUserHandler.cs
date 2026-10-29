@@ -42,30 +42,38 @@ internal sealed class UpdateUserCommandHandler(
         }
 
         // Security review (sfc A3.1): same gate as AssignRole — only the transition that NEWLY
-        // starts consuming a seat is checked; see AssignRoleCommandHandler for the full rationale.
+        // starts consuming a seat is checked; see AssignRoleCommandHandler for the full rationale,
+        // including why the lock must be acquired BEFORE deciding whether this is a seat
+        // transition (fourth round: closes a race against a concurrent UpdateRoleCommandHandler
+        // call granting command.RoleId its first permission).
         bool roleChanged = user.RoleId != command.RoleId;
-        bool newlyConsumesASeat = roleChanged
-            && !await entitlementService.RoleConsumesASeatAsync(user.RoleId, cancellationToken)
-            && await entitlementService.RoleConsumesASeatAsync(command.RoleId, cancellationToken);
 
-        IDbContextTransaction? transaction = newlyConsumesASeat && dbContext.Database.IsRelational()
+        IDbContextTransaction? transaction = roleChanged && dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
             : null;
 
         try
         {
-            if (newlyConsumesASeat)
+            if (roleChanged)
             {
-                Result entitlementCheck = await entitlementService.EnsureCanAddAsync(
-                    tenantService.DealerId, PlanResource.Users, cancellationToken);
-                if (entitlementCheck.IsFailure)
-                {
-                    if (transaction is not null)
-                    {
-                        await transaction.RollbackAsync(cancellationToken);
-                    }
+                await entitlementService.AcquireUsersLockAsync(tenantService.DealerId, cancellationToken);
 
-                    return Result.Failure<Guid>(entitlementCheck.Error);
+                bool newlyConsumesASeat = !await entitlementService.RoleConsumesASeatAsync(user.RoleId, cancellationToken)
+                    && await entitlementService.RoleConsumesASeatAsync(command.RoleId, cancellationToken);
+
+                if (newlyConsumesASeat)
+                {
+                    Result entitlementCheck = await entitlementService.EnsureCanAddAsync(
+                        tenantService.DealerId, PlanResource.Users, cancellationToken);
+                    if (entitlementCheck.IsFailure)
+                    {
+                        if (transaction is not null)
+                        {
+                            await transaction.RollbackAsync(cancellationToken);
+                        }
+
+                        return Result.Failure<Guid>(entitlementCheck.Error);
+                    }
                 }
             }
 

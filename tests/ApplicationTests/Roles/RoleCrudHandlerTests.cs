@@ -149,7 +149,7 @@ public class RoleCrudHandlerTests
         await context.SaveChangesAsync();
 
         var invalidator = CacheInvalidator();
-        var handler = new UpdateRoleCommandHandler(context, context, invalidator.Object, AlwaysAllowEntitlements());
+        var handler = new UpdateRoleCommandHandler(context, context, TenantService(), invalidator.Object, AlwaysAllowEntitlements());
 
         var result = await handler.Handle(
             new UpdateRoleCommand(role.Id, "Vendedor Senior", "Cierra ventas", ["cars:read", "sales:create"]),
@@ -174,7 +174,7 @@ public class RoleCrudHandlerTests
         await context.SaveChangesAsync();
 
         var invalidator = CacheInvalidator();
-        var handler = new UpdateRoleCommandHandler(context, context, invalidator.Object, AlwaysAllowEntitlements());
+        var handler = new UpdateRoleCommandHandler(context, context, TenantService(), invalidator.Object, AlwaysAllowEntitlements());
 
         await handler.Handle(
             new UpdateRoleCommand(role.Id, "Vendedor", "", ["cars:read", "leads:read"]),
@@ -187,7 +187,7 @@ public class RoleCrudHandlerTests
     public async Task Update_Fails_WhenTheRoleDoesNotExist()
     {
         using var context = CreateContext();
-        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, AlwaysAllowEntitlements());
+        var handler = new UpdateRoleCommandHandler(context, context, TenantService(), CacheInvalidator().Object, AlwaysAllowEntitlements());
 
         var result = await handler.Handle(
             new UpdateRoleCommand(Guid.NewGuid(), "X", "", ["cars:read"]),
@@ -205,7 +205,7 @@ public class RoleCrudHandlerTests
         SeedRole(context, "Gerente", "cars:read");
         await context.SaveChangesAsync();
 
-        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, AlwaysAllowEntitlements());
+        var handler = new UpdateRoleCommandHandler(context, context, TenantService(), CacheInvalidator().Object, AlwaysAllowEntitlements());
         var result = await handler.Handle(
             new UpdateRoleCommand(vendedor.Id, "Gerente", "", ["cars:read"]),
             CancellationToken.None);
@@ -223,7 +223,7 @@ public class RoleCrudHandlerTests
         SeedRole(context, "Admin", "CanManageRoles");
         await context.SaveChangesAsync();
 
-        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, AlwaysAllowEntitlements());
+        var handler = new UpdateRoleCommandHandler(context, context, TenantService(), CacheInvalidator().Object, AlwaysAllowEntitlements());
         var result = await handler.Handle(
             new UpdateRoleCommand(role.Id, "Vendedor", "Otra descripción", ["cars:read"]),
             CancellationToken.None);
@@ -251,7 +251,7 @@ public class RoleCrudHandlerTests
             .ReturnsAsync(new PlanLimits(null, MaxUsers: 1, null, null));
         IEntitlementService realEntitlementService = new EntitlementServiceHandler(context, context, planCatalog.Object);
 
-        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, realEntitlementService);
+        var handler = new UpdateRoleCommandHandler(context, context, TenantService(), CacheInvalidator().Object, realEntitlementService);
 
         // Limit is 1 seat; this role alone would bring 2 holders -> must be rejected, and the role
         // must be left exactly as it was (no partial rename, no partial permission grant).
@@ -278,7 +278,7 @@ public class RoleCrudHandlerTests
             .ReturnsAsync(new PlanLimits(null, MaxUsers: 1, null, null));
         IEntitlementService realEntitlementService = new EntitlementServiceHandler(context, context, planCatalog.Object);
 
-        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, realEntitlementService);
+        var handler = new UpdateRoleCommandHandler(context, context, TenantService(), CacheInvalidator().Object, realEntitlementService);
 
         var result = await handler.Handle(
             new UpdateRoleCommand(sinPermisos.Id, "SinPermisos", "", ["cars:delete"]),
@@ -296,7 +296,7 @@ public class RoleCrudHandlerTests
         Role onlyAdmin = SeedRole(context, "Admin", "CanManageRoles", "cars:read");
         await context.SaveChangesAsync();
 
-        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, AlwaysAllowEntitlements());
+        var handler = new UpdateRoleCommandHandler(context, context, TenantService(), CacheInvalidator().Object, AlwaysAllowEntitlements());
         var result = await handler.Handle(
             new UpdateRoleCommand(onlyAdmin.Id, "Admin", "", ["cars:read"]),
             CancellationToken.None);
@@ -316,7 +316,7 @@ public class RoleCrudHandlerTests
         SeedRole(context, "Co-Admin", "CanManageRoles");
         await context.SaveChangesAsync();
 
-        var handler = new UpdateRoleCommandHandler(context, context, CacheInvalidator().Object, AlwaysAllowEntitlements());
+        var handler = new UpdateRoleCommandHandler(context, context, TenantService(), CacheInvalidator().Object, AlwaysAllowEntitlements());
         var result = await handler.Handle(
             new UpdateRoleCommand(first.Id, "Admin", "", ["cars:read"]),
             CancellationToken.None);
@@ -334,7 +334,7 @@ public class RoleCrudHandlerTests
         SeedRole(context, "Admin", "CanManageRoles");
         await context.SaveChangesAsync();
 
-        var result = await new DeleteRoleCommandHandler(context)
+        var result = await new DeleteRoleCommandHandler(context, TenantService())
             .Handle(new DeleteRoleCommand(role.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -352,7 +352,7 @@ public class RoleCrudHandlerTests
         context.Users.Add(new User(DealerId, "v@test.com", "Vende", "Dor", "hash", role.Id));
         await context.SaveChangesAsync();
 
-        var result = await new DeleteRoleCommandHandler(context)
+        var result = await new DeleteRoleCommandHandler(context, TenantService())
             .Handle(new DeleteRoleCommand(role.Id), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -368,7 +368,7 @@ public class RoleCrudHandlerTests
         Role onlyAdmin = SeedRole(context, "Admin", "CanManageRoles");
         await context.SaveChangesAsync();
 
-        var result = await new DeleteRoleCommandHandler(context)
+        var result = await new DeleteRoleCommandHandler(context, TenantService())
             .Handle(new DeleteRoleCommand(onlyAdmin.Id), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -380,10 +380,55 @@ public class RoleCrudHandlerTests
     {
         using var context = CreateContext();
 
-        var result = await new DeleteRoleCommandHandler(context)
+        var result = await new DeleteRoleCommandHandler(context, TenantService())
             .Handle(new DeleteRoleCommand(Guid.NewGuid()), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Roles.NotFound");
+    }
+
+    // ── Cross-tenant isolation (security review, fourth round) ────────────────────────────────
+    //
+    // Role had no global query filter at all (unlike every other tenant-scoped entity) — any
+    // dealer with CanManageRoles could update or delete any OTHER dealer's role just by RoleId.
+    // Both handlers now also scope their own lookup explicitly, on top of the filter.
+
+    [Fact]
+    public async Task Update_OnARoleOfAnotherDealer_Is404_AndDoesNotModifyIt()
+    {
+        using var context = CreateContext();
+        var foreignDealerId = Guid.NewGuid();
+        var foreignRole = new Role(foreignDealerId, "Admin", "Admin de otra concesionaria");
+        foreignRole.AddPermission("cars:delete");
+        context.Roles.Add(foreignRole);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateRoleCommandHandler(context, context, TenantService(), CacheInvalidator().Object, AlwaysAllowEntitlements());
+        var result = await handler.Handle(
+            new UpdateRoleCommand(foreignRole.Id, "Hijacked", "", []),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Roles.NotFound");
+        Role reloaded = await context.Roles.Include(r => r.Permissions).AsNoTracking().SingleAsync(r => r.Id == foreignRole.Id);
+        reloaded.Name.Should().Be("Admin", "a rejected cross-tenant update must not touch the foreign role at all");
+        reloaded.Permissions.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Delete_OnARoleOfAnotherDealer_Is404_AndDoesNotDeleteIt()
+    {
+        using var context = CreateContext();
+        var foreignDealerId = Guid.NewGuid();
+        var foreignRole = new Role(foreignDealerId, "SinUso", "Rol sin usar de otra concesionaria");
+        context.Roles.Add(foreignRole);
+        await context.SaveChangesAsync();
+
+        var result = await new DeleteRoleCommandHandler(context, TenantService())
+            .Handle(new DeleteRoleCommand(foreignRole.Id), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Roles.NotFound");
+        (await context.Roles.AnyAsync(r => r.Id == foreignRole.Id)).Should().BeTrue("a rejected cross-tenant delete must not remove the foreign role");
     }
 }

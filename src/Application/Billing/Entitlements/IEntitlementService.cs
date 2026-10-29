@@ -57,4 +57,21 @@ public interface IEntitlementService
     /// zero holders yet, so it can never retroactively promote anyone.
     /// </summary>
     Task<Result> EnsureRoleCanGainHoldersAsync(Guid dealerId, Guid roleId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Security review (sfc A3.1), fourth round: a handler that reassigns a user's or membership's
+    /// role (AssignRole, UpdateUser, GrantDealerMembership) decides whether the change is a seat
+    /// transition from data read BEFORE any lock is held. A concurrent <c>UpdateRoleCommandHandler</c>
+    /// call that grants the TARGET role its first permission in between that read and this handler's
+    /// own write would never be seen, because nothing serializes the two. Call this, inside an
+    /// already-open transaction, BEFORE deciding whether the role change is a seat transition — not
+    /// after — so this call and <see cref="EnsureRoleCanGainHoldersAsync"/>'s lock on the same
+    /// (dealerId, Users) key order the two operations: whichever acquires it first commits (or
+    /// rolls back) before the other's holder/permission counts are read. Acquiring this lock twice
+    /// in the same transaction (this call, then <see cref="EnsureCanAddAsync"/> or
+    /// <see cref="EnsureRoleCanGainHoldersAsync"/> later in the same handler) is safe:
+    /// <c>pg_advisory_xact_lock</c> is reentrant within one session and releases fully at the
+    /// transaction's end regardless of how many times it was acquired.
+    /// </summary>
+    Task AcquireUsersLockAsync(Guid dealerId, CancellationToken ct = default);
 }

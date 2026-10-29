@@ -1,9 +1,11 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Users.Register;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 
 using Application.UnitTests;
 
@@ -19,6 +21,18 @@ public class RegisterUserCommandHandlerTests
         return new TestApplicationDbContext(options);
     }
 
+    /// <summary>sfc A3.1: these tests exercise pre-existing registration behavior, not entitlements —
+    /// the Cliente role they get is always freshly built with zero permissions.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        mock.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        return mock.Object;
+    }
+
     [Fact]
     public async Task Handle_ReturnsTenantRequiredFailure_WhenTenantServiceHasEmptyDealerId()
     {
@@ -31,7 +45,7 @@ public class RegisterUserCommandHandlerTests
         tenantService.Setup(t => t.DealerId).Returns(Guid.Empty);
         tenantService.Setup(t => t.HasTenant).Returns(false);
 
-        var handler = new RegisterUserCommandHandler(context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var handler = new RegisterUserCommandHandler(context, context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), AlwaysAllowEntitlements());
         var command = new RegisterUserCommand("newuser@example.com", "John", "Doe", "Pass123!", Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
 
         // Act
@@ -56,7 +70,7 @@ public class RegisterUserCommandHandlerTests
         tenantService.Setup(t => t.DealerId).Returns(dealerId);
         tenantService.Setup(t => t.HasTenant).Returns(true);
 
-        var handler = new RegisterUserCommandHandler(context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var handler = new RegisterUserCommandHandler(context, context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), AlwaysAllowEntitlements());
         var command = new RegisterUserCommand("newuser@example.com", "Jane", "Doe", "Pass123!", Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
 
         // Act
@@ -91,7 +105,7 @@ public class RegisterUserCommandHandlerTests
         tenantService.Setup(t => t.DealerId).Returns(dealerId);
         tenantService.Setup(t => t.HasTenant).Returns(true);
 
-        var handler = new RegisterUserCommandHandler(context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context));
+        var handler = new RegisterUserCommandHandler(context, context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), AlwaysAllowEntitlements());
         var command = new RegisterUserCommand("seconduser@example.com", "Bob", "Smith", "Pass123!", Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
 
         // Act

@@ -206,6 +206,14 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext, Mic
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<User>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        // Security review (sfc A3.1): this filter was always assumed to exist — every cross-tenant
+        // Role query in this codebase (BackfillDefaultRoles, DealerAccessResolver,
+        // PermissionCacheInvalidator, RegisterUserCommandHandler) already calls .IgnoreQueryFilters()
+        // on it, and CreateRoleCommandHandler's own comment claims it. It was never actually added,
+        // which left UpdateRoleCommandHandler and DeleteRoleCommandHandler's unscoped role lookups
+        // open to any dealer operating on any OTHER dealer's role by RoleId (cross-tenant IDOR).
+        modelBuilder.Entity<Role>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<DealerSettingsEntity>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Lead>().HasQueryFilter(x =>

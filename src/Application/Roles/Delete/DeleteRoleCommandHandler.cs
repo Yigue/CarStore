@@ -1,21 +1,24 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Roles.Delete;
 
-internal sealed class DeleteRoleCommandHandler(IApplicationDbContext context)
+internal sealed class DeleteRoleCommandHandler(IApplicationDbContext context, ICurrentTenantService tenantService)
     : ICommandHandler<DeleteRoleCommand>
 {
     private const string RoleAdministration = "CanManageRoles";
 
     public async Task<Result> Handle(DeleteRoleCommand command, CancellationToken cancellationToken)
     {
+        // Security review (sfc A3.1): explicit scoping on top of Role's global query filter
+        // (defense in depth — this is the same cross-tenant gap UpdateRoleCommandHandler had).
         Role? role = await context.Roles
             .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == command.RoleId, cancellationToken);
+            .FirstOrDefaultAsync(r => r.Id == command.RoleId && r.DealerId == tenantService.DealerId, cancellationToken);
 
         if (role is null)
         {
@@ -35,12 +38,14 @@ internal sealed class DeleteRoleCommandHandler(IApplicationDbContext context)
 
         // Same one-way door as UpdateRoleCommandHandler: an unassigned role can still be the only
         // one carrying CanManageRoles, and deleting it would leave nobody able to create another.
+        // Scoped the same way — RolePermissions carries no DealerId, so an unscoped check would ask
+        // "does CanManageRoles exist anywhere on the platform", true on any populated system.
         if (role.Permissions.Any(p => p.Permission == RoleAdministration))
         {
-            bool anotherAdministratorExists = await context.RolePermissions
-                .AnyAsync(
-                    rp => rp.Permission == RoleAdministration && rp.RoleId != role.Id,
-                    cancellationToken);
+            bool anotherAdministratorExists = await context.Roles
+                .Where(r => r.DealerId == tenantService.DealerId && r.Id != role.Id)
+                .Join(context.RolePermissions, r => r.Id, rp => rp.RoleId, (r, rp) => rp.Permission)
+                .AnyAsync(p => p == RoleAdministration, cancellationToken);
 
             if (!anotherAdministratorExists)
             {

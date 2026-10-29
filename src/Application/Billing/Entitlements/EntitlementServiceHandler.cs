@@ -21,16 +21,7 @@ internal sealed class EntitlementServiceHandler(
 {
     public async Task<Result> EnsureCanAddAsync(Guid dealerId, PlanResource resource, CancellationToken ct = default)
     {
-        if (dbContext.Database.IsRelational())
-        {
-            // Two deterministic int keys (dealer, resource) — avoids any hashing-collision concern
-            // from packing both into a single bigint key. Postgres-only: pg_advisory_xact_lock has no
-            // SQLite/InMemory equivalent, which is exactly why this branch is guarded by IsRelational().
-            int dealerLockKey = dealerId.GetHashCode();
-            int resourceLockKey = (int)resource;
-            await dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock({dealerLockKey}, {resourceLockKey})", ct);
-        }
+        await AcquireLockAsync(dealerId, resource, ct);
 
         string planCode = await LoadPlanCodeAsync(dealerId, ct);
         PlanLimits? limits = await planCatalog.GetEntitlementsAsync(planCode, ct);
@@ -143,13 +134,7 @@ internal sealed class EntitlementServiceHandler(
     /// </summary>
     public async Task<Result> EnsureRoleCanGainHoldersAsync(Guid dealerId, Guid roleId, CancellationToken ct = default)
     {
-        if (dbContext.Database.IsRelational())
-        {
-            int dealerLockKey = dealerId.GetHashCode();
-            int resourceLockKey = (int)PlanResource.Users;
-            await dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock({dealerLockKey}, {resourceLockKey})", ct);
-        }
+        await AcquireLockAsync(dealerId, PlanResource.Users, ct);
 
         string planCode = await LoadPlanCodeAsync(dealerId, ct);
         PlanLimits? limits = await planCatalog.GetEntitlementsAsync(planCode, ct);
@@ -180,5 +165,27 @@ internal sealed class EntitlementServiceHandler(
             .IgnoreQueryFilters()
             .CountAsync(m => m.DealerId == dealerId && m.RoleId == roleId, ct);
         return homeHolders + membershipHolders;
+    }
+
+    public Task AcquireUsersLockAsync(Guid dealerId, CancellationToken ct = default) =>
+        AcquireLockAsync(dealerId, PlanResource.Users, ct);
+
+    private async Task AcquireLockAsync(Guid dealerId, PlanResource resource, CancellationToken ct)
+    {
+        if (!dbContext.Database.IsRelational())
+        {
+            return;
+        }
+
+        // Two deterministic int keys (dealer, resource) — avoids any hashing-collision concern from
+        // packing both into a single bigint key. Postgres-only: pg_advisory_xact_lock has no
+        // SQLite/InMemory equivalent, which is exactly why this is guarded by IsRelational().
+        // Reentrant within one session/transaction: calling this twice on the same key (e.g. once
+        // from AssignRoleCommandHandler via AcquireUsersLockAsync, then again from the
+        // EnsureCanAddAsync it calls afterward) is safe, not a self-deadlock.
+        int dealerLockKey = dealerId.GetHashCode();
+        int resourceLockKey = (int)resource;
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({dealerLockKey}, {resourceLockKey})", ct);
     }
 }
