@@ -185,6 +185,64 @@ public class EntitlementServiceTests
         reloaded.RoleId.Should().Be(clienteRole.Id, "a rejected promotion must not partially apply");
     }
 
+    // Security review (sfc A3.1), fifth round: AssignRoleCommandHandler loads the user ONCE, before
+    // acquiring the advisory lock. If this exact user's role already changed underneath it by the
+    // time the lock is acquired, deciding newlyConsumesASeat from the stale in-memory value can skip
+    // the gate for what is, right now, a genuine new seat. Reproduced here with two DbContext
+    // instances sharing one InMemory database: `primed` simulates the handler's own context after
+    // its initial (now-stale) read; `concurrent` simulates a second, already-committed request that
+    // demoted the SAME user off a seat in between.
+    [Fact]
+    public async Task AssignRole_WhenTheUsersRoleChangedAfterTheInitialRead_UsesTheCurrentRole_NotTheStaleOne()
+    {
+        var dealerId = Guid.NewGuid();
+        var sharedDbName = Guid.NewGuid().ToString();
+        var options = new DbContextOptionsBuilder<TestApplicationDbContext>().UseInMemoryDatabase(sharedDbName).Options;
+
+        await using var seed = new TestApplicationDbContext(options, dealerId);
+        var roleWithPermA = new Role(dealerId, "Ventas", "Ventas");
+        roleWithPermA.AddPermission("sales:create");
+        var roleWithPermB = new Role(dealerId, "Admin", "Admin");
+        roleWithPermB.AddPermission("cars:delete");
+        var roleNoPerm = new Role(dealerId, "Cliente", "Cliente");
+        seed.Roles.AddRange(roleWithPermA, roleWithPermB, roleNoPerm);
+        var staffAdmin = new User(dealerId, "admin@autosdelsur.test", "Admin", "Uno", "hash", roleWithPermA.Id);
+        var x = new User(dealerId, "x@autosdelsur.test", "Equis", "Uno", "hash", roleWithPermA.Id);
+        seed.Users.AddRange(staffAdmin, x);
+        seed.DealerSubscriptions.Add(DealerSubscription.CreatePending(dealerId, null, planId: string.Empty, planCode: "standard"));
+        await seed.SaveChangesAsync();
+
+        await using var primed = new TestApplicationDbContext(options, dealerId);
+        // The handler's OWN first query, run early so `x` is tracked in `primed` with the role it
+        // had when this test's "request" started — stale the instant the next step commits.
+        await primed.Users.FirstAsync(u => u.Id == x.Id);
+
+        await using var concurrent = new TestApplicationDbContext(options, dealerId);
+        User concurrentView = await concurrent.Users.FirstAsync(u => u.Id == x.Id);
+        concurrentView.UpdateRole(roleNoPerm.Id);
+        await concurrent.SaveChangesAsync();
+
+        var planCatalog = new Mock<IPlanCatalog>();
+        planCatalog.Setup(p => p.GetEntitlementsAsync("standard", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlanLimits(null, MaxUsers: 1, null, null));
+        var entitlementService = new EntitlementServiceHandler(primed, primed, planCatalog.Object);
+
+        var tenant = new Mock<ICurrentTenantService>();
+        tenant.SetupGet(t => t.DealerId).Returns(dealerId);
+        var handler = new AssignRoleCommandHandler(primed, primed, tenant.Object, entitlementService);
+
+        // Current real state: staffAdmin holds the dealer's one seat (roleWithPermA), x was already
+        // demoted to roleNoPerm by `concurrent`. Moving x to roleWithPermB is a genuine NEW seat on
+        // top of staffAdmin's — over the limit of 1 — and must be rejected. A handler still trusting
+        // its stale pre-lock read of x (roleWithPermA, also seat-consuming) would wrongly treat this
+        // as a lateral move between two seat-holding roles and let it through ungated.
+        Result<Guid> result = await handler.Handle(new AssignRoleCommand(x.Id, roleWithPermB.Id), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue("the user's CURRENT role (demoted, no seat) must be used, not the stale pre-lock read (still seat-holding)");
+        User reloadedX = await seed.Users.AsNoTracking().FirstAsync(u => u.Id == x.Id);
+        reloadedX.RoleId.Should().Be(roleNoPerm.Id, "a rejected assignment must not partially apply");
+    }
+
     // Security review (sfc A3.1) follow-up: granting a B6.3 multi-dealer membership is also a new seat
     // in the GRANTING dealer, even though the member's home User.DealerId points elsewhere.
     [Fact]

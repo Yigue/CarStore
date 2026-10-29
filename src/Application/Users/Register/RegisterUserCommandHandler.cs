@@ -62,10 +62,11 @@ internal sealed class RegisterUserCommandHandler(
         // staff role to literally "Cliente" (UpdateRoleCommandHandler does not forbid that). If that
         // ever happens, this is the one unauthenticated path that would otherwise create unlimited
         // staff-seat-consuming users with no entitlement check at all.
-        bool existingClienteRoleConsumesASeat = !clienteRoleIsNew
-            && await entitlementService.RoleConsumesASeatAsync(clienteRole.Id, cancellationToken);
-
-        IDbContextTransaction? transaction = existingClienteRoleConsumesASeat && dbContext.Database.IsRelational()
+        // Fifth round: the lock must be acquired BEFORE checking RoleConsumesASeatAsync, not after —
+        // same TOCTOU this exact check already closed for AssignRole/UpdateUser/GrantDealerMembership
+        // in the fourth round. A newly-built role needs no lock at all: it isn't persisted yet, so no
+        // concurrent UpdateRoleCommandHandler call could possibly be racing to grant it a permission.
+        IDbContextTransaction? transaction = !clienteRoleIsNew && dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
             : null;
 
@@ -73,18 +74,24 @@ internal sealed class RegisterUserCommandHandler(
 
         try
         {
-            if (existingClienteRoleConsumesASeat)
+            if (!clienteRoleIsNew)
             {
-                Result entitlementCheck = await entitlementService.EnsureCanAddAsync(
-                    dealerId, PlanResource.Users, cancellationToken);
-                if (entitlementCheck.IsFailure)
-                {
-                    if (transaction is not null)
-                    {
-                        await transaction.RollbackAsync(cancellationToken);
-                    }
+                await entitlementService.AcquireUsersLockAsync(dealerId, cancellationToken);
 
-                    return Result.Failure<Guid>(entitlementCheck.Error);
+                bool existingClienteRoleConsumesASeat = await entitlementService.RoleConsumesASeatAsync(clienteRole.Id, cancellationToken);
+                if (existingClienteRoleConsumesASeat)
+                {
+                    Result entitlementCheck = await entitlementService.EnsureCanAddAsync(
+                        dealerId, PlanResource.Users, cancellationToken);
+                    if (entitlementCheck.IsFailure)
+                    {
+                        if (transaction is not null)
+                        {
+                            await transaction.RollbackAsync(cancellationToken);
+                        }
+
+                        return Result.Failure<Guid>(entitlementCheck.Error);
+                    }
                 }
             }
 
