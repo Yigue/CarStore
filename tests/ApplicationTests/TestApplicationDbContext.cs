@@ -105,6 +105,7 @@ internal sealed class TestApplicationDbContext : DbContext, IApplicationDbContex
     public DbSet<Domain.Marketing.Subscriber> Subscribers => Set<Domain.Marketing.Subscriber>();
     public DbSet<Domain.Integrations.DealerIntegration> DealerIntegrations => Set<Domain.Integrations.DealerIntegration>();
     public DbSet<Domain.Integrations.IntegrationCommand> IntegrationCommands => Set<Domain.Integrations.IntegrationCommand>();
+    public DbSet<Domain.Leads.ProcessedMetaLeadEvent> ProcessedMetaLeadEvents => Set<Domain.Leads.ProcessedMetaLeadEvent>();
     public DbSet<Domain.Commissions.SaleCommission> SaleCommissions => Set<Domain.Commissions.SaleCommission>();
     public DbSet<Domain.Commissions.CommissionPolicy> CommissionPolicies => Set<Domain.Commissions.CommissionPolicy>();
     public DbSet<Domain.Users.UserDealerMembership> UserDealerMemberships => Set<Domain.Users.UserDealerMembership>();

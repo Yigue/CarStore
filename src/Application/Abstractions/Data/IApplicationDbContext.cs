@@ -68,6 +68,8 @@ public interface IApplicationDbContext
     DbSet<Domain.Marketing.Subscriber> Subscribers { get; }
     DbSet<Domain.Integrations.DealerIntegration> DealerIntegrations { get; }
     DbSet<Domain.Integrations.IntegrationCommand> IntegrationCommands { get; }
+    /// <summary>sfc C1.4 / B13: Meta Leads Ads webhook idempotency on <c>leadgen_id</c>.</summary>
+    DbSet<Domain.Leads.ProcessedMetaLeadEvent> ProcessedMetaLeadEvents { get; }
     DbSet<Domain.Commissions.SaleCommission> SaleCommissions { get; }
     DbSet<Domain.Commissions.CommissionPolicy> CommissionPolicies { get; }
     /// <summary>sfc B6.3 / RN-043: extra dealers a user can switch into beyond their home dealer.</summary>

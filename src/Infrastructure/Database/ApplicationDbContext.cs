@@ -81,6 +81,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext, Mic
     public DbSet<Domain.Marketing.Subscriber> Subscribers { get; set; }
     public DbSet<Domain.Integrations.DealerIntegration> DealerIntegrations { get; set; }
     public DbSet<Domain.Integrations.IntegrationCommand> IntegrationCommands { get; set; }
+    // sfc C1.4 / B13: Meta Leads Ads webhook idempotency on leadgen_id.
+    public DbSet<Domain.Leads.ProcessedMetaLeadEvent> ProcessedMetaLeadEvents { get; set; }
     public DbSet<Domain.Commissions.SaleCommission> SaleCommissions { get; set; }
     public DbSet<Domain.Commissions.CommissionPolicy> CommissionPolicies { get; set; }
     public DbSet<Domain.Users.UserDealerMembership> UserDealerMemberships { get; set; }

@@ -2017,6 +2017,31 @@ namespace Infrastructure.Migrations
                     b.ToTable("lead_activities", "public");
                 });
 
+            modelBuilder.Entity("Domain.Leads.ProcessedMetaLeadEvent", b =>
+                {
+                    b.Property<string>("LeadgenId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("leadgen_id");
+
+                    b.Property<Guid?>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<DateTime>("ProcessedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_on_utc");
+
+                    b.HasKey("LeadgenId")
+                        .HasName("pk_processed_meta_lead_events");
+
+                    b.ToTable("processed_meta_lead_events", "public");
+                });
+
             modelBuilder.Entity("Domain.Legal.LegalAcceptance", b =>
                 {
                     b.Property<Guid>("Id")
