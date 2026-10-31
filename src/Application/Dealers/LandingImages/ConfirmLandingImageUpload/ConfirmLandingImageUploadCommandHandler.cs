@@ -86,7 +86,29 @@ internal sealed class ConfirmLandingImageUploadCommandHandler(
                 Error.Validation("LandingImage.InvalidSignature", "The uploaded file is not a valid JPEG, PNG or WebP image, or its type or extension does not match its content."));
         }
 
-        Uri url = await storage.GetPresignedUrlAsync(objectKey, ReadTtl, cancellationToken);
+        // Security review (sfc A5.1): TOCTOU — the presigned POST URL from GetLandingImageUploadUrl
+        // stays valid (and re-writable to this SAME key) for its own 10-minute TTL, which outlives
+        // this one-time check. Without this step, a caller could re-upload a different (e.g.
+        // oversized) object to objectKey after a successful Confirm, and nothing would ever
+        // re-validate it — the dealer's landing config would already be pointing at that key. Move
+        // the validated bytes to a key under a DIFFERENT prefix that no presigned POST was ever
+        // issued for, then destroy the original (still-writable) upload key so it can no longer be
+        // served even if something does manage to write to it again.
+        string confirmedKey = $"landing-confirmed/{tenant.DealerId}/{command.ImageId}.{ext}";
+        await using (Stream? validated = await storage.OpenReadAsync(objectKey, cancellationToken))
+        {
+            if (validated is null)
+            {
+                return Result.Failure<LandingImageDto>(
+                    Error.Validation("LandingImage.NotFound", "No upload was found for this image. Upload the file to the presigned URL first."));
+            }
+
+            await storage.UploadFileAsync(validated, confirmedKey, command.ContentType, actualSize.Value, cancellationToken);
+        }
+
+        await storage.DeleteFileAsync(objectKey, cancellationToken);
+
+        Uri url = await storage.GetPresignedUrlAsync(confirmedKey, ReadTtl, cancellationToken);
 
         return Result.Success(new LandingImageDto(
             command.ImageId,

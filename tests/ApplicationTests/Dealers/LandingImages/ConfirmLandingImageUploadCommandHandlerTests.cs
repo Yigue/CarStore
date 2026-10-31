@@ -42,24 +42,32 @@ public class ConfirmLandingImageUploadCommandHandlerTests
     }
 
     /// <summary>
-    /// Arranges storage so that ONLY the object key for <paramref name="keyOwnerDealerId"/> +
+    /// Arranges storage so that ONLY the UPLOAD key for <paramref name="keyOwnerDealerId"/> +
     /// <paramref name="imageId"/> resolves to <paramref name="head"/>. Any other key (e.g. the one a
     /// different tenant would compute) falls through Moq's default loose-mock behaviour and returns
-    /// null — exactly like a real miss against object storage.
+    /// null — exactly like a real miss against object storage. Also wires the CONFIRMED (copy) key
+    /// that a successful Handle moves validated bytes to (sfc A5.1 TOCTOU fix): OpenReadAsync on the
+    /// upload key returns the same bytes as <paramref name="head"/>, UploadFileAsync to the confirmed
+    /// key succeeds, and GetPresignedUrlAsync on the CONFIRMED key (never the upload key, which gets
+    /// deleted) returns the fake public URL.
     /// </summary>
-    private static Mock<IStorageService> ArrangeStorage(Guid keyOwnerDealerId, Guid imageId, string ext, byte[]? head, long? actualSize = 2048) =>
-        ArrangeStorageAtKey($"landing/{keyOwnerDealerId}/{imageId}.{ext}", head, actualSize);
-
-    private static Mock<IStorageService> ArrangeStorageAtKey(string expectedKey, byte[]? head, long? actualSize)
+    private static Mock<IStorageService> ArrangeStorage(Guid keyOwnerDealerId, Guid imageId, string ext, byte[]? head, long? actualSize = 2048)
     {
+        string uploadKey = $"landing/{keyOwnerDealerId}/{imageId}.{ext}";
+        string confirmedKey = $"landing-confirmed/{keyOwnerDealerId}/{imageId}.{ext}";
+
         var storage = new Mock<IStorageService>();
-        storage.Setup(s => s.ReadHeadAsync(expectedKey, FileSignatureInspectorHeadLength, It.IsAny<CancellationToken>()))
+        storage.Setup(s => s.ReadHeadAsync(uploadKey, FileSignatureInspectorHeadLength, It.IsAny<CancellationToken>()))
             .ReturnsAsync(head);
         // Security review (sfc A5.1): the REAL stored size, independent of whatever the command claims —
         // this is what ConfirmLandingImageUploadCommandHandler must check, never the client's SizeBytes.
-        storage.Setup(s => s.GetObjectSizeAsync(expectedKey, It.IsAny<CancellationToken>()))
+        storage.Setup(s => s.GetObjectSizeAsync(uploadKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync(actualSize);
-        storage.Setup(s => s.GetPresignedUrlAsync(expectedKey, It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+        storage.Setup(s => s.OpenReadAsync(uploadKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => head is null ? null : new MemoryStream(head));
+        storage.Setup(s => s.UploadFileAsync(It.IsAny<Stream>(), confirmedKey, It.IsAny<string>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(confirmedKey);
+        storage.Setup(s => s.GetPresignedUrlAsync(confirmedKey, It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Uri("https://example.com/landing/fake-image.png"));
         return storage;
     }
@@ -84,7 +92,11 @@ public class ConfirmLandingImageUploadCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Url.Should().Be("https://example.com/landing/fake-image.png");
-        storage.Verify(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        // Security review (sfc A5.1): a successful confirm now ALWAYS deletes the mutable upload-
+        // staging key after copying its validated bytes to the immutable "landing-confirmed/" key —
+        // this is the TOCTOU fix, not a failure signal.
+        storage.Verify(s => s.DeleteFileAsync($"landing/{DealerId}/{imageId}.png", It.IsAny<CancellationToken>()), Times.Once);
+        storage.Verify(s => s.UploadFileAsync(It.IsAny<Stream>(), $"landing-confirmed/{DealerId}/{imageId}.png", It.IsAny<string>(), It.IsAny<long?>(), It.IsAny<CancellationToken>()), Times.Once);
 
         // The confirm step hands back a durable URL; the dealer's existing landing-update endpoint
         // (CFG-06) is what actually writes it into the landing config, as part of a complete slide.
