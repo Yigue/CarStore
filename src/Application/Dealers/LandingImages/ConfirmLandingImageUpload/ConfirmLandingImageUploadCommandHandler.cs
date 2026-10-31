@@ -42,6 +42,10 @@ internal sealed class ConfirmLandingImageUploadCommandHandler(
                 Error.Validation("LandingImage.InvalidContentType", "Content type must be one of: image/jpeg, image/png, image/webp."));
         }
 
+        // Fast, cheap rejection of an obviously-bad request — but NEVER the authoritative check: a
+        // presigned POST URL only constrains bucket/key/content-type/expiry, not size (see
+        // IStorageService.GeneratePresignedPostAsync), so a client can assert any SizeBytes it wants
+        // while actually uploading a much larger object. The real check is below, against storage.
         if (command.SizeBytes <= 0 || command.SizeBytes > LandingImageUploadConstraints.MaxUploadSizeBytes)
         {
             return Result.Failure<LandingImageDto>(
@@ -51,6 +55,21 @@ internal sealed class ConfirmLandingImageUploadCommandHandler(
         string ext = Path.GetExtension(command.FileName).TrimStart('.');
         if (string.IsNullOrEmpty(ext)) ext = "jpg";
         string objectKey = $"landing/{tenant.DealerId}/{command.ImageId}.{ext}";
+
+        // Security review (sfc A5.1): re-check the size MinIO actually stored, not the client's claim.
+        long? actualSize = await storage.GetObjectSizeAsync(objectKey, cancellationToken);
+        if (actualSize is null)
+        {
+            return Result.Failure<LandingImageDto>(
+                Error.Validation("LandingImage.NotFound", "No upload was found for this image. Upload the file to the presigned URL first."));
+        }
+
+        if (actualSize.Value > LandingImageUploadConstraints.MaxUploadSizeBytes)
+        {
+            await storage.DeleteFileAsync(objectKey, cancellationToken);
+            return Result.Failure<LandingImageDto>(
+                Error.Validation("LandingImage.InvalidSize", "Image exceeds the maximum allowed size (5 MB)."));
+        }
 
         // The declared Content-Type is client-controlled: verify the real signature of the stored
         // object (A5.1 / H11) and discard it when it is missing or not a supported image. A renamed

@@ -76,4 +76,15 @@ public interface IStorageService
         string objectKey,
         int count,
         CancellationToken ct);
+
+    /// <summary>
+    /// Security review (sfc A5.1): the actual stored size of the object, read from the storage
+    /// provider itself — never trust a client-asserted size for a resource cap. A presigned POST
+    /// URL only constrains bucket/key/content-type/expiry (see <see cref="GeneratePresignedPostAsync"/>),
+    /// not size, so the confirming side MUST re-check the real object. Returns <c>null</c> when the
+    /// object does not exist.
+    /// </summary>
+    Task<long?> GetObjectSizeAsync(
+        string objectKey,
+        CancellationToken ct);
 }

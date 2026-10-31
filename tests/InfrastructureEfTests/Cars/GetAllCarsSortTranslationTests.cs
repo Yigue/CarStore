@@ -68,6 +68,9 @@ public class GetAllCarsSortTranslationTests
         public Task<byte[]?> ReadHeadAsync(string objectKey, int count, CancellationToken ct) =>
             throw new NotSupportedException("Seeded cars carry no images.");
 
+        public Task<long?> GetObjectSizeAsync(string objectKey, CancellationToken ct) =>
+            throw new NotSupportedException("Seeded cars carry no images.");
+
         public Task<(string Url, IReadOnlyDictionary<string, string> Fields)> GeneratePresignedPostAsync(
             string objectKey, string contentType, TimeSpan ttl, CancellationToken ct) =>
             throw new NotSupportedException("Seeded cars carry no images.");

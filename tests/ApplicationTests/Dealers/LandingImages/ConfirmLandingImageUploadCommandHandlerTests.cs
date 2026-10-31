@@ -47,13 +47,18 @@ public class ConfirmLandingImageUploadCommandHandlerTests
     /// different tenant would compute) falls through Moq's default loose-mock behaviour and returns
     /// null — exactly like a real miss against object storage.
     /// </summary>
-    private static Mock<IStorageService> ArrangeStorage(Guid keyOwnerDealerId, Guid imageId, string ext, byte[]? head)
-    {
-        string expectedKey = $"landing/{keyOwnerDealerId}/{imageId}.{ext}";
+    private static Mock<IStorageService> ArrangeStorage(Guid keyOwnerDealerId, Guid imageId, string ext, byte[]? head, long? actualSize = 2048) =>
+        ArrangeStorageAtKey($"landing/{keyOwnerDealerId}/{imageId}.{ext}", head, actualSize);
 
+    private static Mock<IStorageService> ArrangeStorageAtKey(string expectedKey, byte[]? head, long? actualSize)
+    {
         var storage = new Mock<IStorageService>();
         storage.Setup(s => s.ReadHeadAsync(expectedKey, FileSignatureInspectorHeadLength, It.IsAny<CancellationToken>()))
             .ReturnsAsync(head);
+        // Security review (sfc A5.1): the REAL stored size, independent of whatever the command claims —
+        // this is what ConfirmLandingImageUploadCommandHandler must check, never the client's SizeBytes.
+        storage.Setup(s => s.GetObjectSizeAsync(expectedKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(actualSize);
         storage.Setup(s => s.GetPresignedUrlAsync(expectedKey, It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Uri("https://example.com/landing/fake-image.png"));
         return storage;
@@ -159,6 +164,47 @@ public class ConfirmLandingImageUploadCommandHandlerTests
         var result = await handler.Handle(command, CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("LandingImage.InvalidSignature");
+        // The key the handler rebuilds for DealerB was never stored, so the real-size lookup (which
+        // now runs BEFORE the signature check) is the first thing to miss — still proves the same
+        // structural guarantee: DealerB can never reach DealerA's object no matter what it claims.
+        result.Error.Code.Should().Be("LandingImage.NotFound");
+    }
+
+    // Security review (sfc A5.1): a client can assert any SizeBytes it wants in the command — a
+    // presigned POST URL does not constrain size. The REAL stored object must be checked.
+    [Fact]
+    public async Task Handle_Should_RejectAndDeleteObject_WhenActualStoredSizeExceedsMaximum_RegardlessOfClaimedSize()
+    {
+        using var context = CreateContext(DealerId);
+        var imageId = Guid.NewGuid();
+        long actualOversizedBytes = Application.Dealers.LandingImages.LandingImageUploadConstraints.MaxUploadSizeBytes + 1024;
+        // Claims a small, well-within-limit size, but the object actually stored is oversized.
+        var storage = ArrangeStorage(DealerId, imageId, "png", Png, actualSize: actualOversizedBytes);
+        var handler = new ConfirmLandingImageUploadCommandHandler(
+            storage.Object, MockTenant(DealerId).Object, new FakeDateTimeProvider());
+
+        var command = new ConfirmLandingImageUploadCommand(imageId, "sneaky.png", "image/png", 2048);
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue("the real stored size must be checked, not the client's claim");
+        result.Error.Code.Should().Be("LandingImage.InvalidSize");
+        storage.Verify(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Reject_WhenNoObjectWasActuallyUploaded()
+    {
+        using var context = CreateContext(DealerId);
+        var imageId = Guid.NewGuid();
+        // Nothing was ever PUT to the presigned URL — GetObjectSizeAsync correctly returns null.
+        var storage = ArrangeStorage(DealerId, imageId, "png", head: null, actualSize: null);
+        var handler = new ConfirmLandingImageUploadCommandHandler(
+            storage.Object, MockTenant(DealerId).Object, new FakeDateTimeProvider());
+
+        var command = new ConfirmLandingImageUploadCommand(imageId, "ghost.png", "image/png", 2048);
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("LandingImage.NotFound");
     }
 }

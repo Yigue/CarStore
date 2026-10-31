@@ -158,6 +158,27 @@ internal sealed class MinioStorageService : IStorageService
         }
     }
 
+    public async Task<long?> GetObjectSizeAsync(string objectKey, CancellationToken ct)
+    {
+        try
+        {
+            var args = new StatObjectArgs()
+                .WithBucket(_options.BucketName)
+                .WithObject(objectKey);
+
+            ObjectStat stat = await _client.StatObjectAsync(args, ct);
+            return stat.Size;
+        }
+        catch (ObjectNotFoundException)
+        {
+            return null;
+        }
+        catch (MinioException ex) when (IsNoSuchKey(ex))
+        {
+            return null;
+        }
+    }
+
     public async Task<Uri> GetPresignedUrlAsync(string objectKey, TimeSpan ttl, CancellationToken ct)
     {
         // Never let the client-declared type decide how the browser interprets the bytes: the response
