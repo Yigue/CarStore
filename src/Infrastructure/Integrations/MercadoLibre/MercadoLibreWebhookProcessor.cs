@@ -38,12 +38,28 @@ public sealed record MercadoLibreNotification(string Topic, string Resource, lon
 public sealed class MercadoLibreWebhookProcessor(
     IApplicationDbContext dbContext,
     MercadoLibreClient client,
+    Application.Abstractions.Integrations.IRateLimiter rateLimiter,
     IDateTimeProvider dateTimeProvider,
     ILogger<MercadoLibreWebhookProcessor> logger)
 {
     private const string QuestionsTopic = "questions";
     private const string OrdersTopic = "orders";
     private const string OrdersV2Topic = "orders_v2";
+
+    /// <summary>
+    /// Security review (sfc C1.3), HIGH: MercadoLibre notifications carry no signature and
+    /// <c>resource</c>/<c>topic</c> are fully attacker-controlled — anyone who knows a dealer's
+    /// PUBLICLY LISTED item id (trivial; it is on the public marketplace listing) can POST
+    /// unlimited forged notifications and spam that dealer's Lead CRM with fake "compra"/"pregunta"
+    /// notes, since the pull-to-confirm step still re-fetches the item's real (public) data and
+    /// proceeds. A full fix needs a stored MercadoLibre seller id on DealerIntegration to validate
+    /// against the notification's own user_id — out of this PR's allowed Domain/Integrations
+    /// surface (see the type doc comment's scope note). This throttles the volume cheaply, reusing
+    /// the EXISTING per-(dealer, provider) rate limiter from sfc C1.1, under a provider key
+    /// distinct from the outbound "mercadolibre" bucket so it never competes with legitimate
+    /// listing-sync calls. Documented residual gap, not a full close.
+    /// </summary>
+    private const string WebhookRateLimitProvider = "mercadolibre-webhook";
 
     public async Task<Result> ProcessAsync(MercadoLibreNotification notification, CancellationToken cancellationToken)
     {
@@ -60,6 +76,15 @@ public sealed class MercadoLibreWebhookProcessor(
         if (listing is null)
         {
             // Not an item this dealer has ever published through CarStore — nothing to reconcile.
+            return Result.Success();
+        }
+
+        var rateLimit = await rateLimiter.TryAcquireAsync(listing.DealerId, WebhookRateLimitProvider, cancellationToken);
+        if (!rateLimit.Allowed)
+        {
+            logger.LogWarning(
+                "MercadoLibre webhook rate-limited for dealer {DealerId}, item {ItemId}; retry after {RetryAfter}.",
+                listing.DealerId, itemId, rateLimit.RetryAfter);
             return Result.Success();
         }
 
@@ -148,7 +173,13 @@ public sealed class MercadoLibreWebhookProcessor(
 
         if (existing is not null)
         {
-            existing.UpdateNotes(string.IsNullOrWhiteSpace(existing.Notes) ? note : $"{existing.Notes}\n{note}");
+            string appended = string.IsNullOrWhiteSpace(existing.Notes) ? note : $"{existing.Notes}\n{note}";
+            // Security review (sfc C1.3): Notes has a 2000-char column cap (LeadConfiguration) — an
+            // unbounded append (whether from legitimate repeat notifications or the webhook-spam gap
+            // documented on WebhookRateLimitProvider above) would eventually throw at SaveChanges
+            // instead of just losing history. Keep the most recent content, never crash on it.
+            const int maxNotesLength = 2000;
+            existing.UpdateNotes(appended.Length > maxNotesLength ? appended[^maxNotesLength..] : appended);
             await dbContext.SaveChangesAsync(cancellationToken);
             return;
         }

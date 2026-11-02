@@ -9,6 +9,7 @@ using Application.Abstractions.Integrations;
 using Domain.Cars.Events;
 using Infrastructure.Integrations;
 using Infrastructure.Integrations.MercadoLibre;
+using Infrastructure.Integrations.WhatsApp;
 using MediatR;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
@@ -100,10 +101,12 @@ public static class DependencyInjection
                 return ConnectionMultiplexer.Connect(options);
             });
             services.AddSingleton<IRateLimiter, RedisRateLimiter>();
+            services.AddSingleton<IWhatsAppContactStateStore, RedisWhatsAppContactStateStore>();
         }
         else
         {
             services.AddSingleton<IRateLimiter, InMemoryRateLimiter>();
+            services.AddSingleton<IWhatsAppContactStateStore, InMemoryWhatsAppContactStateStore>();
         }
 
         services.AddScoped<IntegrationCommandDispatcher>();
@@ -120,6 +123,17 @@ public static class DependencyInjection
         services.AddScoped<INotificationHandler<CarPriceChangedDomainEvent>, MercadoLibreListingSyncHandlers>();
         services.AddScoped<INotificationHandler<Domain.Cars.Events.CarSoldDomainEvent>, MercadoLibreListingSyncHandlers>();
         services.AddScoped<INotificationHandler<Domain.Cars.Events.CarDeleteDomainEvent>, MercadoLibreListingSyncHandlers>();
+
+        // sfc C0.4 (RN-046): WhatsApp Cloud API connector. IWhatsAppContactStateStore is registered
+        // above alongside IRateLimiter (same Redis-vs-InMemory branch); the webhook endpoint resolves
+        // IWhatsAppCredentialResolver/IWhatsAppContactStateStore directly via [FromServices].
+        services.AddHttpClient(WhatsAppCloudApiClient.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddScoped<IWhatsAppCredentialResolver, WhatsAppCredentialResolver>();
+        services.AddScoped<WhatsAppCloudApiClient>();
+        services.AddScoped<IIntegrationClient, WhatsAppCloudApiClient>(sp => sp.GetRequiredService<WhatsAppCloudApiClient>());
 
         return services;
     }

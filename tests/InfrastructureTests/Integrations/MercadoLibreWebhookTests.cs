@@ -85,7 +85,7 @@ public sealed class MercadoLibreWebhookTests : IDisposable
         return car;
     }
 
-    private MercadoLibreWebhookProcessor CreateProcessor(HttpStatusCode itemResponseStatus = HttpStatusCode.OK)
+    private MercadoLibreWebhookProcessor CreateProcessor(HttpStatusCode itemResponseStatus = HttpStatusCode.OK, bool rateLimitAllowed = true)
     {
         var handler = new StubHttpMessageHandler(request =>
         {
@@ -117,7 +117,11 @@ public sealed class MercadoLibreWebhookTests : IDisposable
             _clock,
             NullLogger<MercadoLibreClient>.Instance);
 
-        return new MercadoLibreWebhookProcessor(_db, client, _clock, NullLogger<MercadoLibreWebhookProcessor>.Instance);
+        var rateLimiter = new Mock<IRateLimiter>();
+        rateLimiter.Setup(r => r.TryAcquireAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RateLimitDecision(rateLimitAllowed, TimeSpan.FromSeconds(5)));
+
+        return new MercadoLibreWebhookProcessor(_db, client, rateLimiter.Object, _clock, NullLogger<MercadoLibreWebhookProcessor>.Instance);
     }
 
     // ─── RN-047: purchase intent vs local reservation/deposit ──────────────────
@@ -208,6 +212,23 @@ public sealed class MercadoLibreWebhookTests : IDisposable
         await processor.ProcessAsync(notification, CancellationToken.None);
 
         (await _db.Leads.IgnoreQueryFilters().CountAsync()).Should().Be(1);
+    }
+
+    // Security review (sfc C1.3): the webhook has no signature, so anyone who knows a dealer's
+    // public MeLi item id could otherwise spam notifications unboundedly. This proves the rate
+    // limiter (reused from sfc C1.1, a distinct provider key from outbound sync) actually
+    // short-circuits before any pull-to-confirm or Lead write happens.
+    [Fact]
+    public async Task RateLimited_IsAckedWithoutAnyPullOrLeadCreation()
+    {
+        await SeedCarAsync(StatusServiceCar.Disponible);
+        var processor = CreateProcessor(rateLimitAllowed: false);
+
+        Result result = await processor.ProcessAsync(
+            new MercadoLibreNotification("questions", $"/questions/{ExternalItemId}", UserId: 999), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        (await _db.Leads.IgnoreQueryFilters().AnyAsync()).Should().BeFalse();
     }
 
     [Fact]

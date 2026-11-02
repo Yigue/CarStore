@@ -219,8 +219,14 @@ public sealed class MercadoLibreClient(
         if (root.TryGetProperty("refresh_token", out JsonElement newRefreshTokenElement)
             && newRefreshTokenElement.GetString() is { Length: > 0 } newRefreshToken)
         {
+            // Security review (sfc C1.2): MercadoLibre rotates the refresh token on every use and
+            // invalidates the old one — if the new one is never persisted, the dealer's connection
+            // breaks permanently the moment anything else in this request fails after this point
+            // (or simply because nothing here ever called SaveChanges at all). Save it immediately,
+            // on its own, before any further work that could throw.
             integration.UpdateCredentials(
                 credentialProtector.Protect(newRefreshToken), integration.Scopes, integration.TokenExpiresAtUtc, dateTimeProvider.UtcNow);
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         return accessToken;
