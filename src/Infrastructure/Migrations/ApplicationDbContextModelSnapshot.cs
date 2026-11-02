@@ -1803,6 +1803,62 @@ namespace Infrastructure.Migrations
                     b.ToTable("dealer_integrations", "public");
                 });
 
+            modelBuilder.Entity("Domain.Integrations.ExternalListing", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CarId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("car_id");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTime>("LastSyncedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at_utc");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_external_listings");
+
+                    b.HasIndex("Provider", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_external_listings_provider_external_id");
+
+                    b.HasIndex("DealerId", "Provider", "CarId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_external_listings_dealer_id_provider_car_id");
+
+                    b.ToTable("external_listings", "public");
+                });
+
             modelBuilder.Entity("Domain.Integrations.IntegrationCommand", b =>
                 {
                     b.Property<Guid>("Id")

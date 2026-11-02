@@ -299,14 +299,28 @@ public sealed class Car : Entity
 
     public void UpdatePrice(decimal newPrice, DateTime updatedAt, CurrencyCode? currency = null)
     {
+        Money previous = Price;
         Price = Money.Of(newPrice, currency ?? CurrencyCode.Parse(Price.Currency));
         UpdatedAt = updatedAt;
+        RaisePriceChangedIfDifferent(previous);
     }
-    
+
     public void UpdatePrice(Money newPrice, DateTime updatedAt)
     {
+        Money previous = Price;
         Price = newPrice;
         UpdatedAt = updatedAt;
+        RaisePriceChangedIfDifferent(previous);
+    }
+
+    /// <summary>sfc C1.2 / ADR C25: the MercadoLibre push connector only needs to know a price actually
+    /// moved, not by how much — a no-op update (same amount and currency) stays silent.</summary>
+    private void RaisePriceChangedIfDifferent(Money previous)
+    {
+        if (previous.Amount != Price.Amount || previous.Currency != Price.Currency)
+        {
+            Raise(new CarPriceChangedDomainEvent(Id));
+        }
     }
 
     /// <summary>

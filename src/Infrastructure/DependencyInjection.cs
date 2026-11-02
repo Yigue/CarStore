@@ -6,7 +6,10 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Integrations;
+using Domain.Cars.Events;
 using Infrastructure.Integrations;
+using Infrastructure.Integrations.MercadoLibre;
+using MediatR;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
 using Application.Abstractions.Webhooks;
@@ -69,7 +72,9 @@ public static class DependencyInjection
             .AddBilling(configuration)
             .AddIntegrations(configuration, environment);
 
-    /// <summary>sfc C1.1 / ADR C22: encrypted credentials, command queue dispatcher and rate limiter. No provider client is registered yet (C1.2+).</summary>
+    /// <summary>sfc C1.1 / ADR C22: encrypted credentials, command queue dispatcher and rate limiter.
+    /// sfc C1.2 / C1.3 (ADR C25): adds the MercadoLibre push client/webhook processor and its domain-event
+    /// handlers — registered here (not auto-scanned) because MediatR only scans the Application assembly.</summary>
     private static IServiceCollection AddIntegrations(
         this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment? environment)
     {
@@ -102,6 +107,19 @@ public static class DependencyInjection
         }
 
         services.AddScoped<IntegrationCommandDispatcher>();
+
+        services.AddOptions<MercadoLibreOptions>()
+            .BindConfiguration(MercadoLibreOptions.SectionName);
+        services.AddHttpClient(MercadoLibreClient.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddScoped<MercadoLibreClient>();
+        services.AddScoped<IIntegrationClient, MercadoLibreClient>(sp => sp.GetRequiredService<MercadoLibreClient>());
+        services.AddScoped<MercadoLibreWebhookProcessor>();
+        services.AddScoped<INotificationHandler<CarPriceChangedDomainEvent>, MercadoLibreListingSyncHandlers>();
+        services.AddScoped<INotificationHandler<Domain.Cars.Events.CarSoldDomainEvent>, MercadoLibreListingSyncHandlers>();
+        services.AddScoped<INotificationHandler<Domain.Cars.Events.CarDeleteDomainEvent>, MercadoLibreListingSyncHandlers>();
 
         return services;
     }
