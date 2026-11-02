@@ -172,14 +172,19 @@ internal sealed class EntitlementServiceHandler(
 
     private async Task AcquireLockAsync(Guid dealerId, PlanResource resource, CancellationToken ct)
     {
-        if (!dbContext.Database.IsRelational())
+        // Security review (sfc A3, sixth round): IsRelational() is true for SQLite too (it is only
+        // false for the EF InMemory provider), so WebApiTests' SQLite-backed CustomWebApplicationFactory
+        // was still reaching the raw pg_advisory_xact_lock call below and throwing "no such function"
+        // on every entitlement-gated request (CreateCar, AssignRole, RegisterUser, ...), a real 500
+        // regression. Only the real Postgres provider understands this function.
+        if (dbContext.Database.ProviderName?.Contains("Npgsql", StringComparison.Ordinal) != true)
         {
             return;
         }
 
         // Two deterministic int keys (dealer, resource) — avoids any hashing-collision concern from
         // packing both into a single bigint key. Postgres-only: pg_advisory_xact_lock has no
-        // SQLite/InMemory equivalent, which is exactly why this is guarded by IsRelational().
+        // SQLite/InMemory equivalent, which is exactly why this is guarded by the provider check above.
         // Reentrant within one session/transaction: calling this twice on the same key (e.g. once
         // from AssignRoleCommandHandler via AcquireUsersLockAsync, then again from the
         // EnsureCanAddAsync it calls afterward) is safe, not a self-deadlock.
