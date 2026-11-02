@@ -219,14 +219,18 @@ public sealed class MercadoLibreClient(
         if (root.TryGetProperty("refresh_token", out JsonElement newRefreshTokenElement)
             && newRefreshTokenElement.GetString() is { Length: > 0 } newRefreshToken)
         {
-            // Security review (sfc C1.2): MercadoLibre rotates the refresh token on every use and
-            // invalidates the old one — if the new one is never persisted, the dealer's connection
-            // breaks permanently the moment anything else in this request fails after this point
-            // (or simply because nothing here ever called SaveChanges at all). Save it immediately,
-            // on its own, before any further work that could throw.
+            // Security review (sfc C1.2), second round: MercadoLibre rotates the refresh token on
+            // every use and invalidates the old one — if the new one is never persisted, the
+            // dealer's connection breaks permanently. The first fix saved it immediately, but still
+            // under the CALLER's own cancellationToken (e.g. an anonymous webhook request) — if that
+            // request is cancelled (client disconnect, MeLi's own timeout) after MercadoLibre has
+            // already rotated the token server-side, this save is cancelled too and the new token is
+            // lost exactly the same way. The token is already rotated server-side at this point
+            // regardless of what happens to the inbound request, so persisting it must not be tied
+            // to that request's own token.
             integration.UpdateCredentials(
                 credentialProtector.Protect(newRefreshToken), integration.Scopes, integration.TokenExpiresAtUtc, dateTimeProvider.UtcNow);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(CancellationToken.None);
         }
 
         return accessToken;

@@ -173,14 +173,20 @@ public sealed class MercadoLibreWebhookProcessor(
 
         if (existing is not null)
         {
-            string appended = string.IsNullOrWhiteSpace(existing.Notes) ? note : $"{existing.Notes}\n{note}";
-            // Security review (sfc C1.3): Notes has a 2000-char column cap (LeadConfiguration) — an
-            // unbounded append (whether from legitimate repeat notifications or the webhook-spam gap
-            // documented on WebhookRateLimitProvider above) would eventually throw at SaveChanges
-            // instead of just losing history. Keep the most recent content, never crash on it.
+            // Security review (sfc C1.3), second round: Notes has a 2000-char column cap
+            // (LeadConfiguration). The first fix truncated the APPENDED value from the front, which
+            // can evict a salesperson's own hand-written notes (or earlier webhook history) once a
+            // forged/spammy notification stream fills the cap — that is worse than losing a webhook
+            // note. Once the field is already at/near the cap, stop appending further webhook noise
+            // instead and keep whatever is already there untouched.
             const int maxNotesLength = 2000;
-            existing.UpdateNotes(appended.Length > maxNotesLength ? appended[^maxNotesLength..] : appended);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            string existingNotes = existing.Notes ?? string.Empty;
+            if (existingNotes.Length + 1 + note.Length <= maxNotesLength)
+            {
+                existing.UpdateNotes(string.IsNullOrWhiteSpace(existingNotes) ? note : $"{existingNotes}\n{note}");
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
             return;
         }
 
