@@ -2,6 +2,7 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Billing;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.TenantUrl;
 using Domain.Billing;
 using Domain.DealerSettings;
 using Domain.DealerSettings.Events;
@@ -43,10 +44,19 @@ internal sealed class ProvisionDealerCommandHandler(
     ISubscriptionGateway subscriptionGateway,
     ILogger<ProvisionDealerCommandHandler> logger,
     Application.Legal.LegalAcceptanceRecorder legalRecorder,
-    IPlanCatalog planCatalog)
+    IPlanCatalog planCatalog,
+    /// <summary>
+    /// spr PR 3.3 (ADR B11): optional so existing direct-construction unit tests keep compiling
+    /// unchanged. When omitted, <see cref="FallbackTenantUrlBuilder"/> reproduces the previous
+    /// hardcoded "carstore.com" behavior; production DI always supplies the real
+    /// <c>ConfigurationTenantUrlBuilder</c> (config-driven, see <c>Frontend:TenantUrlTemplate</c>/<c>Frontend:BaseUrl</c>).
+    /// </summary>
+    ITenantUrlBuilder? tenantUrlBuilder = null)
     : ICommandHandler<ProvisionDealerCommand, ProvisionDealerResponse>
 {
-    private const string DashboardBaseUrl = "carstore.com";
+    private static readonly ITenantUrlBuilder FallbackTenantUrlBuilder = new DefaultTenantUrlBuilder();
+
+    private readonly ITenantUrlBuilder _tenantUrlBuilder = tenantUrlBuilder ?? FallbackTenantUrlBuilder;
 
     public async Task<Result<ProvisionDealerResponse>> Handle(
         ProvisionDealerCommand command,
@@ -173,7 +183,7 @@ internal sealed class ProvisionDealerCommandHandler(
             }
         }
 
-        var dashboardUrl = $"https://{subdomain}.{DashboardBaseUrl}/dashboard";
+        var dashboardUrl = _tenantUrlBuilder.BuildDashboardUrl(subdomain);
 
         await publisher.Publish(
             new DealerProvisionedDomainEvent(dealerId, user.Id, command.AdminEmail, subdomain, dashboardUrl),
@@ -182,7 +192,12 @@ internal sealed class ProvisionDealerCommandHandler(
         string? checkoutUrl = null;
         try
         {
-            checkoutUrl = await subscriptionGateway.CreateCheckoutSessionAsync(dealerId, command.AdminEmail, planCode, CheckoutReturn.None, cancellationToken);
+            checkoutUrl = await subscriptionGateway.CreateCheckoutSessionAsync(
+                dealerId,
+                command.AdminEmail,
+                planCode,
+                new CheckoutReturn(SuccessUrl: _tenantUrlBuilder.BuildCheckoutSuccessUrl()),
+                cancellationToken);
         }
         catch (Exception ex)
         {
@@ -204,5 +219,18 @@ internal sealed class ProvisionDealerCommandHandler(
         return message.Contains("HostName", StringComparison.OrdinalIgnoreCase)
             || message.Contains("host_name", StringComparison.OrdinalIgnoreCase)
             || message.Contains("dealer_settings", StringComparison.OrdinalIgnoreCase) && message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// spr PR 3.3 (ADR B11): reproduces the previous hardcoded "carstore.com" behavior for the handful
+    /// of pre-existing unit tests that construct <see cref="ProvisionDealerCommandHandler"/> directly
+    /// without supplying an <see cref="ITenantUrlBuilder"/>. Production DI never resolves this —
+    /// see <c>ConfigurationTenantUrlBuilder</c> in Infrastructure.
+    /// </summary>
+    private sealed class DefaultTenantUrlBuilder : ITenantUrlBuilder
+    {
+        public string BuildDashboardUrl(string slug) => $"https://{slug}.carstore.com/dashboard";
+
+        public string BuildCheckoutSuccessUrl() => "https://carstore-app.com/saas/felicitaciones?session_id={CHECKOUT_SESSION_ID}";
     }
 }

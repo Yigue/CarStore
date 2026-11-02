@@ -43,7 +43,8 @@ public class ProvisionConcurrencyTests
             AdminPassword = "Sup3r$ecret!",
             AdminFirstName = "A",
             AdminLastName = "A",
-            AcceptedTermsVersion = "2026-10-01"
+            AcceptedTermsVersion = "2026-10-01",
+            CaptchaToken = "test-captcha-token"
         };
         var body2 = new
         {
@@ -53,7 +54,8 @@ public class ProvisionConcurrencyTests
             AdminPassword = "Sup3r$ecret!",
             AdminFirstName = "B",
             AdminLastName = "B",
-            AcceptedTermsVersion = "2026-10-01"
+            AcceptedTermsVersion = "2026-10-01",
+            CaptchaToken = "test-captcha-token"
         };
 
         // Fire both POSTs concurrently.

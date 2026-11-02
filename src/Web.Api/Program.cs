@@ -218,6 +218,22 @@ if (fallback.DevFallbackDealerId is not null && !app.Environment.IsDevelopment()
         "PR1 saas-custom-domains ADR-1 — see openspec/changes/saas-custom-domains/specs/tenant-safety-default-deny.");
 }
 
+// spr PR 3.3 (ADR B10): fail fast if the host would boot in Production with the always-valid
+// NoOpCaptchaVerifier — that would let anyone bypass the CAPTCHA on dealers/provision. Configure
+// Captcha:SecretKey (Infrastructure/DependencyInjection.cs AddCaptcha) to wire up the real
+// TurnstileCaptchaVerifier instead.
+using (IServiceScope captchaScope = app.Services.CreateScope())
+{
+    Application.Abstractions.Security.ICaptchaVerifier? captchaVerifier =
+        captchaScope.ServiceProvider.GetService<Application.Abstractions.Security.ICaptchaVerifier>();
+    if (app.Environment.IsProduction() && captchaVerifier is Infrastructure.Security.NoOpCaptchaVerifier)
+    {
+        throw new InvalidOperationException(
+            "Captcha:SecretKey is not configured. NoOpCaptchaVerifier must never be the active " +
+            "ICaptchaVerifier in Production — configure Captcha:SecretKey to wire up TurnstileCaptchaVerifier.");
+    }
+}
+
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.ApplyMigrations();

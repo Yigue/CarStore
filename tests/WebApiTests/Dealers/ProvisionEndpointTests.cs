@@ -1,17 +1,27 @@
 using System.Net;
 using System.Net.Http.Json;
+using Application.Abstractions.Security;
 using Domain.DealerSettings;
 using Domain.Users;
 using FluentAssertions;
 using Infrastructure.Database;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using WebApiTests.Fakes;
 
 namespace WebApiTests.Dealers;
 
 public class ProvisionEndpointTests
 {
     private sealed record ProvisionResponse(Guid DealerId, Guid AdminUserId, string Subdomain);
+
+    // spr PR 3.3 (B10): CaptchaEndpointFilter requires a non-empty token on every request. In the
+    // "Testing" environment (default CustomWebApplicationFactory) no Captcha:SecretKey is configured,
+    // so ICaptchaVerifier resolves to NoOpCaptchaVerifier — any non-empty token is accepted.
+    private const string ValidCaptchaToken = "test-captcha-token";
 
     private static object ValidBody(string subdomain = "automotors", string email = "admin@automotors.com") => new
     {
@@ -21,7 +31,8 @@ public class ProvisionEndpointTests
         AdminPassword = "Sup3r$ecret!",
         AdminFirstName = "Ana",
         AdminLastName = "García",
-        AcceptedTermsVersion = "2026-10-01"
+        AcceptedTermsVersion = "2026-10-01",
+        CaptchaToken = ValidCaptchaToken
     };
 
     [Fact]
@@ -74,7 +85,8 @@ public class ProvisionEndpointTests
             AdminPassword = "password",
             AdminFirstName = "A",
             AdminLastName = "B",
-            AcceptedTermsVersion = "2026-10-01"
+            AcceptedTermsVersion = "2026-10-01",
+            CaptchaToken = ValidCaptchaToken
         };
 
         var response = await client.PostAsJsonAsync("/api/v1/dealers/provision", weak);
@@ -140,5 +152,85 @@ public class ProvisionEndpointTests
 
         response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.BadRequest);
+    }
+
+    // spr PR 3.3 (B10) — task 3.3.1 [RED]: CaptchaEndpointFilter must reject the request BEFORE the
+    // MediatR handler runs, so neither DealerSettings, Users nor DealerSubscriptions gain a row.
+    [Fact]
+    public async Task Provision_ReturnsBadRequest_WhenCaptchaTokenMissing_AndCreatesNoRows()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var body = new
+        {
+            DealerName = "Automotors del Sur",
+            Subdomain = "nocaptcha",
+            AdminEmail = "admin@nocaptcha.com",
+            AdminPassword = "Sup3r$ecret!",
+            AdminFirstName = "Ana",
+            AdminLastName = "García",
+            AcceptedTermsVersion = "2026-10-01"
+            // CaptchaToken intentionally omitted.
+        };
+
+        var response = await client.PostAsJsonAsync("/api/v1/dealers/provision", body);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await AssertNoRowsPersistedAsync(factory, "nocaptcha");
+    }
+
+    [Fact]
+    public async Task Provision_ReturnsBadRequest_WhenCaptchaTokenInvalid_AndCreatesNoRows()
+    {
+        await using var factory = new CaptchaStubWebApplicationFactory(CaptchaVerificationResult.Invalid);
+        var client = factory.CreateClient();
+
+        var body = ValidBody(subdomain: "badcaptcha");
+        var response = await client.PostAsJsonAsync("/api/v1/dealers/provision", body);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await AssertNoRowsPersistedAsync(factory, "badcaptcha");
+    }
+
+    [Fact]
+    public async Task Provision_ReturnsServiceUnavailable_WhenCaptchaProviderUnavailable_AndCreatesNoRows()
+    {
+        await using var factory = new CaptchaStubWebApplicationFactory(CaptchaVerificationResult.Unavailable);
+        var client = factory.CreateClient();
+
+        var body = ValidBody(subdomain: "downcaptcha");
+        var response = await client.PostAsJsonAsync("/api/v1/dealers/provision", body);
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        await AssertNoRowsPersistedAsync(factory, "downcaptcha");
+    }
+
+    /// <summary>
+    /// CustomWebApplicationFactory boots in "Testing", which runs <c>app.SeedTestData()</c>
+    /// (Program.cs) — the DB already has demo rows before any request, so a blanket zero-count
+    /// assertion is wrong. Checking by this test's unique <c>subdomain</c> (same pattern as
+    /// <c>Provision_ReturnsConflict_OnDuplicateSubdomain</c> above) is precise regardless of seed data.
+    /// </summary>
+    private static async Task AssertNoRowsPersistedAsync(CustomWebApplicationFactory factory, string subdomain)
+    {
+        using var scope = factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.DealerSettings.IgnoreQueryFilters().AnyAsync(s => s.HostName == subdomain))
+            .Should().BeFalse($"no DealerSettings row should exist after a rejected captcha for '{subdomain}'");
+    }
+
+    /// <summary>Boots the normal Testing host but swaps <see cref="ICaptchaVerifier"/> for a deterministic stub.</summary>
+    private sealed class CaptchaStubWebApplicationFactory(CaptchaVerificationResult result) : CustomWebApplicationFactory
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ICaptchaVerifier>();
+                services.AddSingleton<ICaptchaVerifier>(new StubCaptchaVerifier { Result = result });
+            });
+        }
     }
 }

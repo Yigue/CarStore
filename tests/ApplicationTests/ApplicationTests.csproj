@@ -21,6 +21,11 @@
     </PackageReference>
 
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+
+    <!-- spr PR 3.3 (B10): ProvisionCaptchaTests boots a real WebApplicationFactory<Web.Api.Program>
+         against a Sqlite in-memory DB to prove the Production anti-NoOp captcha guard in Program.cs. -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Application\Application.csproj" />

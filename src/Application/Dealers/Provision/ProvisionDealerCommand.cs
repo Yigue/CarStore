@@ -17,4 +17,10 @@ public sealed record ProvisionDealerCommand(
     string? AcceptanceIp = null,
     string? AcceptanceUserAgent = null,
     /// <summary>spr PR 1.1 (ADR B1): optional plan code, validated against <c>IPlanCatalog</c>. Null → default plan.</summary>
-    string? PlanCode = null) : ICommand<ProvisionDealerResponse>;
+    string? PlanCode = null,
+    /// <summary>
+    /// spr PR 3.3 (ADR B10): carried through for audit/traceability. The actual CAPTCHA verification
+    /// already happened in <c>CaptchaEndpointFilter</c> BEFORE this command was dispatched — the
+    /// handler does not re-verify it.
+    /// </summary>
+    string? CaptchaToken = null) : ICommand<ProvisionDealerResponse>;

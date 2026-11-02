@@ -58,6 +58,14 @@ public sealed class CorsProductionConfigurationTests
                 {
                     builder.UseSetting("UseInMemoryDatabase", "true");
                     builder.UseEnvironment("Production");
+                    // spr PR 3.3 (B10): AddCaptcha's NoOp-vs-Turnstile decision runs synchronously
+                    // during AddInfrastructure, on `builder.Configuration` BEFORE `Build()` — only
+                    // `UseSetting` is visible to it then; a `ConfigureAppConfiguration` dictionary
+                    // entry (like the ones below) is only merged into `app.Configuration` at
+                    // `Build()` time, too late for this read. Program.cs refuses to boot in
+                    // Production with the NoOp captcha verifier, so this test (an unrelated CORS
+                    // assertion) needs a secret key to pass that guard.
+                    builder.UseSetting("Captcha:SecretKey", "test-secret-key");
 
                     // Mirrors StartupAssertionTests: minimum config so DI/startup
                     // succeeds up to the point under test, without a real Postgres

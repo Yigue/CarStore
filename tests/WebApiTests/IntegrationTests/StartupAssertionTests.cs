@@ -31,6 +31,13 @@ public sealed class StartupAssertionTests
             {
                 builder.UseEnvironment("Production");
 
+                // spr PR 3.3 (B10): AddCaptcha's NoOp-vs-Turnstile decision (like AddBilling's
+                // Stripe:SecretKey check below) runs synchronously during AddInfrastructure, which
+                // executes on `builder.Configuration` BEFORE `Build()` — only `UseSetting` is visible
+                // to it at that point; `ConfigureAppConfiguration`'s additions are only merged into
+                // `app.Configuration` once `Build()` runs, too late for this particular read.
+                builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+
                 // Provide env-vars that CustomWebApplicationFactory normally sets,
                 // so the infrastructure DI registration succeeds up to the assertion point.
                 builder.ConfigureAppConfiguration((_, config) =>
@@ -82,6 +89,9 @@ public sealed class StartupAssertionTests
             {
                 builder.UseSetting("Stripe:SecretKey", "sk_test_123");
                 builder.UseSetting("Stripe:PriceId", ""); // Explicitly missing
+                // spr PR 3.3 (B10): must be UseSetting, not ConfigureAppConfiguration — see the
+                // comment on the first test above for why.
+                builder.UseSetting("Captcha:SecretKey", "test-secret-key");
                 builder.UseEnvironment("Production");
                 builder.ConfigureAppConfiguration((_, config) =>
                 {
@@ -112,6 +122,11 @@ public sealed class StartupAssertionTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Production");
+                // spr PR 3.3 (B10): must be UseSetting, not ConfigureAppConfiguration — without
+                // this, Production + no visible Captcha:SecretKey would throw from the anti-NoOp
+                // captcha guard, contradicting "boots clean". See the comment on the first test
+                // above for why ConfigureAppConfiguration doesn't reach this particular check.
+                builder.UseSetting("Captcha:SecretKey", "test-secret-key");
                 builder.ConfigureAppConfiguration((_, config) =>
                 {
                     config.AddInMemoryCollection(new Dictionary<string, string?>

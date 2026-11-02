@@ -64,6 +64,9 @@ public class NoTenantServiceProductionGuardTests
             builder.UseSetting("Stripe:SecretKey", "sk_test_dummy");
             builder.UseSetting("Stripe:PriceId", "price_dummy");
             builder.UseSetting("Stripe:WebhookSecret", "whsec_dummy");
+            // spr PR 3.3 (B10): without this, Program.cs's anti-NoOp captcha guard would throw
+            // before NoTenantServiceProductionGuard gets a chance to — this test targets the latter.
+            builder.UseSetting("Captcha:SecretKey", "test-secret-key");
 
             // Production environment triggers NoTenantServiceProductionGuard registration.
             builder.UseEnvironment("Production");

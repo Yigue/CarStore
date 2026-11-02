@@ -36,6 +36,10 @@ using Minio;
 using Stripe;
 using Application.Abstractions.Billing;
 using Infrastructure.Billing;
+using Application.Abstractions.Security;
+using Infrastructure.Security;
+using Application.Abstractions.TenantUrl;
+using Infrastructure.TenantUrl;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
@@ -71,6 +75,7 @@ public static class DependencyInjection
             .ConfigureOpenTelemetry()
             .AddBackgroundJobs(configuration)
             .AddBilling(configuration)
+            .AddCaptcha(configuration)
             .AddIntegrations(configuration, environment);
 
     /// <summary>sfc C1.1 / ADR C22: encrypted credentials, command queue dispatcher and rate limiter.
@@ -180,6 +185,30 @@ public static class DependencyInjection
         return services;
     }
 
+    /// <summary>
+    /// spr PR 3.3 (ADR B10): mirrors the <c>AddBilling</c> optional-service pattern — real Turnstile
+    /// wiring when <c>Captcha:SecretKey</c> is configured, otherwise the always-valid
+    /// <see cref="NoOpCaptchaVerifier"/>. <c>Program.cs</c> asserts at startup that the NoOp verifier
+    /// is never resolved in a Production environment.
+    /// </summary>
+    private static IServiceCollection AddCaptcha(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<CaptchaOptions>().BindConfiguration(CaptchaOptions.SectionName);
+
+        bool captchaConfigured = !string.IsNullOrWhiteSpace(configuration[$"{CaptchaOptions.SectionName}:SecretKey"]);
+        if (captchaConfigured)
+        {
+            services.AddHttpClient<TurnstileCaptchaVerifier>(client => client.Timeout = TimeSpan.FromSeconds(3));
+            services.AddScoped<ICaptchaVerifier, TurnstileCaptchaVerifier>();
+        }
+        else
+        {
+            services.AddScoped<ICaptchaVerifier, NoOpCaptchaVerifier>();
+        }
+
+        return services;
+    }
+
     private static IServiceCollection AddTenancy(
         this IServiceCollection services,
         IWebHostEnvironment? environment = null)
@@ -208,6 +237,9 @@ public static class DependencyInjection
     {
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddSingleton<Application.Legal.ILegalTermsProvider, Infrastructure.Legal.ConfigurationLegalTermsProvider>();
+
+        // spr PR 3.3 (ADR B11): tenant-aware dashboard/checkout URLs (Frontend:TenantUrlTemplate, Frontend:BaseUrl).
+        services.AddScoped<ITenantUrlBuilder, ConfigurationTenantUrlBuilder>();
 
         // sfc B3.1 / B8: QuestPDF-backed document renderer. License is set once via a
         // static constructor on QuestPdfRenderer (see that class), not here.

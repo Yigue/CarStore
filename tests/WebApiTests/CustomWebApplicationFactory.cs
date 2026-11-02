@@ -20,7 +20,9 @@ using WebApiTests.Fakes;
 
 namespace WebApiTests;
 
-public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
+// spr PR 3.3 (B10): no longer sealed so ProvisionEndpointTests.CaptchaStubWebApplicationFactory can
+// override ConfigureWebHost to swap in a deterministic ICaptchaVerifier stub.
+public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     public string Id { get; } = Guid.NewGuid().ToString();
     private readonly SqliteConnection _connection;

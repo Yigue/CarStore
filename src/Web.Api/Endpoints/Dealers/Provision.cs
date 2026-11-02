@@ -21,7 +21,10 @@ internal sealed class Provision : IEndpoint
         string AdminPassword,
         string AdminFirstName,
         string AdminLastName,
-        string? AcceptedTermsVersion = null);
+        string? AcceptedTermsVersion = null,
+        /// <summary>spr PR 3.3 (ADR B10): required by <see cref="CaptchaEndpointFilter"/> — see that filter
+        /// for the 400/503 contract on a missing/invalid/unavailable token.</summary>
+        string? CaptchaToken = null) : IHasCaptchaToken;
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -40,7 +43,8 @@ internal sealed class Provision : IEndpoint
                 AdminLastName: request.AdminLastName,
                 AcceptedTermsVersion: request.AcceptedTermsVersion,
                 AcceptanceIp: httpContext.Connection.RemoteIpAddress?.ToString(),
-                AcceptanceUserAgent: httpContext.Request.Headers.UserAgent.ToString());
+                AcceptanceUserAgent: httpContext.Request.Headers.UserAgent.ToString(),
+                CaptchaToken: request.CaptchaToken);
 
             Result<ProvisionDealerResponse> result = await sender.Send(command, cancellationToken);
 
@@ -54,10 +58,15 @@ internal sealed class Provision : IEndpoint
         .WithName("ProvisionDealer")
         .AllowAnonymous()
         .RequireRateLimiting("public")
+        // spr PR 3.3 (ADR B10): runs after the rate limiter (middleware, wraps the whole endpoint) and
+        // BEFORE the handler — a missing/invalid/unavailable CAPTCHA token short-circuits here and no
+        // DealerSettings/User/DealerSubscription row is ever created.
+        .AddEndpointFilter<CaptchaEndpointFilter>()
         .Produces<ProvisionDealerResponse>(StatusCodes.Status201Created)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status409Conflict)
         .ProducesProblem(StatusCodes.Status429TooManyRequests)
+        .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
     }
 }
