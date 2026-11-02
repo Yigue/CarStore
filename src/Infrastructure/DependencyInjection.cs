@@ -198,8 +198,12 @@ public static class DependencyInjection
         bool captchaConfigured = !string.IsNullOrWhiteSpace(configuration[$"{CaptchaOptions.SectionName}:SecretKey"]);
         if (captchaConfigured)
         {
+            // Security review: AddScoped<ICaptchaVerifier, TurnstileCaptchaVerifier>() would resolve its
+            // own HttpClient constructor param from the DEFAULT unnamed client (100s timeout), not the one
+            // configured below — only resolving TurnstileCaptchaVerifier itself goes through the typed-client
+            // factory. Resolving it here and handing that instance to ICaptchaVerifier keeps the 3s timeout real.
             services.AddHttpClient<TurnstileCaptchaVerifier>(client => client.Timeout = TimeSpan.FromSeconds(3));
-            services.AddScoped<ICaptchaVerifier, TurnstileCaptchaVerifier>();
+            services.AddScoped<ICaptchaVerifier>(sp => sp.GetRequiredService<TurnstileCaptchaVerifier>());
         }
         else
         {
