@@ -186,6 +186,18 @@ public sealed class MercadoLibreWebhookProcessor(
                 existing.UpdateNotes(string.IsNullOrWhiteSpace(existingNotes) ? note : $"{existingNotes}\n{note}");
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
+            else
+            {
+                // Security review (sfc C1.3), third round: silently dropping this note means a
+                // GENUINE purchase-intent notification arriving after the field fills up vanishes
+                // with no trace — worth a warning even though the root cause (overloading a
+                // human-authored field with machine-generated events instead of a dedicated,
+                // deduplicated LeadActivity-style log, keyed by validated seller id) stays a
+                // documented, deferred architectural gap: see tasks.md C1.3.2's residual-risk note.
+                logger.LogWarning(
+                    "MercadoLibre note dropped for Lead {LeadId} (dealer {DealerId}, item {ItemId}): Notes field is at its 2000-char cap.",
+                    existing.Id, listing.DealerId, listing.ExternalId);
+            }
 
             return;
         }
