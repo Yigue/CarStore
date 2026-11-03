@@ -147,6 +147,12 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
             .HasColumnType("jsonb")
             .IsRequired(false);
 
+        // sfc B5.2: same jsonb-raw-string convention as CarouselSlidesJson above — see
+        // DealerSettings.SetBusinessHours/GetBusinessHours and BusinessHoursEntry's doc comment.
+        builder.Property(s => s.BusinessHoursJson)
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
         // ──────────────────────────────────────────────────────────────────────
         // PR1 (saas-custom-domains) tenant-identity hardening.
         //

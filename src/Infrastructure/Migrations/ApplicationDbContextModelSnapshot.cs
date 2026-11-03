@@ -1248,6 +1248,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("billing_email");
 
+                    b.Property<string>("BusinessHoursJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("business_hours_json");
+
                     b.Property<DateTime?>("CancelledAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("cancelled_at");

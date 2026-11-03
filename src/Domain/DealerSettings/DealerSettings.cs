@@ -396,6 +396,101 @@ public sealed class DealerSettings : Entity
         }
     }
 
+    // ─── B5.2 · public test-drive scheduling (B11-ext, RN-044) ─────────────────────────────────
+    //
+    // Locked decision (sfc B5.2, same posture as "Locked decision O5" above): this product ships
+    // exclusively to Argentine car dealerships — ARS pricing, Argentine license plates, Spanish-
+    // only UI — so there is ONE timezone for the whole platform, not one per dealer. It is a fixed
+    // constant, not a per-tenant setting, and nothing downstream (Appointment, this aggregate) ever
+    // converts between UTC and local time: every DateTime the scheduling flow stores or compares is
+    // already wall-clock Argentina time, matching how <see cref="Appointment"/> already behaves.
+    // Do not add a per-dealer timezone field without re-opening this decision.
+    /// <summary>Fixed product-wide timezone. See the locked-decision comment above this constant.</summary>
+    public const string BusinessTimeZoneId = "America/Argentina/Buenos_Aires";
+
+    /// <summary>At most one entry per day of the week.</summary>
+    public const int MaxBusinessHoursEntries = 7;
+
+    /// <summary>
+    /// Raw JSON array of <see cref="BusinessHoursEntry"/>, one per open weekday. Same jsonb-column
+    /// convention as <see cref="CarouselSlidesJson"/>. Null or empty means "no hours configured
+    /// yet" — the public test-drive slot query returns no slots for any day until this is set,
+    /// rather than guessing a default schedule.
+    /// </summary>
+    public string? BusinessHoursJson { get; private set; }
+
+    /// <summary>
+    /// Replaces the whole weekly schedule. Validates every entry before mutating anything (same
+    /// posture as <see cref="UpdateLanding"/>): rejects a day listed twice, and rejects
+    /// <c>OpenTime &gt;= CloseTime</c> when both are set on the same entry. An entry with both times
+    /// null is a valid "explicitly closed" row. A day missing from <paramref name="entries"/> is
+    /// closed by omission — callers do not need to send all 7 days.
+    /// </summary>
+    public void SetBusinessHours(IReadOnlyList<BusinessHoursEntry>? entries)
+    {
+        string? json = SerializeBusinessHours(entries);
+
+        BusinessHoursJson = json;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static string? SerializeBusinessHours(IReadOnlyList<BusinessHoursEntry>? entries)
+    {
+        if (entries is null || entries.Count == 0)
+        {
+            return null;
+        }
+
+        if (entries.Count > MaxBusinessHoursEntries)
+        {
+            throw new DomainException(
+                $"Business hours can have at most {MaxBusinessHoursEntries} entries (one per day of the week).");
+        }
+
+        var seenDays = new HashSet<DayOfWeek>();
+        foreach (BusinessHoursEntry entry in entries)
+        {
+            if (!seenDays.Add(entry.DayOfWeek))
+            {
+                throw new DomainException($"Business hours cannot list {entry.DayOfWeek} more than once.");
+            }
+
+            if (entry.OpenTime is not null && entry.CloseTime is not null && entry.OpenTime >= entry.CloseTime)
+            {
+                throw new DomainException(
+                    $"Business hours for {entry.DayOfWeek}: OpenTime must be earlier than CloseTime.");
+            }
+
+            if (entry.OpenTime is null != entry.CloseTime is null)
+            {
+                throw new DomainException(
+                    $"Business hours for {entry.DayOfWeek}: OpenTime and CloseTime must either both be set or both be null.");
+            }
+        }
+
+        return JsonSerializer.Serialize(entries);
+    }
+
+    /// <summary>Deserializes <see cref="BusinessHoursJson"/> back into typed entries.</summary>
+    public IReadOnlyList<BusinessHoursEntry> GetBusinessHours()
+    {
+        if (string.IsNullOrWhiteSpace(BusinessHoursJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<BusinessHoursEntry>>(BusinessHoursJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            // Same fallback posture as GetCarouselSlides(): never 500 the public scheduler over a
+            // corrupted/future-format row — treat it as "no hours configured" instead.
+            return [];
+        }
+    }
+
     public void UpdateVisual(string? logoUrl, string? primaryColor, string? secondaryColor, string? footerText)
     {
         if (primaryColor != null && !string.IsNullOrWhiteSpace(primaryColor) && !System.Text.RegularExpressions.Regex.IsMatch(primaryColor, @"^#[0-9A-Fa-f]{6}$"))
