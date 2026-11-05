@@ -66,6 +66,14 @@ internal sealed class RedisSubscriptionStatusCache : ISubscriptionStatusCache
         // the status, and only then — a later SetAsync call while still PastDue (e.g. a Stripe dunning
         // retry re-fetched from the DB) must NOT push the anchor forward, or the grace period would never
         // actually expire. Any other status clears the anchor so a future PastDue starts a fresh window.
+        //
+        // Security review follow-up: if a dealer recovers (PastDue -> Active) and relapses so fast that
+        // NO request hits this cache during the Active window, SetAsync's else-branch below never runs,
+        // and the next PastDue read keeps the OLD anchor instead of starting fresh. Traced through: this
+        // can only make the anchor OLDER than the dealer's current episode, which only SHORTENS the grace
+        // window the resolver grants (denies sooner) — it can never extend it past the original anchor +
+        // grace. Confirmed: this is not an enforcement bypass, only a rare case of a stricter-than-intended
+        // grace window for a dealer with an unobserved recovery blip. Not worth a DB column for now.
         var sinceKey = GetPastDueSinceKey(dealerId);
         if (status == SubscriptionStatus.PastDue)
         {
