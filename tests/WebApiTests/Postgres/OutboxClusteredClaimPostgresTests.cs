@@ -7,6 +7,7 @@ using Domain.Shared;
 using FluentAssertions;
 using Infrastructure.BackgroundJobs;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
@@ -94,11 +95,13 @@ public class OutboxClusteredClaimPostgresTests : IAsyncLifetime
 
         var jobA = new ProcessOutboxMessagesJob(
             scopeA.ServiceProvider.GetRequiredService<IApplicationDbContext>(),
+            scopeA.ServiceProvider.GetRequiredService<DbContext>(),
             publisherA,
             NullLogger<ProcessOutboxMessagesJob>.Instance);
 
         var jobB = new ProcessOutboxMessagesJob(
             scopeB.ServiceProvider.GetRequiredService<IApplicationDbContext>(),
+            scopeB.ServiceProvider.GetRequiredService<DbContext>(),
             publisherB,
             NullLogger<ProcessOutboxMessagesJob>.Instance);
 

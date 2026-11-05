@@ -623,6 +623,7 @@ public static class DependencyInjection
                 .AddJob<ProcessOutboxMessagesJob>(opts => opts.WithIdentity(outboxJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(outboxJobKey)
+                        .WithIdentity($"{outboxJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(10)
                                 .RepeatForever()));
@@ -633,6 +634,7 @@ public static class DependencyInjection
                 .AddJob<MarkExpiredQuotesJob>(opts => opts.WithIdentity(expiredQuotesJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(expiredQuotesJobKey)
+                        .WithIdentity($"{expiredQuotesJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInMinutes(5) // Check every 5 minutes
                                 .RepeatForever()));
@@ -643,6 +645,7 @@ public static class DependencyInjection
                 .AddJob<ProcessStripeWebhooksJob>(opts => opts.WithIdentity(stripeJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(stripeJobKey)
+                        .WithIdentity($"{stripeJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(5)
                                 .RepeatForever()));
@@ -654,6 +657,7 @@ public static class DependencyInjection
                 .AddJob<DispatchWebhookDeliveriesJob>(opts => opts.WithIdentity(webhookDispatchJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(webhookDispatchJobKey)
+                        .WithIdentity($"{webhookDispatchJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(15)
                                 .RepeatForever()));
@@ -664,6 +668,7 @@ public static class DependencyInjection
                 .AddJob<DispatchIntegrationCommandsJob>(opts => opts.WithIdentity(integrationJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(integrationJobKey)
+                        .WithIdentity($"{integrationJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(10)
                                 .RepeatForever()));
@@ -674,6 +679,7 @@ public static class DependencyInjection
                 .AddJob<LeadReengagementJob>(opts => opts.WithIdentity(reengagementJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(reengagementJobKey)
+                        .WithIdentity($"{reengagementJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInHours(24)
                                 .RepeatForever()));
@@ -684,6 +690,7 @@ public static class DependencyInjection
                 .AddJob<BuildTenantExportJob>(opts => opts.WithIdentity(exportJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(exportJobKey)
+                        .WithIdentity($"{exportJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(30)
                                 .RepeatForever()));
@@ -694,6 +701,7 @@ public static class DependencyInjection
                 .AddJob<PurgeTenantDataJob>(opts => opts.WithIdentity(purgeJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(purgeJobKey)
+                        .WithIdentity($"{purgeJobKey.Name}-trigger")
                         .WithCronSchedule("0 0 3 * * ?"));
 
             // sfc C2.4: after-sales reminders (RN-049), daily at 10:30 UTC.
@@ -702,6 +710,7 @@ public static class DependencyInjection
                 .AddJob<ServiceReminderJob>(opts => opts.WithIdentity(serviceReminderJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(serviceReminderJobKey)
+                        .WithIdentity($"{serviceReminderJobKey.Name}-trigger")
                         .WithCronSchedule("0 30 10 * * ?"));
 
             // sfc B6.2: follow-up reminders (RN-041), daily at 11:00 UTC (08:00 in Argentina).
@@ -710,6 +719,7 @@ public static class DependencyInjection
                 .AddJob<FollowUpCadenceJob>(opts => opts.WithIdentity(followUpJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(followUpJobKey)
+                        .WithIdentity($"{followUpJobKey.Name}-trigger")
                         .WithCronSchedule("0 0 11 * * ?"));
 
             // sfc B1.3.3: deposit sweep (RN-002/RN-003), hourly at minute 5.
@@ -718,6 +728,7 @@ public static class DependencyInjection
                 .AddJob<ExpireDepositsJob>(opts => opts.WithIdentity(depositJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(depositJobKey)
+                        .WithIdentity($"{depositJobKey.Name}-trigger")
                         .WithCronSchedule("0 5 * * * ?"));
 
             // Job 9: retries storage deletes parked by the tenant purge (every 15 minutes). No feature flag: it only
@@ -727,6 +738,7 @@ public static class DependencyInjection
                 .AddJob<StorageDeletionRetryJob>(opts => opts.WithIdentity(storageRetryJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(storageRetryJobKey)
+                        .WithIdentity($"{storageRetryJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInMinutes(15)
                                 .RepeatForever()));
@@ -743,6 +755,7 @@ public static class DependencyInjection
                     .AddJob<ReconcileSubscriptionsJob>(opts => opts.WithIdentity(reconcileJobKey).StoreDurably())
                     .AddTrigger(trigger =>
                         trigger.ForJob(reconcileJobKey)
+                            .WithIdentity($"{reconcileJobKey.Name}-trigger")
                             .WithSimpleSchedule(schedule =>
                                 schedule.WithIntervalInMinutes(Math.Max(1, reconciliation.IntervalMinutes))
                                     .RepeatForever()));

@@ -26,13 +26,16 @@ public sealed class ProductionAssertionTests
                 // NoOp-vs-Turnstile decision runs synchronously during AddInfrastructure, on
                 // builder.Configuration, before Build() merges ConfigureAppConfiguration's additions.
                 builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+                // spr PR 5.1.8: same reason — AddBackgroundJobs now reads UseInMemoryDatabase
+                // synchronously (to skip Quartz's persistent Postgres store under tests), so it must
+                // also be UseSetting, or the host tries a real Postgres connection and fails auth.
+                builder.UseSetting("UseInMemoryDatabase", "true");
                 builder.ConfigureAppConfiguration((_, config) =>
                 {
                     config.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["FeatureFlags:SubscriptionEnforcement"] = "false",
                         ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
-                        ["UseInMemoryDatabase"] = "true",
                         ["ConnectionStrings:Redis"] = "",
                         ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
                         ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
@@ -58,6 +61,7 @@ public sealed class ProductionAssertionTests
             {
                 builder.UseEnvironment("Production");
                 builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+                builder.UseSetting("UseInMemoryDatabase", "true");
                 builder.ConfigureAppConfiguration((_, config) =>
                 {
                     config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -65,7 +69,6 @@ public sealed class ProductionAssertionTests
                         ["FeatureFlags:SubscriptionEnforcement"] = "true",
                         ["Stripe:WebhookSecret"] = "whsec_startup_test_only",
                         ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
-                        ["UseInMemoryDatabase"] = "true",
                         ["ConnectionStrings:Redis"] = "",
                         ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
                         ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",

@@ -16,9 +16,14 @@ namespace Infrastructure.BackgroundJobs;
 [DisallowConcurrentExecution]
 public class ProcessOutboxMessagesJob(
     IApplicationDbContext dbContext,
+    DbContext efContext,
     IPublisher publisher,
     ILogger<ProcessOutboxMessagesJob> logger) : IJob
 {
+    // DI resolves both IApplicationDbContext and the base DbContext to the same scoped
+    // ApplicationDbContext instance (same identity, two interfaces) — efContext is only here for
+    // the raw Database.ExecuteSqlInterpolatedAsync/Entry access IApplicationDbContext doesn't expose.
+
     /// <summary>
     /// Explicit type map for safe deserialization of domain events.
     /// Only types in this dictionary can be instantiated from outbox messages.
@@ -41,14 +46,20 @@ public class ProcessOutboxMessagesJob(
         TypeNameHandling = TypeNameHandling.None
     };
 
+    /// <summary>
+    /// Security review follow-up (spr PR 5.1): the claim must never grab a row another job owns.
+    /// "StripeRaw" rows belong exclusively to <see cref="ProcessStripeWebhooksJob"/> — without this
+    /// filter, this job's atomic claim marks them processed before that job ever sees them, silently
+    /// dropping every Stripe webhook routed through the outbox. Add any other job-owned Type here.
+    /// </summary>
+    private const string StripeRawType = "StripeRaw";
+
     public async Task Execute(IJobExecutionContext context)
     {
         // spr PR 5.1 (OPS-07): defense in depth, independent of Quartz clustering — atomically
         // claim rows via a single UPDATE ... RETURNING guarded by FOR UPDATE SKIP LOCKED, so two
         // schedulers racing against the same Postgres (e.g. the blue/green overlap window during
-        // a deploy) can never read and process the same outbox message twice. The claim sets
-        // ProcessedOnUtc up front; the catch block below resets it to null on a publish failure
-        // so the retry-on-next-tick behavior is unchanged from before this fix.
+        // a deploy) can never read and process the same outbox message twice.
         DateTime claimedAtUtc = DateTime.UtcNow;
         List<OutboxMessage> messages = await dbContext
             .OutboxMessages
@@ -57,7 +68,7 @@ public class ProcessOutboxMessagesJob(
                 SET processed_on_utc = {claimedAtUtc}
                 WHERE id IN (
                     SELECT id FROM ""OutboxMessages""
-                    WHERE processed_on_utc IS NULL
+                    WHERE processed_on_utc IS NULL AND type <> {StripeRawType}
                     ORDER BY occurred_on_utc
                     LIMIT 20
                     FOR UPDATE SKIP LOCKED
@@ -129,10 +140,23 @@ public class ProcessOutboxMessagesJob(
             }
             catch (Exception ex)
             {
-                // Undo the claim so the message is retried on the next tick — matches the
-                // pre-claim behavior where a failed publish left ProcessedOnUtc null.
+                // Security review follow-up: the claim above already committed on its own (it is a
+                // standalone statement, not part of this method's final SaveChangesAsync). If this
+                // undo were left for that same final SaveChangesAsync, a crash between here and that
+                // call would leave the message permanently marked processed despite never publishing —
+                // the exact message-loss window the review flagged. Persist the undo immediately, on
+                // its own, with CancellationToken.None so a cancelling host still gets it recorded.
+                await efContext.Database.ExecuteSqlInterpolatedAsync(
+                    $@"UPDATE ""OutboxMessages"" SET processed_on_utc = NULL, error = {ex.Message} WHERE id = {outboxMessage.Id}",
+                    CancellationToken.None);
+
+                // Keep the in-memory entity's tracked state consistent with what was just persisted,
+                // so this loop's later SaveChangesAsync (for unrelated messages in the same batch)
+                // does not try to write a stale ProcessedOnUtc value back over the undo.
                 outboxMessage.ProcessedOnUtc = null;
                 outboxMessage.Error = ex.Message;
+                efContext.Entry(outboxMessage).Property(m => m.ProcessedOnUtc).IsModified = false;
+                efContext.Entry(outboxMessage).Property(m => m.Error).IsModified = false;
             }
         }
 

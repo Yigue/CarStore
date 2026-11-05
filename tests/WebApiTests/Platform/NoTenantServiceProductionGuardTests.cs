@@ -67,6 +67,11 @@ public class NoTenantServiceProductionGuardTests
             // spr PR 3.3 (B10): without this, Program.cs's anti-NoOp captcha guard would throw
             // before NoTenantServiceProductionGuard gets a chance to — this test targets the latter.
             builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+            // spr PR 5.1.8: AddBackgroundJobs reads this flag directly (unrelated to the SQLite
+            // DbContext swap below) to skip Quartz's persistent Postgres store under tests — without
+            // it, the host also tries a real Postgres connection and fails auth before this test's
+            // own guard gets a chance to run.
+            builder.UseSetting("UseInMemoryDatabase", "true");
 
             // Production environment triggers NoTenantServiceProductionGuard registration.
             builder.UseEnvironment("Production");

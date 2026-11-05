@@ -37,6 +37,10 @@ public sealed class StartupAssertionTests
                 // to it at that point; `ConfigureAppConfiguration`'s additions are only merged into
                 // `app.Configuration` once `Build()` runs, too late for this particular read.
                 builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+                // spr PR 5.1.8: same reason — AddBackgroundJobs now reads UseInMemoryDatabase
+                // synchronously (to skip Quartz's persistent Postgres store under tests), so it must
+                // also be UseSetting, or the host tries a real Postgres connection and fails auth.
+                builder.UseSetting("UseInMemoryDatabase", "true");
 
                 // Provide env-vars that CustomWebApplicationFactory normally sets,
                 // so the infrastructure DI registration succeeds up to the assertion point.
@@ -51,9 +55,6 @@ public sealed class StartupAssertionTests
 
                         // The trigger: DevFallbackDealerId in Production must be rejected.
                         ["Tenant:DevFallbackDealerId"] = fallbackGuid,
-
-                        // Avoid real DB connection string requirement.
-                        ["UseInMemoryDatabase"] = "true",
 
                         // Minio: minimal values to pass options binding (ValidateOnStart fires
                         // during IHost.StartAsync which never runs — thrown before app.Run).
@@ -94,6 +95,7 @@ public sealed class StartupAssertionTests
                 // spr PR 3.3 (B10): must be UseSetting, not ConfigureAppConfiguration — see the
                 // comment on the first test above for why.
                 builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+                builder.UseSetting("UseInMemoryDatabase", "true");
                 builder.UseEnvironment("Production");
                 builder.ConfigureAppConfiguration((_, config) =>
                 {
@@ -105,7 +107,6 @@ public sealed class StartupAssertionTests
                         ["FeatureFlags:SubscriptionEnforcement"] = "true",
                         ["Stripe:WebhookSecret"] = "whsec_startup_test_only",
                         ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
-                        ["UseInMemoryDatabase"] = "true",
                         ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
                         ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
                         ["Storage:Minio:AccessKey"] = "minioadmin",
@@ -133,6 +134,7 @@ public sealed class StartupAssertionTests
                 // captcha guard, contradicting "boots clean". See the comment on the first test
                 // above for why ConfigureAppConfiguration doesn't reach this particular check.
                 builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+                builder.UseSetting("UseInMemoryDatabase", "true");
                 builder.ConfigureAppConfiguration((_, config) =>
                 {
                     config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -142,7 +144,6 @@ public sealed class StartupAssertionTests
                         ["FeatureFlags:SubscriptionEnforcement"] = "true",
                         ["Stripe:WebhookSecret"] = "whsec_startup_test_only",
                         ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
-                        ["UseInMemoryDatabase"] = "true",
                         ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
                         ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
                         ["Storage:Minio:AccessKey"] = "minioadmin",

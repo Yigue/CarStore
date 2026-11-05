@@ -31,7 +31,7 @@ public class ProcessOutboxMessagesJobWebhookTests
     }
 
     private static ProcessOutboxMessagesJob CreateJob(TestApplicationDbContext context) =>
-        new(context, Mock.Of<IPublisher>(), NullLogger<ProcessOutboxMessagesJob>.Instance);
+        new(context, context, Mock.Of<IPublisher>(), NullLogger<ProcessOutboxMessagesJob>.Instance);
 
     private static OutboxMessage CreateOutboxMessage(Guid dealerId) => new()
     {
