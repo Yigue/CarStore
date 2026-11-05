@@ -205,6 +205,16 @@ if (string.IsNullOrWhiteSpace(stripeWebhookSecret))
     }
 }
 
+// spr PR 5.1 (OPS-06): a Production boot with billing enforcement disabled means every dealer's
+// subscription gate is effectively off — the same free-ride risk the Incomplete fail-closed (PR 3.1)
+// and the CAPTCHA guard above exist to prevent. Fail fast instead of silently running unmetered.
+if (app.Environment.IsProduction() && !subscriptionEnforcement)
+{
+    throw new InvalidOperationException(
+        "FeatureFlags:SubscriptionEnforcement must be true in Production — running with billing " +
+        "enforcement disabled would let every dealer use the product without a confirmed subscription.");
+}
+
 // PR1 (saas-custom-domains) ADR-1: refuse to start the host if a dev-fallback
 // is configured outside Development. Mirrors the Jwt:Secret fail-fast above.
 // Spec: openspec/changes/saas-custom-domains/specs/tenant-safety-default-deny

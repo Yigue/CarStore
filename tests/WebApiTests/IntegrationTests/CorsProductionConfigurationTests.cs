@@ -86,7 +86,9 @@ public sealed class CorsProductionConfigurationTests
                             ["ConnectionStrings:Redis"] = "",
                             ["Stripe:Enabled"] = "false",
                             ["Stripe:WebhookSecret"] = "whsec_dummy",
-                            ["FeatureFlags:SubscriptionEnforcement"] = "false"
+                            // spr PR 5.1 (OPS-06): Production now requires enforcement on; this test is
+                            // about CORS, not billing, so keep it true here to stay past that guard.
+                            ["FeatureFlags:SubscriptionEnforcement"] = "true"
                         });
                     });
 

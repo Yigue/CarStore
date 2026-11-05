@@ -63,8 +63,10 @@ public sealed class StartupAssertionTests
                         ["Storage:Minio:SecretKey"] = "minioadmin123",
                         ["Storage:Minio:BucketName"] = "cars",
 
-                        // Disable subscription enforcement so it doesn't fail on missing WebhookSecret
-                        ["FeatureFlags:SubscriptionEnforcement"] = "false",
+                        // spr PR 5.1 (OPS-06): Production now requires enforcement on; this test is
+                        // about DevFallbackDealerId, not billing, so give it a webhook secret too.
+                        ["FeatureFlags:SubscriptionEnforcement"] = "true",
+                        ["Stripe:WebhookSecret"] = "whsec_startup_test_only",
 
                         // Redis: empty → uses in-memory cache fallback.
                         ["ConnectionStrings:Redis"] = ""
@@ -97,7 +99,11 @@ public sealed class StartupAssertionTests
                 {
                     config.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        ["FeatureFlags:SubscriptionEnforcement"] = "false",
+                        // spr PR 5.1 (OPS-06): Production now requires enforcement on; this test is
+                        // about Stripe PriceId validation, which fires at Build() before this guard
+                        // would even run — kept consistent anyway.
+                        ["FeatureFlags:SubscriptionEnforcement"] = "true",
+                        ["Stripe:WebhookSecret"] = "whsec_startup_test_only",
                         ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
                         ["UseInMemoryDatabase"] = "true",
                         ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
@@ -131,8 +137,10 @@ public sealed class StartupAssertionTests
                 {
                     config.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        // No Stripe settings
-                        ["FeatureFlags:SubscriptionEnforcement"] = "false",
+                        // No Stripe:SecretKey/PriceId section — only the webhook secret spr PR 5.1
+                        // (OPS-06) now requires in Production alongside enforcement being on.
+                        ["FeatureFlags:SubscriptionEnforcement"] = "true",
+                        ["Stripe:WebhookSecret"] = "whsec_startup_test_only",
                         ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
                         ["UseInMemoryDatabase"] = "true",
                         ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
