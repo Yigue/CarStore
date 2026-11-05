@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -7,6 +8,7 @@ using Application.Tenancy;
 using Domain.Billing;
 using Domain.DealerSettings;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Infrastructure.Middleware;
@@ -84,7 +86,29 @@ public sealed class SubscriptionGuardMiddleware
             if (reader is not null)
                 lifecycle = await reader.GetAsync(dealerId, context.RequestAborted);
 
-            var decision = TenantAccessPolicy.Evaluate(status, lifecycle, context.Request.Method, path);
+            // spr PR 3.1 (ADR B8, D2): only fetch the PastDue anchor when it is actually relevant —
+            // avoids an extra cache round-trip for the common Active/Trialing/no-row paths.
+            DateTime? pastDueSinceUtc = null;
+            if (status == SubscriptionStatus.PastDue)
+            {
+                pastDueSinceUtc = await cache.GetPastDueSinceAsync(dealerId, context.RequestAborted);
+            }
+
+            // Billing:PastDueGraceDays (default 7). Read via the optional IConfiguration service — same
+            // "missing registration defaults safely" pattern as ITenantLifecycleReader above, so tests
+            // that don't register IConfiguration in their minimal service collection keep working.
+            var configuration = context.RequestServices.GetService<IConfiguration>();
+            var pastDueGrace = DealerOperationalStatusResolver.DefaultPastDueGrace;
+            var graceDays = configuration?.GetValue<int?>("Billing:PastDueGraceDays");
+            if (graceDays is > 0)
+            {
+                pastDueGrace = TimeSpan.FromDays(graceDays.Value);
+            }
+
+            var decision = TenantAccessPolicy.Evaluate(
+                status, lifecycle, context.Request.Method, path,
+                pastDueSinceUtc: pastDueSinceUtc,
+                pastDueGrace: pastDueGrace);
             bool allowed = decision.Allowed;
 
             if (!allowed)

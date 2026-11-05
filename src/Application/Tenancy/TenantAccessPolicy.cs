@@ -36,8 +36,28 @@ public static class TenantAccessPolicy
     private static readonly Regex LockedEscapeHatchPath = new(
         @"^/api/v1/(users/(login|me)|subscriptions/portal)/?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    /// <param name="status">Cached subscription status; null means no row (legacy dealer).</param>
+    /// <param name="lifecycle">Tenant lifecycle; takes precedence over billing per the matrix above.</param>
+    /// <param name="method">HTTP method of the current request.</param>
+    /// <param name="path">HTTP path of the current request.</param>
+    /// <param name="pastDueSinceUtc">
+    /// spr PR 3.1 (ADR B8, D2): when <paramref name="status"/> is <see cref="SubscriptionStatus.PastDue"/>,
+    /// the UTC instant that standing began (from <see cref="Application.Abstractions.Billing.ISubscriptionStatusCache.GetPastDueSinceAsync"/>).
+    /// Null (unknown) fails closed — same behavior as before this parameter existed.
+    /// </param>
+    /// <param name="pastDueGrace">
+    /// Configurable PastDue tolerance (<c>Billing:PastDueGraceDays</c>, default 7). Null reuses
+    /// <see cref="DealerOperationalStatusResolver.DefaultPastDueGrace"/>.
+    /// </param>
+    /// <param name="nowUtc">Injectable "now" for tests; defaults to <see cref="DateTime.UtcNow"/>.</param>
     public static TenantAccessDecision Evaluate(
-        SubscriptionStatus? status, TenantLifecycleStatus lifecycle, string method, string path)
+        SubscriptionStatus? status,
+        TenantLifecycleStatus lifecycle,
+        string method,
+        string path,
+        DateTime? pastDueSinceUtc = null,
+        TimeSpan? pastDueGrace = null,
+        DateTime? nowUtc = null)
     {
         bool isRead = IsRead(method);
         bool isGet = string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase);
@@ -59,8 +79,20 @@ public static class TenantAccessPolicy
                 return TenantAccessDecision.Deny(LockedError);
 
             default:
-                bool paying = status is SubscriptionStatus.Active or SubscriptionStatus.Trialing;
-                return paying ? TenantAccessDecision.Allow : TenantAccessDecision.Deny(SuspendedError);
+                // spr PR 3.1 (ADR B8, D2): reuse the already-tested pure resolver instead of
+                // reimplementing the PastDue grace period here. isActive is always true by this point —
+                // a manually-suspended dealer (SuspendedManual) never reaches this branch; the manual
+                // switch is enforced upstream (DealerSuspensionMiddleware), before the billing gate runs.
+                var billing = BillingStandingMapper.From(status);
+                var decision = DealerOperationalStatusResolver.DecideAccess(
+                    isActive: true,
+                    billing: billing,
+                    pastDueSinceUtc: pastDueSinceUtc,
+                    nowUtc: nowUtc ?? DateTime.UtcNow,
+                    pastDueGrace: pastDueGrace);
+                return decision == DealerAccessDecision.Allowed
+                    ? TenantAccessDecision.Allow
+                    : TenantAccessDecision.Deny(SuspendedError);
         }
     }
 

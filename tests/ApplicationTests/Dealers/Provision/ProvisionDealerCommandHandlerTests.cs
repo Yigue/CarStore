@@ -85,6 +85,36 @@ public class ProvisionDealerCommandHandlerTests
         user.Email.Value.Should().Be("admin@automotors.com");
     }
 
+    // spr PR 3.1 (ADR B8), task 3.1.1: the dealer never exists without a subscription row, created
+    // Incomplete in the SAME transaction regardless of whether Stripe confirmed a customer. This
+    // covers the "Stripe succeeded" half; Handle_ShouldSucceedWithNullCheckoutUrl_WhenStripeGatewayThrows
+    // below (already pre-existing) covers the "Stripe failed" half with the same assertion added.
+    [Fact]
+    public async Task Handle_ShouldCreateIncompleteSubscriptionRow_InSameTransaction_WhenStripeSucceeds()
+    {
+        using var context = CreateContext();
+        var publisher = new Mock<MediatR.IPublisher>();
+        publisher.Setup(p => p.Publish(It.IsAny<MediatR.INotification>(), It.IsAny<CancellationToken>()))
+                 .Returns(Task.CompletedTask);
+        var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
+        gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Application.Abstractions.Billing.CheckoutReturn>(), It.IsAny<CancellationToken>())).ReturnsAsync("https://checkout.stripe.com/123");
+
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
+
+        var result = await handler.Handle(ValidCommand("stripe-ok"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+
+        var subscription = await context.DealerSubscriptions
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(s => s.DealerId == result.Value.DealerId);
+        subscription.Should().NotBeNull("spr ADR B8: provisioning must always create the subscription row");
+        subscription!.Status.Should().Be(Domain.Billing.SubscriptionStatus.Incomplete,
+            "the row starts Incomplete until Stripe confirms a trial/payment, even when the Stripe customer call itself succeeded");
+        subscription.StripeCustomerId.Should().Be("cus_123");
+    }
+
     [Fact]
     public async Task Handle_ShouldUseSameGuid_ForDealerSettingsIdAndDealerId()
     {
@@ -232,5 +262,15 @@ public class ProvisionDealerCommandHandlerTests
         var roles = await context.Roles.IgnoreQueryFilters().Where(r => r.DealerId == result.Value.DealerId).ToListAsync();
         roles.Should().HaveCount(2);
         roles.Select(r => r.Name).Should().Contain(new[] { "Admin", "Cliente" });
+
+        // spr PR 3.1 (ADR B8), task 3.1.1: the "Stripe failed" half of the same guarantee —
+        // the subscription row is still created Incomplete, in the same transaction, with a null
+        // StripeCustomerId (Stripe was unreachable during provisioning).
+        var subscription = await context.DealerSubscriptions
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(s => s.DealerId == result.Value.DealerId);
+        subscription.Should().NotBeNull("spr ADR B8: a dealer never exists without a subscription row, Stripe outage or not");
+        subscription!.Status.Should().Be(Domain.Billing.SubscriptionStatus.Incomplete);
+        subscription.StripeCustomerId.Should().BeNull("Stripe never returned a customer id in this scenario");
     }
 }

@@ -22,4 +22,9 @@ public class NoOpSubscriptionStatusCache : ISubscriptionStatusCache
     {
         return Task.CompletedTask;
     }
+
+    public Task<DateTime?> GetPastDueSinceAsync(Guid dealerId, CancellationToken ct = default)
+    {
+        return Task.FromResult<DateTime?>(null);
+    }
 }
