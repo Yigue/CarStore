@@ -26,6 +26,8 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
     <PackageReference Include="Quartz.AspNetCore" />
+    <!-- spr PR 5.1 (OPS-07): required by UseJsonSerializer() on the clustered ADO job store. -->
+    <PackageReference Include="Quartz.Serialization.Json" />
     <!-- sfc B3.1 / B8: QuestPDF-backed IDocumentRenderer -->
     <PackageReference Include="QuestPDF" />
     <PackageReference Include="StackExchange.Redis" />

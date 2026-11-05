@@ -603,12 +603,24 @@ public static class DependencyInjection
             return services;
         }
 
+        // spr PR 5.1 (OPS-07): same Postgres used by EF Core, read from the connection string
+        // key already used by AddDbContext/UseNpgsql below (never a separate config key).
+        string quartzConnectionString = configuration.GetConnectionString("Database")
+            ?? throw new InvalidOperationException("Missing ConnectionStrings:Database for Quartz's clustered job store.");
+
         services.AddQuartz(configure =>
         {
+            // spr PR 5.1 (OPS-07): stable scheduler name shared by every node so they form one
+            // cluster against the persistent store below; SchedulerId stays "AUTO" so each node
+            // gets its own unique instance id (required by UseClustering, see docs/runbooks/
+            // quartz-clustering-y-multi-instancia.md).
+            configure.SchedulerName = "CarStoreScheduler";
+            configure.SchedulerId = "AUTO";
+
             // Job 1: Process Outbox Messages
             var outboxJobKey = new JobKey(nameof(ProcessOutboxMessagesJob));
             configure
-                .AddJob<ProcessOutboxMessagesJob>(opts => opts.WithIdentity(outboxJobKey))
+                .AddJob<ProcessOutboxMessagesJob>(opts => opts.WithIdentity(outboxJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(outboxJobKey)
                         .WithSimpleSchedule(schedule =>
@@ -618,7 +630,7 @@ public static class DependencyInjection
             // Job 2: Mark Expired Quotes
             var expiredQuotesJobKey = new JobKey(nameof(MarkExpiredQuotesJob));
             configure
-                .AddJob<MarkExpiredQuotesJob>(opts => opts.WithIdentity(expiredQuotesJobKey))
+                .AddJob<MarkExpiredQuotesJob>(opts => opts.WithIdentity(expiredQuotesJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(expiredQuotesJobKey)
                         .WithSimpleSchedule(schedule =>
@@ -628,7 +640,7 @@ public static class DependencyInjection
             // Job 3: Process Stripe Webhooks
             var stripeJobKey = new JobKey(nameof(ProcessStripeWebhooksJob));
             configure
-                .AddJob<ProcessStripeWebhooksJob>(opts => opts.WithIdentity(stripeJobKey))
+                .AddJob<ProcessStripeWebhooksJob>(opts => opts.WithIdentity(stripeJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(stripeJobKey)
                         .WithSimpleSchedule(schedule =>
@@ -639,7 +651,7 @@ public static class DependencyInjection
             // WebhookDelivery rows — see Domain.Webhooks.WebhookRetryPolicy).
             var webhookDispatchJobKey = new JobKey(nameof(DispatchWebhookDeliveriesJob));
             configure
-                .AddJob<DispatchWebhookDeliveriesJob>(opts => opts.WithIdentity(webhookDispatchJobKey))
+                .AddJob<DispatchWebhookDeliveriesJob>(opts => opts.WithIdentity(webhookDispatchJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(webhookDispatchJobKey)
                         .WithSimpleSchedule(schedule =>
@@ -649,7 +661,7 @@ public static class DependencyInjection
             // sfc C1.1 / ADR C22: integration command queue (providers opt in via Integrations:{Provider}:Enabled).
             var integrationJobKey = new JobKey(nameof(DispatchIntegrationCommandsJob));
             configure
-                .AddJob<DispatchIntegrationCommandsJob>(opts => opts.WithIdentity(integrationJobKey))
+                .AddJob<DispatchIntegrationCommandsJob>(opts => opts.WithIdentity(integrationJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(integrationJobKey)
                         .WithSimpleSchedule(schedule =>
@@ -659,7 +671,7 @@ public static class DependencyInjection
             // Job 5: Lost-lead re-engagement (disabled by default — Crm:Reengagement:Enabled).
             var reengagementJobKey = new JobKey(nameof(LeadReengagementJob));
             configure
-                .AddJob<LeadReengagementJob>(opts => opts.WithIdentity(reengagementJobKey))
+                .AddJob<LeadReengagementJob>(opts => opts.WithIdentity(reengagementJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(reengagementJobKey)
                         .WithSimpleSchedule(schedule =>
@@ -669,7 +681,7 @@ public static class DependencyInjection
             // Job 7: Tenant data exports (RN-014): builds pending ZIPs and expires old ones.
             var exportJobKey = new JobKey(nameof(BuildTenantExportJob));
             configure
-                .AddJob<BuildTenantExportJob>(opts => opts.WithIdentity(exportJobKey))
+                .AddJob<BuildTenantExportJob>(opts => opts.WithIdentity(exportJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(exportJobKey)
                         .WithSimpleSchedule(schedule =>
@@ -679,7 +691,7 @@ public static class DependencyInjection
             // Job 8: Tenant purge (RN-013, A1.4): daily at 03:00 UTC. Dry run unless Retention:PurgeEnabled=true.
             var purgeJobKey = new JobKey(nameof(PurgeTenantDataJob));
             configure
-                .AddJob<PurgeTenantDataJob>(opts => opts.WithIdentity(purgeJobKey))
+                .AddJob<PurgeTenantDataJob>(opts => opts.WithIdentity(purgeJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(purgeJobKey)
                         .WithCronSchedule("0 0 3 * * ?"));
@@ -687,7 +699,7 @@ public static class DependencyInjection
             // sfc C2.4: after-sales reminders (RN-049), daily at 10:30 UTC.
             var serviceReminderJobKey = new JobKey(nameof(ServiceReminderJob));
             configure
-                .AddJob<ServiceReminderJob>(opts => opts.WithIdentity(serviceReminderJobKey))
+                .AddJob<ServiceReminderJob>(opts => opts.WithIdentity(serviceReminderJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(serviceReminderJobKey)
                         .WithCronSchedule("0 30 10 * * ?"));
@@ -695,7 +707,7 @@ public static class DependencyInjection
             // sfc B6.2: follow-up reminders (RN-041), daily at 11:00 UTC (08:00 in Argentina).
             var followUpJobKey = new JobKey(nameof(FollowUpCadenceJob));
             configure
-                .AddJob<FollowUpCadenceJob>(opts => opts.WithIdentity(followUpJobKey))
+                .AddJob<FollowUpCadenceJob>(opts => opts.WithIdentity(followUpJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(followUpJobKey)
                         .WithCronSchedule("0 0 11 * * ?"));
@@ -703,7 +715,7 @@ public static class DependencyInjection
             // sfc B1.3.3: deposit sweep (RN-002/RN-003), hourly at minute 5.
             var depositJobKey = new JobKey(nameof(ExpireDepositsJob));
             configure
-                .AddJob<ExpireDepositsJob>(opts => opts.WithIdentity(depositJobKey))
+                .AddJob<ExpireDepositsJob>(opts => opts.WithIdentity(depositJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(depositJobKey)
                         .WithCronSchedule("0 5 * * * ?"));
@@ -712,7 +724,7 @@ public static class DependencyInjection
             // deletes objects of tenants already purged.
             var storageRetryJobKey = new JobKey(nameof(StorageDeletionRetryJob));
             configure
-                .AddJob<StorageDeletionRetryJob>(opts => opts.WithIdentity(storageRetryJobKey))
+                .AddJob<StorageDeletionRetryJob>(opts => opts.WithIdentity(storageRetryJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(storageRetryJobKey)
                         .WithSimpleSchedule(schedule =>
@@ -728,13 +740,35 @@ public static class DependencyInjection
             {
                 var reconcileJobKey = new JobKey(nameof(ReconcileSubscriptionsJob));
                 configure
-                    .AddJob<ReconcileSubscriptionsJob>(opts => opts.WithIdentity(reconcileJobKey))
+                    .AddJob<ReconcileSubscriptionsJob>(opts => opts.WithIdentity(reconcileJobKey).StoreDurably())
                     .AddTrigger(trigger =>
                         trigger.ForJob(reconcileJobKey)
                             .WithSimpleSchedule(schedule =>
                                 schedule.WithIntervalInMinutes(Math.Max(1, reconciliation.IntervalMinutes))
                                     .RepeatForever()));
             }
+
+            // spr PR 5.1 (OPS-07): clustered ADO job store on the app's own Postgres so only one
+            // node in the cluster fires each trigger — see docs/runbooks/
+            // quartz-clustering-y-multi-instancia.md ("Opción A"). Table schema/prefix are
+            // Quartz's own defaults (qrtz_*, lowercase, already consistent with this repo's
+            // snake_case convention once Postgres folds the unquoted identifiers).
+            configure.UsePersistentStore(store =>
+            {
+                store.UseProperties = true;
+                store.UsePostgres(quartzConnectionString);
+                store.UseClustering(cluster =>
+                {
+                    cluster.CheckinInterval = TimeSpan.FromSeconds(10);
+                    cluster.CheckinMisfireThreshold = TimeSpan.FromSeconds(15);
+                });
+
+                // Runbook pseudocode said UseSystemTextJsonSerializer(); Quartz.Serialization.Json
+                // 3.15.1 actually exposes it as UseJsonSerializer() (System.Text.Json-backed) vs.
+                // UseNewtonsoftJsonSerializer() — confirmed via reflection against the installed
+                // package, not assumed from the runbook's literal pseudocode.
+                store.UseJsonSerializer();
+            });
         });
 
         services.AddQuartzHostedService();

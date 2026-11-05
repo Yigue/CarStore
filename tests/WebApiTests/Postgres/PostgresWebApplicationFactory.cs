@@ -34,6 +34,12 @@ public sealed class PostgresWebApplicationFactory : WebApplicationFactory<Progra
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("UseInMemoryDatabase", "false");
+        // spr PR 5.1 (OPS-07): AddBackgroundJobs now reads ConnectionStrings:Database directly
+        // from IConfiguration for Quartz's clustered ADO job store (not just via the DbContext
+        // DI override below), so it must point at this fixture's Testcontainers Postgres too —
+        // otherwise Quartz's hosted service tries to connect with whatever default connection
+        // string is in appsettings and the whole host fails to start under "Testing".
+        builder.UseSetting("ConnectionStrings:Database", _connectionString);
         builder.UseSetting("Jwt:Secret", "SecretKeyForTestingPurposesOnly1234567890");
         builder.UseSetting("Jwt:Issuer", "CarStore");
         builder.UseSetting("Jwt:Audience", "CarStore");

@@ -43,10 +43,26 @@ public class ProcessOutboxMessagesJob(
 
     public async Task Execute(IJobExecutionContext context)
     {
+        // spr PR 5.1 (OPS-07): defense in depth, independent of Quartz clustering — atomically
+        // claim rows via a single UPDATE ... RETURNING guarded by FOR UPDATE SKIP LOCKED, so two
+        // schedulers racing against the same Postgres (e.g. the blue/green overlap window during
+        // a deploy) can never read and process the same outbox message twice. The claim sets
+        // ProcessedOnUtc up front; the catch block below resets it to null on a publish failure
+        // so the retry-on-next-tick behavior is unchanged from before this fix.
+        DateTime claimedAtUtc = DateTime.UtcNow;
         List<OutboxMessage> messages = await dbContext
             .OutboxMessages
-            .Where(m => m.ProcessedOnUtc == null)
-            .Take(20)
+            .FromSqlInterpolated($@"
+                UPDATE ""OutboxMessages""
+                SET processed_on_utc = {claimedAtUtc}
+                WHERE id IN (
+                    SELECT id FROM ""OutboxMessages""
+                    WHERE processed_on_utc IS NULL
+                    ORDER BY occurred_on_utc
+                    LIMIT 20
+                    FOR UPDATE SKIP LOCKED
+                )
+                RETURNING *")
             .ToListAsync(context.CancellationToken);
 
         if (messages.Count == 0)
@@ -109,10 +125,13 @@ public class ProcessOutboxMessagesJob(
             {
                 await publisher.Publish(domainEvent, context.CancellationToken);
 
-                outboxMessage.ProcessedOnUtc = DateTime.UtcNow;
+                // Already set to claimedAtUtc by the atomic claim above.
             }
             catch (Exception ex)
             {
+                // Undo the claim so the message is retried on the next tick — matches the
+                // pre-claim behavior where a failed publish left ProcessedOnUtc null.
+                outboxMessage.ProcessedOnUtc = null;
                 outboxMessage.Error = ex.Message;
             }
         }

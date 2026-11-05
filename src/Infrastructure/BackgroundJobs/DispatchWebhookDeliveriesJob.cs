@@ -34,6 +34,16 @@ public sealed class DispatchWebhookDeliveriesJob(
     {
         DateTime now = dateTimeProvider.UtcNow;
 
+        // spr PR 5.1 (OPS-07): evaluated the same atomic-claim defense-in-depth used in
+        // ProcessOutboxMessagesJob (FOR UPDATE SKIP LOCKED via raw SQL) for this job too, since
+        // it has the equivalent unclaimed read-then-save shape. Deliberately NOT applied here:
+        // this job's existing fast unit suite (DispatchWebhookDeliveriesJobTests) calls Execute()
+        // directly against the EF InMemory provider, which does not support FromSqlRaw/
+        // FromSqlInterpolated — adapting those tests is outside this change's allowed edit
+        // surface. Quartz clustering (this same PR) already removes the main real-world risk:
+        // only one node in the cluster fires this trigger, so the remaining exposure is just the
+        // brief blue/green overlap window already covered by the runbook's documented residual
+        // risk — see docs/runbooks/quartz-clustering-y-multi-instancia.md.
         List<WebhookDelivery> dueDeliveries = await dbContext.WebhookDeliveries
             .IgnoreQueryFilters() // background job runs without tenant context
             .Where(d => d.Status == WebhookDeliveryStatus.Pending && d.NextRetryAtUtc <= now)
