@@ -239,7 +239,9 @@ internal sealed class BuildTenantExportCommandHandler(
             string recipient = requesterEmail.Value;
 
             string baseUrl = (configuration["Frontend:BaseUrl"] ?? "https://carstore-app.com").TrimEnd('/');
-            string link = $"{baseUrl}/api/v1/dealer/exports/{export.Id}/download";
+            // A page, not the API URL: the API wants a Bearer header and a link clicked from an email carries
+            // none, so the old link could never be opened. The page signs in (if needed) and fetches the URL.
+            string link = $"{baseUrl}/dashboard/exportacion/{export.Id}";
             string body = $"""
                 Hola,
 

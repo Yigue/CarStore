@@ -31,7 +31,7 @@ public static class TenantAccessPolicy
         @"^/api/v1/dealer/exports/?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex ExportDownloadPath = new(
-        @"^/api/v1/dealer/exports/[^/]+/download/?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        @"^/api/v1/dealer/exports/[^/]+/download(-url)?/?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex LockedEscapeHatchPath = new(
         @"^/api/v1/(users/(login|me)|subscriptions/portal)/?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);

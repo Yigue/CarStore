@@ -282,7 +282,7 @@ public class BuildTenantExportCommandHandlerTests
         rig.Email.Verify(e => e.SendEmailAsync(
             "owner@dealer.com",
             It.IsAny<string>(),
-            It.Is<string>(body => body.Contains($"https://app.test/api/v1/dealer/exports/{export.Id}/download")),
+            It.Is<string>(body => body.Contains($"https://app.test/dashboard/exportacion/{export.Id}")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 

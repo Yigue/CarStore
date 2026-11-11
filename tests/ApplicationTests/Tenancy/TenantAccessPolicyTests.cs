@@ -15,6 +15,7 @@ public class TenantAccessPolicyTests
     private const string Cars = "/api/v1/cars";
     private const string Exports = "/api/v1/dealer/exports";
     private const string ExportDownload = "/api/v1/dealer/exports/3f2b8f0e-1111-2222-3333-444455556666/download";
+    private const string ExportDownloadUrl = "/api/v1/dealer/exports/3f2b8f0e-1111-2222-3333-444455556666/download-url";
 
     private static TenantAccessDecision Evaluate(
         SubscriptionStatus? status, TenantLifecycleStatus lifecycle, string method, string path) =>
@@ -52,6 +53,7 @@ public class TenantAccessPolicyTests
     [InlineData("HEAD", Cars)]
     [InlineData("get", Cars)]
     [InlineData("POST", Exports)]
+    [InlineData("GET", ExportDownloadUrl)]
     [InlineData("GET", ExportDownload)]
     public void CancelledGrace_AllowsReadsAndExportRequests(string method, string path)
     {
