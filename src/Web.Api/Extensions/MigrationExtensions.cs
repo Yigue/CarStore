@@ -124,6 +124,8 @@ public static class MigrationExtensions
 
                 // Usar dbContext directamente para evitar problemas de interfaz en tests
                 DatabaseSeeder.SeedAsync(dbContext, passwordHasher, configuration, logger).GetAwaiter().GetResult();
+                // spr Fase 8 (B21): opt-in happy-path fixtures; throws if enabled outside Dev/Testing.
+                E2EHappyPathSeeder.SeedAsync(dbContext, passwordHasher, configuration, env.EnvironmentName).GetAwaiter().GetResult();
                 Log.Information("Data seeded successfully");
             }
         }
