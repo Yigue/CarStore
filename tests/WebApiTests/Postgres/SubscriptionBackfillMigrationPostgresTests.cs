@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Application.Abstractions.Tenancy;
 using Domain.Billing;
@@ -10,7 +12,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using Xunit;
-using DealerSettingsEntity = Domain.DealerSettings.DealerSettings;
 
 namespace WebApiTests.Postgres;
 
@@ -47,6 +48,67 @@ public class SubscriptionBackfillMigrationPostgresTests(PostgresFixture fixture)
             new NoOpPublisher(),
             new NoTenant());
 
+    /// <summary>
+    /// Inserts one row using only the columns the table has at the current migration. Columns that
+    /// are NOT NULL without a default and not supplied get a neutral value for their type, so the
+    /// test keeps working when a later migration adds a required column to an OLD schema snapshot
+    /// it never sees.
+    /// </summary>
+    private static async Task InsertAsync(ApplicationDbContext context, string table, Dictionary<string, object> values)
+    {
+        var connection = (NpgsqlConnection)context.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        var columns = new List<(string Name, string Type, bool Required)>();
+        await using (var schema = connection.CreateCommand())
+        {
+            schema.CommandText = @"
+SELECT column_name, data_type, (is_nullable = 'NO' AND column_default IS NULL)
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = @table";
+            schema.Parameters.AddWithValue("table", table);
+            await using var reader = await schema.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                columns.Add((reader.GetString(0), reader.GetString(1), reader.GetBoolean(2)));
+            }
+        }
+
+        columns.Should().NotBeEmpty($"table {table} must exist at this migration");
+        foreach (string supplied in values.Keys)
+        {
+            columns.Should().Contain(c => c.Name == supplied, $"column {table}.{supplied} must exist at this migration");
+        }
+
+        foreach (var column in columns.Where(c => c.Required && !values.ContainsKey(c.Name)))
+        {
+            values[column.Name] = column.Type switch
+            {
+                "uuid" => Guid.NewGuid(),
+                "boolean" => false,
+                "integer" or "bigint" or "smallint" => 0,
+                "numeric" or "double precision" or "real" => 0m,
+                "timestamp with time zone" or "timestamp without time zone" => DateTime.UtcNow,
+                _ => string.Empty,
+            };
+        }
+
+        string[] names = values.Keys.ToArray();
+        await using var insert = connection.CreateCommand();
+        insert.CommandText =
+            $"INSERT INTO public.\"{table}\" ({string.Join(", ", names.Select(n => $"\"{n}\""))}) " +
+            $"VALUES ({string.Join(", ", names.Select((_, i) => $"@p{i}"))})";
+        for (int i = 0; i < names.Length; i++)
+        {
+            insert.Parameters.AddWithValue($"p{i}", values[names[i]]);
+        }
+
+        await insert.ExecuteNonQueryAsync();
+    }
+
     [Fact]
     public async Task Backfill_CreatesIncompleteRow_ForDealersWithoutOne_AndLeavesExistingRowsAlone()
     {
@@ -73,16 +135,42 @@ public class SubscriptionBackfillMigrationPostgresTests(PostgresFixture fixture)
             // Schema as it was before the fail-closed release.
             await before.GetService<IMigrator>().MigrateAsync(PreviousMigration);
 
-            var legacy = new DealerSettingsEntity(withoutRow, withoutRow, "Legacy", "legacy@x.com", true, "legacy-dealer");
-            legacy.SetStripeCustomerId("cus_legacy");
-            typeof(DealerSettingsEntity).GetProperty(nameof(DealerSettingsEntity.CreatedAt))!.SetValue(legacy, createdAt);
-            before.DealerSettings.Add(legacy);
-
-            before.DealerSettings.Add(new DealerSettingsEntity(withActiveRow, withActiveRow, "Paying", "paying@x.com", true, "paying-dealer"));
-            var active = DealerSubscription.Create(withActiveRow, "cus_paying", "sub_paying", "price_1");
-            active.Activate("sub_paying", DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(29));
-            before.DealerSubscriptions.Add(active);
-            await before.SaveChangesAsync();
+            // Raw SQL on purpose. This schema is the one from before the fail-closed release, and
+            // the EF model is today's: saving entities through it emits every column the model has
+            // gained since (billing_email was the first to break it), which do not exist yet at
+            // PreviousMigration. The helper fills whatever else that old schema requires.
+            await InsertAsync(before, "dealer_settings", new()
+            {
+                ["id"] = Guid.NewGuid(),
+                ["dealer_id"] = withoutRow,
+                ["dealer_name"] = "Legacy",
+                ["contact_email"] = "legacy@x.com",
+                ["is_active"] = true,
+                ["subdomain"] = "legacy-dealer",
+                ["stripe_customer_id"] = "cus_legacy",
+                ["created_at"] = createdAt,
+            });
+            await InsertAsync(before, "dealer_settings", new()
+            {
+                ["id"] = Guid.NewGuid(),
+                ["dealer_id"] = withActiveRow,
+                ["dealer_name"] = "Paying",
+                ["contact_email"] = "paying@x.com",
+                ["is_active"] = true,
+                ["subdomain"] = "paying-dealer",
+                ["created_at"] = DateTime.UtcNow,
+            });
+            await InsertAsync(before, "dealer_subscriptions", new()
+            {
+                ["id"] = Guid.NewGuid(),
+                ["dealer_id"] = withActiveRow,
+                ["status"] = "Active",
+                ["stripe_customer_id"] = "cus_paying",
+                ["stripe_subscription_id"] = "sub_paying",
+                ["plan_id"] = "price_1",
+                ["current_period_start"] = DateTime.UtcNow.AddDays(-1),
+                ["current_period_end"] = DateTime.UtcNow.AddDays(29),
+            });
         }
 
         await using (var after = NewContext(connectionString))

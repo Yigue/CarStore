@@ -39,11 +39,15 @@ public static class DefaultRoleCatalog
     };
 
     /// <summary>
-    /// Exact permission set captured from <c>ProvisionDealerCommandHandler</c> — the main dealer
-    /// onboarding path — as of spr PR 4.1. <c>UsersSeeder</c> additionally granted
-    /// <c>"audit:read"</c> to its dev-seeded Admin; that was a drift between the two sites, not
-    /// an intentional grant (nothing in <c>ProvisionDealerCommandHandler</c> or the spec called
-    /// for it), so the catalogue converges on onboarding's set and drops it.
+    /// Permission set of the default Admin role, shared by <c>ProvisionDealerCommandHandler</c>
+    /// (dealer onboarding) and <c>UsersSeeder</c> (dev seed).
+    /// <para>
+    /// <c>"audit:read"</c> belongs here. spr PR 4.1 dropped it as "drift" because onboarding had never
+    /// granted it, but sfc B2.2 had added the dealer audit trail (<c>GET audit-log</c> and the
+    /// dashboard's Auditoría page) a week earlier, gated on exactly that permission and meant for
+    /// the dealer's Admin. With it gone no default role could open that page — the missing grant in
+    /// onboarding was the bug, not the one in the seeder.
+    /// </para>
     /// </summary>
     private static readonly IReadOnlyList<string> AdminPermissionsList =
     [
@@ -59,6 +63,8 @@ public static class DefaultRoleCatalog
         "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
         "admin:backfill",
         "webhooks:manage",
+        // sfc B2.2: the dealer's own audit trail (GET audit-log, dashboard Auditoría).
+        "audit:read",
         // qa-p1-integridad PR6 (D7): grant at both seed sites.
         "documents:read", "documents:create",
         // sfc B4.2 / RN-010: Admin sees/manages every salesperson's commission.

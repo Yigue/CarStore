@@ -113,6 +113,16 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // mock key and throws. See FakePlanCatalog.
             services.RemoveAll<IPlanCatalog>();
             services.AddScoped<IPlanCatalog, FakePlanCatalog>();
+
+            // spr PR 3.3 (B10) made Program.cs refuse to boot in Production with NoOpCaptchaVerifier.
+            // The hosts that boot as "Production" here (error-contract convergence tests) are not
+            // about the CAPTCHA at all, and wiring Captcha:SecretKey would make them call Turnstile
+            // for real. A deterministic stub stands for "a production host with a real verifier".
+            if (string.Equals(_environment, "Production", StringComparison.Ordinal))
+            {
+                services.RemoveAll<Application.Abstractions.Security.ICaptchaVerifier>();
+                services.AddSingleton<Application.Abstractions.Security.ICaptchaVerifier, StubCaptchaVerifier>();
+            }
         });
     }
 

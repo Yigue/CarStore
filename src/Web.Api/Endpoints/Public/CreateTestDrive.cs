@@ -41,14 +41,14 @@ internal sealed class CreateTestDrive : IEndpoint
             CancellationToken cancellationToken) =>
         {
             var command = new CreateTestDriveCommand(
-                request.CarId,
-                request.FirstName,
-                request.LastName,
-                request.Email,
-                request.Phone,
-                request.Start,
-                request.Comments,
-                request.Website);
+                CarId: request.CarId,
+                FirstName: request.FirstName,
+                LastName: request.LastName,
+                Email: request.Email,
+                Phone: request.Phone,
+                Start: request.Start,
+                Comments: request.Comments,
+                Website: request.Website);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

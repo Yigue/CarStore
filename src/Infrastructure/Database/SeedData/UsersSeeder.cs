@@ -40,10 +40,8 @@ internal static class UsersSeeder
                 adminPassword);
         }
 
-        // spr PR 4.1 (SPR-18): the permission set lives once in DefaultRoleCatalog. It used to carry an
-        // extra "audit:read" that ProvisionDealerCommandHandler never granted — drift, not an intentional
-        // grant; the catalog converges on onboarding's set, so a brand-new dev seed no longer gets it (an
-        // already-seeded one keeps it, since SeedRoleAsync below only adds, never revokes, on re-seed).
+        // spr PR 4.1 (SPR-18): the permission set lives once in DefaultRoleCatalog (which includes
+        // "audit:read" for the dealer audit trail, sfc B2.2).
         var adminRole = await SeedRoleAsync(
             context, dealerId, DefaultRoleCatalog.Admin, DefaultRoleCatalog.GetDescription(DefaultRoleCatalog.Admin),
             DefaultRoleCatalog.GetPermissions(DefaultRoleCatalog.Admin).ToArray(), cancellationToken);
@@ -210,6 +208,10 @@ internal static class UsersSeeder
             "platform:dealers:suspend",
             "platform:dealers:activate",
             "platform:metrics:read",
+            // GET platform/audit-logs has required this since the platform audit log shipped, but no
+            // seed or migration ever granted it: the super-admin Auditoría page answered 403 on any
+            // database that was not patched by hand.
+            "platform:audit-logs:read",
             // spr PR 4.1 (SPR-18): reaches POST platform/backfill/default-roles.
             "platform:roles:backfill"
         };

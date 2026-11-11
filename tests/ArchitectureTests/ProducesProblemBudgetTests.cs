@@ -10,7 +10,11 @@ namespace ArchitectureTests;
 
 public class ProducesProblemBudgetTests : BaseTest
 {
-    private const int FrozenBudget = 113; // spr PR 1.1: +1, GetPublicPlans (GET billing/plans) endpoint added
+    // spr PR 1.1: +1, GetPublicPlans (GET billing/plans).
+    // sfc A5.1 / B5.2 / C0: +6 — SetBusinessHours, LandingImages (GetUploadUrl, ConfirmUpload),
+    // public CreateTestDrive, TestDriveSlots and RegisterWhatsAppClickIntent were added with their
+    // own ProducesProblem(500) and the budget was not updated with them.
+    private const int FrozenBudget = 119;
 
     [Fact]
     public void ProducesProblem500_DeclarationCount_MatchesFrozenBudget()

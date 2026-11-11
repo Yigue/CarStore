@@ -296,9 +296,15 @@ public class ProcessStripeWebhooksJobTests
     {
         var dealerId = Guid.NewGuid();
         var adminRole = new Domain.Users.Role(dealerId, "Admin", "Administrator");
-        dbContext.DealerSettings.Add(new Domain.DealerSettings.DealerSettings(dealerId, "Autos del Sur", "contacto@autosdelsur.test"));
+        var settings = new Domain.DealerSettings.DealerSettings(dealerId, "Autos del Sur", "contacto@autosdelsur.test");
+        var owner = new Domain.Users.User(dealerId, "owner@autosdelsur.test", "Marta", "Gomez", "hash", adminRole.Id);
+        // sfc C17: billing emails go to DealerSettings.OwnerUserId, not to "whoever holds the Admin
+        // role". This seed predates that and never named the owner, so the dunning email fell back to
+        // the contact address and the assertion on the owner's address stopped holding.
+        settings.SetOwner(owner.Id);
+        dbContext.DealerSettings.Add(settings);
         dbContext.Roles.Add(adminRole);
-        dbContext.Users.Add(new Domain.Users.User(dealerId, "owner@autosdelsur.test", "Marta", "Gomez", "hash", adminRole.Id));
+        dbContext.Users.Add(owner);
         var sub = DealerSubscription.Create(dealerId, "cus_fail", "sub_fail", "price_1");
         sub.Activate("sub_fail", DateTime.UtcNow, DateTime.UtcNow.AddMonths(1));
         sub.TryRegisterProviderEvent(FromUnix(BaselineUnix)).Should().BeTrue();

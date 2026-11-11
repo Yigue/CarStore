@@ -40,6 +40,10 @@ public class IgnoreQueryFiltersAllowListTests
         "Users/SelectDealer/",
         "Users/SwitchDealer/",
         "Users/Commands/GrantDealerMembership/",
+        // sfc B6.3: plan seats count UserDealerMembership rows of members whose home dealer is another
+        // one, so the tenant filter (home DealerId) would hide exactly the rows being counted. Both
+        // queries constrain `m.DealerId == dealerId` explicitly.
+        "Billing/Entitlements/EntitlementServiceHandler.cs",
         // sfc B5.1 / RFC 8058: one-click unsubscribe is POSTed by the mail client with no dealer headers;
         // the 256-bit token (looked up by SHA-256) identifies the subscriber.
         "Marketing/Newsletter/Tokens/",
