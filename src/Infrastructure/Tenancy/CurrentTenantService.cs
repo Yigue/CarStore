@@ -83,7 +83,13 @@ public class CurrentTenantService : ICurrentTenantService
 
             // 3. Development-only convenience fallback. Outside Development this
             //    block is dead — the spec requires default-deny verbatim.
-            if (_env.IsDevelopment() && _fallbackOptions.DevFallbackDealerId is { } configuredFallback)
+            //
+            //    It also requires an HTTP request: the fallback stands in for a request whose host did not
+            //    resolve. Quartz jobs and the outbox have no request, and giving them the demo dealer as
+            //    their tenant made them filter every query to that one dealer (dunning emails skipped
+            //    with "no subscription for provider customer", welcome emails with "user not found").
+            //    Background work must run tenant-less, exactly as it does in Production.
+            if (httpContext is not null && _env.IsDevelopment() && _fallbackOptions.DevFallbackDealerId is { } configuredFallback)
             {
                 _logger.LogInformation(
                     "CurrentTenantService: host miss in Development — using Tenant:DevFallbackDealerId={DealerId}.",

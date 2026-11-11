@@ -199,6 +199,21 @@ public class CurrentTenantServiceTenantSafetyTests : IDisposable
     }
 
     [Fact]
+    public void DealerId_OutsideAnHttpRequest_WithDevFallbackConfigured_InDevelopment_HasNoTenant()
+    {
+        // Quartz jobs and the outbox have no HttpContext. The dev fallback stands in for a request whose
+        // host did not resolve; handing it to background work made dunning/welcome emails filter every
+        // query to the demo dealer and skip everyone else ("no subscription for provider customer").
+        var accessor = new Mock<IHttpContextAccessor>();
+        accessor.Setup(a => a.HttpContext).Returns((HttpContext?)null);
+
+        var sut = NewService(accessor.Object, DevEnv(), devFallbackDealerId: Guid.Parse(RealDealerId));
+
+        sut.DealerId.Should().Be(Guid.Empty);
+        sut.HasTenant.Should().BeFalse("background work runs tenant-less, as it does in Production");
+    }
+
+    [Fact]
     public void DealerId_HostMiss_WithDevFallbackConfigured_InProduction_ReturnsEmpty()
     {
         var services = BuildSeededContextProvider();

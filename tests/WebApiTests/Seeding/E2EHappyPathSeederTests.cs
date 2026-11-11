@@ -72,6 +72,13 @@ public class E2EHappyPathSeederTests
         var reset = await db.Users.IgnoreQueryFilters().SingleAsync(u => u.Email == E2EHappyPathSeeder.ResetUserEmail);
         hasher.Verify(E2EHappyPathSeeder.ResetUserInitialPassword, reset.PasswordHash).Should().BeTrue();
 
+        var dunning = await db.DealerSubscriptions.IgnoreQueryFilters()
+            .SingleAsync(x => x.DealerId == E2EHappyPathSeeder.DunningDealerId);
+        dunning.StripeCustomerId.Should().Be(E2EHappyPathSeeder.DunningStripeCustomerId);
+        dunning.Status.Should().Be(SubscriptionStatus.Active);
+        (await db.DealerSettings.IgnoreQueryFilters().SingleAsync(x => x.DealerId == E2EHappyPathSeeder.DunningDealerId))
+            .OwnerUserId.Should().NotBeNull("billing email goes to the owner");
+
         (await db.Cars.IgnoreQueryFilters().CountAsync(c => c.Patente == E2EHappyPathSeeder.VehiclePatente)).Should().Be(1);
         (await db.Leads.IgnoreQueryFilters().CountAsync(l => l.ClientName == E2EHappyPathSeeder.LeadName)).Should().Be(1);
     }
@@ -98,6 +105,30 @@ public class E2EHappyPathSeederTests
         var reset = await verifyDb.Users.IgnoreQueryFilters().SingleAsync(u => u.Email == E2EHappyPathSeeder.ResetUserEmail);
         verifyScope.ServiceProvider.GetRequiredService<IPasswordHasher>()
             .Verify(E2EHappyPathSeeder.ResetUserInitialPassword, reset.PasswordHash).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Rerun_PutsTheDunningDealerBackToActive()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        factory.SeedDatabase();
+        await RunAsync(factory, enabled: true);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var sub = await db.DealerSubscriptions.IgnoreQueryFilters()
+                .SingleAsync(x => x.DealerId == E2EHappyPathSeeder.DunningDealerId);
+            sub.MarkPastDue();
+            await db.SaveChangesAsync();
+        }
+
+        await RunAsync(factory, enabled: true);
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await verifyDb.DealerSubscriptions.IgnoreQueryFilters()
+            .SingleAsync(x => x.DealerId == E2EHappyPathSeeder.DunningDealerId)).Status.Should().Be(SubscriptionStatus.Active);
     }
 
     [Theory]
