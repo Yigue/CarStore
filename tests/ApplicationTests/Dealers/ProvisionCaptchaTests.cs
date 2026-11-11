@@ -80,6 +80,10 @@ public class ProvisionCaptchaTests
             builder.UseSetting("Stripe:SecretKey", "sk_test_dummy");
             builder.UseSetting("Stripe:PriceId", "price_dummy");
             builder.UseSetting("Stripe:WebhookSecret", "whsec_dummy");
+            // spr PR 5.1.8: AddBackgroundJobs reads this flag synchronously to skip Quartz's
+            // persistent Postgres store under tests — without it, the host tries a real Postgres
+            // connection when the Quartz hosted service starts and fails auth.
+            builder.UseSetting("UseInMemoryDatabase", "true");
 
             if (_captchaSecretKey is not null)
             {

@@ -83,84 +83,119 @@ public class ProcessOutboxMessagesJob(
 
         foreach (OutboxMessage outboxMessage in messages)
         {
-            if (!DomainEventTypeMap.TryGetValue(outboxMessage.Type, out Type? eventType))
-            {
-                logger.LogWarning(
-                    "Unknown domain event type '{EventType}' in outbox message {MessageId}. Skipping.",
-                    outboxMessage.Type,
-                    outboxMessage.Id);
-
-                outboxMessage.ProcessedOnUtc = DateTime.UtcNow;
-                outboxMessage.Error = $"Unknown event type: {outboxMessage.Type}";
-                continue;
-            }
-
-            IDomainEvent? domainEvent = (IDomainEvent?)JsonConvert
-                .DeserializeObject(
-                    outboxMessage.Content,
-                    eventType,
-                    SafeSerializerSettings);
-
-            if (domainEvent is null)
-            {
-                logger.LogWarning(
-                    "Failed to deserialize outbox message {MessageId} as {EventType}. Skipping.",
-                    outboxMessage.Id,
-                    outboxMessage.Type);
-
-                outboxMessage.ProcessedOnUtc = DateTime.UtcNow;
-                outboxMessage.Error = $"Deserialization returned null for type: {outboxMessage.Type}";
-                continue;
-            }
-
-            // Outgoing webhooks: fan out to tenant subscriptions before publishing so a
-            // failing in-process MediatR handler never blocks external delivery. Enqueue
-            // is idempotent (checked against WebhookDelivery.EventId) so re-reads of a
-            // still-unprocessed message on the next tick never double-enqueue.
-            if (outboxMessage.DealerId is Guid dealerId)
-            {
-                if (WebhookEventCatalog.FromDomainEventTypeName.TryGetValue(outboxMessage.Type, out string? catalogEventType))
-                {
-                    await EnqueueWebhookDeliveriesAsync(dealerId, outboxMessage, catalogEventType, context.CancellationToken);
-                }
-            }
-            else if (WebhookEventCatalog.FromDomainEventTypeName.ContainsKey(outboxMessage.Type))
-            {
-                logger.LogWarning(
-                    "Outbox message {MessageId} of type {EventType} is webhook-catalogued but has no DealerId — skipping webhook fan-out.",
-                    outboxMessage.Id,
-                    outboxMessage.Type);
-            }
+            // Security review follow-up: everything that can throw for THIS message — deserialization,
+            // webhook enqueue, and publish — now lives inside one try, and this message's own
+            // SaveChangesAsync commits right after, before the next message is even looked at. That
+            // bounds a crash's damage to exactly the message in flight: every earlier message in this
+            // batch is already durably committed (claim + its own WebhookDeliveries together), and the
+            // one in flight gets its claim undone below. The previous shape ran deserialization/enqueue
+            // outside any try (an uncaught throw there crashed the whole batch) and deferred every
+            // message's WebhookDeliveries to one final SaveChangesAsync (a later message's crash lost
+            // them for every earlier message too, even though those had already "succeeded").
+            // Snapshot of entities newly added to the tracker before this message starts, so a
+            // failure below can detach ONLY what this specific attempt added (typically its own
+            // WebhookDeliveries) without disturbing the already-committed, still-tracked entities
+            // from earlier messages in this same batch (ChangeTracker.Clear() would detach those too,
+            // breaking their later re-use if anything referenced them again).
+            HashSet<object> trackedBeforeThisMessage = efContext.ChangeTracker.Entries()
+                .Where(e => e.State == EntityState.Added)
+                .Select(e => e.Entity)
+                .ToHashSet();
 
             try
             {
+                if (!DomainEventTypeMap.TryGetValue(outboxMessage.Type, out Type? eventType))
+                {
+                    logger.LogWarning(
+                        "Unknown domain event type '{EventType}' in outbox message {MessageId}. Skipping.",
+                        outboxMessage.Type,
+                        outboxMessage.Id);
+
+                    outboxMessage.Error = $"Unknown event type: {outboxMessage.Type}";
+                    await dbContext.SaveChangesAsync(context.CancellationToken);
+                    continue;
+                }
+
+                IDomainEvent? domainEvent = (IDomainEvent?)JsonConvert
+                    .DeserializeObject(
+                        outboxMessage.Content,
+                        eventType,
+                        SafeSerializerSettings);
+
+                if (domainEvent is null)
+                {
+                    logger.LogWarning(
+                        "Failed to deserialize outbox message {MessageId} as {EventType}. Skipping.",
+                        outboxMessage.Id,
+                        outboxMessage.Type);
+
+                    outboxMessage.Error = $"Deserialization returned null for type: {outboxMessage.Type}";
+                    await dbContext.SaveChangesAsync(context.CancellationToken);
+                    continue;
+                }
+
+                // Outgoing webhooks: fan out to tenant subscriptions before publishing so a
+                // failing in-process MediatR handler never blocks external delivery. Enqueue
+                // is idempotent (checked against WebhookDelivery.EventId) so re-reads of a
+                // still-unprocessed message on the next tick never double-enqueue.
+                if (outboxMessage.DealerId is Guid dealerId)
+                {
+                    if (WebhookEventCatalog.FromDomainEventTypeName.TryGetValue(outboxMessage.Type, out string? catalogEventType))
+                    {
+                        await EnqueueWebhookDeliveriesAsync(dealerId, outboxMessage, catalogEventType, context.CancellationToken);
+                    }
+                }
+                else if (WebhookEventCatalog.FromDomainEventTypeName.ContainsKey(outboxMessage.Type))
+                {
+                    logger.LogWarning(
+                        "Outbox message {MessageId} of type {EventType} is webhook-catalogued but has no DealerId — skipping webhook fan-out.",
+                        outboxMessage.Id,
+                        outboxMessage.Type);
+                }
+
                 await publisher.Publish(domainEvent, context.CancellationToken);
 
-                // Already set to claimedAtUtc by the atomic claim above.
+                // ProcessedOnUtc is already claimedAtUtc from the atomic claim above — this save only
+                // persists this message's own WebhookDeliveries (and any handler side effects on the
+                // same tracked DbContext), right away, not batched with the rest.
+                await dbContext.SaveChangesAsync(context.CancellationToken);
             }
             catch (Exception ex)
             {
-                // Security review follow-up: the claim above already committed on its own (it is a
-                // standalone statement, not part of this method's final SaveChangesAsync). If this
-                // undo were left for that same final SaveChangesAsync, a crash between here and that
-                // call would leave the message permanently marked processed despite never publishing —
-                // the exact message-loss window the review flagged. Persist the undo immediately, on
-                // its own, with CancellationToken.None so a cancelling host still gets it recorded.
-                await efContext.Database.ExecuteSqlInterpolatedAsync(
-                    $@"UPDATE ""OutboxMessages"" SET processed_on_utc = NULL, error = {ex.Message} WHERE id = {outboxMessage.Id}",
-                    CancellationToken.None);
+                // The claim committed on its own, as a standalone statement — undo it immediately and
+                // on its own too, with CancellationToken.None so a cancelling host still gets it
+                // recorded, instead of leaving the message permanently marked processed.
+                try
+                {
+                    string sanitizedError = ex.Message.Replace("\0", string.Empty);
+                    await efContext.Database.ExecuteSqlInterpolatedAsync(
+                        $@"UPDATE ""OutboxMessages"" SET processed_on_utc = NULL, error = {sanitizedError} WHERE id = {outboxMessage.Id}",
+                        CancellationToken.None);
+                }
+                catch (Exception undoEx)
+                {
+                    logger.LogError(undoEx,
+                        "Failed to undo the processed claim for outbox message {MessageId} after a publish failure. " +
+                        "It stays marked processed and will NOT be retried.",
+                        outboxMessage.Id);
+                }
 
-                // Keep the in-memory entity's tracked state consistent with what was just persisted,
-                // so this loop's later SaveChangesAsync (for unrelated messages in the same batch)
-                // does not try to write a stale ProcessedOnUtc value back over the undo.
-                outboxMessage.ProcessedOnUtc = null;
-                outboxMessage.Error = ex.Message;
-                efContext.Entry(outboxMessage).Property(m => m.ProcessedOnUtc).IsModified = false;
-                efContext.Entry(outboxMessage).Property(m => m.Error).IsModified = false;
+                // Detach only what THIS attempt added (e.g. WebhookDeliveries enqueued before the
+                // throw) — never ChangeTracker.Clear(), which would also detach the already-committed
+                // entities from earlier messages in this same batch and break their own later use.
+                foreach (var entry in efContext.ChangeTracker.Entries().Where(e => e.State == EntityState.Added).ToList())
+                {
+                    if (!trackedBeforeThisMessage.Contains(entry.Entity))
+                    {
+                        entry.State = EntityState.Detached;
+                    }
+                }
+
+                // Revert the entity itself to how the database actually left it (claim undone above),
+                // discarding any half-made in-memory edits (e.g. Error set before a later throw).
+                efContext.Entry(outboxMessage).State = EntityState.Unchanged;
             }
         }
-
-        await dbContext.SaveChangesAsync(context.CancellationToken);
     }
 
     /// <remarks>internal (not private) so ApplicationTests (Infrastructure InternalsVisibleTo target)
