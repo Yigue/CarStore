@@ -107,6 +107,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // Mock Stripe to avoid real API calls and Exceptions
             services.RemoveAll<ISubscriptionGateway>();
             services.AddSingleton<ISubscriptionGateway, FakeSubscriptionGateway>();
+
+            // Same reason for the plan catalog: with Stripe:SecretKey set, the real StripePlanCatalog
+            // is registered and any price lookup (platform MRR, public plans) calls Stripe with the
+            // mock key and throws. See FakePlanCatalog.
+            services.RemoveAll<IPlanCatalog>();
+            services.AddScoped<IPlanCatalog, FakePlanCatalog>();
         });
     }
 
