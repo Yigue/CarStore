@@ -28,6 +28,8 @@ public class IgnoreQueryFiltersAllowListTests
         "Users/Login/",
         "Users/Register/",
         "Users/ResetPassword/",
+        // Same flow, request side: forgot-password resolves the user by email before any tenant exists.
+        "Users/Commands/RequestPasswordReset/",
         "Users/ChangePassword/",
         // sfc A4.1: anonymous email verification; the token (looked up by SHA-256) identifies the user.
         "Users/Verification/",

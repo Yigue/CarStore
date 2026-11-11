@@ -56,7 +56,7 @@ public class VerifyEmailCommandHandlerTests
     private static string TokenFrom(CapturedEmail email)
     {
         string url = email.Sent.Single().Model["VerifyUrl"];
-        url.Should().StartWith("https://app.example.com/verificar?token=");
+        url.Should().StartWith("https://app.example.com/auth/verificar-email?token=");
         return url.Split("token=")[1];
     }
 

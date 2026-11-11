@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
-using Application.Users.GetByEmail;
 using Application.Users.ResetPassword;
 using Domain.Users;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SharedKernel;
 
@@ -13,7 +13,6 @@ namespace Application.Users.Commands.RequestPasswordReset;
 public sealed record RequestPasswordResetCommand(string Email) : ICommand;
 
 internal sealed class RequestPasswordResetCommandHandler(
-    ISender sender,
     IApplicationDbContext context,
     IEmailService emailService,
     IConfiguration configuration
@@ -23,16 +22,24 @@ internal sealed class RequestPasswordResetCommandHandler(
 
     public async Task<Result> Handle(RequestPasswordResetCommand request, CancellationToken cancellationToken)
     {
-        // Check if user exists
-        var userResult = await sender.Send(new GetUserByEmailQuery(request.Email), cancellationToken);
+        // The caller is anonymous by definition: this must NOT go through GetUserByEmailQuery, which is
+        // "my own profile by email" and compares the match against the authenticated user — with no session
+        // it threw "User id is unavailable" and forgot-password answered 500 for everybody, so nobody could
+        // ever recover a password.
+        //
+        // Tenant filters are bypassed on purpose (no tenant is resolved before login) and the lookup is by
+        // the unique email only. Unknown or deactivated accounts get the same neutral success as known ones,
+        // so the response never reveals whether an email exists.
+        var user = await context.Users
+            .IgnoreQueryFilters()
+            .Where(u => u.Email == request.Email && u.IsActive)
+            .Select(u => new { u.Id, u.FirstName })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (userResult.IsFailure)
+        if (user is null)
         {
-            // Do not leak whether the user exists or not
             return Result.Success();
         }
-
-        UserResponse user = userResult.Value;
 
         // Single-use, time-limited token. Only its SHA-256 digest is stored; the plain value
         // travels in the email and is hashed again when the user submits the reset.
@@ -43,7 +50,7 @@ internal sealed class RequestPasswordResetCommandHandler(
         await context.SaveChangesAsync(cancellationToken);
 
         string baseUrl = (configuration["Frontend:BaseUrl"] ?? "https://carstore-app.com").TrimEnd('/');
-        string resetLink = $"{baseUrl}/reset-password?token={token}";
+        string resetLink = $"{baseUrl}/auth/reset-password?token={token}";
 
         string subject = "Recuperación de contraseña - CarStore";
         string body = $@"

@@ -31,14 +31,6 @@ public class ResetPasswordCommandHandlerTests
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
-        var sender = new Mock<ISender>();
-        sender
-            .Setup(s => s.Send(It.IsAny<GetUserByEmailQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success(new UserResponse
-            {
-                Id = user.Id, Email = "ana@test.com", FirstName = "Ana", LastName = "Gomez", RoleId = user.RoleId,
-            }));
-
         string? body = null;
         var email = new Mock<IEmailService>();
         email
@@ -47,7 +39,7 @@ public class ResetPasswordCommandHandlerTests
             .Returns(Task.CompletedTask);
 
         var configuration = new ConfigurationBuilder().Build();
-        var handler = new RequestPasswordResetCommandHandler(sender.Object, context, email.Object, configuration);
+        var handler = new RequestPasswordResetCommandHandler(context, email.Object, configuration);
 
         var result = await handler.Handle(new RequestPasswordResetCommand("ana@test.com"), CancellationToken.None);
 

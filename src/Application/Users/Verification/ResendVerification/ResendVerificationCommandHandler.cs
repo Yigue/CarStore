@@ -77,7 +77,7 @@ internal sealed class ResendVerificationCommandHandler(
                 new Dictionary<string, string>
                 {
                     ["Name"] = user!.FirstName,
-                    ["VerifyUrl"] = $"{baseUrl}/verificar?token={secret}",
+                    ["VerifyUrl"] = $"{baseUrl}/auth/verificar-email?token={secret}",
                     ["ExpiresInHours"] = UserActionToken.LifetimeOf(UserActionPurpose.EmailVerification).TotalHours.ToString("0")
                 },
                 cancellationToken);
