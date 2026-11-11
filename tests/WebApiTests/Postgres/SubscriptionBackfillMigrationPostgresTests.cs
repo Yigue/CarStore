@@ -146,7 +146,7 @@ WHERE table_schema = 'public' AND table_name = @table";
                 ["dealer_name"] = "Legacy",
                 ["contact_email"] = "legacy@x.com",
                 ["is_active"] = true,
-                ["subdomain"] = "legacy-dealer",
+                ["slug"] = "legacy-dealer",
                 ["stripe_customer_id"] = "cus_legacy",
                 ["created_at"] = createdAt,
             });
@@ -157,7 +157,7 @@ WHERE table_schema = 'public' AND table_name = @table";
                 ["dealer_name"] = "Paying",
                 ["contact_email"] = "paying@x.com",
                 ["is_active"] = true,
-                ["subdomain"] = "paying-dealer",
+                ["slug"] = "paying-dealer",
                 ["created_at"] = DateTime.UtcNow,
             });
             await InsertAsync(before, "dealer_subscriptions", new()
