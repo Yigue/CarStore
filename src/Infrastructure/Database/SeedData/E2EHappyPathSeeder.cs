@@ -100,7 +100,7 @@ public static class E2EHappyPathSeeder
                 dealerName: SuspendDealerName,
                 contactEmail: SuspendAdminEmail,
                 notificationsEnabled: true,
-                hostName: $"{SuspendDealerSlug}.localhost",
+                hostName: $"{SuspendDealerSlug}.carstore.localhost",
                 slug: SuspendDealerSlug));
         }
 
@@ -142,7 +142,7 @@ public static class E2EHappyPathSeeder
                 dealerName: DunningDealerName,
                 contactEmail: DunningAdminEmail,
                 notificationsEnabled: true,
-                hostName: $"{DunningDealerSlug}.localhost",
+                hostName: $"{DunningDealerSlug}.carstore.localhost",
                 slug: DunningDealerSlug));
         }
 
