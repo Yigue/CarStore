@@ -604,6 +604,14 @@ public static class DependencyInjection
             return services;
         }
 
+        // Tooling that only needs the host's service graph (scripts/export-openapi.sh) has no database, and
+        // Quartz's clustered store validates its schema against Postgres at startup. BackgroundJobs:Enabled=false
+        // skips the scheduler entirely. Default true: a real deployment always runs its jobs.
+        if (!configuration.GetValue("BackgroundJobs:Enabled", true))
+        {
+            return services;
+        }
+
         // spr PR 5.1 (OPS-07): same Postgres used by EF Core, read from the connection string
         // key already used by AddDbContext/UseNpgsql below (never a separate config key).
         string quartzConnectionString = configuration.GetConnectionString("Database")

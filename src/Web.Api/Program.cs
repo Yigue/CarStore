@@ -244,6 +244,31 @@ using (IServiceScope captchaScope = app.Services.CreateScope())
     }
 }
 
+// Same fail-fast idea as the CAPTCHA guard above: with no email provider configured the host falls back to
+// NoOpEmailService, which only logs. In Production that silently drops password-reset, email-verification,
+// dunning and data-export emails — users get "check your inbox" and nothing ever arrives.
+// Mirrors the provider selection in Infrastructure/DependencyInjection.cs (Resend or SMTP).
+if (app.Environment.IsProduction())
+{
+    bool emailConfigured =
+        string.Equals(app.Configuration["Email:Provider"], "Resend", StringComparison.OrdinalIgnoreCase)
+        || !string.IsNullOrWhiteSpace(app.Configuration["Email:Resend:ApiKey"] ?? app.Configuration["Resend:ApiKey"])
+        || !string.IsNullOrWhiteSpace(app.Configuration["Email:Smtp:Host"]);
+    if (!emailConfigured)
+    {
+        throw new InvalidOperationException(
+            "No email provider is configured. Set Email:Smtp:Host (SMTP) or Email:Resend:ApiKey (Resend) — " +
+            "NoOpEmailService must never be the active IEmailService in Production.");
+    }
+
+    // Billing without a Stripe key is a supported configuration (Stripe:Enabled=false), so this only warns.
+    if (string.IsNullOrWhiteSpace(app.Configuration["Stripe:SecretKey"]))
+    {
+        app.Logger.LogWarning(
+            "Stripe:SecretKey is not configured: checkout and the billing portal use the no-op gateway, so nobody can pay.");
+    }
+}
+
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.ApplyMigrations();
