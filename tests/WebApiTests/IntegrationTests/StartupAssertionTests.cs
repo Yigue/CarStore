@@ -30,6 +30,8 @@ public sealed class StartupAssertionTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Production");
+                // Production refuses to boot without an email provider (Program.cs); any SMTP host satisfies the guard.
+                builder.UseSetting("Email:Smtp:Host", "localhost");
 
                 // spr PR 3.3 (B10): AddCaptcha's NoOp-vs-Turnstile decision (like AddBilling's
                 // Stripe:SecretKey check below) runs synchronously during AddInfrastructure, which
@@ -97,6 +99,8 @@ public sealed class StartupAssertionTests
                 builder.UseSetting("Captcha:SecretKey", "test-secret-key");
                 builder.UseSetting("UseInMemoryDatabase", "true");
                 builder.UseEnvironment("Production");
+                // Production refuses to boot without an email provider (Program.cs); any SMTP host satisfies the guard.
+                builder.UseSetting("Email:Smtp:Host", "localhost");
                 builder.ConfigureAppConfiguration((_, config) =>
                 {
                     config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -129,6 +133,8 @@ public sealed class StartupAssertionTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Production");
+                // Production refuses to boot without an email provider (Program.cs); any SMTP host satisfies the guard.
+                builder.UseSetting("Email:Smtp:Host", "localhost");
                 // spr PR 3.3 (B10): must be UseSetting, not ConfigureAppConfiguration — without
                 // this, Production + no visible Captcha:SecretKey would throw from the anti-NoOp
                 // captcha guard, contradicting "boots clean". See the comment on the first test

@@ -77,6 +77,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("Stripe:PriceId", "price_mock");
 
         builder.UseEnvironment(_environment);
+        // Program.cs refuses a Production boot without an email provider. Only set it for the Production runs
+        // (GlobalHandlerConvergenceTests, which send no email): everywhere else the host keeps NoOpEmailService,
+        // so no test ever opens an SMTP connection.
+        if (string.Equals(_environment, "Production", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.UseSetting("Email:Smtp:Host", "localhost");
+        }
 
         builder.ConfigureTestServices(services =>
         {

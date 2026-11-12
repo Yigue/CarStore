@@ -58,6 +58,8 @@ public sealed class CorsProductionConfigurationTests
                 {
                     builder.UseSetting("UseInMemoryDatabase", "true");
                     builder.UseEnvironment("Production");
+                    // Production refuses to boot without an email provider (Program.cs); any SMTP host satisfies the guard.
+                    builder.UseSetting("Email:Smtp:Host", "localhost");
                     // spr PR 3.3 (B10): AddCaptcha's NoOp-vs-Turnstile decision runs synchronously
                     // during AddInfrastructure, on `builder.Configuration` BEFORE `Build()` — only
                     // `UseSetting` is visible to it then; a `ConfigureAppConfiguration` dictionary

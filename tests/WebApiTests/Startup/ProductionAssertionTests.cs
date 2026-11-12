@@ -22,6 +22,8 @@ public sealed class ProductionAssertionTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Production");
+                // Production refuses to boot without an email provider (Program.cs); any SMTP host satisfies the guard.
+                builder.UseSetting("Email:Smtp:Host", "localhost");
                 // spr PR 3.3 (B10): must be UseSetting, not ConfigureAppConfiguration — AddCaptcha's
                 // NoOp-vs-Turnstile decision runs synchronously during AddInfrastructure, on
                 // builder.Configuration, before Build() merges ConfigureAppConfiguration's additions.
@@ -60,6 +62,8 @@ public sealed class ProductionAssertionTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Production");
+                // Production refuses to boot without an email provider (Program.cs); any SMTP host satisfies the guard.
+                builder.UseSetting("Email:Smtp:Host", "localhost");
                 builder.UseSetting("Captcha:SecretKey", "test-secret-key");
                 builder.UseSetting("UseInMemoryDatabase", "true");
                 builder.ConfigureAppConfiguration((_, config) =>
@@ -82,5 +86,38 @@ public sealed class ProductionAssertionTests
         var act = () => factory.CreateClient();
 
         act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Host_WithProductionEnvironmentAndNoEmailProvider_ThrowsInvalidOperationException()
+    {
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Production");
+                builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+                builder.UseSetting("UseInMemoryDatabase", "true");
+                builder.ConfigureAppConfiguration((_, config) =>
+                {
+                    config.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["FeatureFlags:SubscriptionEnforcement"] = "true",
+                        ["Stripe:WebhookSecret"] = "whsec_startup_test_only",
+                        ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
+                        ["ConnectionStrings:Redis"] = "",
+                        ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
+                        ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
+                        ["Storage:Minio:AccessKey"] = "minioadmin",
+                        ["Storage:Minio:SecretKey"] = "minioadmin123",
+                        ["Storage:Minio:BucketName"] = "cars"
+                    });
+                });
+            });
+
+        var act = () => factory.CreateClient();
+
+        act.Should().Throw<InvalidOperationException>()
+            .And.Message.Should().Contain("email provider",
+                because: "a Production host that only logs its emails silently drops password resets");
     }
 }

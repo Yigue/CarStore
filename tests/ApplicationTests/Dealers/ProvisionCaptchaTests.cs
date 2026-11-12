@@ -92,6 +92,10 @@ public class ProvisionCaptchaTests
 
             builder.UseEnvironment("Production");
 
+            // Production refuses to boot without an email provider (Program.cs); any SMTP host satisfies the guard.
+
+            builder.UseSetting("Email:Smtp:Host", "localhost");
+
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
