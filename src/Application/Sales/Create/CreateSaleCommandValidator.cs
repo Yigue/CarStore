@@ -1,12 +1,17 @@
 using Domain.Sales.Attributes;
+using Application.Abstractions.Pricing;
 using FluentValidation;
 
 namespace Application.Sales.Create;
 
 internal sealed class CreateSaleCommandValidator : AbstractValidator<CreateSaleCommand>
 {
-    public CreateSaleCommandValidator()
+    public CreateSaleCommandValidator(IMoneyPolicy? moneyPolicy = null)
     {
+        // sfc B0.2.3 / VB.2: with Money:RequireExplicitCurrency on, no implicit ARS default for new records.
+        When(_ => moneyPolicy?.RequireExplicitCurrency == true, () =>
+            RuleFor(x => x.Currency).NotEmpty().WithMessage("La moneda es obligatoria (ARS o USD)."));
+
         RuleFor(x => x.CarId).NotEmpty();
         RuleFor(x => x.ClientId).NotEmpty();
         // VEN-04: a sale converting an accepted quote may omit both and inherit them. Without a

@@ -90,6 +90,7 @@ public static class DependencyInjection
             services.AddTransient<IStartupFilter, DataProtectionProductionGuard>();
         }
 
+        services.AddSingleton<Application.Abstractions.Pricing.IMoneyPolicy, Infrastructure.Pricing.ConfigurationMoneyPolicy>();
         services.AddSingleton<ICredentialProtector, DataProtectionCredentialProtector>();
         services.AddSingleton<IIntegrationProviderSettings, IntegrationProviderSettings>();
 
