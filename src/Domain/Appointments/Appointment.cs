@@ -7,15 +7,19 @@ namespace Domain.Appointments;
 /// Appointment aggregate root. Represents a scheduled event (test drive, service, delivery)
 /// between an agent, a client, and a vehicle. Tenant-scoped via <see cref="Entity.DealerId"/>.
 /// Time-overlap conflict detection is performed at the application layer (CQRS handler)
-/// against a dealer-wide range index — invariants here are limited to the local
-/// EndDateTime &gt; StartDateTime guard.
+/// against a dealer-wide range index. Local invariants: EndDateTime &gt; StartDateTime,
+/// StartDateTime cannot be dated before the calling operation's own clock (no scheduling
+/// into the past), and Reschedule/Complete/Cancel/MarkNoShow all require the appointment to
+/// still be Scheduled (see <see cref="EnsureScheduled"/>) — once it left that status it is
+/// a closed record.
 /// </summary>
 public sealed class Appointment : Entity
 {
     public Guid VehicleId { get; private set; }
     public Guid? ClientId { get; private set; }
     public Guid? LeadId { get; private set; }
-    public Guid AgentId { get; private set; }
+    // sfc B5.2.3 / H15: null while the appointment is Requested (no agent assigned yet).
+    public Guid? AgentId { get; private set; }
     public DateTime StartDateTime { get; private set; }
     public DateTime EndDateTime { get; private set; }
     public AppointmentType Type { get; private set; }
@@ -46,6 +50,8 @@ public sealed class Appointment : Entity
             throw new DomainException("AgentId cannot be empty");
         if (end <= start)
             throw new DomainException("La hora de fin debe ser posterior a la hora de inicio");
+        if (start.Date < createdAtUtc.Date)
+            throw new DomainException("No se puede agendar un turno en una fecha pasada");
 
         var appointment = new Appointment();
         appointment.SetDealer(dealerId);
@@ -65,16 +71,71 @@ public sealed class Appointment : Entity
         return appointment;
     }
 
+    /// <summary>
+    /// sfc B5.2.3 / H15: a customer-requested appointment (e.g. public test drive) with no agent yet.
+    /// Stays Requested until <see cref="Confirm"/> assigns one.
+    /// </summary>
+    public static Appointment Request(
+        Guid dealerId,
+        Guid vehicleId,
+        Guid? clientId,
+        Guid? leadId,
+        DateTime start,
+        DateTime end,
+        AppointmentType type,
+        string? notes,
+        DateTime createdAtUtc)
+    {
+        if (vehicleId == Guid.Empty)
+            throw new DomainException("VehicleId cannot be empty");
+        if (clientId is null && leadId is null)
+            throw new DomainException("Un compromiso debe tener un Cliente o un Lead");
+        if (end <= start)
+            throw new DomainException("La hora de fin debe ser posterior a la hora de inicio");
+        if (start.Date < createdAtUtc.Date)
+            throw new DomainException("No se puede agendar un turno en una fecha pasada");
+
+        var appointment = new Appointment();
+        appointment.SetDealer(dealerId);
+        appointment.Id = Guid.NewGuid();
+        appointment.VehicleId = vehicleId;
+        appointment.ClientId = clientId;
+        appointment.LeadId = leadId;
+        appointment.AgentId = null;
+        appointment.StartDateTime = start;
+        appointment.EndDateTime = end;
+        appointment.Type = type;
+        appointment.Status = AppointmentStatus.Requested;
+        appointment.Notes = notes;
+        appointment.CreatedAt = createdAtUtc;
+
+        appointment.Raise(new AppointmentCreatedDomainEvent(appointment.Id, null, start));
+        return appointment;
+    }
+
+    /// <summary>Assigns the agent and moves Requested to Scheduled. Conflict revalidation is the caller's job.</summary>
+    public void Confirm(Guid agentId)
+    {
+        if (Status != AppointmentStatus.Requested)
+            throw new DomainException($"Solo se puede confirmar un turno solicitado (estado actual: {Status})");
+        if (agentId == Guid.Empty)
+            throw new DomainException("AgentId cannot be empty");
+
+        AgentId = agentId;
+        Status = AppointmentStatus.Scheduled;
+    }
+
     public void Reschedule(DateTime newStart, DateTime newEnd, DateTime rescheduledAtUtc)
     {
+        EnsureScheduled();
+
         if (newEnd <= newStart)
             throw new DomainException("La hora de fin debe ser posterior a la hora de inicio");
+        if (newStart.Date < rescheduledAtUtc.Date)
+            throw new DomainException("No se puede reagendar un turno a una fecha pasada");
 
         StartDateTime = newStart;
         EndDateTime = newEnd;
-        // rescheduledAtUtc is reserved for an audit trail field; kept as a parameter
-        // so callers can drive it from IDateTimeProvider (no hidden clock dependency).
-        _ = rescheduledAtUtc;
 
         Raise(new AppointmentRescheduledDomainEvent(Id, newStart, newEnd));
     }
@@ -108,7 +169,9 @@ public sealed class Appointment : Entity
 
     public void Cancel()
     {
-        EnsureScheduled();
+        // A Requested appointment can be rejected (cancelled) before it is confirmed.
+        if (Status != AppointmentStatus.Requested)
+            EnsureScheduled();
         Status = AppointmentStatus.Cancelled;
     }
 

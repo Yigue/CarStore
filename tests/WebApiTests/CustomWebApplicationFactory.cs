@@ -20,7 +20,9 @@ using WebApiTests.Fakes;
 
 namespace WebApiTests;
 
-public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
+// spr PR 3.3 (B10): no longer sealed so ProvisionEndpointTests.CaptchaStubWebApplicationFactory can
+// override ConfigureWebHost to swap in a deterministic ICaptchaVerifier stub.
+public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     public string Id { get; } = Guid.NewGuid().ToString();
     private readonly SqliteConnection _connection;
@@ -53,26 +55,26 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Forzar variables de entorno ANTES de cualquier configuración
-        Environment.SetEnvironmentVariable("UseInMemoryDatabase", "true");
-        Environment.SetEnvironmentVariable("Jwt__Secret", "SecretKeyForTestingPurposesOnly1234567890");
-        Environment.SetEnvironmentVariable("Jwt__Issuer", "CarStore");
-        Environment.SetEnvironmentVariable("Jwt__Audience", "CarStore");
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", "");
+        // Use host configuration via UseSetting instead of process-wide environment variables
+        builder.UseSetting("UseInMemoryDatabase", "true");
+        builder.UseSetting("Jwt:Secret", "SecretKeyForTestingPurposesOnly1234567890");
+        builder.UseSetting("Jwt:Issuer", "CarStore");
+        builder.UseSetting("Jwt:Audience", "CarStore");
+        builder.UseSetting("ConnectionStrings:Redis", "");
 
         // Storage:Minio config so the IOptions<MinioOptions> ValidateOnStart passes in tests.
         // The real MinioStorageService is replaced below by FakeStorageService, so these
         // values are never used to reach a real MinIO.
-        Environment.SetEnvironmentVariable("Storage__Minio__InternalEndpoint", "http://minio:9000");
-        Environment.SetEnvironmentVariable("Storage__Minio__PublicEndpoint", "http://localhost:9000");
-        Environment.SetEnvironmentVariable("Storage__Minio__AccessKey", "minioadmin");
-        Environment.SetEnvironmentVariable("Storage__Minio__SecretKey", "minioadmin123");
-        Environment.SetEnvironmentVariable("Storage__Minio__BucketName", "cars");
+        builder.UseSetting("Storage:Minio:InternalEndpoint", "http://minio:9000");
+        builder.UseSetting("Storage:Minio:PublicEndpoint", "http://localhost:9000");
+        builder.UseSetting("Storage:Minio:AccessKey", "minioadmin");
+        builder.UseSetting("Storage:Minio:SecretKey", "minioadmin123");
+        builder.UseSetting("Storage:Minio:BucketName", "cars");
         
         // Mock Stripe secrets to bypass SubscriptionEnforcement checks
-        Environment.SetEnvironmentVariable("Stripe__SecretKey", "sk_test_mock");
-        Environment.SetEnvironmentVariable("Stripe__WebhookSecret", "whsec_mock");
-        Environment.SetEnvironmentVariable("Stripe__PriceId", "price_mock");
+        builder.UseSetting("Stripe:SecretKey", "sk_test_mock");
+        builder.UseSetting("Stripe:WebhookSecret", "whsec_mock");
+        builder.UseSetting("Stripe:PriceId", "price_mock");
 
         builder.UseEnvironment(_environment);
 
@@ -80,6 +82,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             // Remover TODO rastro de EF Core previo
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
+            services.RemoveAll<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<ApplicationDbContext>>();
             services.RemoveAll<ApplicationDbContext>();
             services.RemoveAll<IApplicationDbContext>();
 
@@ -104,6 +107,22 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // Mock Stripe to avoid real API calls and Exceptions
             services.RemoveAll<ISubscriptionGateway>();
             services.AddSingleton<ISubscriptionGateway, FakeSubscriptionGateway>();
+
+            // Same reason for the plan catalog: with Stripe:SecretKey set, the real StripePlanCatalog
+            // is registered and any price lookup (platform MRR, public plans) calls Stripe with the
+            // mock key and throws. See FakePlanCatalog.
+            services.RemoveAll<IPlanCatalog>();
+            services.AddScoped<IPlanCatalog, FakePlanCatalog>();
+
+            // spr PR 3.3 (B10) made Program.cs refuse to boot in Production with NoOpCaptchaVerifier.
+            // The hosts that boot as "Production" here (error-contract convergence tests) are not
+            // about the CAPTCHA at all, and wiring Captcha:SecretKey would make them call Turnstile
+            // for real. A deterministic stub stands for "a production host with a real verifier".
+            if (string.Equals(_environment, "Production", StringComparison.Ordinal))
+            {
+                services.RemoveAll<Application.Abstractions.Security.ICaptchaVerifier>();
+                services.AddSingleton<Application.Abstractions.Security.ICaptchaVerifier, StubCaptchaVerifier>();
+            }
         });
     }
 

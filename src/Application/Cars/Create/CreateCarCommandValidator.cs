@@ -1,3 +1,4 @@
+using Application.Abstractions.Pricing;
 using FluentValidation;
 
 namespace Application.Cars.Create;
@@ -15,8 +16,12 @@ namespace Application.Cars.Create;
 /// </summary>
 internal sealed class CreateCarCommandValidator : AbstractValidator<CreateCarCommand>
 {
-    public CreateCarCommandValidator()
+    public CreateCarCommandValidator(IMoneyPolicy? moneyPolicy = null)
     {
+        // sfc B0.2.3 / VB.2: with Money:RequireExplicitCurrency on, no implicit ARS default for new records.
+        When(_ => moneyPolicy?.RequireExplicitCurrency == true, () =>
+            RuleFor(x => x.Currency).NotEmpty().WithMessage("La moneda es obligatoria (ARS o USD)."));
+
         RuleFor(x => x.Marca).NotEmpty().WithMessage("El campo marca es requerido y debe ser una opcion valida");
         RuleFor(x => x.Modelo).NotEmpty().WithMessage("El campo modelo es requerido y debe ser una opcion valida");
         RuleFor(x => x.Color).IsInEnum().WithMessage("El campo color es requerido y debe ser una opcion valida");

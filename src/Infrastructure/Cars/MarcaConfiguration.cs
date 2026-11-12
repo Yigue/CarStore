@@ -14,10 +14,16 @@ public class MarcaConfiguration : IEntityTypeConfiguration<Marca>
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(m => m.NombreNormalizado)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.HasIndex(m => m.NombreNormalizado)
+            .IsUnique()
+            .HasDatabaseName("ix_marca_nombre_normalizado");
+
         builder.HasMany(m => m.Modelos)
             .WithOne(mo => mo.Marca)
             .HasForeignKey(mo => mo.MarcaId);
-
-     
     }
 }

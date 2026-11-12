@@ -8,7 +8,7 @@ namespace Infrastructure.Billing;
 
 public class NoOpSubscriptionGateway : ISubscriptionGateway
 {
-    public Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, CancellationToken ct = default)
+    public Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, string planCode, CheckoutReturn checkoutReturn, CancellationToken ct = default)
     {
         return Task.FromResult("https://checkout.stripe.com/noop_session");
     }
@@ -23,8 +23,28 @@ public class NoOpSubscriptionGateway : ISubscriptionGateway
         return Task.CompletedTask;
     }
 
+    public Task CancelNowAsync(string stripeSubscriptionId, CancellationToken ct = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateCustomerEmailAsync(string stripeCustomerId, string email, CancellationToken ct = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<ExternalSubscription?> FindSubscriptionForDealerAsync(Guid dealerId, CancellationToken ct = default)
+    {
+        return Task.FromResult<ExternalSubscription?>(null);
+    }
+
     public Task<string> CreateCustomerAsync(Guid dealerId, string email, CancellationToken ct = default)
     {
         return Task.FromResult($"cus_noop_{Guid.NewGuid():N}");
+    }
+
+    public Task<string> CreatePortalSessionAsync(string stripeCustomerId, CancellationToken ct = default)
+    {
+        return Task.FromResult("https://billing.stripe.com/noop_session");
     }
 }

@@ -18,17 +18,20 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
     private readonly IDealerSubscriptionRepository _repository;
     private readonly IConfiguration _configuration;
     private readonly StripeOptions _options;
+    private readonly IPlanCatalog _planCatalog;
 
     public StripeSubscriptionGateway(
         IStripeClient stripeClient,
         IDealerSubscriptionRepository repository,
         IConfiguration configuration,
-        IOptions<StripeOptions> options)
+        IOptions<StripeOptions> options,
+        IPlanCatalog planCatalog)
     {
         _stripeClient = stripeClient;
         _repository = repository;
         _configuration = configuration;
         _options = options.Value;
+        _planCatalog = planCatalog;
     }
 
     public async Task<string> CreateCustomerAsync(Guid dealerId, string email, CancellationToken ct = default)
@@ -65,12 +68,20 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
         return customer.Id;
     }
 
-    public async Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, CancellationToken ct = default)
+    public async Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, string planCode, CheckoutReturn checkoutReturn, CancellationToken ct = default)
     {
         string stripeCustomerId = await CreateCustomerAsync(dealerId, dealerEmail, ct);
 
+        // spr PR 1.1 (ADR B1): resolve the price through the catalog instead of _options.PriceId directly,
+        // so the gateway is plan-aware. Falls back to the legacy PriceId if the catalog has nothing for the
+        // code (should not happen once StripeOptionsValidator passes, but never block checkout on it).
+        var plan = await _planCatalog.GetAsync(planCode, ct);
+        string priceId = plan?.PriceId ?? _options.PriceId;
+
         var sessionService = new SessionService(_stripeClient);
         string baseUrl = (_configuration["Frontend:BaseUrl"] ?? "http://localhost:3000").TrimEnd('/');
+        string successUrl = checkoutReturn.SuccessUrl ?? $"{baseUrl}/dashboard?session_id={{CHECKOUT_SESSION_ID}}";
+        string cancelUrl = checkoutReturn.CancelUrl ?? $"{baseUrl}/dashboard";
 
         var options = new SessionCreateOptions
         {
@@ -80,7 +91,7 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
             {
                 new SessionLineItemOptions
                 {
-                    Price = _options.PriceId,
+                    Price = priceId,
                     Quantity = 1
                 }
             },
@@ -90,15 +101,17 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
                 TrialPeriodDays = _options.TrialDays > 0 ? _options.TrialDays : null,
                 Metadata = new Dictionary<string, string>
                 {
-                    { "dealer_id", dealerId.ToString() }
+                    { "dealer_id", dealerId.ToString() },
+                    { "planCode", planCode }
                 }
             },
             Metadata = new Dictionary<string, string>
             {
-                { "dealer_id", dealerId.ToString() }
+                { "dealer_id", dealerId.ToString() },
+                { "planCode", planCode }
             },
-            SuccessUrl = $"{baseUrl}/dashboard?session_id={{CHECKOUT_SESSION_ID}}",
-            CancelUrl = $"{baseUrl}/dashboard"
+            SuccessUrl = successUrl,
+            CancelUrl = cancelUrl
         };
 
         var session = await sessionService.CreateAsync(options, cancellationToken: ct);
@@ -115,11 +128,79 @@ public sealed class StripeSubscriptionGateway : ISubscriptionGateway
         await subscriptionService.UpdateAsync(stripeSubscriptionId, options, cancellationToken: ct);
     }
 
+    public async Task CancelNowAsync(string stripeSubscriptionId, CancellationToken ct = default)
+    {
+        var subscriptionService = new SubscriptionService(_stripeClient);
+        try
+        {
+            await subscriptionService.CancelAsync(
+                stripeSubscriptionId,
+                new SubscriptionCancelOptions { InvoiceNow = false, Prorate = false },
+                cancellationToken: ct);
+        }
+        catch (StripeException ex) when (ex.StripeError?.Code == "resource_missing")
+        {
+            // Already cancelled / gone at the provider: the end state is the one we wanted.
+        }
+    }
+
+    public async Task UpdateCustomerEmailAsync(string stripeCustomerId, string email, CancellationToken ct = default)
+    {
+        var customerService = new CustomerService(_stripeClient);
+        await customerService.UpdateAsync(
+            stripeCustomerId,
+            new CustomerUpdateOptions { Email = email },
+            cancellationToken: ct);
+    }
+
     public async Task<SubscriptionStatus> GetStatusAsync(string stripeSubscriptionId, CancellationToken ct = default)
     {
         var subscriptionService = new SubscriptionService(_stripeClient);
         var subscription = await subscriptionService.GetAsync(stripeSubscriptionId, cancellationToken: ct);
         return MapStripeStatus(subscription.Status);
+    }
+
+    public async Task<ExternalSubscription?> FindSubscriptionForDealerAsync(Guid dealerId, CancellationToken ct = default)
+    {
+        var subscriptionService = new SubscriptionService(_stripeClient);
+        var search = await subscriptionService.SearchAsync(
+            new SubscriptionSearchOptions { Query = $"metadata['dealer_id']:'{dealerId}'", Limit = 10 },
+            cancellationToken: ct);
+
+        // Most recent live subscription wins; a cancelled one does not count as "confirmed".
+        var live = search.Data
+            .Where(s => s.Status != "canceled" && s.Status != "incomplete_expired")
+            .OrderByDescending(s => s.Created)
+            .FirstOrDefault();
+
+        if (live is null)
+        {
+            return null;
+        }
+
+        return new ExternalSubscription(
+            live.CustomerId,
+            live.Id,
+            MapStripeStatus(live.Status),
+            live.CurrentPeriodStart,
+            live.CurrentPeriodEnd,
+            live.TrialEnd,
+            live.Items?.Data?.FirstOrDefault()?.Price?.Id);
+    }
+
+    public async Task<string> CreatePortalSessionAsync(string stripeCustomerId, CancellationToken ct = default)
+    {
+        var portalSessionService = new Stripe.BillingPortal.SessionService(_stripeClient);
+        string baseUrl = (_configuration["Frontend:BaseUrl"] ?? "http://localhost:3000").TrimEnd('/');
+
+        var options = new Stripe.BillingPortal.SessionCreateOptions
+        {
+            Customer = stripeCustomerId,
+            ReturnUrl = $"{baseUrl}/dashboard/settings"
+        };
+
+        var session = await portalSessionService.CreateAsync(options, cancellationToken: ct);
+        return session.Url;
     }
 
     private static SubscriptionStatus MapStripeStatus(string stripeStatus)

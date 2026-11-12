@@ -27,7 +27,6 @@ internal sealed class GetUserByIdQueryHandler(
                 RoleId = u.RoleId,
                 IsActive = u.IsActive,
                 CreatedAt = u.CreatedAt,
-                Permissions = u.Permissions.Select(p => p.Permission).ToList()
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -36,6 +35,14 @@ internal sealed class GetUserByIdQueryHandler(
             return Result.Failure<UserResponse>(UserErrors.NotFound(query.UserId));
         }
 
-        return user;
+        // spr PR 4.2 / H9 follow-up: effective permissions come exclusively from the user's Role ->
+        // RolePermission, never the legacy UserPermissions table (its write path was deleted in PR 4.2;
+        // the navigation used here before always read back an empty collection for a tenant user).
+        List<string> permissions = await context.RolePermissions
+            .Where(rp => rp.RoleId == user.RoleId)
+            .Select(rp => rp.Permission)
+            .ToListAsync(cancellationToken);
+
+        return user with { Permissions = permissions };
     }
 }

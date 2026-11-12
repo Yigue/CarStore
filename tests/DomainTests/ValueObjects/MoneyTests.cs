@@ -12,7 +12,17 @@ public class MoneyTests
         var money = new Money(amount);
 
         money.Amount.Should().Be(amount);
-        money.Currency.Should().Be("USD");
+        money.Currency.Should().Be(Money.DefaultCurrency);
+    }
+
+    // ADR C1: the implicit currency is the one the platform has always served (ARS). It must match
+    // the backfill of the new *_currency columns, otherwise rows created through the
+    // single-argument constructor would be stored as USD while legacy rows read as ARS.
+    [Fact]
+    public void DefaultCurrency_ShouldBeArs()
+    {
+        Money.DefaultCurrency.Should().Be("ARS");
+        new Money(10m).Currency.Should().Be("ARS");
     }
 
     [Fact]
@@ -41,7 +51,7 @@ public class MoneyTests
         var zero = Money.Zero;
 
         zero.Amount.Should().Be(0m);
-        zero.Currency.Should().Be("USD");
+        zero.Currency.Should().Be(Money.DefaultCurrency);
     }
 
     [Fact]
@@ -53,7 +63,7 @@ public class MoneyTests
         var result = money1 + money2;
 
         result.Amount.Should().Be(150m);
-        result.Currency.Should().Be("USD");
+        result.Currency.Should().Be(Money.DefaultCurrency);
     }
 
     [Fact]
@@ -77,7 +87,7 @@ public class MoneyTests
         var result = money1 - money2;
 
         result.Amount.Should().Be(70m);
-        result.Currency.Should().Be("USD");
+        result.Currency.Should().Be(Money.DefaultCurrency);
     }
 
     [Fact]
@@ -101,7 +111,7 @@ public class MoneyTests
         var result = money * multiplier;
 
         result.Amount.Should().Be(150m);
-        result.Currency.Should().Be("USD");
+        result.Currency.Should().Be(Money.DefaultCurrency);
     }
 
     [Fact]

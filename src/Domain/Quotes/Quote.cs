@@ -1,6 +1,7 @@
 using SharedKernel;
 using Domain.Cars;
 using Domain.Clients;
+using Domain.Currency;
 using Domain.Leads;
 using Domain.Quotes.Attributes;
 using Domain.Quotes.Events;
@@ -13,7 +14,13 @@ public sealed class Quote : Entity, ISoftDeletable
     public Guid CarId { get; private set; }
     public Guid? ClientId { get; private set; }
     public Guid? LeadId { get; private set; }
+    /// <summary>sfc B4.3 / RN-018: per-dealer folio (`COT-{yyyy}-{n:D6}`), null until assigned by
+    /// <see cref="AssignNumber"/>. Nullable so existing quotes can be backfilled by a migration
+    /// instead of breaking every pre-existing <c>new Quote(...)</c> call site.</summary>
+    public string? Number { get; private set; }
     public Money ProposedPrice { get; private set; }
+    /// <summary>sfc B0.2 / ADR C2: set only when the quote currency differs from the vehicle's; immutable once captured.</summary>
+    public ExchangeRateSnapshot? ExchangeRate { get; private set; }
     public PaymentMethod PaymentMethod { get; private set; }
     public QuoteStatus Status { get; private set; }
     public DateTime ValidUntil { get; private set; }
@@ -37,7 +44,11 @@ public sealed class Quote : Entity, ISoftDeletable
         PaymentMethod paymentMethod,
         DateTime validUntil,
         string comments,
-        DateTime date)
+        DateTime date,
+        // sfc B0.2.3 phase 1: ARS when omitted.
+        CurrencyCode? proposedCurrency = null,
+        // ADR C2: the rate frozen when the quote currency differs from the vehicle's. Never recalculated.
+        ExchangeRateSnapshot? exchangeRate = null)
     {
         SetDealer(dealerId);
 
@@ -66,7 +77,8 @@ public sealed class Quote : Entity, ISoftDeletable
         }
 
         
-        ProposedPrice = new Money(proposedPrice);
+        ProposedPrice = Money.Of(proposedPrice, proposedCurrency ?? CurrencyCode.Ars);
+        ExchangeRate = exchangeRate;
         PaymentMethod = paymentMethod;
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
@@ -77,19 +89,41 @@ public sealed class Quote : Entity, ISoftDeletable
         Raise(new QuoteCreatedDomainEvent(Id, CarId, ClientId ?? Guid.Empty, ProposedPrice));
     }
 
+    /// <summary>sfc B4.3 / RN-018: formats the per-dealer folio. Pure — the sequence value itself
+    /// comes from IDealerSequenceAllocator, a DB side effect this aggregate cannot own.</summary>
+    public static string FormatNumber(int year, long sequenceValue) => $"COT-{year:D4}-{sequenceValue:D6}";
+
+    /// <summary>
+    /// Assigns this quote's folio, once, right after a sequence value has been allocated for a
+    /// NEW quote. Existing quotes get their Number from the AddQuoteNumbers migration backfill
+    /// instead — that path writes the column directly, it does not call this method.
+    /// </summary>
+    public void AssignNumber(string number)
+    {
+        if (string.IsNullOrWhiteSpace(number))
+            throw new DomainException("Quote number cannot be empty");
+
+        if (Number is not null)
+            throw new DomainException("Quote number is already assigned");
+
+        Number = number;
+    }
+
     public void Update(
         decimal proposedPrice,
         DateTime validUntil,
         string comments,
-        DateTime updatedAt)
+        DateTime updatedAt,
+        CurrencyCode? proposedCurrency = null)
     {
         if (Status != QuoteStatus.Pending)
             throw new DomainException("Only pending quotes can be updated");
-        
+
         if (validUntil <= updatedAt)
             throw new DomainException("ValidUntil must be in the future");
-        
-        ProposedPrice = new Money(proposedPrice);
+
+        // Without an explicit currency the quote keeps its own; hard-coding ARS here converted USD quotes silently.
+        ProposedPrice = Money.Of(proposedPrice, proposedCurrency ?? CurrencyCode.Parse(ProposedPrice.Currency));
         ValidUntil = validUntil;
         Comments = comments ?? string.Empty;
         UpdatedAt = updatedAt;
@@ -143,6 +177,36 @@ public sealed class Quote : Entity, ISoftDeletable
             Status = QuoteStatus.Expired;
             UpdatedAt = updatedAt;
         }
+    }
+
+    /// <summary>
+    /// LEAD-04: withdraws the offer because the negotiation behind it is over — the lead was
+    /// marked Perdido.
+    ///
+    /// <para>
+    /// Distinct from <see cref="Reject"/>, which only closes a PENDING quote: what actually
+    /// hurt was the ACCEPTED one, because acceptance holds the vehicle Reservado. A deal that
+    /// no longer exists kept a car off the floor and nothing ever noticed. Distinct from
+    /// <see cref="Expire"/> too, which is a no-op before the validity date and would have
+    /// silently done nothing.
+    /// </para>
+    ///
+    /// <para>
+    /// The record is kept, not deleted: the funnel has to be able to tell a lost negotiation
+    /// from one that was never quoted. Idempotent — a quote already closed stays as it is, so
+    /// an outbox retry changes nothing.
+    /// </para>
+    /// </summary>
+    public void CloseAsLost(string reason, DateTime updatedAt)
+    {
+        if (Status is QuoteStatus.Rejected or QuoteStatus.Expired)
+        {
+            return;
+        }
+
+        Status = QuoteStatus.Rejected;
+        UpdatedAt = updatedAt;
+        Raise(new QuoteRejectedDomainEvent(Id, reason ?? string.Empty));
     }
     
     /// <summary>

@@ -1,4 +1,4 @@
-﻿using SharedKernel;
+using SharedKernel;
 
 namespace Domain.Users;
 
@@ -24,15 +24,27 @@ public static class UserErrors
         "Users.InvalidPassword",
         "The password provided is incorrect");
 
+    public static readonly Error InvalidCredentials = Error.Problem(
+        "Users.InvalidCredentials",
+        "Credenciales inválidas");
+
     public static readonly Error InvalidResetToken = Error.Problem(
         "Users.InvalidResetToken",
         "El token de recuperación es inválido o ha expirado");
+
+    public static readonly Error InvalidVerificationToken = Error.Problem(
+        "Users.InvalidVerificationToken",
+        "El enlace de verificación es inválido o ha expirado");
 
     public static readonly Error SelfDeleteNotAllowed = Error.Failure(
         "Users.SelfDeleteNotAllowed",
         "No puedes eliminar tu propia cuenta");
 
-    public static readonly Error CannotRevokeOwnPermission = Error.Failure(
-        "Users.CannotRevokeOwnPermission",
-        "No puedes revocar tus propios permisos de administrador");
+    public static readonly Error OwnerProtected = Error.Conflict(
+        "Users.OwnerProtected",
+        "El titular de la cuenta no puede desactivarse, eliminarse ni cambiar de rol: transfiere la titularidad primero");
+
+    public static readonly Error TenantRequired = Error.Problem(
+        "Users.TenantRequired",
+        "A valid tenant context is required to register a user.");
 }

@@ -37,6 +37,7 @@ public class UsersControllerTests
             FirstName = "List",
             LastName = "User",
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var regResponse = await client.PostAsJsonAsync("/api/v1/users/register", register);
@@ -76,6 +77,7 @@ public class UsersControllerTests
             FirstName = "GetById",
             LastName = "Test",
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var regResponse = await client.PostAsJsonAsync("/api/v1/users/register", register);
@@ -116,6 +118,7 @@ public class UsersControllerTests
             FirstName = "Update",
             LastName = "User",
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var regResponse = await client.PostAsJsonAsync("/api/v1/users/register", register);
@@ -172,6 +175,7 @@ public class UsersControllerTests
             FirstName = "Admin",
             LastName = "User",
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var adminRegResponse = await client.PostAsJsonAsync("/api/v1/users/register", adminRegister);
@@ -184,6 +188,7 @@ public class UsersControllerTests
             FirstName = "To",
             LastName = "Delete",
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var deleteRegResponse = await client.PostAsJsonAsync("/api/v1/users/register", deleteRegister);
@@ -220,6 +225,7 @@ public class UsersControllerTests
             FirstName = "Assign",
             LastName = "Role",
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var adminRegResponse = await client.PostAsJsonAsync("/api/v1/users/register", adminRegister);
@@ -232,6 +238,7 @@ public class UsersControllerTests
             FirstName = "Target",
             LastName = "User",
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         var targetRegResponse = await client.PostAsJsonAsync("/api/v1/users/register", targetRegister);

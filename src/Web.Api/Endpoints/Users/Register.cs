@@ -1,4 +1,4 @@
-﻿using Application.Users.Register;
+using Application.Users.Register;
 using MediatR;
 using SharedKernel;
 using Web.Api.Extensions;
@@ -13,18 +13,20 @@ internal sealed class Register : IEndpoint
         string FirstName,
         string LastName,
         string Password,
-        Guid? DealerId);
+        string? AcceptedTermsVersion = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("users/register", async (Request request, ISender sender, CancellationToken cancellationToken) =>
+        app.MapPost("users/register", async (Request request, HttpContext httpContext, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new RegisterUserCommand(
-                request.Email,
-                request.FirstName,
-                request.LastName,
-                request.Password,
-                request.DealerId);
+                Email: request.Email,
+                FirstName: request.FirstName,
+                LastName: request.LastName,
+                Password: request.Password,
+                AcceptedTermsVersion: request.AcceptedTermsVersion,
+                AcceptanceIp: httpContext.Connection.RemoteIpAddress?.ToString(),
+                AcceptanceUserAgent: httpContext.Request.Headers.UserAgent.ToString());
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 
@@ -35,6 +37,7 @@ internal sealed class Register : IEndpoint
         .WithTags(Tags.Users)
         .WithName("RegisterUser")
         .AllowAnonymous()
+        .RequireRateLimiting("public")
         .Produces<Guid>(StatusCodes.Status201Created)
         .ProducesValidationProblem()
         .ProducesProblem(StatusCodes.Status409Conflict)

@@ -1,15 +1,19 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SharedKernel;
 
 namespace Application.Users.Commands.UpdateUser;
 
 internal sealed class UpdateUserCommandHandler(
     IApplicationDbContext context,
-    ICurrentTenantService tenantService)
+    DbContext dbContext,
+    ICurrentTenantService tenantService,
+    IEntitlementService entitlementService)
     : ICommandHandler<UpdateUserCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(UpdateUserCommand command, CancellationToken cancellationToken)
@@ -22,31 +26,114 @@ internal sealed class UpdateUserCommandHandler(
             return Result.Failure<Guid>(UserErrors.NotFound(command.UserId));
         }
 
-        // Update user properties using domain methods
-        user.UpdateName(command.FirstName.Trim(), command.LastName.Trim());
+        var roleBelongsToDealer = await context.Roles
+            .AnyAsync(r => r.Id == command.RoleId && r.DealerId == tenantService.DealerId, cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(command.Phone))
+        if (!roleBelongsToDealer)
         {
-            user.UpdatePhone(command.Phone.Trim());
-        }
-        else
-        {
-            user.UpdatePhone(null);
+            return Result.Failure<Guid>(RoleErrors.NotFound(command.RoleId));
         }
 
-        user.UpdateRole(command.RoleId);
-
-        if (command.IsActive && !user.IsActive)
+        // sfc A4.3 / C17: the owner can be renamed, but not deactivated or moved to another role.
+        if ((user.RoleId != command.RoleId || (!command.IsActive && user.IsActive))
+            && await OwnerGuard.IsOwnerAsync(context, tenantService.DealerId, user.Id, cancellationToken))
         {
-            user.Activate();
-        }
-        else if (!command.IsActive && user.IsActive)
-        {
-            user.Deactivate();
+            return Result.Failure<Guid>(UserErrors.OwnerProtected);
         }
 
-        await context.SaveChangesAsync(cancellationToken);
+        // Security review (sfc A3.1): same gate as AssignRole — only the transition that NEWLY
+        // starts consuming a seat is checked; see AssignRoleCommandHandler for the full rationale,
+        // including why the lock must be acquired BEFORE deciding whether this is a seat
+        // transition (fourth round: closes a race against a concurrent UpdateRoleCommandHandler
+        // call granting command.RoleId its first permission).
+        bool roleChanged = user.RoleId != command.RoleId;
 
-        return Result.Success(user.Id);
+        IDbContextTransaction? transaction = roleChanged && dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        try
+        {
+            if (roleChanged)
+            {
+                await entitlementService.AcquireUsersLockAsync(tenantService.DealerId, cancellationToken);
+
+                // Security review (sfc A3.1), fifth round: user.RoleId above was read BEFORE this
+                // lock — reload the user's current role under the lock before deciding anything;
+                // see AssignRoleCommandHandler for the full rationale. Safe to reload here: nothing
+                // on `user` has been mutated yet at this point in the handler.
+                await dbContext.Entry(user).ReloadAsync(cancellationToken);
+                bool stillRoleChanged = user.RoleId != command.RoleId;
+
+                if (stillRoleChanged)
+                {
+                    bool newlyConsumesASeat = !await entitlementService.RoleConsumesASeatAsync(user.RoleId, cancellationToken)
+                        && await entitlementService.RoleConsumesASeatAsync(command.RoleId, cancellationToken);
+
+                    if (newlyConsumesASeat)
+                    {
+                        Result entitlementCheck = await entitlementService.EnsureCanAddAsync(
+                            tenantService.DealerId, PlanResource.Users, cancellationToken);
+                        if (entitlementCheck.IsFailure)
+                        {
+                            if (transaction is not null)
+                            {
+                                await transaction.RollbackAsync(cancellationToken);
+                            }
+
+                            return Result.Failure<Guid>(entitlementCheck.Error);
+                        }
+                    }
+                }
+            }
+
+            // Update user properties using domain methods
+            user.UpdateName(command.FirstName.Trim(), command.LastName.Trim());
+
+            if (!string.IsNullOrWhiteSpace(command.Phone))
+            {
+                user.UpdatePhone(command.Phone.Trim());
+            }
+            else
+            {
+                user.UpdatePhone(null);
+            }
+
+            user.UpdateRole(command.RoleId);
+
+            if (command.IsActive && !user.IsActive)
+            {
+                user.Activate();
+            }
+            else if (!command.IsActive && user.IsActive)
+            {
+                user.Deactivate();
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(user.Id);
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
     }
 }

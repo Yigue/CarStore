@@ -18,17 +18,19 @@ public class StripeSubscriptionGatewayInterfaceContractTests
         var type = typeof(ISubscriptionGateway);
         var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance);
 
-        methods.Should().HaveCount(4);
+        methods.Should().HaveCount(8);
 
-        // Method 1: CreateCheckoutSessionAsync
+        // Method 1 (spr PR 1.1, ADR B1): CreateCheckoutSessionAsync — grew planCode + CheckoutReturn.
         var m1 = methods.SingleOrDefault(m => m.Name == "CreateCheckoutSessionAsync");
         m1.Should().NotBeNull();
         m1.ReturnType.Should().Be<Task<string>>();
         var p1 = m1.GetParameters();
-        p1.Should().HaveCount(3);
+        p1.Should().HaveCount(5);
         p1[0].ParameterType.Should().Be<Guid>(); // dealerId
         p1[1].ParameterType.Should().Be<string>(); // dealerEmail
-        p1[2].ParameterType.Should().Be<CancellationToken>();
+        p1[2].ParameterType.Should().Be<string>(); // planCode
+        p1[3].ParameterType.Should().Be<CheckoutReturn>();
+        p1[4].ParameterType.Should().Be<CancellationToken>();
 
         // Method 2: GetStatusAsync
         var m2 = methods.SingleOrDefault(m => m.Name == "GetStatusAsync");
@@ -57,5 +59,42 @@ public class StripeSubscriptionGatewayInterfaceContractTests
         p4[0].ParameterType.Should().Be<Guid>(); // dealerId
         p4[1].ParameterType.Should().Be<string>(); // email
         p4[2].ParameterType.Should().Be<CancellationToken>();
+    
+        // Method 5 (spr ADR B9 / C14): FindSubscriptionForDealerAsync — provider lookup used by reconciliation.
+        var m5 = methods.SingleOrDefault(m => m.Name == "FindSubscriptionForDealerAsync");
+        m5.Should().NotBeNull();
+        m5.ReturnType.Should().Be<Task<ExternalSubscription?>>();
+        var p5 = m5.GetParameters();
+        p5.Should().HaveCount(2);
+        p5[0].ParameterType.Should().Be<Guid>(); // dealerId
+        p5[1].ParameterType.Should().Be<CancellationToken>();
+
+        // Method 6 (sfc A1.4, RN-015): CancelNowAsync — immediate cancellation for account self-deletion.
+        var m6 = methods.SingleOrDefault(m => m.Name == "CancelNowAsync");
+        m6.Should().NotBeNull();
+        m6.ReturnType.Should().Be<Task>();
+        var p6 = m6.GetParameters();
+        p6.Should().HaveCount(2);
+        p6[0].ParameterType.Should().Be<string>(); // stripeSubscriptionId
+        p6[1].ParameterType.Should().Be<CancellationToken>();
+
+        // Method 7 (sfc A2.1, ADR C14): UpdateCustomerEmailAsync — keeps the provider billing email in sync.
+        var m7 = methods.SingleOrDefault(m => m.Name == "UpdateCustomerEmailAsync");
+        m7.Should().NotBeNull();
+        m7!.ReturnType.Should().Be<Task>();
+        var p7 = m7.GetParameters();
+        p7.Should().HaveCount(3);
+        p7[0].ParameterType.Should().Be<string>(); // stripeCustomerId
+        p7[1].ParameterType.Should().Be<string>(); // email
+        p7[2].ParameterType.Should().Be<CancellationToken>();
+
+        // Method 8 (spr PR 1.3, D2): CreatePortalSessionAsync — Stripe-hosted billing portal.
+        var m8 = methods.SingleOrDefault(m => m.Name == "CreatePortalSessionAsync");
+        m8.Should().NotBeNull();
+        m8!.ReturnType.Should().Be<Task<string>>();
+        var p8 = m8.GetParameters();
+        p8.Should().HaveCount(2);
+        p8[0].ParameterType.Should().Be<string>(); // stripeCustomerId
+        p8[1].ParameterType.Should().Be<CancellationToken>();
     }
 }

@@ -25,6 +25,11 @@ internal sealed class UploadImageCarCommandHandler(
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
         }
 
+        if (car.Images.Count >= 10)
+        {
+            return Result.Failure<Guid>(CarErrors.ImageLimitReached(10));
+        }
+
         // Generar nombre único para el archivo
         string uniqueFileName = $"{Guid.NewGuid()}_{command.FileName}";
         

@@ -11,10 +11,8 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
     {
         builder.HasKey(s => s.Id);
 
-        builder.Property(s => s.FinalPrice)
-            .HasConversion(new MoneyValueConverter())
-            .HasColumnName("final_price")
-            .IsRequired();
+        builder.OwnsRequiredMoney(s => s.FinalPrice, "final_price", "final_price_currency");
+        builder.OwnsOptionalExchangeRate(s => s.ExchangeRate);
 
         builder.Property(s => s.Status)
             .HasConversion<string>();
@@ -70,5 +68,53 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
             .IsUnique()
             .HasDatabaseName("ux_sales_one_completed_per_car")
             .HasFilter("status = 'Completed'");
+
+        // ─── VEN-03 · payment breakdown ───────────────────────────────────────────────────────
+        // Every column is nullable: a sale recorded before this change, or one paid in cash,
+        // has nothing to fill in here.
+
+        builder.OwnsOptionalMoney(s => s.DownPayment, "down_payment", "down_payment_currency");
+
+        builder.Property(s => s.TradeInCarId)
+            .HasColumnName("trade_in_car_id");
+
+        builder.OwnsOptionalMoney(s => s.TradeInValue, "trade_in_value", "trade_in_value_currency");
+
+        builder.OwnsOptionalMoney(s => s.FinancedAmount, "financed_amount", "financed_amount_currency");
+
+        builder.Property(s => s.InstallmentCount)
+            .HasColumnName("installment_count");
+
+        builder.OwnsOptionalMoney(s => s.InstallmentAmount, "installment_amount", "installment_amount_currency");
+
+        builder.Property(s => s.FinancingEntity)
+            .HasMaxLength(120)
+            .HasColumnName("financing_entity");
+
+        // The trade-in points at a Car but is NOT a constrained FK: the unit taken in part
+        // payment may be entered into inventory later, or not at all, and a hard constraint
+        // would block recording the sale until someone created it. Same convention as
+        // SalespersonId above.
+        builder.HasIndex(s => s.TradeInCarId)
+            .HasDatabaseName("ix_sales_trade_in_car_id");
+
+        // ─── VEN-03 · legal paperwork ─────────────────────────────────────────────────────────
+        // Attachments already exist (Document.SaleId). A file is not a number: the factura, the
+        // 08 and the patentamiento are looked up by theirs.
+
+        builder.Property(s => s.InvoiceNumber)
+            .HasMaxLength(50)
+            .HasColumnName("invoice_number");
+
+        builder.Property(s => s.TransferFormNumber)
+            .HasMaxLength(50)
+            .HasColumnName("transfer_form_number");
+
+        builder.Property(s => s.RegistrationNumber)
+            .HasMaxLength(50)
+            .HasColumnName("registration_number");
+
+        builder.Property(s => s.DeliveryDate)
+            .HasColumnName("delivery_date");
     }
 }

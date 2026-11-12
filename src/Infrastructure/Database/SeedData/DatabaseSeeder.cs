@@ -47,6 +47,10 @@ public static class DatabaseSeeder
         // 4. DevData (Clients, Cars, Sales, Quotes, Leads, Subscriptions)
         await DevDataSeeder.SeedAsync(context, passwordHasher, configuration, cancellationToken);
 
+        // 5. EXT-01: datos de volumen (miles de autos/leads) — no-op salvo que se
+        // habilite explícitamente con Seeding:VolumeData:Enabled. Ver VolumeDataSeeder.
+        await VolumeDataSeeder.SeedAsync(context, configuration, logger, cancellationToken);
+
         // Guardar todos los cambios
         await context.SaveChangesAsync(cancellationToken);
     }

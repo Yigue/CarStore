@@ -9,17 +9,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace WebApiTests.IntegrationTests.Newsletter;
 
 /// <summary>
-/// qa-p1-integridad PR5, Slice 10 (D6, REQ: crm-client-data-contract). <c>Subscribe.cs</c>
-/// constructed <see cref="Application.Clients.Create.CreateClientCommand"/> positionally against
-/// a record shaped <c>(FirstName, LastName, DNI, Email, Phone, Address, Type, ...)</c>. The
-/// subscriber's address landed in the <c>DNI</c> slot and the literal <c>"N/A"</c> landed in
-/// <c>Email</c>, so <c>new Email("N/A")</c> always threw a <see cref="SharedKernel.DomainException"/>
-/// and the endpoint returned 400 for every request.
+/// qa-p1-integridad D6 first fixed the positional-argument bug that put the email in the DNI slot. sfc B5.1 / RN-019
+/// then stopped creating a placeholder <c>Client</c> altogether: a sign-up is a pending
+/// <see cref="Domain.Marketing.Subscriber"/> with the email in its own field, awaiting double opt-in.
 /// </summary>
 public class NewsletterSubscribeTests
 {
     [Fact]
-    public async Task ValidEmail_Returns200_AndPersistsEmailInEmailField_NotDni()
+    public async Task ValidEmail_Returns200_AndPersistsAPendingSubscriber_NotAClient()
     {
         await using var factory = new CustomWebApplicationFactory();
         factory.SeedDatabase();
@@ -29,23 +26,41 @@ public class NewsletterSubscribeTests
             "/api/v1/newsletter/subscribe",
             new { email = "persona@example.com" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK,
-            "a well-formed email must not be rejected — the positional-argument bug made every " +
-            "subscription throw a DomainException from new Email(\"N/A\")");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var persisted = await db.Clients
-            .IgnoreQueryFilters()
-            .Where(c => c.DNI.StartsWith("NL-"))
-            .OrderByDescending(c => c.CreatedAt)
-            .FirstOrDefaultAsync();
+        var subscriber = await db.Subscribers.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(s => s.EmailNormalized == "persona@example.com");
 
-        persisted.Should().NotBeNull("the subscribe endpoint must have created a client");
-        persisted!.Email.Value.Should().Be("persona@example.com",
-            "the request's email must land in the Email field, not the DNI field");
-        persisted.DNI.Should().StartWith("NL-",
-            "DNI must hold the generated newsletter placeholder, not the subscriber's email");
-        persisted.DNI.Should().NotBe("persona@example.com");
+        subscriber.Should().NotBeNull("the subscribe endpoint must have created a subscriber");
+        subscriber!.Status.Should().Be(Domain.Marketing.SubscriberStatus.Pending);
+        (await db.Clients.IgnoreQueryFilters().AnyAsync(c => c.DNI.StartsWith("NL-")))
+            .Should().BeFalse("a newsletter sign-up is not a client");
+    }
+
+    // RFC 8058: link scanners and prefetchers issue GETs, so a GET must never unsubscribe; only the POST does.
+    [Fact]
+    public async Task Unsubscribe_DoesNotAnswerGet()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        factory.SeedDatabase();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/v1/newsletter/unsubscribe?t=bogus");
+
+        response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+    }
+
+    [Fact]
+    public async Task UnknownUnsubscribeToken_Returns400()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        factory.SeedDatabase();
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsync("/api/v1/newsletter/unsubscribe?t=bogus", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }

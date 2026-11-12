@@ -25,6 +25,9 @@ public class FinancialIntegrationTests
 {
     private sealed record CreateResponse(Guid id);
 
+    // The API payload, not the domain entity (which has no JSON-friendly constructor).
+    private sealed record CategoryDto(string Name, string? Description);
+
     [Fact]
     public async Task CreateFinancialTransaction_WithSeededCategory_ShouldSucceed()
     {
@@ -131,7 +134,7 @@ public class FinancialIntegrationTests
         // Follow-up GET: assert the description echoes back
         var getResponse = await client.GetAsync("/api/v1/financial/categories");
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var categories = await getResponse.Content.ReadFromJsonAsync<List<TransactionCategory>>(IntegrationTestHelpers.JsonOptions);
+        var categories = await getResponse.Content.ReadFromJsonAsync<List<CategoryDto>>(IntegrationTestHelpers.JsonOptions);
         categories.Should().NotBeNull();
         var created = categories!.FirstOrDefault(c => c.Name == newName);
         created.Should().NotBeNull();

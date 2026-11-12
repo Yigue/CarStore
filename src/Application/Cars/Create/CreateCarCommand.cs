@@ -21,4 +21,9 @@ public sealed record CreateCarCommand(
     FuelType FuelType = FuelType.Gasolina,
     bool Featured = false,
     Transmission Transmission = Transmission.Manual,
-    decimal? PurchaseCost = null) : ICommand<Guid>;
+    decimal? PurchaseCost = null,
+    string? Currency = null,
+    // sfc B7.4: one of the dealer's suppliers.
+    Guid? SupplierId = null,
+    // sfc C2.1: one of the dealer's branches.
+    Guid? BranchId = null) : ICommand<Guid>;

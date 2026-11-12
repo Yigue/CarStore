@@ -1,0 +1,122 @@
+using Application.Abstractions.Authentication;
+using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
+using Application.Users.Register;
+using Domain.Users;
+using Microsoft.EntityFrameworkCore;
+using Moq;
+using SharedKernel;
+
+using Application.UnitTests;
+
+namespace ApplicationTests.Users;
+
+public class RegisterUserCommandHandlerTests
+{
+    private static TestApplicationDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<TestApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        return new TestApplicationDbContext(options);
+    }
+
+    /// <summary>sfc A3.1: these tests exercise pre-existing registration behavior, not entitlements —
+    /// the Cliente role they get is always freshly built with zero permissions.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        mock.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        return mock.Object;
+    }
+
+    [Fact]
+    public async Task Handle_ReturnsTenantRequiredFailure_WhenTenantServiceHasEmptyDealerId()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var passwordHasher = new Mock<IPasswordHasher>();
+        passwordHasher.Setup(p => p.Hash(It.IsAny<string>())).Returns("hashed_password");
+
+        var tenantService = new Mock<ICurrentTenantService>();
+        tenantService.Setup(t => t.DealerId).Returns(Guid.Empty);
+        tenantService.Setup(t => t.HasTenant).Returns(false);
+
+        var handler = new RegisterUserCommandHandler(context, context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), AlwaysAllowEntitlements());
+        var command = new RegisterUserCommand("newuser@example.com", "John", "Doe", "Pass123!", Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(UserErrors.TenantRequired);
+        context.Users.Any().Should().BeFalse("No user should be created without a valid tenant");
+    }
+
+    [Fact]
+    public async Task Handle_AssignsClienteRole_WhenTenantIsPresent()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var dealerId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var passwordHasher = new Mock<IPasswordHasher>();
+        passwordHasher.Setup(p => p.Hash(It.IsAny<string>())).Returns("hashed_password");
+
+        var tenantService = new Mock<ICurrentTenantService>();
+        tenantService.Setup(t => t.DealerId).Returns(dealerId);
+        tenantService.Setup(t => t.HasTenant).Returns(true);
+
+        var handler = new RegisterUserCommandHandler(context, context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), AlwaysAllowEntitlements());
+        var command = new RegisterUserCommand("newuser@example.com", "Jane", "Doe", "Pass123!", Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        var createdUser = await context.Users.FirstAsync(u => u.Id == result.Value);
+        createdUser.DealerId.Should().Be(dealerId);
+        createdUser.RoleId.Should().NotBe(Guid.Empty, "Registered user must have a non-empty RoleId");
+
+        var assignedRole = await context.Roles.FirstOrDefaultAsync(r => r.Id == createdUser.RoleId);
+        assignedRole.Should().NotBeNull();
+        assignedRole!.Name.Should().Be("Cliente");
+        assignedRole.DealerId.Should().Be(dealerId);
+    }
+
+    [Fact]
+    public async Task Handle_ReusesExistingClienteRole_WhenAlreadyPresent()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var dealerId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+        var existingClienteRole = new Role(dealerId, "Cliente", "Rol de clientes existente");
+        context.Roles.Add(existingClienteRole);
+        await context.SaveChangesAsync();
+
+        var passwordHasher = new Mock<IPasswordHasher>();
+        passwordHasher.Setup(p => p.Hash(It.IsAny<string>())).Returns("hashed_password");
+
+        var tenantService = new Mock<ICurrentTenantService>();
+        tenantService.Setup(t => t.DealerId).Returns(dealerId);
+        tenantService.Setup(t => t.HasTenant).Returns(true);
+
+        var handler = new RegisterUserCommandHandler(context, context, passwordHasher.Object, tenantService.Object, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), AlwaysAllowEntitlements());
+        var command = new RegisterUserCommand("seconduser@example.com", "Bob", "Smith", "Pass123!", Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        var createdUser = await context.Users.FirstAsync(u => u.Id == result.Value);
+        createdUser.RoleId.Should().Be(existingClienteRole.Id);
+
+        var rolesCount = await context.Roles.CountAsync(r => r.DealerId == dealerId && r.Name == "Cliente");
+        rolesCount.Should().Be(1, "Should not duplicate the Cliente role if it already exists");
+    }
+}

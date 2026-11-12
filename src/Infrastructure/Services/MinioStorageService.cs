@@ -98,12 +98,110 @@ internal sealed class MinioStorageService : IStorageService
         }
     }
 
+    public async Task<Stream?> OpenReadAsync(string objectKey, CancellationToken ct)
+    {
+        // Spool to a self-deleting temp file: attachments can be large and an export bundles many.
+        var buffer = new FileStream(
+            Path.Combine(Path.GetTempPath(), $"carstore-{Guid.NewGuid():N}.tmp"),
+            FileMode.Create, FileAccess.ReadWrite, FileShare.None, 81920,
+            FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+
+        try
+        {
+            var args = new GetObjectArgs()
+                .WithBucket(_options.BucketName)
+                .WithObject(objectKey)
+                .WithCallbackStream((source, token) => source.CopyToAsync(buffer, token));
+
+            await _client.GetObjectAsync(args, ct);
+            buffer.Position = 0;
+            return buffer;
+        }
+        catch (ObjectNotFoundException)
+        {
+            await buffer.DisposeAsync();
+            return null;
+        }
+        catch (MinioException ex) when (IsNoSuchKey(ex))
+        {
+            await buffer.DisposeAsync();
+            return null;
+        }
+        catch
+        {
+            await buffer.DisposeAsync();
+            throw;
+        }
+    }
+
+    public async Task<byte[]?> ReadHeadAsync(string objectKey, int count, CancellationToken ct)
+    {
+        using var head = new MemoryStream(count);
+        try
+        {
+            var args = new GetObjectArgs()
+                .WithBucket(_options.BucketName)
+                .WithObject(objectKey)
+                .WithOffsetAndLength(0, count)
+                .WithCallbackStream((source, token) => source.CopyToAsync(head, token));
+
+            await _client.GetObjectAsync(args, ct);
+            return head.ToArray();
+        }
+        catch (ObjectNotFoundException)
+        {
+            return null;
+        }
+        catch (MinioException ex) when (IsNoSuchKey(ex))
+        {
+            return null;
+        }
+    }
+
+    public async Task<long?> GetObjectSizeAsync(string objectKey, CancellationToken ct)
+    {
+        try
+        {
+            var args = new StatObjectArgs()
+                .WithBucket(_options.BucketName)
+                .WithObject(objectKey);
+
+            ObjectStat stat = await _client.StatObjectAsync(args, ct);
+            return stat.Size;
+        }
+        catch (ObjectNotFoundException)
+        {
+            return null;
+        }
+        catch (MinioException ex) when (IsNoSuchKey(ex))
+        {
+            return null;
+        }
+    }
+
     public async Task<Uri> GetPresignedUrlAsync(string objectKey, TimeSpan ttl, CancellationToken ct)
     {
+        // Never let the client-declared type decide how the browser interprets the bytes: the response
+        // type comes from the key extension (which confirm verified against the file signature), and
+        // anything unrecognised is forced to download as an opaque binary.
+        // S3/MinIO has no response-* override for X-Content-Type-Options, so nosniff cannot be set here.
+        (string responseType, string disposition) = Path.GetExtension(objectKey).TrimStart('.').ToLowerInvariant() switch
+        {
+            "jpg" or "jpeg" => ("image/jpeg", "inline"),
+            "png" => ("image/png", "inline"),
+            "webp" => ("image/webp", "inline"),
+            _ => ("application/octet-stream", "attachment"),
+        };
+
         var args = new PresignedGetObjectArgs()
             .WithBucket(_options.BucketName)
             .WithObject(objectKey)
-            .WithExpiry((int)ttl.TotalSeconds);
+            .WithExpiry((int)ttl.TotalSeconds)
+            .WithHeaders(new Dictionary<string, string>
+            {
+                ["response-content-type"] = responseType,
+                ["response-content-disposition"] = disposition,
+            });
 
         string presigned = await _client.PresignedGetObjectAsync(args);
 

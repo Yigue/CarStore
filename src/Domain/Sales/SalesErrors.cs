@@ -32,7 +32,7 @@ public static class SalesErrors
 
     public static Error CannotDeleteCompleted(Guid saleId) => Error.Conflict(
         "Sales.CannotDeleteCompleted",
-        $"The sale with Id = '{saleId}' cannot be deleted because it is Completed. Completed sales have a linked financial transaction.");
+        $"The sale with Id = '{saleId}' cannot be deleted because it is Completed. Completed sales have a linked financial transaction and a sold vehicle; void the sale instead.");
 
     public static Error QuoteNotFound(Guid quoteId) => Error.NotFound(
         "Sales.QuoteNotFound",
@@ -45,5 +45,67 @@ public static class SalesErrors
     public static Error QuoteMismatch(Guid quoteId) => Error.Problem(
         "Sales.QuoteMismatch",
         $"The car or client of this sale does not match the accepted quote with Id = '{quoteId}'.");
-}
 
+    // ─── VEN-03 · payment terms ───────────────────────────────────────────────────────────────
+
+    public static Error NegativePaymentAmount() => Error.Validation(
+        "Sales.NegativePaymentAmount",
+        "Down payment, trade-in value, financed amount and installment amount cannot be negative.");
+
+    public static Error TradeInValueWithoutVehicle() => Error.Validation(
+        "Sales.TradeInValueWithoutVehicle",
+        "A trade-in value requires the vehicle being taken in part payment.");
+
+    public static Error FinancingWithoutInstallments() => Error.Validation(
+        "Sales.FinancingWithoutInstallments",
+        "A financed amount requires a positive number of installments.");
+
+    /// <summary>
+    /// The parts of the payment do not add up to the price. Not a rounding complaint: a sale whose
+    /// seña + permuta + financiado differs from its total is a number nobody can collect against,
+    /// and the discrepancy would otherwise surface months later in the cobranza.
+    /// </summary>
+    public static Error PaymentPartsDoNotMatchPrice(decimal finalPrice, decimal parts) => Error.Validation(
+        "Sales.PaymentPartsDoNotMatchPrice",
+        $"The payment breakdown adds up to {parts:0.##} but the sale price is {finalPrice:0.##}.");
+
+    /// <summary>
+    /// A sale with no price is not a sale. Normally caught by the validator; this exists so the
+    /// aggregate is never handed a price it cannot honour.
+    /// </summary>
+    public static Error PriceRequired() => Error.Validation(
+        "Sales.PriceRequired",
+        "The sale needs a final price and a payment method, either supplied or inherited from an accepted quote.");
+
+    // ─── VEN-02 · selling to a client that is still a prospect ────────────────────────────────
+
+    /// <summary>
+    /// A Prospect is a person the CRM created automatically when the lead reached Negociación:
+    /// a name, an email and a placeholder DNI. That is enough to quote and not enough to invoice.
+    /// </summary>
+    public static Error ClientDataIncomplete(Guid clientId) => Error.Problem(
+        "Sales.ClientDataIncomplete",
+        $"The client with Id = '{clientId}' is still a prospect with incomplete data. DNI and address are required before invoicing.");
+
+    // ─── ADR C3 · Sale.Void ───────────────────────────────────────────────────────────────────
+
+    public static Error VoidReasonRequired() => Error.Validation(
+        "Sales.VoidReasonRequired",
+        "A reason is required to void a sale.");
+
+    public static Error OnlyCompletedCanBeVoided(Guid saleId) => Error.Conflict(
+        "Sales.OnlyCompletedCanBeVoided",
+        $"The sale with Id = '{saleId}' cannot be voided because it is not Completed.");
+
+    // ─── sfc B3.2 / B8 / RN-028 · legal documents (boleto, formulario 08) ──────────────────────
+
+    /// <summary>A legal document cannot be generated until the invoice number is on file.</summary>
+    public static Error InvoiceNumberRequiredForDocument(Guid saleId) => Error.Validation(
+        "Sales.InvoiceNumberRequiredForDocument",
+        $"The sale with Id = '{saleId}' needs InvoiceNumber set before generating a legal document.");
+
+    /// <summary>A legal document cannot be generated until the transfer form (08) number is on file.</summary>
+    public static Error TransferFormNumberRequiredForDocument(Guid saleId) => Error.Validation(
+        "Sales.TransferFormNumberRequiredForDocument",
+        $"The sale with Id = '{saleId}' needs TransferFormNumber set before generating a legal document.");
+}

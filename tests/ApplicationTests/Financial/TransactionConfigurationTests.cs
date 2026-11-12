@@ -96,7 +96,9 @@ public class TransactionConfigurationTests
         // by this test).
         using var ctx = CreateContext();
         var entityType = ctx.Model.FindEntityType(typeof(FinancialTransaction));
-        var amountProperty = entityType!.FindProperty("Amount");
+        // Since ADR C1 Amount is an owned Money (amount + currency columns); the decimal lives on
+        // the owned type.
+        var amountProperty = entityType!.FindNavigation("Amount")!.TargetEntityType.FindProperty("Amount");
         amountProperty.Should().NotBeNull();
 
         // The HasPrecision(18, 2) call registers annotations on the property.

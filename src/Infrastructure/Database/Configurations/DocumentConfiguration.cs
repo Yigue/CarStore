@@ -45,6 +45,8 @@ public sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
         builder.Property(x => x.UploadedAtUtc).IsRequired();
         builder.Property(x => x.VerifiedAtUtc);
         builder.Property(x => x.DiscrepancyNotes).HasMaxLength(1000);
+        // sfc B3.2: hex-encoded SHA-256, null for an uploaded/scanned document.
+        builder.Property(x => x.Sha256Hash).HasMaxLength(64);
 
         // Backward-compatibility aliases on the entity must not be mapped as columns.
         builder.Ignore(x => x.Status);
@@ -65,8 +67,17 @@ public sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .OnDelete(DeleteBehavior.SetNull)
             .IsRequired(false);
 
+        // sfc B4.3 / B10 / RN-018: same shape as the SaleId relationship above, for the quote
+        // proposal PDF — no navigation property, SetNull on delete.
+        builder.HasOne<Domain.Quotes.Quote>()
+            .WithMany()
+            .HasForeignKey(x => x.QuoteId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
+
         builder.HasIndex(x => x.DealerId);
         builder.HasIndex(x => x.ClientId);
         builder.HasIndex(x => x.SaleId);
+        builder.HasIndex(x => x.QuoteId);
     }
 }

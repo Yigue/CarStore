@@ -28,13 +28,23 @@ public class ProvisionDealerCommandHandlerTests
         return hasher;
     }
 
+    // spr PR 1.1 (ADR B1): "standard" is always sellable in these tests — the catalog's provider-facing
+    // lookup is irrelevant to the behavior under test here.
+    private static Mock<Application.Abstractions.Billing.IPlanCatalog> PlanCatalogStub()
+    {
+        var catalog = new Mock<Application.Abstractions.Billing.IPlanCatalog>();
+        catalog.Setup(c => c.IsSellable(It.IsAny<string>())).Returns(true);
+        return catalog;
+    }
+
     private static ProvisionDealerCommand ValidCommand(string subdomain = "automotors") => new(
         DealerName: "Automotors del Sur",
         Subdomain: subdomain,
         AdminEmail: "admin@automotors.com",
         AdminPassword: "Sup3r$ecret!",
         AdminFirstName: "Ana",
-        AdminLastName: "García");
+        AdminLastName: "García",
+        AcceptedTermsVersion: Application.UnitTests.Legal.FakeLegalTermsProvider.CurrentVersion);
 
     [Fact]
     public async Task Handle_ShouldCreateDealerSettingsAndAdminUser_OnSuccess()
@@ -46,9 +56,9 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("https://checkout.stripe.com/123");
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Application.Abstractions.Billing.CheckoutReturn>(), It.IsAny<CancellationToken>())).ReturnsAsync("https://checkout.stripe.com/123");
 
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
         var command = ValidCommand();
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -75,6 +85,36 @@ public class ProvisionDealerCommandHandlerTests
         user.Email.Value.Should().Be("admin@automotors.com");
     }
 
+    // spr PR 3.1 (ADR B8), task 3.1.1: the dealer never exists without a subscription row, created
+    // Incomplete in the SAME transaction regardless of whether Stripe confirmed a customer. This
+    // covers the "Stripe succeeded" half; Handle_ShouldSucceedWithNullCheckoutUrl_WhenStripeGatewayThrows
+    // below (already pre-existing) covers the "Stripe failed" half with the same assertion added.
+    [Fact]
+    public async Task Handle_ShouldCreateIncompleteSubscriptionRow_InSameTransaction_WhenStripeSucceeds()
+    {
+        using var context = CreateContext();
+        var publisher = new Mock<MediatR.IPublisher>();
+        publisher.Setup(p => p.Publish(It.IsAny<MediatR.INotification>(), It.IsAny<CancellationToken>()))
+                 .Returns(Task.CompletedTask);
+        var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
+        gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Application.Abstractions.Billing.CheckoutReturn>(), It.IsAny<CancellationToken>())).ReturnsAsync("https://checkout.stripe.com/123");
+
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
+
+        var result = await handler.Handle(ValidCommand("stripe-ok"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+
+        var subscription = await context.DealerSubscriptions
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(s => s.DealerId == result.Value.DealerId);
+        subscription.Should().NotBeNull("spr ADR B8: provisioning must always create the subscription row");
+        subscription!.Status.Should().Be(Domain.Billing.SubscriptionStatus.Incomplete,
+            "the row starts Incomplete until Stripe confirms a trial/payment, even when the Stripe customer call itself succeeded");
+        subscription.StripeCustomerId.Should().Be("cus_123");
+    }
+
     [Fact]
     public async Task Handle_ShouldUseSameGuid_ForDealerSettingsIdAndDealerId()
     {
@@ -84,7 +124,7 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         var result = await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -112,7 +152,7 @@ public class ProvisionDealerCommandHandlerTests
 
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         var act = async () => await handler.Handle(ValidCommand(), CancellationToken.None);
 
@@ -132,7 +172,7 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         var result = await handler.Handle(ValidCommand("acme"), CancellationToken.None);
 
@@ -161,10 +201,9 @@ public class ProvisionDealerCommandHandlerTests
 
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
+        var handler = new ProvisionDealerCommandHandler(context, context, hasher.Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
-        try { await handler.Handle(ValidCommand(), CancellationToken.None); }
-        catch (InvalidOperationException) { /* expected */ }
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(ValidCommand(), CancellationToken.None));
 
         publisher.Verify(
             p => p.Publish(It.IsAny<DealerProvisionedDomainEvent>(), It.IsAny<CancellationToken>()),
@@ -181,7 +220,7 @@ public class ProvisionDealerCommandHandlerTests
                  .Returns(Task.CompletedTask);
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("cus_123");
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         var result = await handler.Handle(ValidCommand("AuToMoToRs"), CancellationToken.None);
 
@@ -204,10 +243,10 @@ public class ProvisionDealerCommandHandlerTests
         var gateway = new Mock<Application.Abstractions.Billing.ISubscriptionGateway>();
         gateway.Setup(g => g.CreateCustomerAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                .ThrowsAsync(new System.Net.Http.HttpRequestException("Stripe is unreachable"));
-        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gateway.Setup(g => g.CreateCheckoutSessionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Application.Abstractions.Billing.CheckoutReturn>(), It.IsAny<CancellationToken>()))
                .ThrowsAsync(new System.Net.Http.HttpRequestException("Stripe is unreachable"));
 
-        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance);
+        var handler = new ProvisionDealerCommandHandler(context, context, HasherReturning().Object, publisher.Object, gateway.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<ProvisionDealerCommandHandler>.Instance, Application.UnitTests.Legal.FakeLegalTermsProvider.Recorder(context), PlanCatalogStub().Object);
 
         var result = await handler.Handle(ValidCommand("resilient"), CancellationToken.None);
 
@@ -220,7 +259,18 @@ public class ProvisionDealerCommandHandlerTests
         var userCount = await context.Users.IgnoreQueryFilters().CountAsync(u => u.Email.Value == "admin@automotors.com");
         userCount.Should().Be(1);
 
-        var roleCount = await context.Roles.IgnoreQueryFilters().CountAsync(r => r.DealerId == result.Value.DealerId);
-        roleCount.Should().Be(1);
+        var roles = await context.Roles.IgnoreQueryFilters().Where(r => r.DealerId == result.Value.DealerId).ToListAsync();
+        roles.Should().HaveCount(2);
+        roles.Select(r => r.Name).Should().Contain(new[] { "Admin", "Cliente" });
+
+        // spr PR 3.1 (ADR B8), task 3.1.1: the "Stripe failed" half of the same guarantee —
+        // the subscription row is still created Incomplete, in the same transaction, with a null
+        // StripeCustomerId (Stripe was unreachable during provisioning).
+        var subscription = await context.DealerSubscriptions
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(s => s.DealerId == result.Value.DealerId);
+        subscription.Should().NotBeNull("spr ADR B8: a dealer never exists without a subscription row, Stripe outage or not");
+        subscription!.Status.Should().Be(Domain.Billing.SubscriptionStatus.Incomplete);
+        subscription.StripeCustomerId.Should().BeNull("Stripe never returned a customer id in this scenario");
     }
 }

@@ -41,7 +41,8 @@ internal sealed class GetSubscriptionStatusQueryHandler : IQueryHandler<GetSubsc
         if (subscription == null ||
             subscription.Status == SubscriptionStatus.Suspended ||
             subscription.Status == SubscriptionStatus.Cancelled ||
-            subscription.Status == SubscriptionStatus.PastDue)
+            subscription.Status == SubscriptionStatus.PastDue ||
+            subscription.Status == SubscriptionStatus.Incomplete)
         {
             var adminUser = await _context.Users
                 .Where(u => u.DealerId == request.DealerId && u.RoleId != Guid.Empty)
@@ -61,6 +62,8 @@ internal sealed class GetSubscriptionStatusQueryHandler : IQueryHandler<GetSubsc
                     reactivationUrl = await _subscriptionGateway.CreateCheckoutSessionAsync(
                         request.DealerId,
                         adminUser.Email.Value,
+                        subscription?.PlanCode ?? DealerSubscription.DefaultPlanCode,
+                        CheckoutReturn.None,
                         cancellationToken);
                 }
                 catch

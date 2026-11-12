@@ -2,12 +2,14 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using Application.Abstractions.Tenancy;
 using Application.Sales.Delete;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Financial.Attributes;
 using Domain.Sales;
 using Microsoft.EntityFrameworkCore;
+using Moq;
 
 namespace Application.UnitTests.Sales;
 
@@ -22,6 +24,17 @@ public class DeleteSaleCommandHandlerTests
             .Options;
         return new TestApplicationDbContext(options);
     }
+
+    private static ICurrentTenantService CreateTenantService()
+    {
+        var tenantMock = new Mock<ICurrentTenantService>();
+        tenantMock.SetupGet(t => t.HasTenant).Returns(true);
+        tenantMock.SetupGet(t => t.DealerId).Returns(DealerId);
+        return tenantMock.Object;
+    }
+
+    private static DeleteSaleCommandHandler CreateHandler(TestApplicationDbContext context) =>
+        new DeleteSaleCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
 
     private static Sale NewPendingSale(Guid? carId = null) =>
         new Sale(
@@ -38,7 +51,7 @@ public class DeleteSaleCommandHandlerTests
     public async Task Handle_Should_ReturnNotFound_When_SaleDoesNotExist()
     {
         using var context = CreateContext();
-        var handler = new DeleteSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
         var missingId = Guid.NewGuid();
 
         var result = await handler.Handle(new DeleteSaleCommand(missingId), CancellationToken.None);
@@ -55,7 +68,7 @@ public class DeleteSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteSaleCommand(sale.Id), CancellationToken.None);
 
@@ -83,7 +96,7 @@ public class DeleteSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteSaleCommand(sale.Id), CancellationToken.None);
 
@@ -100,7 +113,7 @@ public class DeleteSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteSaleCommand(sale.Id), CancellationToken.None);
 
@@ -120,12 +133,77 @@ public class DeleteSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new DeleteSaleCommandHandler(context, new FakeDateTimeProvider());
+        var handler = CreateHandler(context);
 
         var result = await handler.Handle(new DeleteSaleCommand(sale.Id), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Be(SalesErrors.CannotDeleteCompleted(sale.Id));
         context.Sales.Should().Contain(s => s.Id == sale.Id);
+    }
+
+    private static Car NewCar(TestApplicationDbContext context, StatusServiceCar status)
+    {
+        var marca = new Marca("Toyota");
+        var modelo = new Modelo("Corolla", marca.Id);
+        var car = new Car(DealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New,
+            status, 4, 5, 1600, 1000, 2020, "AB123CD", "desc", 10000m, DateTime.UtcNow);
+        context.Marca.Add(marca);
+        context.Modelo.Add(modelo);
+        context.Cars.Add(car);
+        return car;
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnConflict_And_KeepSaleAndSoldCar_When_SaleIsCompleted()
+    {
+        using var context = CreateContext();
+        var car = NewCar(context, StatusServiceCar.Vendido);
+        var sale = NewPendingSale(car.Id);
+        sale.Complete();
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var result = await CreateHandler(context).Handle(new DeleteSaleCommand(sale.Id), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(SharedKernel.ErrorType.Conflict);
+        result.Error.Should().Be(SalesErrors.CannotDeleteCompleted(sale.Id));
+        result.Error.Description.Should().ContainEquivalentOf("void");
+        context.Sales.Should().Contain(s => s.Id == sale.Id);
+        car.ServiceCar.Should().Be(StatusServiceCar.Vendido);
+    }
+
+    [Fact]
+    public async Task Handle_Should_RemoveSale_And_LeaveCarUntouched_When_PendingSaleCarIsNotReserved()
+    {
+        using var context = CreateContext();
+        var car = NewCar(context, StatusServiceCar.Disponible);
+        var sale = NewPendingSale(car.Id);
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var result = await CreateHandler(context).Handle(new DeleteSaleCommand(sale.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        context.Sales.Should().NotContain(s => s.Id == sale.Id);
+        car.ServiceCar.Should().Be(StatusServiceCar.Disponible);
+    }
+
+    [Fact]
+    public async Task Handle_Should_KeepCarReserved_When_AnotherPendingSaleStillHoldsIt()
+    {
+        using var context = CreateContext();
+        var car = NewCar(context, StatusServiceCar.Reservado);
+        var cancelled = NewPendingSale(car.Id);
+        cancelled.Cancel("changed mind");
+        var holder = NewPendingSale(car.Id);
+        context.Sales.AddRange(cancelled, holder);
+        await context.SaveChangesAsync();
+
+        var result = await CreateHandler(context).Handle(new DeleteSaleCommand(cancelled.Id), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        car.ServiceCar.Should().Be(StatusServiceCar.Reservado);
     }
 }

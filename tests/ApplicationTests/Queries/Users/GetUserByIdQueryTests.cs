@@ -95,6 +95,8 @@ public class GetUserByIdQueryTests
         result.Error.Should().Be(UserErrors.NotFound(user.Id));
     }
 
+    // spr PR 4.2 / H9 follow-up: effective permissions come from the user's Role, never the legacy
+    // UserPermissions table (its write path was deleted in PR 4.2; User.AddPermission is now dead code).
     [Fact]
     public async Task Handle_ReturnsUserWithPermissions()
     {
@@ -103,9 +105,11 @@ public class GetUserByIdQueryTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "perm@example.com", "Perm", "User", "hash", Guid.NewGuid());
-        user.AddPermission("users:read");
-        user.AddPermission("users:write");
+        var role = new Role(dealerId, "Vendedor", "Vendedor");
+        role.AddPermission("users:read");
+        role.AddPermission("users:write");
+        context.Roles.Add(role);
+        var user = new User(dealerId, "perm@example.com", "Perm", "User", "hash", role.Id);
         context.Users.Add(user);
         await context.SaveChangesAsync();
 

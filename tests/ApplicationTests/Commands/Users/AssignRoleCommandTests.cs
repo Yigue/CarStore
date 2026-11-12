@@ -2,10 +2,12 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Users.Commands.AssignRole;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 using Xunit;
 
 namespace Application.UnitTests.Commands.Users;
@@ -20,6 +22,17 @@ public class AssignRoleCommandTests
         return new TestApplicationDbContext(options);
     }
 
+    /// <summary>sfc A3.1: these tests exercise pre-existing tenant-isolation behavior, not entitlements.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        mock.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        return mock.Object;
+    }
+
     private static AssignRoleCommandHandler CreateHandler(
         TestApplicationDbContext context,
         ICurrentTenantService? tenantService = null)
@@ -29,7 +42,9 @@ public class AssignRoleCommandTests
 
         return new AssignRoleCommandHandler(
             context,
-            tenantService ?? mockTenantService.Object);
+            context,
+            tenantService ?? mockTenantService.Object,
+            AlwaysAllowEntitlements());
     }
 
     [Fact]
@@ -40,7 +55,9 @@ public class AssignRoleCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var newRoleId = Guid.NewGuid();
+        var ownRole = new Role(dealerId, "Empleado", "Rol del mismo dealer");
+        context.Roles.Add(ownRole);
+        var newRoleId = ownRole.Id;
         var user = new User(dealerId, "assign@example.com", "Assign", "Role", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -104,7 +121,9 @@ public class AssignRoleCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var roleId = Guid.NewGuid();
+        var ownRole = new Role(dealerId, "Empleado", "Rol del mismo dealer");
+        context.Roles.Add(ownRole);
+        var roleId = ownRole.Id;
         var user = new User(dealerId, "samerole@example.com", "Same", "Role", "hash", roleId);
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -127,6 +146,9 @@ public class AssignRoleCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
+        var ownRole = new Role(dealerId, "Gerente", "Rol del mismo dealer");
+        context.Roles.Add(ownRole);
+        newRole = ownRole.Id;
         var user = new User(dealerId, $"role{newRole}@example.com", "Role", "Test", "hash", Guid.NewGuid());
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -140,5 +162,51 @@ public class AssignRoleCommandTests
         result.IsSuccess.Should().BeTrue();
         var updatedUser = await context.Users.FirstOrDefaultAsync(u => u.Id == user.Id);
         updatedUser!.RoleId.Should().Be(newRole);
+    }
+}
+public class AssignRoleCrossDealerTests
+{
+    private static TestApplicationDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<TestApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        return new TestApplicationDbContext(options);
+    }
+
+    /// <summary>sfc A3.1: these tests exercise pre-existing tenant-isolation behavior, not entitlements.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        mock.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        return mock.Object;
+    }
+
+    [Fact]
+    public async Task Handle_RoleFromAnotherDealer_IsRejected_AndUserKeepsItsRole()
+    {
+        using var context = CreateContext();
+        var callerDealer = Guid.NewGuid();
+        var otherDealer = Guid.NewGuid();
+
+        var originalRoleId = Guid.NewGuid();
+        var user = new User(callerDealer, "victim@example.com", "Vic", "Tim", "hash", originalRoleId);
+        var foreignRole = new Role(otherDealer, "Admin", "Admin de otra concesionaria");
+        context.Users.Add(user);
+        context.Roles.Add(foreignRole);
+        await context.SaveChangesAsync();
+
+        var tenant = new Mock<ICurrentTenantService>();
+        tenant.SetupGet(t => t.DealerId).Returns(callerDealer);
+        var handler = new AssignRoleCommandHandler(context, context, tenant.Object, AlwaysAllowEntitlements());
+
+        var result = await handler.Handle(new AssignRoleCommand(user.Id, foreignRole.Id), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        var reloaded = await context.Users.FirstAsync(u => u.Id == user.Id);
+        reloaded.RoleId.Should().Be(originalRoleId);
     }
 }

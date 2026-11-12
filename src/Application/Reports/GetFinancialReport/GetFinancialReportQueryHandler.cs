@@ -3,7 +3,9 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
 using Application.Common;
+using Domain.Currency;
 using Domain.Financial.Attributes;
+using Domain.Shared.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -35,14 +37,74 @@ internal sealed class GetFinancialReportQueryHandler(
             return Result.Failure<FinancialReportDto>(guard.Error);
         }
 
-        DateTime from = query.From;
-        DateTime to = query.To;
+        // sfc B0.3.1 / ADR C1: amounts in different currencies are never added together. One currency per report.
+        CurrencyCode currency = CurrencyCode.Ars;
+        if (query.Currency is not null && !CurrencyCode.TryParse(query.Currency, out currency))
+        {
+            return Result.Failure<FinancialReportDto>(Error.Validation(
+                "Currency.Unsupported", "Unsupported currency. Supported: ARS, USD."));
+        }
 
-        var rows = await context.Transactions.AsNoTracking()
+        CurrencyCode? presentation = null;
+        if (query.PresentationCurrency is not null)
+        {
+            if (!CurrencyCode.TryParse(query.PresentationCurrency, out CurrencyCode parsedPresentation))
+            {
+                return Result.Failure<FinancialReportDto>(Error.Validation(
+                    "Currency.Unsupported", "Unsupported currency. Supported: ARS, USD."));
+            }
+
+            presentation = parsedPresentation;
+            currency = parsedPresentation;
+        }
+
+        // A ten-year window would build thousands of buckets: cut it to the maximum range.
+        (DateTime from, DateTime to) = Pagination.ClampRange(query.From, query.To);
+
+        var allRows = await context.Transactions.AsNoTracking()
             .Where(t => t.DealerId == tenantService.DealerId)
             .Where(t => t.TransactionDate >= from && t.TransactionDate <= to)
-            .Select(t => new TransactionRow(t.TransactionDate, t.Type, t.Amount.Amount))
+            .Select(t => new TransactionRow(t.TransactionDate, t.Type, t.Amount.Amount, t.Amount.Currency, t.ExchangeRate))
             .ToListAsync(cancellationToken);
+
+        List<string> availableCurrencies = allRows.Select(r => r.Currency).Distinct().Order(StringComparer.Ordinal).ToList();
+        List<TransactionRow> rows;
+        FinancialReportUnconvertedDto? unconverted = null;
+        if (presentation is { } target)
+        {
+            // sfc B0.3.1 / ADR C2: convert only with the operation's own frozen rate; no snapshot, no conversion.
+            rows = [];
+            var left = new List<TransactionRow>();
+            foreach (var r in allRows)
+            {
+                if (r.Currency == target.Value)
+                {
+                    rows.Add(r);
+                }
+                else if (r.Rate is { } snap && Covers(snap, r.Currency, target.Value))
+                {
+                    decimal converted = snap.Convert(Money.Of(r.Amount, CurrencyCode.Parse(r.Currency)), target).Amount;
+                    rows.Add(r with { Amount = converted, Currency = target.Value });
+                }
+                else
+                {
+                    left.Add(r);
+                }
+            }
+
+            unconverted = new FinancialReportUnconvertedDto(
+                left.Count,
+                left.GroupBy(r => r.Currency).OrderBy(g => g.Key, StringComparer.Ordinal)
+                    .Select(g => new FinancialReportUnconvertedDto.Entry(
+                        g.Key,
+                        g.Where(x => x.Type == TransactionType.Income).Sum(x => x.Amount),
+                        g.Where(x => x.Type == TransactionType.Expense).Sum(x => x.Amount)))
+                    .ToList());
+        }
+        else
+        {
+            rows = allRows.Where(r => r.Currency == currency.Value).ToList();
+        }
 
         // Generate all period boundary start dates within [from, to] inclusive
         var allPeriods = new List<DateTime>();
@@ -89,15 +151,20 @@ internal sealed class GetFinancialReportQueryHandler(
         decimal totalExpense = series.Sum(p => p.Expense);
 
         var dto = new FinancialReportDto(
-            "ARS",
+            currency.Value,
             from,
             to,
             query.GroupBy.ToString(),
             series,
-            new FinancialReportTotalsDto(totalIncome, totalExpense, totalIncome - totalExpense));
+            new FinancialReportTotalsDto(totalIncome, totalExpense, totalIncome - totalExpense),
+            availableCurrencies,
+            unconverted);
 
         return Result.Success(dto);
     }
+
+    private static bool Covers(ExchangeRateSnapshot snap, string from, string to) =>
+        (snap.Base == from && snap.Quote == to) || (snap.Base == to && snap.Quote == from);
 
     private static DateTime PeriodStart(DateTime date, ReportGroupBy groupBy) => groupBy switch
     {
@@ -126,5 +193,5 @@ internal sealed class GetFinancialReportQueryHandler(
 
     private static int ISOYear(DateTime date) => ISOWeek.GetYear(date);
 
-    private readonly record struct TransactionRow(DateTime Date, TransactionType Type, decimal Amount);
+    private readonly record struct TransactionRow(DateTime Date, TransactionType Type, decimal Amount, string Currency, ExchangeRateSnapshot? Rate);
 }

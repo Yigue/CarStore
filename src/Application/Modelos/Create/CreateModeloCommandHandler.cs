@@ -30,9 +30,11 @@ internal sealed class CreateModeloCommandHandler(
             return Result.Failure<Guid>(Error.NotFound("Marca.NotFound", $"La marca con ID '{command.MarcaId}' no existe."));
         }
 
+        // sfc B7.5 / RN-040: unique per brand regardless of case, as brand names already are.
+        string nombreLower = nombre.ToLowerInvariant();
         var exists = await context.Modelo
             .IgnoreQueryFilters()
-            .AnyAsync(m => m.Nombre == nombre && m.MarcaId == command.MarcaId, cancellationToken);
+            .AnyAsync(m => m.MarcaId == command.MarcaId && m.Nombre.ToLower() == nombreLower, cancellationToken);
 
         if (exists)
         {

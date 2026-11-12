@@ -72,7 +72,7 @@ public class PermissionAuthorizationHandlerTests : IDisposable
     {
         var permission = "cars:read";
         var requirement = new PermissionRequirement(permission);
-        
+
         var dealerId = Guid.NewGuid();
         var role = new Domain.Users.Role(dealerId, "Admin", "Admin Role");
         role.AddPermission(permission);
@@ -86,7 +86,8 @@ public class PermissionAuthorizationHandlerTests : IDisposable
         var handler = CreateHandler();
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim("dealer_id", dealerId.ToString())
         }, "test"));
         var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
 
@@ -100,11 +101,83 @@ public class PermissionAuthorizationHandlerTests : IDisposable
     {
         var userId = Guid.NewGuid();
         var requirement = new PermissionRequirement("cars:write");
-        
+
         var handler = CreateHandler();
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+        }, "test"));
+        var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
+
+        await handler.HandleAsync(context);
+
+        context.HasSucceeded.Should().BeFalse();
+    }
+
+    // sfc B6.3 security review: a user's permissions are now dealer-scoped (UserDealerMembership can give a
+    // DIFFERENT role per dealer). The dealer_id claim on the ACTIVE token must decide which role's permissions
+    // apply — not always the user's home role — or switching dealers would leak the home dealer's grants.
+    [Fact]
+    public async Task UserWithADifferentRoleInAnotherDealer_GetsThatDealersPermissions_NotTheHomeOnes()
+    {
+        var homeDealerId = Guid.NewGuid();
+        var otherDealerId = Guid.NewGuid();
+
+        var homeAdminRole = new Domain.Users.Role(homeDealerId, "Admin", "Admin Role");
+        homeAdminRole.AddPermission("CanManageUsers");
+        homeAdminRole.AddPermission("cars:delete");
+        _context.Roles.Add(homeAdminRole);
+
+        var otherLimitedRole = new Domain.Users.Role(otherDealerId, "Empleado", "Empleado Role");
+        otherLimitedRole.AddPermission("cars:read");
+        _context.Roles.Add(otherLimitedRole);
+
+        var userEntity = new Domain.Users.User(homeDealerId, "multi@example.com", "Multi", "Dealer", "hash", homeAdminRole.Id);
+        _context.Users.Add(userEntity);
+        await _context.SaveChangesAsync();
+
+        _context.UserDealerMemberships.Add(
+            Domain.Users.UserDealerMembership.Grant(userEntity.Id, otherDealerId, otherLimitedRole.Id, DateTime.UtcNow));
+        await _context.SaveChangesAsync();
+
+        var handler = CreateHandler();
+
+        // Acting as the OTHER dealer (dealer_id claim says so) — must get Empleado's permissions, never Admin's.
+        var requirement = new PermissionRequirement("CanManageUsers");
+        var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, userEntity.Id.ToString()),
+            new Claim("dealer_id", otherDealerId.ToString())
+        }, "test"));
+        var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
+
+        await handler.HandleAsync(context);
+
+        context.HasSucceeded.Should().BeFalse(
+            "scoped to the other dealer, this user is only Empleado there and must not keep the home Admin grant");
+    }
+
+    [Fact]
+    public async Task UserScopedToADealerTheyHaveNoMembershipIn_GetsNoRoleBasedPermissions()
+    {
+        var homeDealerId = Guid.NewGuid();
+        var unrelatedDealerId = Guid.NewGuid();
+
+        var homeAdminRole = new Domain.Users.Role(homeDealerId, "Admin", "Admin Role");
+        homeAdminRole.AddPermission("cars:read");
+        _context.Roles.Add(homeAdminRole);
+
+        var userEntity = new Domain.Users.User(homeDealerId, "solo@example.com", "Solo", "Dealer", "hash", homeAdminRole.Id);
+        _context.Users.Add(userEntity);
+        await _context.SaveChangesAsync();
+
+        var handler = CreateHandler();
+        var requirement = new PermissionRequirement("cars:read");
+        // A stale/forged/mismatched dealer_id claim with no membership — must deny, never fall back to home.
+        var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, userEntity.Id.ToString()),
+            new Claim("dealer_id", unrelatedDealerId.ToString())
         }, "test"));
         var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
 

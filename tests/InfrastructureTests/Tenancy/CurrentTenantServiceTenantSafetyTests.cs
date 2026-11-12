@@ -199,6 +199,21 @@ public class CurrentTenantServiceTenantSafetyTests : IDisposable
     }
 
     [Fact]
+    public void DealerId_OutsideAnHttpRequest_WithDevFallbackConfigured_InDevelopment_HasNoTenant()
+    {
+        // Quartz jobs and the outbox have no HttpContext. The dev fallback stands in for a request whose
+        // host did not resolve; handing it to background work made dunning/welcome emails filter every
+        // query to the demo dealer and skip everyone else ("no subscription for provider customer").
+        var accessor = new Mock<IHttpContextAccessor>();
+        accessor.Setup(a => a.HttpContext).Returns((HttpContext?)null);
+
+        var sut = NewService(accessor.Object, DevEnv(), devFallbackDealerId: Guid.Parse(RealDealerId));
+
+        sut.DealerId.Should().Be(Guid.Empty);
+        sut.HasTenant.Should().BeFalse("background work runs tenant-less, as it does in Production");
+    }
+
+    [Fact]
     public void DealerId_HostMiss_WithDevFallbackConfigured_InProduction_ReturnsEmpty()
     {
         var services = BuildSeededContextProvider();
@@ -231,6 +246,51 @@ public class CurrentTenantServiceTenantSafetyTests : IDisposable
         var sut = NewService(accessor.Object, ProdEnv());
 
         sut.DealerId.Should().Be(Guid.Empty);
+    }
+
+    // ── 5: A pending-dealer-selection token (sfc B6.3, security review) must never resolve a tenant ──
+    //
+    // Password-verified but no dealer chosen yet: Identity.IsAuthenticated is true (the JWT is validly
+    // signed), so this principal passes any bare [Authorize] gate. Without this guard, a request that
+    // also set X-Tenant-Host to ANY dealer's real hostname would resolve DealerId to that dealer via
+    // the header path — letting a multi-dealer user (or anyone who has merely logged in and not yet
+    // picked a dealer) read a completely unrelated dealer's data before ever proving membership in it.
+
+    [Fact]
+    public void DealerId_PendingDealerSelectionToken_WithASpoofedTenantHeader_ReturnsGuidEmpty_NotTheHeaderDealer()
+    {
+        var services = BuildSeededContextProvider();
+        var accessor = BuildAccessor(xTenantHost: "xyz.carstore.com", services: services);
+        SetAuthenticatedPendingSelectionUser(accessor, Guid.NewGuid());
+
+        var sut = NewService(accessor.Object, ProdEnv());
+
+        sut.DealerId.Should().Be(Guid.Empty,
+            "a pending-dealer-selection token must never resolve a tenant via any path, including headers");
+    }
+
+    [Fact]
+    public void HasTenant_PendingDealerSelectionToken_WithASpoofedTenantHeader_IsFalse()
+    {
+        var services = BuildSeededContextProvider();
+        var accessor = BuildAccessor(xTenantHost: "xyz.carstore.com", services: services);
+        SetAuthenticatedPendingSelectionUser(accessor, Guid.NewGuid());
+
+        var sut = NewService(accessor.Object, ProdEnv());
+
+        sut.HasTenant.Should().BeFalse();
+    }
+
+    private static void SetAuthenticatedPendingSelectionUser(Mock<IHttpContextAccessor> accessor, Guid userId)
+    {
+        var claims = new List<System.Security.Claims.Claim>
+        {
+            new(Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(Infrastructure.Authentication.TokenProvider.LoginStageClaimType,
+                Infrastructure.Authentication.TokenProvider.PendingDealerSelectionStage)
+        };
+        var identity = new System.Security.Claims.ClaimsIdentity(claims, "TestAuth");
+        accessor.Object.HttpContext!.User = new System.Security.Claims.ClaimsPrincipal(identity);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

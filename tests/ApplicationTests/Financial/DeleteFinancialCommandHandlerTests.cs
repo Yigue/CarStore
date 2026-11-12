@@ -40,7 +40,7 @@ public class DeleteFinancialCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_CrossTenantDelete_ReturnsForbidden_AndNeverSaves()
+    public async Task Handle_CrossTenantDelete_ReturnsNotFound_AndNeverSaves()
     {
         var (seededCtx, txId) = SeedTransaction();
 
@@ -65,7 +65,8 @@ public class DeleteFinancialCommandHandlerTests
             new DeleteFinancialCommand(txId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Type.Should().Be(ErrorType.Forbidden);
+        result.Error.Type.Should().Be(ErrorType.NotFound);
+        result.Error.Code.Should().Be(FinancialErrors.NotFound(txId).Code);
         saveCalls.Should().Be(0);
 
         // Underlying row still present

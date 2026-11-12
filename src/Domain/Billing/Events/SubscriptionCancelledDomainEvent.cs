@@ -5,4 +5,5 @@ namespace Domain.Billing.Events;
 
 public sealed record SubscriptionCancelledDomainEvent(
     Guid SubscriptionId,
-    Guid DealerId) : IDomainEvent;
+    Guid DealerId,
+    DateTime CancelledAtUtc) : IDomainEvent;

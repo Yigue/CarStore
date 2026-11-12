@@ -19,6 +19,8 @@
     <PackageReference Include="Moq" />
     <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="Testcontainers" />
+    <!-- sfc B3.1 / B8: text extraction to assert QuestPdfRenderer output is real text, not an image -->
+    <PackageReference Include="PdfPig" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Infrastructure\Infrastructure.csproj" />

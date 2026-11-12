@@ -26,10 +26,12 @@ internal sealed class GetInventoryStatsQueryHandler
             .ToListAsync(cancellationToken);
 
         var totalCount = cars.Count;
-        var totalValue = cars.Sum(c => c.Price.Amount);
+        // sfc B7.1 / RN-036: consigned vehicles belong to third parties, not to the dealer's own inventory value.
+        var totalValue = cars.Where(c => !c.IsConsigned).Sum(c => c.Price.Amount);
 
-        var available = cars.Count(c => c.ServiceCar == StatusServiceCar.Disponible);
-        var reserved = cars.Count(c => c.ServiceCar == StatusServiceCar.EnVenta);
+        // sfc B6.1 / RN-042: EnVenta is on sale too; it used to fall through every bucket.
+        var available = cars.Count(c => c.ServiceCar is StatusServiceCar.Disponible or StatusServiceCar.EnVenta);
+        var reserved = cars.Count(c => c.ServiceCar == StatusServiceCar.Reservado);
         var sold = cars.Count(c => c.ServiceCar == StatusServiceCar.Vendido);
 
         var byBrand = cars
@@ -40,12 +42,27 @@ internal sealed class GetInventoryStatsQueryHandler
             .GroupBy(c => c.CarType.ToString())
             .ToDictionary(g => g.Key, g => g.Count());
 
+        List<BranchInventory>? byBranch = null;
+        if (query.GroupByBranch)
+        {
+            var names = await _context.Branches.AsNoTracking()
+                .ToDictionaryAsync(b => b.Id, b => b.Name, cancellationToken);
+            byBranch = cars
+                .Where(c => c.BranchId is not null)
+                .GroupBy(c => c.BranchId!.Value)
+                .Select(g => new BranchInventory(
+                    g.Key, names.GetValueOrDefault(g.Key, string.Empty), g.Count(), g.Where(c => !c.IsConsigned).Sum(c => c.Price.Amount)))
+                .OrderByDescending(b => b.Count)
+                .ToList();
+        }
+
         var response = new InventoryStatsResponse(
             totalCount,
             totalValue,
             new InventoryByStatus(available, reserved, sold),
             byBrand,
-            byType);
+            byType,
+            byBranch);
 
         return Result.Success(response);
     }

@@ -1,4 +1,5 @@
 using Application.Abstractions.Behaviors;
+using Application.Billing.Entitlements;
 using Application.Leads.Activity;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,12 @@ public static class DependencyInjection
         // populate it. Scoped so it joins the same unit of work as the handler that uses it.
         services.AddScoped<LeadActivityRecorder>();
         services.AddScoped<Application.Platform.AuditLogs.PlatformAuditLogRecorder>();
+
+        services.AddScoped<Application.Legal.LegalAcceptanceRecorder>();
+
+        // sfc A3.1: needed regardless of whether Stripe/billing is enabled — entitlement limits are
+        // also checked when running with NoOpPlanCatalog (fail-open: no configured limits → unlimited).
+        services.AddScoped<IEntitlementService, EntitlementServiceHandler>();
 
         return services;
     }

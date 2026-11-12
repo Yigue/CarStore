@@ -2,6 +2,7 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Cars;
 using Domain.Clients;
 using Domain.Financial;
@@ -21,6 +22,12 @@ internal sealed class CreateFinancialCommandHandler(
 {
     public async Task<Result<Guid>> Handle(CreateFinancialCommand command, CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<Guid>(guard.Error);
+        }
+
         Car? car = null;
         Client? client = null;
         Sale? sale = null;

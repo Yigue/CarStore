@@ -73,7 +73,8 @@ public class UpdateLeadStatusDecouplingTests
         leadAfterStageUpdate.Status.Should().Be(LeadStatus.Contactado);
 
         var tenantService = Mock.Of<ICurrentTenantService>(t => t.DealerId == dealerId);
-        var quoteHandler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), tenantService);
+        var quoteHandler = new CreateQuoteCommandHandler(
+            context, new FakeDateTimeProvider(), tenantService, new Infrastructure.Common.DealerSequenceAllocator(context));
         var quoteResult = await quoteHandler.Handle(
             new CreateQuoteCommand(car.Id, null, lead.Id, 100_000m, PaymentMethod.Contado, DateTime.UtcNow.AddDays(5), "c"),
             CancellationToken.None);

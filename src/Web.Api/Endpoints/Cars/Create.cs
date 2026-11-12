@@ -30,6 +30,12 @@ internal sealed class Create : IEndpoint
         public bool Featured { get; set; }
         public int Transmission { get; set; }
         public decimal? PurchaseCost { get; set; }
+        // sfc B0.2.3 phase 1: optional; when omitted the price stays ARS. Phase 2 makes it required.
+        public string? Currency { get; set; }
+        // sfc B7.4: one of the dealer's suppliers.
+        public Guid? SupplierId { get; set; }
+        // sfc C2.1: one of the dealer's branches.
+        public Guid? BranchId { get; set; }
         }
 
         public void MapEndpoint(IEndpointRouteBuilder app)
@@ -37,24 +43,27 @@ internal sealed class Create : IEndpoint
         app.MapPost("cars", async (Request request, ISender sender, CancellationToken cancellationToken) =>
         {
             var command = new CreateCarCommand(
-                request.Marca,
-                request.Modelo,
-                (Color)request.Color,
-                (TypeCar)request.CarType,
-                (StatusCar)request.CarStatus,
-                (StatusServiceCar)request.ServiceCar,
-                request.CantidadPuertas,
-                request.CantidadAsientos,
-                request.Cilindrada,
-                request.Kilometraje,
-                request.Anio,
-                request.Patente,
-                request.Descripcion,
-                request.Precio,
-                (FuelType)request.FuelType,
-                request.Featured,
-                (Transmission)request.Transmission,
-                request.PurchaseCost);
+                Marca: request.Marca,
+                Modelo: request.Modelo,
+                Color: (Color)request.Color,
+                CarType: (TypeCar)request.CarType,
+                CarStatus: (StatusCar)request.CarStatus,
+                ServiceCar: (StatusServiceCar)request.ServiceCar,
+                CantidadPuertas: request.CantidadPuertas,
+                CantidadAsientos: request.CantidadAsientos,
+                Cilindrada: request.Cilindrada,
+                Kilometraje: request.Kilometraje,
+                Anio: request.Anio,
+                Patente: request.Patente,
+                Descripcion: request.Descripcion,
+                Price: request.Precio,
+                FuelType: (FuelType)request.FuelType,
+                Featured: request.Featured,
+                Transmission: (Transmission)request.Transmission,
+                PurchaseCost: request.PurchaseCost,
+                Currency: request.Currency,
+                SupplierId: request.SupplierId,
+                BranchId: request.BranchId);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

@@ -39,6 +39,21 @@ internal sealed class ConvertLeadToClientCommandHandler(
         if (existingClient is not null)
         {
             targetClient = existingClient;
+
+            // VEN-02: the dialog asks for DNI and address, and when the client already existed —
+            // which is now the normal case, because Negociación creates a Prospect automatically —
+            // both were read and thrown away. The prospect kept its TEMP placeholder DNI and its
+            // empty address forever, and the first attempt to invoice it hit the wall. Additive:
+            // a client who already carries a real document keeps it.
+            Result completion = targetClient.CompleteBillingData(
+                command.Dni,
+                command.Address,
+                dateTimeProvider.UtcNow);
+
+            if (completion.IsFailure)
+            {
+                return Result.Failure<Guid>(completion.Error);
+            }
         }
         else
         {

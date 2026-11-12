@@ -26,7 +26,9 @@ public sealed record CarsResponses(
     DateTime UpdatedAt,
     List<CarImageResponse> Images,
     bool Featured,
-    decimal? PurchaseCost
+    decimal? PurchaseCost,
+    // sfc B0.3.3: ISO code of the price (ARS, USD).
+    string Currency = "ARS"
 );
 
 [SuppressMessage("Design", "CA1054:Los parámetros URI deben ser de tipo System.Uri", Justification = "Se usa string para simplificar")]

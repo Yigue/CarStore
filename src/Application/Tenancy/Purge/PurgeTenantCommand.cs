@@ -1,0 +1,349 @@
+using Application.Abstractions.Data;
+using Application.Abstractions.Messaging;
+using Application.Abstractions.Storage;
+using Application.Abstractions.Tenancy;
+using Domain.DealerSettings;
+using Domain.Tenancy;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
+using SharedKernel;
+using DealerSettingsEntity = Domain.DealerSettings.DealerSettings;
+
+namespace Application.Tenancy.Purge;
+
+/// <summary>
+/// RN-013 (A1.4): removes the personal and operational data of ONE tenant. It only runs for a tenant that is
+/// <see cref="TenantLifecycleStatus.Locked"/> with a purge date already reached; for anything else it is a no-op
+/// that answers <see cref="TenantPurgeErrors.NotEligible"/>. <paramref name="DryRun"/> only counts.
+/// </summary>
+public sealed record PurgeTenantCommand(Guid DealerId, bool DryRun) : ICommand<TenantPurgeResult>;
+
+/// <summary>Rows removed (or, in a dry run, that would be removed) per aggregate.</summary>
+public sealed record TenantPurgeResult(bool DryRun, IReadOnlyDictionary<string, int> Counts);
+
+public static class TenantPurgeErrors
+{
+    public static readonly Error NotFound = new(
+        "TenantPurge.NotFound", "No se encontró el tenant a purgar.", ErrorType.NotFound);
+
+    public static readonly Error NotEligible = new(
+        "TenantPurge.NotEligible",
+        "Solo se puede purgar un tenant bloqueado cuya fecha de purga ya pasó.", ErrorType.Conflict);
+
+    public static readonly Error ExportStillAvailable = new(
+        "TenantPurge.ExportStillAvailable",
+        "El tenant todavía tiene una exportación en curso o descargable; la purga se posterga hasta que venza.",
+        ErrorType.Conflict);
+}
+
+internal sealed class PurgeTenantCommandHandler(
+    IApplicationDbContext context,
+    IStorageService storage,
+    IDateTimeProvider clock,
+    ITenantLifecycleCache lifecycleCache,
+    ILogger<PurgeTenantCommandHandler> logger) : ICommandHandler<PurgeTenantCommand, TenantPurgeResult>
+{
+    public const int BatchSize = 200;
+    // Provider name ends with "PostgreSQL"; matched by suffix because Application must not reference the driver name.
+    private const string PostgresProviderSuffix = "EntityFrameworkCore.PostgreSQL";
+
+    public async Task<Result<TenantPurgeResult>> Handle(PurgeTenantCommand request, CancellationToken ct)
+    {
+        Guid dealerId = request.DealerId;
+        if (dealerId == Guid.Empty)
+            return Result.Failure<TenantPurgeResult>(TenantPurgeErrors.NotFound);
+
+        DateTime now = clock.UtcNow;
+
+        // Fast path: a read-only pre-check (also the whole dry run). It is NOT trusted for the delete: the state can
+        // change right after it, so the write path below re-validates inside a transaction holding a row lock.
+        Result<DealerSettingsEntity> precheck = await CheckEligibilityAsync(dealerId, now, track: false, ct);
+        if (precheck.IsFailure)
+            return Result.Failure<TenantPurgeResult>(precheck.Error);
+
+        var counts = new Dictionary<string, int>();
+
+        if (request.DryRun)
+        {
+            foreach ((string name, IQueryable<object> query) in Scopes(dealerId))
+                counts[name] = await query.CountAsync(ct);
+
+            return new TenantPurgeResult(true, counts);
+        }
+
+        // One transaction for the re-check and every delete. Relational providers only (InMemory has no transactions).
+        DbContext? db = context as DbContext;
+        await using IDbContextTransaction? transaction = db is not null && db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        // Row lock on dealer_settings (PostgreSQL only; SQLite serializes writers on its own). Any concurrent writer of
+        // this row (e.g. StartTenantRetentionHandler.ClearRetention) blocks on its UPDATE until we commit, and by then
+        // the row is Purged; its xmin concurrency token then fails the stale write instead of resurrecting the tenant.
+        if (db is not null && db.Database.ProviderName?.EndsWith(PostgresProviderSuffix, StringComparison.Ordinal) == true)
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM dealer_settings WHERE dealer_id = {dealerId} FOR UPDATE", ct);
+        }
+
+        // Authoritative re-check, tracked, under the lock. A copy of the row already tracked by this context (loaded
+        // earlier in the same scope) would be returned stale by the query, so it is detached to force a fresh read.
+        foreach (DealerSettingsEntity stale in context.DealerSettings.Local.Where(d => d.DealerId == dealerId).ToList())
+            context.DetachEntity(stale);
+
+        Result<DealerSettingsEntity> locked = await CheckEligibilityAsync(dealerId, now, track: true, ct);
+        if (locked.IsFailure)
+        {
+            if (transaction is not null)
+                await transaction.RollbackAsync(ct);
+            return Result.Failure<TenantPurgeResult>(locked.Error);
+        }
+
+        DealerSettingsEntity dealer = locked.Value;
+
+        // 1. Break the Client -> Lead link so both sides can be deleted (clients.origin_lead_id vs leads.converted_client_id).
+        await ClearClientOriginLeadsAsync(dealerId, ct);
+
+        // 2. Delete in FK order, children first. Batches are separate SaveChanges but one transaction: a failure rolls
+        //    everything back, the tenant stays Locked and the next run starts over. Stored blobs CANNOT be rolled back,
+        //    so nothing is deleted from storage here: the keys are only collected and removed after the commit.
+        var storageKeys = new HashSet<string>(StringComparer.Ordinal);
+        counts["webhookDeliveries"] = await DeleteAsync(context.WebhookDeliveries.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.WebhookDeliveries, null, ct);
+        counts["webhookSubscriptions"] = await DeleteAsync(context.WebhookSubscriptions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.WebhookSubscriptions, null, ct);
+        counts["leadActivities"] = await DeleteAsync(context.LeadActivities.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.LeadActivities, null, ct);
+        counts["documents"] = await DeleteAsync(context.Documents.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Documents, d => d.BlobName, ct, storageKeys);
+        counts["transactions"] = await DeleteAsync(context.Transactions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Transactions, null, ct);
+        counts["appointments"] = await DeleteAsync(context.Appointments.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Appointments, null, ct);
+        counts["serviceReminders"] = await DeleteAsync(context.ServiceReminders.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.ServiceReminders, null, ct);
+        counts["warrantyRecords"] = await DeleteAsync(context.WarrantyRecords.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.WarrantyRecords, null, ct);
+        counts["vehicleLiens"] = await DeleteAsync(context.VehicleLiens.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.VehicleLiens, null, ct);
+        counts["deposits"] = await DeleteAsync(context.Deposits.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Deposits, null, ct);
+        // sfc B4.1 security review: these carry the dealer's own DealerId (unlike the legacy UserPermissions
+        // bug above), so the direct filter is correct here.
+        counts["saleCommissions"] = await DeleteAsync(context.SaleCommissions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.SaleCommissions, null, ct);
+        counts["commissionPolicies"] = await DeleteAsync(context.CommissionPolicies.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.CommissionPolicies, null, ct);
+        counts["sales"] = await DeleteAsync(context.Sales.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Sales, null, ct);
+        counts["quotes"] = await DeleteAsync(context.Quotes.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Quotes, null, ct);
+        counts["reconditioningTasks"] = await DeleteAsync(context.ReconditioningTasks.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.ReconditioningTasks, null, ct);
+        counts["leads"] = await DeleteAsync(context.Leads.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Leads, null, ct);
+        counts["carImages"] = await DeleteAsync(CarImagesOf(dealerId), context.CarImages, i => i.ObjectKey, ct, storageKeys);
+        counts["cars"] = await DeleteAsync(context.Cars.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Cars, null, ct);
+        counts["branches"] = await DeleteAsync(context.Branches.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Branches, null, ct);
+        counts["suppliers"] = await DeleteAsync(context.Suppliers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Suppliers, null, ct);
+        counts["integrationCommands"] = await DeleteAsync(context.IntegrationCommands.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.IntegrationCommands, null, ct);
+        counts["dealerIntegrations"] = await DeleteAsync(context.DealerIntegrations.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.DealerIntegrations, null, ct);
+        // sfc B6.3: both directions — rows this dealer granted to someone else (DealerId == dealerId) AND rows
+        // where this dealer's own user was granted access elsewhere (the user is about to be deleted below).
+        counts["userDealerMemberships"] = await DeleteAsync(UserDealerMembershipsOf(dealerId), context.UserDealerMemberships, null, ct);
+        counts["subscribers"] = await DeleteAsync(context.Subscribers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Subscribers, null, ct);
+        counts["clients"] = await DeleteAsync(context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Clients, null, ct);
+        counts["exchangeRates"] = await DeleteAsync(context.DealerExchangeRates.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.DealerExchangeRates, null, ct);
+        counts["transactionCategories"] = await DeleteAsync(context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.TransactionCategories, null, ct);
+        // spr PR 4.2 / REV-SDD-01: UserPermission.DealerId is always Guid.Empty (never set); scope by the owning
+        // User's dealer instead, like userBranches/passwordResetTokens/userPreferences below.
+        counts["userPermissions"] = await DeleteAsync(UserPermissionsOf(dealerId), context.UserPermissions, null, ct);
+        counts["passwordResetTokens"] = await DeleteAsync(PasswordResetTokensOf(dealerId), context.PasswordResetTokens, null, ct);
+        counts["userBranches"] = await DeleteAsync(context.UserBranches.Where(ub => context.Users.IgnoreQueryFilters().Any(u => u.Id == ub.UserId && u.DealerId == dealerId)), context.UserBranches, null, ct);
+        counts["userPreferences"] = await DeleteAsync(UserPreferencesOf(dealerId), context.UserPreferences, null, ct);
+        counts["users"] = await DeleteAsync(context.Users.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Users, null, ct);
+        counts["rolePermissions"] = await DeleteAsync(RolePermissionsOf(dealerId), context.RolePermissions, null, ct);
+        counts["roles"] = await DeleteAsync(context.Roles.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.Roles, null, ct);
+        counts["tenantExports"] = await DeleteAsync(context.TenantExports.IgnoreQueryFilters().Where(x => x.DealerId == dealerId), context.TenantExports, e => e.ObjectKey, ct, storageKeys);
+
+        // 3. Terminal transition + tombstone, saved together. DealerSubscription, audit logs, legal acceptances,
+        //    Stripe events and refund records are NOT touched (billing / evidence retention).
+        dealer.Purge(now);
+        context.TenantPurgeRecords.Add(TenantPurgeRecord.Create(dealerId, dealer.DealerName, now, counts));
+        await context.SaveChangesAsync(ct);
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
+        lifecycleCache.Invalidate(dealerId);
+
+        // 4. Only now that the rows are gone for good: remove the blobs. A failure here must not fail or undo the
+        //    purge; the key is parked in pending_storage_deletions so it is not lost.
+        await DeleteStorageObjectsAsync(dealerId, storageKeys, now, ct);
+
+        logger.LogInformation("Tenant {DealerId} purged: {Counts}", dealerId, counts);
+        return new TenantPurgeResult(false, counts);
+    }
+
+    private async Task<Result<DealerSettingsEntity>> CheckEligibilityAsync(
+        Guid dealerId, DateTime now, bool track, CancellationToken ct)
+    {
+        // Platform job: no tenant in scope, so the filters are bypassed and EVERY query pins DealerId.
+        IQueryable<DealerSettingsEntity> query = context.DealerSettings.IgnoreQueryFilters();
+        if (!track)
+            query = query.AsNoTracking();
+
+        DealerSettingsEntity? dealer = await query.FirstOrDefaultAsync(d => d.DealerId == dealerId, ct);
+        if (dealer is null)
+            return Result.Failure<DealerSettingsEntity>(TenantPurgeErrors.NotFound);
+
+        if (!dealer.IsDueForPurge(now))
+        {
+            logger.LogInformation(
+                "Purge of tenant {DealerId} skipped: lifecycle {Status}, purge scheduled at {ScheduledAt}",
+                dealerId, dealer.LifecycleStatus, dealer.PurgeScheduledAt);
+            return Result.Failure<DealerSettingsEntity>(TenantPurgeErrors.NotEligible);
+        }
+
+        // RN-014: the dealer can still download a Ready export for up to 7 days after it was built, also while Locked.
+        bool exportPending = await context.TenantExports
+            .IgnoreQueryFilters()
+            .AnyAsync(e => e.DealerId == dealerId
+                           && (e.Status == TenantExportStatus.Requested
+                               || e.Status == TenantExportStatus.Running
+                               || (e.Status == TenantExportStatus.Ready && (e.ExpiresAt == null || e.ExpiresAt > now))),
+                ct);
+        if (exportPending)
+        {
+            logger.LogInformation("Purge of tenant {DealerId} deferred: an export is still available", dealerId);
+            return Result.Failure<DealerSettingsEntity>(TenantPurgeErrors.ExportStillAvailable);
+        }
+
+        return dealer;
+    }
+
+    private IEnumerable<(string Name, IQueryable<object> Query)> Scopes(Guid dealerId)
+    {
+        yield return ("webhookDeliveries", context.WebhookDeliveries.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("webhookSubscriptions", context.WebhookSubscriptions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("leadActivities", context.LeadActivities.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("documents", context.Documents.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("transactions", context.Transactions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("appointments", context.Appointments.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("serviceReminders", context.ServiceReminders.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("warrantyRecords", context.WarrantyRecords.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("vehicleLiens", context.VehicleLiens.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("deposits", context.Deposits.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("saleCommissions", context.SaleCommissions.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("commissionPolicies", context.CommissionPolicies.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("sales", context.Sales.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("quotes", context.Quotes.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("reconditioningTasks", context.ReconditioningTasks.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("leads", context.Leads.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("carImages", CarImagesOf(dealerId));
+        yield return ("cars", context.Cars.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("branches", context.Branches.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("suppliers", context.Suppliers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("integrationCommands", context.IntegrationCommands.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("dealerIntegrations", context.DealerIntegrations.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("userDealerMemberships", UserDealerMembershipsOf(dealerId));
+        yield return ("subscribers", context.Subscribers.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("clients", context.Clients.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("exchangeRates", context.DealerExchangeRates.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("transactionCategories", context.TransactionCategories.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("userPermissions", UserPermissionsOf(dealerId));
+        yield return ("passwordResetTokens", PasswordResetTokensOf(dealerId));
+        yield return ("userBranches", context.UserBranches.Where(ub => context.Users.IgnoreQueryFilters().Any(u => u.Id == ub.UserId && u.DealerId == dealerId)));
+        yield return ("userPreferences", UserPreferencesOf(dealerId));
+        yield return ("users", context.Users.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("rolePermissions", RolePermissionsOf(dealerId));
+        yield return ("roles", context.Roles.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+        yield return ("tenantExports", context.TenantExports.IgnoreQueryFilters().Where(x => x.DealerId == dealerId));
+    }
+
+    // CarImage, PasswordResetToken and RolePermission carry no DealerId: they are reached through their owner.
+    private IQueryable<Domain.Cars.CarImage> CarImagesOf(Guid dealerId) =>
+        context.CarImages.Where(i => context.Cars.IgnoreQueryFilters().Any(c => c.Id == i.CarId && c.DealerId == dealerId));
+
+    private IQueryable<Domain.Users.PasswordResetToken> PasswordResetTokensOf(Guid dealerId) =>
+        context.PasswordResetTokens.Where(t => context.Users.IgnoreQueryFilters().Any(u => u.Id == t.UserId && u.DealerId == dealerId));
+
+    private IQueryable<Domain.Users.UserPreferences> UserPreferencesOf(Guid dealerId) =>
+        context.UserPreferences.Where(p => context.Users.IgnoreQueryFilters().Any(u => u.Id == p.UserId && u.DealerId == dealerId));
+
+    private IQueryable<Domain.Users.RolePermission> RolePermissionsOf(Guid dealerId) =>
+        context.RolePermissions.Where(p => context.Roles.IgnoreQueryFilters().Any(r => r.Id == p.RoleId && r.DealerId == dealerId));
+
+    private IQueryable<Domain.Users.UserPermission> UserPermissionsOf(Guid dealerId) =>
+        context.UserPermissions.Where(p => context.Users.IgnoreQueryFilters().Any(u => u.Id == p.UserId && u.DealerId == dealerId));
+
+    // sfc B6.3: own rows (this dealer granted someone access) plus orphan cleanup (this dealer's own user had
+    // an extra membership elsewhere, and that user is about to be deleted).
+    private IQueryable<Domain.Users.UserDealerMembership> UserDealerMembershipsOf(Guid dealerId) =>
+        context.UserDealerMemberships.IgnoreQueryFilters().Where(m =>
+            m.DealerId == dealerId || context.Users.IgnoreQueryFilters().Any(u => u.Id == m.UserId && u.DealerId == dealerId));
+
+    private async Task ClearClientOriginLeadsAsync(Guid dealerId, CancellationToken ct)
+    {
+        while (true)
+        {
+            List<Domain.Clients.Client> batch = await context.Clients
+                .IgnoreQueryFilters()
+                .Where(c => c.DealerId == dealerId && c.OriginLeadId != null)
+                .Take(BatchSize)
+                .ToListAsync(ct);
+
+            if (batch.Count == 0)
+                return;
+
+            foreach (Domain.Clients.Client client in batch)
+                client.ClearOriginLead();
+
+            await context.SaveChangesAsync(ct);
+        }
+    }
+
+    private async Task DeleteStorageObjectsAsync(
+        Guid dealerId, IReadOnlyCollection<string> keys, DateTime now, CancellationToken ct)
+    {
+        var failed = new List<(string Key, string Error)>();
+        foreach (string key in keys)
+        {
+            try
+            {
+                await storage.DeleteFileAsync(key, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Tenant {DealerId} purged but storage object {ObjectKey} could not be deleted; queued for retry", dealerId, key);
+                failed.Add((key, ex.Message));
+            }
+        }
+
+        if (failed.Count == 0)
+            return;
+
+        try
+        {
+            foreach ((string key, string error) in failed)
+                context.PendingStorageDeletions.Add(PendingStorageDeletion.Create(dealerId, key, now, error));
+            // The purge is already committed and the caller may have cancelled: persist the retry list regardless.
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // Last resort: the keys stay in the log so an operator can clean them up by hand.
+            logger.LogError(ex, "Could not persist pending storage deletions for tenant {DealerId}: {ObjectKeys}", dealerId, failed.Select(f => f.Key));
+        }
+    }
+
+    private async Task<int> DeleteAsync<T>(
+        IQueryable<T> query, DbSet<T> set, Func<T, string?>? storageKey, CancellationToken ct, ISet<string>? collectedKeys = null)
+        where T : class
+    {
+        int total = 0;
+        while (true)
+        {
+            List<T> batch = await query.Take(BatchSize).ToListAsync(ct);
+            if (batch.Count == 0)
+                return total;
+
+            if (storageKey is not null && collectedKeys is not null)
+            {
+                foreach (T row in batch)
+                {
+                    string? key = storageKey(row);
+                    if (!string.IsNullOrWhiteSpace(key))
+                        collectedKeys.Add(key);
+                }
+            }
+
+            set.RemoveRange(batch);
+            await context.SaveChangesAsync(ct);
+            total += batch.Count;
+        }
+    }
+}

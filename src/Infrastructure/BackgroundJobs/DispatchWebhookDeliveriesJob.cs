@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Application.Abstractions.Data;
+using Application.Abstractions.Webhooks;
 using Domain.Webhooks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -21,7 +22,8 @@ public sealed class DispatchWebhookDeliveriesJob(
     IApplicationDbContext dbContext,
     IHttpClientFactory httpClientFactory,
     IDateTimeProvider dateTimeProvider,
-    ILogger<DispatchWebhookDeliveriesJob> logger) : IJob
+    ILogger<DispatchWebhookDeliveriesJob> logger,
+    IWebhookDestinationGuard? destinationGuard = null) : IJob
 {
     public const string HttpClientName = "WebhookDelivery";
 
@@ -32,6 +34,16 @@ public sealed class DispatchWebhookDeliveriesJob(
     {
         DateTime now = dateTimeProvider.UtcNow;
 
+        // spr PR 5.1 (OPS-07): evaluated the same atomic-claim defense-in-depth used in
+        // ProcessOutboxMessagesJob (FOR UPDATE SKIP LOCKED via raw SQL) for this job too, since
+        // it has the equivalent unclaimed read-then-save shape. Deliberately NOT applied here:
+        // this job's existing fast unit suite (DispatchWebhookDeliveriesJobTests) calls Execute()
+        // directly against the EF InMemory provider, which does not support FromSqlRaw/
+        // FromSqlInterpolated — adapting those tests is outside this change's allowed edit
+        // surface. Quartz clustering (this same PR) already removes the main real-world risk:
+        // only one node in the cluster fires this trigger, so the remaining exposure is just the
+        // brief blue/green overlap window already covered by the runbook's documented residual
+        // risk — see docs/runbooks/quartz-clustering-y-multi-instancia.md.
         List<WebhookDelivery> dueDeliveries = await dbContext.WebhookDeliveries
             .IgnoreQueryFilters() // background job runs without tenant context
             .Where(d => d.Status == WebhookDeliveryStatus.Pending && d.NextRetryAtUtc <= now)
@@ -83,6 +95,17 @@ public sealed class DispatchWebhookDeliveriesJob(
     {
         try
         {
+            if (destinationGuard is not null && !await destinationGuard.ValidateDestinationAsync(subscription.Url, cancellationToken))
+            {
+                logger.LogWarning(
+                    "Webhook delivery {DeliveryId} to subscription {SubscriptionId} rejected: destination blocked",
+                    delivery.Id,
+                    subscription.Id);
+
+                delivery.RecordFailure(dateTimeProvider.UtcNow, statusCode: null, "Destination blocked");
+                return;
+            }
+
             using var request = new HttpRequestMessage(HttpMethod.Post, subscription.Url);
             request.Content = new StringContent(delivery.Payload, Encoding.UTF8, "application/json");
             request.Headers.TryAddWithoutValidation(EventHeaderName, delivery.EventType);
@@ -101,6 +124,17 @@ public sealed class DispatchWebhookDeliveriesJob(
                     (int)response.StatusCode,
                     $"Non-success status code: {(int)response.StatusCode}");
             }
+        }
+        catch (HttpRequestException ex) when (ex.Message.Contains("Destination blocked", StringComparison.OrdinalIgnoreCase) ||
+                                              ex.InnerException?.Message.Contains("Destination blocked", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            logger.LogWarning(
+                ex,
+                "Webhook delivery {DeliveryId} to subscription {SubscriptionId} failed: destination blocked",
+                delivery.Id,
+                subscription.Id);
+
+            delivery.RecordFailure(dateTimeProvider.UtcNow, statusCode: null, "Destination blocked");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
         {

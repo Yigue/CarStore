@@ -4,6 +4,9 @@ namespace Domain.Platform;
 
 public sealed class PlatformAuditLogEntry : Entity
 {
+    /// <summary>Actor id of entries produced by the platform itself (provider webhooks), not by a person.</summary>
+    public static readonly Guid SystemActorId = new("00000000-0000-0000-0000-00000000c0de");
+
     public const string SourceEventKeyUniqueIndex = "ux_platform_audit_logs_source_event_key";
 
     private PlatformAuditLogEntry() { }

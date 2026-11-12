@@ -2,7 +2,7 @@ using Xunit;
 
 namespace WebApiTests.Postgres;
 
-[CollectionDefinition("PostgresCollection")]
+[CollectionDefinition("PostgresCollection", DisableParallelization = true)]
 public class PostgresCollection : ICollectionFixture<PostgresFixture>
 {
 }

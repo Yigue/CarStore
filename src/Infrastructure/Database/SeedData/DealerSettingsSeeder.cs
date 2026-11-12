@@ -16,6 +16,7 @@ public static class DealerSettingsSeeder
 
         if (exists)
         {
+            await EnsureOwnerAsync(context, cancellationToken);
             return;
         }
 
@@ -38,6 +39,38 @@ public static class DealerSettingsSeeder
             isActive: true);
 
         context.DealerSettings.Add(settings);
+        await context.SaveChangesAsync(cancellationToken);
+        await EnsureOwnerAsync(context, cancellationToken);
+    }
+
+    /// <summary>
+    /// sfc A4.3 / C17: same rule as the AddOwnerUserId backfill, so the seeded dealer has an explicit owner
+    /// (oldest active Admin). Idempotent; never overwrites an owner that is already set.
+    /// </summary>
+    private static async Task EnsureOwnerAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        DealerSettings? settings = await context.DealerSettings
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.DealerId == DefaultDealerId, cancellationToken);
+        if (settings is null || settings.OwnerUserId is not null)
+        {
+            return;
+        }
+
+        Guid? ownerId = await context.Users
+            .IgnoreQueryFilters()
+            .Where(u => u.DealerId == DefaultDealerId && u.IsActive
+                && context.Roles.IgnoreQueryFilters().Any(r => r.Id == u.RoleId && r.DealerId == DefaultDealerId && r.Name == "Admin"))
+            .OrderBy(u => u.CreatedAt)
+            .ThenBy(u => u.Id)
+            .Select(u => (Guid?)u.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (ownerId is null)
+        {
+            return;
+        }
+
+        settings.SetOwner(ownerId.Value);
         await context.SaveChangesAsync(cancellationToken);
     }
 }

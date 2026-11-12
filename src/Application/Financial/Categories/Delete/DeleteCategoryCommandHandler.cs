@@ -21,6 +21,11 @@ internal sealed class DeleteCategoryCommandHandler(
             return Result.Failure(Error.NotFound("Category.NotFound", "The category was not found."));
         }
 
+        if (category.DealerId == Guid.Empty)
+        {
+            return Result.Failure(FinancialErrors.SystemReadOnly);
+        }
+
         // D3 (qa-p1-integridad PR2): layer 1, the common case. Polite pre-check that also
         // names the blocking count in the response.
         var blockingTransactionCount = await context.Transactions

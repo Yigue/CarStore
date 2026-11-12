@@ -35,9 +35,18 @@ public class PostgresSubscriptionSeedTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        var subscriptions = await db.DealerSubscriptions
+        // The Postgres collection shares one database across test classes, so other tests may have
+        // added dealers of their own: only the dealers the seed is responsible for count here.
+        var seededDealerIds = SubscriptionStateSeed.AdditionalDealers
+            .Select(d => d.DealerId)
+            .Append(Guid.Parse("11111111-1111-1111-1111-111111111111"))
+            .ToHashSet();
+
+        var subscriptions = (await db.DealerSubscriptions
             .IgnoreQueryFilters()
-            .ToListAsync();
+            .ToListAsync())
+            .Where(s => seededDealerIds.Contains(s.DealerId))
+            .ToList();
 
         subscriptions.Select(s => s.DealerId).Distinct().Should().HaveCount(5);
         subscriptions.Select(s => s.Status).Should().Contain(new[]

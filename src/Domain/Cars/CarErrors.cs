@@ -62,5 +62,19 @@ public static class CarErrors
     public static readonly Error VehicleImageRowBroken = Error.Problem(
         "CarImage.RowBroken",
         "A car_images row has no usable URL field (object_key, image_url all null).");
-}
 
+    // ─── sfc B1 · lifecycle state machine (RN-005, RN-006) ───────────────────────────────────
+
+    public static Error InvalidStatusTransition(Guid carId, Cars.Attributes.StatusServiceCar from, Cars.Attributes.StatusServiceCar to) => Error.Conflict(
+        "Cars.InvalidStatusTransition",
+        $"The car with Id = '{carId}' cannot move from '{from}' to '{to}'.");
+
+    /// <summary>RN-006: a sold car only returns to Disponible through Sale.Void. HTTP 409.</summary>
+    public static Error SaleActiveBlocksStatusChange(Guid carId) => Error.Conflict(
+        "SALE_ACTIVE_BLOCKS_STATUS_CHANGE",
+        $"The car with Id = '{carId}' is sold; its status can only change by voiding the sale.");
+
+    public static Error NotSold(Guid carId) => Error.Conflict(
+        "Cars.NotSold",
+        $"The car with Id = '{carId}' is not in Vendido status.");
+}

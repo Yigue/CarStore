@@ -33,6 +33,7 @@ public interface IApplicationDbContext
     DbSet<Role> Roles { get; }
     DbSet<RolePermission> RolePermissions { get; }
     DbSet<PasswordResetToken> PasswordResetTokens { get; }
+    DbSet<UserActionToken> UserActionTokens { get; }
     DbSet<OutboxMessage> OutboxMessages { get; }
     DbSet<CarImage> CarImages { get; }
     DbSet<ReconditioningTask> ReconditioningTasks { get; }
@@ -44,10 +45,46 @@ public interface IApplicationDbContext
     DbSet<Appointment> Appointments { get; }
     DbSet<BackfillAudit> BackfillAudits { get; }
     DbSet<DealerSubscription> DealerSubscriptions { get; }
+    DbSet<Domain.Legal.LegalAcceptance> LegalAcceptances { get; }
+    DbSet<Domain.Tenancy.TenantExport> TenantExports { get; }
+    DbSet<Domain.Tenancy.TenantPurgeRecord> TenantPurgeRecords { get; }
+    DbSet<Domain.Tenancy.PendingStorageDeletion> PendingStorageDeletions { get; }
     DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; }
+    DbSet<BillingReconciliationFlag> BillingReconciliationFlags { get; }
+    DbSet<BillingRefundRecord> BillingRefundRecords { get; }
     DbSet<WebhookSubscription> WebhookSubscriptions { get; }
     DbSet<WebhookDelivery> WebhookDeliveries { get; }
     DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; }
+    DbSet<Domain.Auditing.DealerAuditLogEntry> DealerAuditLogs { get; }
+    DbSet<Domain.Currency.DealerExchangeRate> DealerExchangeRates { get; }
+    DbSet<Domain.Deposits.Deposit> Deposits { get; }
+    DbSet<Domain.Users.UserPreferences> UserPreferences { get; }
+    DbSet<Domain.Cars.VehicleLien> VehicleLiens { get; }
+    DbSet<Domain.Suppliers.Supplier> Suppliers { get; }
+    DbSet<Domain.AfterSales.WarrantyRecord> WarrantyRecords { get; }
+    DbSet<Domain.AfterSales.ServiceReminder> ServiceReminders { get; }
+    DbSet<Domain.Branches.Branch> Branches { get; }
+    DbSet<Domain.Branches.UserBranch> UserBranches { get; }
+    DbSet<Domain.Marketing.Subscriber> Subscribers { get; }
+    DbSet<Domain.Integrations.DealerIntegration> DealerIntegrations { get; }
+    DbSet<Domain.Integrations.IntegrationCommand> IntegrationCommands { get; }
+    /// <summary>sfc C1.4 / B13: Meta Leads Ads webhook idempotency on <c>leadgen_id</c>.</summary>
+    DbSet<Domain.Leads.ProcessedMetaLeadEvent> ProcessedMetaLeadEvents { get; }
+    /// <summary>sfc C1.2 / ADR C25: the MercadoLibre push connector's own mirror of a Car's provider listing.</summary>
+    DbSet<Domain.Integrations.ExternalListing> ExternalListings { get; }
+    DbSet<Domain.Commissions.SaleCommission> SaleCommissions { get; }
+    DbSet<Domain.Commissions.CommissionPolicy> CommissionPolicies { get; }
+    /// <summary>sfc B6.3 / RN-043: extra dealers a user can switch into beyond their home dealer.</summary>
+    DbSet<UserDealerMembership> UserDealerMemberships { get; }
+    /// <summary>sfc B4.3 / RN-018: backs only the InMemory test-provider allocator fallback and the
+    /// AddQuoteNumbers migration backfill — the real allocation path bypasses the change tracker.</summary>
+    DbSet<Domain.Common.DealerSequence> DealerSequences { get; }
+
+    /// <summary>
+    /// Atomic single use of an action token: <c>UPDATE ... SET consumed_at = @now WHERE id = @id AND consumed_at IS NULL
+    /// AND expires_at &gt; @now</c>. True only for the one caller that sees rowcount = 1.
+    /// </summary>
+    Task<bool> TryConsumeUserActionTokenAsync(Guid tokenId, DateTime nowUtc, CancellationToken cancellationToken = default);
 
     void DetachEntity(object entity);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

@@ -53,12 +53,19 @@ public sealed class CorsProductionConfigurationTests
             // ConfigureAppConfiguration additions are guaranteed to be merged into builder.Configuration.
             // Setting only the in-memory IConfiguration key here is not reliable enough — it must
             // be a real process env var, same as every other factory in this test project.
-            Environment.SetEnvironmentVariable("UseInMemoryDatabase", "true");
-
             Factory = new WebApplicationFactory<Program>()
                 .WithWebHostBuilder(builder =>
                 {
+                    builder.UseSetting("UseInMemoryDatabase", "true");
                     builder.UseEnvironment("Production");
+                    // spr PR 3.3 (B10): AddCaptcha's NoOp-vs-Turnstile decision runs synchronously
+                    // during AddInfrastructure, on `builder.Configuration` BEFORE `Build()` — only
+                    // `UseSetting` is visible to it then; a `ConfigureAppConfiguration` dictionary
+                    // entry (like the ones below) is only merged into `app.Configuration` at
+                    // `Build()` time, too late for this read. Program.cs refuses to boot in
+                    // Production with the NoOp captcha verifier, so this test (an unrelated CORS
+                    // assertion) needs a secret key to pass that guard.
+                    builder.UseSetting("Captcha:SecretKey", "test-secret-key");
 
                     // Mirrors StartupAssertionTests: minimum config so DI/startup
                     // succeeds up to the point under test, without a real Postgres
@@ -79,13 +86,16 @@ public sealed class CorsProductionConfigurationTests
                             ["ConnectionStrings:Redis"] = "",
                             ["Stripe:Enabled"] = "false",
                             ["Stripe:WebhookSecret"] = "whsec_dummy",
-                            ["FeatureFlags:SubscriptionEnforcement"] = "false"
+                            // spr PR 5.1 (OPS-06): Production now requires enforcement on; this test is
+                            // about CORS, not billing, so keep it true here to stay past that guard.
+                            ["FeatureFlags:SubscriptionEnforcement"] = "true"
                         });
                     });
 
                     builder.ConfigureTestServices(services =>
                     {
                         services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
+                        services.RemoveAll<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<ApplicationDbContext>>();
                         services.RemoveAll<ApplicationDbContext>();
                         services.RemoveAll<IApplicationDbContext>();
 

@@ -10,6 +10,7 @@ namespace WebApiTests.IntegrationTests;
 /// Startup guard tests for saas-custom-domains PR1 ADR-1.
 /// task 1.6.4: env=Production + Tenant:DevFallbackDealerId → host throws InvalidOperationException.
 /// </summary>
+[Collection("StartupAssertionTests")]
 public sealed class StartupAssertionTests
 {
     /// <summary>
@@ -30,6 +31,17 @@ public sealed class StartupAssertionTests
             {
                 builder.UseEnvironment("Production");
 
+                // spr PR 3.3 (B10): AddCaptcha's NoOp-vs-Turnstile decision (like AddBilling's
+                // Stripe:SecretKey check below) runs synchronously during AddInfrastructure, which
+                // executes on `builder.Configuration` BEFORE `Build()` — only `UseSetting` is visible
+                // to it at that point; `ConfigureAppConfiguration`'s additions are only merged into
+                // `app.Configuration` once `Build()` runs, too late for this particular read.
+                builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+                // spr PR 5.1.8: same reason — AddBackgroundJobs now reads UseInMemoryDatabase
+                // synchronously (to skip Quartz's persistent Postgres store under tests), so it must
+                // also be UseSetting, or the host tries a real Postgres connection and fails auth.
+                builder.UseSetting("UseInMemoryDatabase", "true");
+
                 // Provide env-vars that CustomWebApplicationFactory normally sets,
                 // so the infrastructure DI registration succeeds up to the assertion point.
                 builder.ConfigureAppConfiguration((_, config) =>
@@ -44,9 +56,6 @@ public sealed class StartupAssertionTests
                         // The trigger: DevFallbackDealerId in Production must be rejected.
                         ["Tenant:DevFallbackDealerId"] = fallbackGuid,
 
-                        // Avoid real DB connection string requirement.
-                        ["UseInMemoryDatabase"] = "true",
-
                         // Minio: minimal values to pass options binding (ValidateOnStart fires
                         // during IHost.StartAsync which never runs — thrown before app.Run).
                         ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
@@ -55,8 +64,10 @@ public sealed class StartupAssertionTests
                         ["Storage:Minio:SecretKey"] = "minioadmin123",
                         ["Storage:Minio:BucketName"] = "cars",
 
-                        // Disable subscription enforcement so it doesn't fail on missing WebhookSecret
-                        ["FeatureFlags:SubscriptionEnforcement"] = "false",
+                        // spr PR 5.1 (OPS-06): Production now requires enforcement on; this test is
+                        // about DevFallbackDealerId, not billing, so give it a webhook secret too.
+                        ["FeatureFlags:SubscriptionEnforcement"] = "true",
+                        ["Stripe:WebhookSecret"] = "whsec_startup_test_only",
 
                         // Redis: empty → uses in-memory cache fallback.
                         ["ConnectionStrings:Redis"] = ""
@@ -76,41 +87,39 @@ public sealed class StartupAssertionTests
     [Fact]
     public void Host_WithStripeSecretKeyButNoPriceId_ThrowsValidationException()
     {
-        Environment.SetEnvironmentVariable("Stripe__SecretKey", "sk_test_123");
-        Environment.SetEnvironmentVariable("Stripe__PriceId", ""); // Explicitly missing
-
-        try
-        {
-            var factory = new WebApplicationFactory<Program>()
-                .WithWebHostBuilder(builder =>
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("Stripe:SecretKey", "sk_test_123");
+                builder.UseSetting("Stripe:PriceId", ""); // Explicitly missing
+                // spr PR 3.3 (B10): must be UseSetting, not ConfigureAppConfiguration — see the
+                // comment on the first test above for why.
+                builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+                builder.UseSetting("UseInMemoryDatabase", "true");
+                builder.UseEnvironment("Production");
+                builder.ConfigureAppConfiguration((_, config) =>
                 {
-                    builder.UseEnvironment("Production");
-                    builder.ConfigureAppConfiguration((_, config) =>
+                    config.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        config.AddInMemoryCollection(new Dictionary<string, string?>
-                        {
-                            ["FeatureFlags:SubscriptionEnforcement"] = "false",
-                            ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
-                            ["UseInMemoryDatabase"] = "true",
-                            ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
-                            ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
-                            ["Storage:Minio:AccessKey"] = "minioadmin",
-                            ["Storage:Minio:SecretKey"] = "minioadmin123",
-                            ["Storage:Minio:BucketName"] = "cars"
-                        });
+                        // spr PR 5.1 (OPS-06): Production now requires enforcement on; this test is
+                        // about Stripe PriceId validation, which fires at Build() before this guard
+                        // would even run — kept consistent anyway.
+                        ["FeatureFlags:SubscriptionEnforcement"] = "true",
+                        ["Stripe:WebhookSecret"] = "whsec_startup_test_only",
+                        ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
+                        ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
+                        ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
+                        ["Storage:Minio:AccessKey"] = "minioadmin",
+                        ["Storage:Minio:SecretKey"] = "minioadmin123",
+                        ["Storage:Minio:BucketName"] = "cars"
                     });
                 });
+            });
 
-            var act = () => factory.CreateClient();
+        var act = () => factory.CreateClient();
 
-            act.Should().Throw<Microsoft.Extensions.Options.OptionsValidationException>()
-                .And.Message.Should().Contain("PriceId");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("Stripe__SecretKey", null);
-            Environment.SetEnvironmentVariable("Stripe__PriceId", null);
-        }
+        act.Should().Throw<Microsoft.Extensions.Options.OptionsValidationException>()
+            .And.Message.Should().Contain("PriceId");
     }
 
     [Fact]
@@ -120,14 +129,21 @@ public sealed class StartupAssertionTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Production");
+                // spr PR 3.3 (B10): must be UseSetting, not ConfigureAppConfiguration — without
+                // this, Production + no visible Captcha:SecretKey would throw from the anti-NoOp
+                // captcha guard, contradicting "boots clean". See the comment on the first test
+                // above for why ConfigureAppConfiguration doesn't reach this particular check.
+                builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+                builder.UseSetting("UseInMemoryDatabase", "true");
                 builder.ConfigureAppConfiguration((_, config) =>
                 {
                     config.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        // No Stripe settings
-                        ["FeatureFlags:SubscriptionEnforcement"] = "false",
+                        // No Stripe:SecretKey/PriceId section — only the webhook secret spr PR 5.1
+                        // (OPS-06) now requires in Production alongside enforcement being on.
+                        ["FeatureFlags:SubscriptionEnforcement"] = "true",
+                        ["Stripe:WebhookSecret"] = "whsec_startup_test_only",
                         ["Jwt:Secret"] = "SecretKeyForProductionStartupTestOnly00000",
-                        ["UseInMemoryDatabase"] = "true",
                         ["Storage:Minio:InternalEndpoint"] = "http://minio:9000",
                         ["Storage:Minio:PublicEndpoint"] = "http://localhost:9000",
                         ["Storage:Minio:AccessKey"] = "minioadmin",
@@ -141,4 +157,9 @@ public sealed class StartupAssertionTests
 
         act.Should().NotThrow();
     }
+}
+
+[CollectionDefinition("StartupAssertionTests", DisableParallelization = true)]
+public class StartupAssertionTestsCollection
+{
 }

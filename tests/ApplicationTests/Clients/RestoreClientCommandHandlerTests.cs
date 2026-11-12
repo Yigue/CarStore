@@ -138,4 +138,73 @@ public class RestoreClientCommandHandlerTests
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Be(ClientErrors.NotFound(id));
     }
+
+    [Fact]
+    public async Task Handle_Should_ReturnConflict_WhenActiveClientWithSameDniAlreadyExistsInSameDealer()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var dateProvider = new FakeDateTimeProvider();
+        var actorId = Guid.NewGuid();
+        var mockUserContext = new Mock<IUserContext>();
+        mockUserContext.Setup(x => x.UserId).Returns(actorId);
+
+        var dealerId = Guid.NewGuid();
+        var deletedClient = new Client(dealerId, "Deleted", "Client", "12345678", "deleted@test.com", "555", "Street 1", dateProvider.UtcNow);
+        deletedClient.Delete(actorId, dateProvider.UtcNow);
+        context.Clients.Add(deletedClient);
+
+        var activeClient = new Client(dealerId, "Active", "Client", "12345678", "active@test.com", "666", "Street 2", dateProvider.UtcNow);
+        context.Clients.Add(activeClient);
+        await context.SaveChangesAsync();
+
+        var mockTenantService = new Mock<ICurrentTenantService>();
+        mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
+        mockTenantService.Setup(x => x.HasTenant).Returns(true);
+
+        var handler = new RestoreClientCommandHandler(context, mockUserContext.Object, dateProvider, mockTenantService.Object);
+        var command = new RestoreClientCommand(deletedClient.Id);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(ClientErrors.DniConflict("12345678"));
+    }
+
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenActiveClientWithSameDniExistsInDifferentDealer()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var dateProvider = new FakeDateTimeProvider();
+        var actorId = Guid.NewGuid();
+        var mockUserContext = new Mock<IUserContext>();
+        mockUserContext.Setup(x => x.UserId).Returns(actorId);
+
+        var dealerId = Guid.NewGuid();
+        var otherDealerId = Guid.NewGuid();
+        var deletedClient = new Client(dealerId, "Deleted", "Client", "12345678", "deleted@test.com", "555", "Street 1", dateProvider.UtcNow);
+        deletedClient.Delete(actorId, dateProvider.UtcNow);
+        context.Clients.Add(deletedClient);
+
+        var activeClientOtherDealer = new Client(otherDealerId, "Active", "Other", "12345678", "active@other.com", "666", "Street 2", dateProvider.UtcNow);
+        context.Clients.Add(activeClientOtherDealer);
+        await context.SaveChangesAsync();
+
+        var mockTenantService = new Mock<ICurrentTenantService>();
+        mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
+        mockTenantService.Setup(x => x.HasTenant).Returns(true);
+
+        var handler = new RestoreClientCommandHandler(context, mockUserContext.Object, dateProvider, mockTenantService.Object);
+        var command = new RestoreClientCommand(deletedClient.Id);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Be(deletedClient.Id);
+    }
 }

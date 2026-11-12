@@ -1,15 +1,25 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Sales.Get;
 
-internal sealed class GetSalesQueryHandler(IApplicationDbContext context)
+internal sealed class GetSalesQueryHandler(
+    IApplicationDbContext context,
+    ICurrentTenantService tenantService)
     : IQueryHandler<GetSalesQuery, List<SaleResponse>>
 {
     public async Task<Result<List<SaleResponse>>> Handle(GetSalesQuery query, CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<List<SaleResponse>>(guard.Error);
+        }
+
         List<SaleResponse> sales = await context.Sales
             .Include(s => s.Car)
             .Include(s => s.Client)

@@ -5,4 +5,6 @@ public enum PlatformAuditAction
     DealerSuspended,
     DealerReactivated,
     DealerProvisioned,
+    SubscriptionRefunded,
+    OwnerTransferred,
 }

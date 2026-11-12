@@ -3,6 +3,7 @@ using Domain.Clients;
 using Domain.Clients.Attributes;
 using Domain.Leads;
 using Domain.Leads.Events;
+using Domain.Sales.Attributes;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -89,6 +90,43 @@ internal sealed class CreateClientFromLeadOnNegociacionHandler(
 
             target.SetProspect();
             context.Clients.Add(target);
+        }
+        else
+        {
+            // A recycled client is not necessarily a usable one. The email fallback happily
+            // returns the record of someone who was deactivated, or of a lead that was marked
+            // Perdido and came back — and CreateSaleCommandHandler refuses to sell to a client
+            // that is Lost or Inactive (ClientErrors.Inactive). That is the whole of VEN-01 /
+            // LEAD-03: the board reached Ganado, the sale form opened, and the API answered 400
+            // about a client the operator never touched.
+            //
+            // Negotiating again is exactly the fact that revives the record, so say so in the
+            // domain instead of leaving the next command to trip over it. Someone who already
+            // bought here goes back to Active — demoting a real customer to Prospect would
+            // rewrite their history; everyone else becomes a Prospect, the same state a client
+            // created by this handler is born in.
+            if (target.Status is ClientStatus.Lost or ClientStatus.Inactive)
+            {
+                Guid targetId = target.Id;
+                bool hasCompletedSale = await context.Sales.AnyAsync(
+                    s => s.ClientId == targetId && s.Status == SaleStatus.Completed,
+                    cancellationToken);
+
+                if (hasCompletedSale)
+                {
+                    target.Activate();
+                }
+                else
+                {
+                    target.SetProspect();
+                }
+            }
+
+            // Stamp the origin enquiry on a client this conversion reused. LinkOriginLead is
+            // idempotent and never overwrites an existing origin, and without it every rule that
+            // walks from a client back to its lead sees nothing for exactly the clients that
+            // came in through the pipeline.
+            target.LinkOriginLead(lead.Id);
         }
 
         lead.MarkConverted(target.Id);

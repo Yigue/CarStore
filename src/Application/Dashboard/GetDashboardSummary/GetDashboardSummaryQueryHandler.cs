@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Cars.Attributes;
 using Domain.Leads;
 using Domain.Quotes.Attributes;
@@ -18,13 +20,21 @@ namespace Application.Dashboard.GetDashboardSummary;
 /// InvalidOperationException ("A second operation was started on this context").
 /// Each query is a cheap aggregate, so sequential latency stays well under budget.
 /// </summary>
-internal sealed class GetDashboardSummaryQueryHandler(IApplicationDbContext context)
+internal sealed class GetDashboardSummaryQueryHandler(
+    IApplicationDbContext context,
+    ICurrentTenantService tenantService)
     : IQueryHandler<GetDashboardSummaryQuery, DashboardSummaryDto>
 {
     public async Task<Result<DashboardSummaryDto>> Handle(
         GetDashboardSummaryQuery query,
         CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<DashboardSummaryDto>(guard.Error);
+        }
+
         DateTime now = DateTime.UtcNow;
         var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         DateTime windowStart = monthStart.AddMonths(-11);

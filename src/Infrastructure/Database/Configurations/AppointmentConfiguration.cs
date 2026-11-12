@@ -23,7 +23,8 @@ internal sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appoin
         builder.Property(a => a.LeadId)
             .IsRequired(false);
             
-        builder.Property(a => a.AgentId).IsRequired();
+        // sfc B5.2.3 / H15: nullable until a Requested appointment is confirmed.
+        builder.Property(a => a.AgentId).IsRequired(false);
 
         builder.Property(a => a.StartDateTime).IsRequired();
         builder.Property(a => a.EndDateTime).IsRequired();

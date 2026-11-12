@@ -1,4 +1,5 @@
 using Application.Abstractions.Data;
+using Application.Common;
 using Application.Abstractions.Messaging;
 using Domain.Clients;
 using Domain.Shared;
@@ -50,8 +51,8 @@ internal sealed class GetActivityQueryHandler(IApplicationDbContext context)
 
         var items = await activityQuery
             .OrderByDescending(m => m.OccurredOnUtc)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
+            .Skip((Pagination.ClampPage(query.Page) - 1) * Pagination.ClampPageSize(query.PageSize))
+            .Take(Pagination.ClampPageSize(query.PageSize))
             .Select(m => new
             {
                 m.Id,

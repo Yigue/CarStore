@@ -13,6 +13,8 @@ using Domain.Quotes;
 using Domain.Quotes.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using FluentAssertions;
+using SharedKernel;
 
 namespace Application.UnitTests.Quotes;
 
@@ -35,6 +37,12 @@ public class CreateQuoteCommandHandlerTests
         tenantMock.SetupGet(t => t.DealerId).Returns(DealerId);
         return tenantMock.Object;
     }
+
+    // sfc B4.3 / RN-018: the real allocator against the InMemory provider — exercises its
+    // non-atomic fallback path, not a mock, since Infrastructure's internals are visible here
+    // (Infrastructure.csproj InternalsVisibleTo "Application.UnitTests").
+    private static Infrastructure.Common.DealerSequenceAllocator CreateAllocator(TestApplicationDbContext context) =>
+        new(context);
 
     private static async Task<Car> SeedCarAsync(TestApplicationDbContext context)
     {
@@ -87,7 +95,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var client = await SeedClientAsync(context, ClientStatus.Lost);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
@@ -101,7 +109,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var lead = await SeedLeadAsync(context, LeadStatus.Perdido);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
 
@@ -115,7 +123,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var lead = await SeedLeadAsync(context, LeadStatus.Archivado);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
 
@@ -129,7 +137,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var client = await SeedClientAsync(context, ClientStatus.Lost);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
@@ -145,7 +153,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var client = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
@@ -162,7 +170,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var lead = await SeedLeadAsync(context, LeadStatus.Negociacion);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
 
@@ -184,7 +192,7 @@ public class CreateQuoteCommandHandlerTests
         var car = await SeedCarAsync(context);
         var otherDealerId = Guid.NewGuid();
         var foreignLead = await SeedLeadAsync(context, LeadStatus.Negociacion, otherDealerId);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, null, foreignLead.Id), CancellationToken.None);
 
@@ -207,7 +215,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var first = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var firstResult = await handler.Handle(BuildCommand(car.Id, first.Id, null), CancellationToken.None);
         firstResult.IsSuccess.Should().BeTrue();
@@ -228,7 +236,7 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var buyer = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var accepted = await handler.Handle(BuildCommand(car.Id, buyer.Id, null), CancellationToken.None);
         var acceptedQuote = await context.Quotes.SingleAsync(q => q.Id == accepted.Value);
@@ -255,7 +263,7 @@ public class CreateQuoteCommandHandlerTests
         await context.SaveChangesAsync();
 
         var client = await SeedClientAsync(context, ClientStatus.Active);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
@@ -284,7 +292,7 @@ public class CreateQuoteCommandHandlerTests
         lead.MarkConverted(client.Id);
         await context.SaveChangesAsync();
 
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
         var result = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -305,7 +313,7 @@ public class CreateQuoteCommandHandlerTests
         lead.MarkConverted(client.Id);
         await context.SaveChangesAsync();
 
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
         await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
 
         // Committed by this handler, not ten seconds later by a background job.
@@ -325,7 +333,7 @@ public class CreateQuoteCommandHandlerTests
         lead.MarkConverted(client.Id);
         await context.SaveChangesAsync();
 
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
         var result = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -340,11 +348,155 @@ public class CreateQuoteCommandHandlerTests
         using var context = CreateContext();
         var car = await SeedCarAsync(context);
         var lead = await SeedLeadAsync(context, LeadStatus.Ganado);
-        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService());
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
 
         await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
 
         var persistedLead = await context.Leads.AsNoTracking().SingleAsync(l => l.Id == lead.Id);
         persistedLead.Status.Should().Be(LeadStatus.Ganado);
+    }
+
+    // ── LEAD-02: one live offer per car and party ────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenTheSameLeadAlreadyHasALiveQuoteForTheCar()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
+
+        var first = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
+        first.IsSuccess.Should().BeTrue();
+
+        var second = await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
+
+        second.IsFailure.Should().BeTrue("re-pricing is an update of the standing offer, not a second one");
+        second.Error.Code.Should().Be("Quotes.ActiveQuoteAlreadyExists");
+        (await context.Quotes.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_WhenTheSameClientAlreadyHasALiveQuoteForTheCar()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var client = await SeedClientAsync(context, ClientStatus.Active);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
+
+        await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+        var second = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+
+        second.IsFailure.Should().BeTrue();
+        second.Error.Code.Should().Be("Quotes.ActiveQuoteAlreadyExists");
+    }
+
+    // The converted lead and the client it became are one buyer. Quoting through the other half
+    // of the same record must not be the way around the rule.
+    [Fact]
+    public async Task Handle_Should_Fail_WhenTheLiveQuoteWasRaisedAgainstTheOtherHalfOfTheSameParty()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
+        var client = new Client(DealerId, "Pepe", "Mujica", "888", "pepe@test.com", "555", "Addr",
+            DateTime.UtcNow, ClientType.Individual, lead.Id);
+        context.Clients.Add(client);
+        lead.MarkConverted(client.Id);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
+
+        await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
+        var second = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+
+        second.IsFailure.Should().BeTrue();
+        second.Error.Code.Should().Be("Quotes.ActiveQuoteAlreadyExists");
+    }
+
+    // The market is still allowed to compete: the guard is per party, not per car.
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenADifferentPartyQuotesTheSameCar()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var lead = await SeedLeadAsync(context, LeadStatus.Contactado);
+        var otherBuyer = await SeedClientAsync(context, ClientStatus.Active);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
+
+        await handler.Handle(BuildCommand(car.Id, null, lead.Id), CancellationToken.None);
+        var second = await handler.Handle(BuildCommand(car.Id, otherBuyer.Id, null), CancellationToken.None);
+
+        second.IsSuccess.Should().BeTrue();
+        (await context.Quotes.CountAsync()).Should().Be(2);
+    }
+
+    // A rejected offer is history; re-quoting after it lapses is a new negotiation.
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenThePreviousQuoteIsNoLongerPending()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var client = await SeedClientAsync(context, ClientStatus.Active);
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), CreateTenantService(), CreateAllocator(context));
+
+        var first = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+        var firstQuote = await context.Quotes.SingleAsync(q => q.Id == first.Value);
+        firstQuote.Reject("buyer walked away", DateTime.UtcNow);
+        await context.SaveChangesAsync();
+
+        var second = await handler.Handle(BuildCommand(car.Id, client.Id, null), CancellationToken.None);
+
+        second.IsSuccess.Should().BeTrue();
+        (await context.Quotes.CountAsync()).Should().Be(2);
+    }
+
+    // An offer whose validity ran out is not standing any more either.
+    [Fact]
+    public async Task Handle_Should_Succeed_WhenThePreviousQuoteHasRunOutOfValidity()
+    {
+        using var context = CreateContext();
+        var car = await SeedCarAsync(context);
+        var client = await SeedClientAsync(context, ClientStatus.Active);
+        var clock = new FakeDateTimeProvider { UtcNow = new DateTime(2024, 1, 1) };
+        var handler = new CreateQuoteCommandHandler(context, clock, CreateTenantService(), CreateAllocator(context));
+
+        var first = await handler.Handle(
+            new CreateQuoteCommand(car.Id, client.Id, null, 14000m, PaymentMethod.Contado, new DateTime(2024, 1, 5), "c"),
+            CancellationToken.None);
+        first.IsSuccess.Should().BeTrue();
+
+        clock.UtcNow = new DateTime(2024, 1, 10);
+
+        var second = await handler.Handle(
+            new CreateQuoteCommand(car.Id, client.Id, null, 13000m, PaymentMethod.Contado, new DateTime(2024, 1, 20), "c"),
+            CancellationToken.None);
+
+        second.IsSuccess.Should().BeTrue();
+        (await context.Quotes.CountAsync()).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_NoTenantContext_ReturnsForbidden()
+    {
+        // API-005: When tenant context is missing, handler returns Forbidden
+        using var context = CreateContext();
+        var tenantMock = new Mock<ICurrentTenantService>();
+        tenantMock.SetupGet(t => t.HasTenant).Returns(false);
+
+        var handler = new CreateQuoteCommandHandler(context, new FakeDateTimeProvider(), tenantMock.Object, CreateAllocator(context));
+        var command = new CreateQuoteCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            null,
+            10000m,
+            PaymentMethod.Contado,
+            DateTime.UtcNow.AddDays(10),
+            "notes");
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Forbidden);
     }
 }

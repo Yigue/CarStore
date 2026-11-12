@@ -1,6 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Appointments;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -18,23 +19,26 @@ internal sealed class RescheduleAppointmentCommandHandler(
 {
     public async Task<Result> Handle(RescheduleAppointmentCommand command, CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+            return guard;
+
         Guid dealerId = tenantService.DealerId;
 
         Appointment? appointment = await context.Appointments
-            .FirstOrDefaultAsync(a => a.Id == command.AppointmentId, cancellationToken);
+            .FirstOrDefaultAsync(a => a.Id == command.AppointmentId && a.DealerId == dealerId, cancellationToken);
 
         if (appointment is null)
             return Result.Failure(AppointmentErrors.NotFound(command.AppointmentId));
 
-        bool hasConflict = await context.Appointments
-            .AsNoTracking()
-            .AnyAsync(a =>
-                a.Id != command.AppointmentId &&
-                a.DealerId == dealerId &&
-                (a.VehicleId == appointment.VehicleId || a.AgentId == appointment.AgentId) &&
-                a.StartDateTime < command.End &&
-                a.EndDateTime > command.Start,
-                cancellationToken);
+        bool hasConflict = await context.Appointments.HasConflictAsync(
+            dealerId,
+            appointment.VehicleId,
+            appointment.AgentId,
+            command.Start,
+            command.End,
+            excludeAppointmentId: appointment.Id,
+            cancellationToken);
 
         if (hasConflict)
             return Result.Failure(AppointmentErrors.Conflict);

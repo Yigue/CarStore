@@ -1,6 +1,7 @@
 using Application.Marcas.Create;
 using MediatR;
 using SharedKernel;
+using Web.Api.Endpoints.Catalog;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
 
@@ -14,7 +15,7 @@ public sealed class Create : IEndpoint
     {
         app.MapPost("marcas", Handler)
             .WithTags(Tags.Marcas)
-            .RequireAuthorization();
+            .HasPermission(Catalog.Permissions.CatalogManage);
     }
 
     private static async Task<IResult> Handler(Request request, ISender sender, CancellationToken cancellationToken)

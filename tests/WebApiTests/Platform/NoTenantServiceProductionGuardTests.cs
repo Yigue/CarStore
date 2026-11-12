@@ -51,19 +51,27 @@ public class NoTenantServiceProductionGuardTests
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            // Set environment variables required for Production startup validations.
-            Environment.SetEnvironmentVariable("Jwt__Secret", "SecretKeyForProductionGuardTest1234567890");
-            Environment.SetEnvironmentVariable("Jwt__Issuer", "CarStore");
-            Environment.SetEnvironmentVariable("Jwt__Audience", "CarStore");
-            Environment.SetEnvironmentVariable("ConnectionStrings__Redis", "");
-            Environment.SetEnvironmentVariable("Storage__Minio__InternalEndpoint", "http://minio:9000");
-            Environment.SetEnvironmentVariable("Storage__Minio__PublicEndpoint", "http://localhost:9000");
-            Environment.SetEnvironmentVariable("Storage__Minio__AccessKey", "minioadmin");
-            Environment.SetEnvironmentVariable("Storage__Minio__SecretKey", "minioadmin123");
-            Environment.SetEnvironmentVariable("Storage__Minio__BucketName", "cars");
-            Environment.SetEnvironmentVariable("Stripe__SecretKey", "sk_test_dummy");
-            Environment.SetEnvironmentVariable("Stripe__PriceId", "price_dummy");
-            Environment.SetEnvironmentVariable("Stripe__WebhookSecret", "whsec_dummy");
+            // Set environment settings required for Production startup validations.
+            builder.UseSetting("Jwt:Secret", "SecretKeyForProductionGuardTest1234567890");
+            builder.UseSetting("Jwt:Issuer", "CarStore");
+            builder.UseSetting("Jwt:Audience", "CarStore");
+            builder.UseSetting("ConnectionStrings:Redis", "");
+            builder.UseSetting("Storage:Minio:InternalEndpoint", "http://minio:9000");
+            builder.UseSetting("Storage:Minio:PublicEndpoint", "http://localhost:9000");
+            builder.UseSetting("Storage:Minio:AccessKey", "minioadmin");
+            builder.UseSetting("Storage:Minio:SecretKey", "minioadmin123");
+            builder.UseSetting("Storage:Minio:BucketName", "cars");
+            builder.UseSetting("Stripe:SecretKey", "sk_test_dummy");
+            builder.UseSetting("Stripe:PriceId", "price_dummy");
+            builder.UseSetting("Stripe:WebhookSecret", "whsec_dummy");
+            // spr PR 3.3 (B10): without this, Program.cs's anti-NoOp captcha guard would throw
+            // before NoTenantServiceProductionGuard gets a chance to — this test targets the latter.
+            builder.UseSetting("Captcha:SecretKey", "test-secret-key");
+            // spr PR 5.1.8: AddBackgroundJobs reads this flag directly (unrelated to the SQLite
+            // DbContext swap below) to skip Quartz's persistent Postgres store under tests — without
+            // it, the host also tries a real Postgres connection and fails auth before this test's
+            // own guard gets a chance to run.
+            builder.UseSetting("UseInMemoryDatabase", "true");
 
             // Production environment triggers NoTenantServiceProductionGuard registration.
             builder.UseEnvironment("Production");
@@ -72,6 +80,7 @@ public class NoTenantServiceProductionGuardTests
             {
                 // Use SQLite in-memory instead of real Postgres.
                 services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
+                services.RemoveAll<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<ApplicationDbContext>>();
                 services.RemoveAll<ApplicationDbContext>();
                 services.RemoveAll<IApplicationDbContext>();
                 services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connection).UseSnakeCaseNamingConvention());

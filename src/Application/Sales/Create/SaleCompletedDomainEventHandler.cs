@@ -46,17 +46,22 @@ internal sealed class SaleCompletedDomainEventHandler(
             return;
         }
         
+        // sfc B7.1 / RN-036: a consigned vehicle is a third party's; the dealer's income is only its commission.
+        bool consigned = sale.Car?.IsConsigned == true;
         var transaction = new FinancialTransaction(
             sale.DealerId,
             TransactionType.Income,
-            notification.FinalPrice,
-            $"Venta de auto - Contrato: {sale.ContractNumber}",
+            sale.Car?.DealerIncomeFrom(notification.FinalPrice) ?? notification.FinalPrice,
+            consigned
+                ? $"Comisión de consignación - Contrato: {sale.ContractNumber}"
+                : $"Venta de auto - Contrato: {sale.ContractNumber}",
             notification.PaymentMethod,
             category,
             car: sale.Car,
             client: sale.Client,
             sale: sale,
-            transactionDate: dateTimeProvider.UtcNow);
+            transactionDate: dateTimeProvider.UtcNow,
+            exchangeRate: sale.ExchangeRate); // sfc B0.3.1 / ADR C2
         
         context.Transactions.Add(transaction);
         await context.SaveChangesAsync(cancellationToken);

@@ -21,6 +21,11 @@ internal sealed class UpdateCategoryCommandHandler(
             return Result.Failure(Error.NotFound("Category.NotFound", "The category was not found."));
         }
 
+        if (category.DealerId == Guid.Empty)
+        {
+            return Result.Failure(Domain.Financial.FinancialErrors.SystemReadOnly);
+        }
+
         category.Update(
             command.Name,
             command.Description,

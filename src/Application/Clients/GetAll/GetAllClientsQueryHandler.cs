@@ -1,4 +1,5 @@
 using System;
+using Application.Common;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -164,7 +165,7 @@ internal sealed class GetAllClientsQueryHandler(IApplicationDbContext context)
 
             int searchTotalCount = await dbQuery.CountAsync(cancellationToken);
             var searchPage = query.Page > 0 ? query.Page : 1;
-            var searchPageSize = query.PageSize > 0 ? query.PageSize : 20;
+            var searchPageSize = Pagination.ClampPageSize(query.PageSize > 0 ? query.PageSize : 20);
 
             var searchClients = await dbQuery
                 .OrderBy(c => c.LastName)
@@ -188,7 +189,7 @@ internal sealed class GetAllClientsQueryHandler(IApplicationDbContext context)
 
         // Apply pagination
         var page = query.Page > 0 ? query.Page : 1;
-        var pageSize = query.PageSize > 0 ? query.PageSize : 20;
+        var pageSize = Pagination.ClampPageSize(query.PageSize > 0 ? query.PageSize : 20);
 
         var clients = await dbQuery
             .OrderBy(c => c.LastName)

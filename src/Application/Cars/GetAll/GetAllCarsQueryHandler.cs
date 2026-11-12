@@ -1,4 +1,6 @@
+using Application.Branches;
 using Application.Abstractions.Authentication;
+using Application.Common;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
@@ -8,16 +10,26 @@ using SharedKernel;
 
 namespace Application.Cars.GetAll;
 
-internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, IStorageService storage, IUserContext userContext)
+internal sealed class GetAllCarsQueryHandler(
+    IApplicationDbContext context,
+    IStorageService storage,
+    IUserContext userContext,
+    Application.Abstractions.Branches.IBranchScope? branchScope = null)
     : IQueryHandler<GetAllCarsQuery, PaginatedResult<CarsResponses>>
 {
     public async Task<Result<PaginatedResult<CarsResponses>>> Handle(GetAllCarsQuery query, CancellationToken cancellationToken)
     {
-        var carsQuery = context.Cars
+        // sfc C2.2: a branch-scoped role only lists its own branches.
+        IReadOnlyCollection<Guid>? restrictedTo = branchScope is null
+            ? null
+            : await branchScope.GetRestrictedBranchIdsAsync(cancellationToken);
+
+        IQueryable<Car> carsQuery = context.Cars
             .AsNoTracking()
             .Include(c => c.Marca)
             .Include(c => c.Modelo)
-            .Include(c => c.Images);
+            .Include(c => c.Images)
+            .ForBranchScope(restrictedTo);
 
         Result<IOrderedQueryable<Car>> ordering = CarSortOrder.Apply(carsQuery, query.SortBy, query.SortOrder);
 
@@ -31,8 +43,8 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, ISto
         // Sort is applied to the whole set before Skip/Take, so page N holds the Nth
         // slice of the sorted inventory rather than a re-ordered arbitrary page.
         var cars = await ordering.Value
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
+            .Skip((Pagination.ClampPage(query.Page) - 1) * Pagination.ClampPageSize(query.PageSize))
+            .Take(Pagination.ClampPageSize(query.PageSize))
             .ToListAsync(cancellationToken);
 
         var responses = new List<CarsResponses>(cars.Count);
@@ -83,15 +95,16 @@ internal sealed class GetAllCarsQueryHandler(IApplicationDbContext context, ISto
                 // endpoint ya exige cars:read, pero eso lo tiene también un
                 // vendedor: sólo el admin ve el costo. La misma regla que
                 // VehicleForm aplica al guardar, ahora también al leer.
-                userContext.IsAdmin ? car.PurchaseCost?.Amount : null
+                userContext.IsAdmin ? car.PurchaseCost?.Amount : null,
+                car.Price.Currency
             ));
         }
 
         var paginatedResult = new PaginatedResult<CarsResponses>(
             responses,
             totalCount,
-            query.Page,
-            query.PageSize);
+            Pagination.ClampPage(query.Page),
+            Pagination.ClampPageSize(query.PageSize));
 
         return Result.Success(paginatedResult);
     }

@@ -17,6 +17,8 @@ internal sealed class Create : IEndpoint
         public Domain.Quotes.Attributes.PaymentMethod PaymentMethod { get; set; }
         public DateTime ValidUntil { get; set; }
         public string Comments { get; set; } = string.Empty;
+        // sfc B0.2.3 phase 1: optional; ARS when omitted. The exchange-rate requirement for other currencies is next.
+        public string? Currency { get; set; }
     }
 
     public void MapEndpoint(IEndpointRouteBuilder app)
@@ -27,13 +29,14 @@ internal sealed class Create : IEndpoint
             CancellationToken cancellationToken) =>
         {
             var command = new CreateQuoteCommand(
-                request.CarId,
-                request.ClientId,
-                request.LeadId,
-                request.ProposedPrice,
-                request.PaymentMethod,
-                request.ValidUntil,
-                request.Comments);
+                CarId: request.CarId,
+                ClientId: request.ClientId,
+                LeadId: request.LeadId,
+                ProposedPrice: request.ProposedPrice,
+                PaymentMethod: request.PaymentMethod,
+                ValidUntil: request.ValidUntil,
+                Comments: request.Comments,
+                Currency: request.Currency);
 
             Result<Guid> result = await sender.Send(command, cancellationToken);
 

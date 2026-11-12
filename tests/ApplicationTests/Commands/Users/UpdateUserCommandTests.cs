@@ -2,22 +2,45 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.Users.Commands.UpdateUser;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using SharedKernel;
 using Xunit;
 
 namespace Application.UnitTests.Commands.Users;
 
 public class UpdateUserCommandTests
 {
-    private static TestApplicationDbContext CreateContext()
+    private static TestApplicationDbContext CreateContext(Guid? dealerId = null)
     {
         var options = new DbContextOptionsBuilder<TestApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        return new TestApplicationDbContext(options);
+        return dealerId is null
+            ? new TestApplicationDbContext(options)
+            : new TestApplicationDbContext(options, dealerId.Value);
+    }
+
+    private static async Task<Guid> SeedRoleAsync(TestApplicationDbContext context, Guid dealerId)
+    {
+        var role = new Role(dealerId, "Empleado", "Rol del mismo dealer");
+        context.Roles.Add(role);
+        await context.SaveChangesAsync();
+        return role.Id;
+    }
+
+    /// <summary>sfc A3.1: these tests exercise pre-existing update behavior, not entitlements.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        mock.Setup(s => s.RoleConsumesASeatAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        return mock.Object;
     }
 
     private static UpdateUserCommandHandler CreateHandler(
@@ -25,22 +48,24 @@ public class UpdateUserCommandTests
         ICurrentTenantService? tenantService = null)
     {
         var mockTenantService = new Mock<ICurrentTenantService>();
-        mockTenantService.Setup(x => x.DealerId).Returns(Guid.NewGuid());
+        mockTenantService.Setup(x => x.DealerId).Returns(context.TenantDealerId);
 
         return new UpdateUserCommandHandler(
             context,
-            tenantService ?? mockTenantService.Object);
+            context,
+            tenantService ?? mockTenantService.Object,
+            AlwaysAllowEntitlements());
     }
 
     [Fact]
     public async Task Handle_ValidCommand_ReturnsSuccess()
     {
-        using var context = CreateContext();
         var dealerId = Guid.NewGuid();
+        using var context = CreateContext(dealerId);
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var roleId = Guid.NewGuid();
+        var roleId = await SeedRoleAsync(context, dealerId);
         var user = new User(dealerId, "original@example.com", "Original", "Name", "hash", roleId);
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -52,7 +77,7 @@ public class UpdateUserCommandTests
             "Updated",
             "Name",
             "+5491112345678",
-            Guid.NewGuid(),
+            roleId,
             true);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -64,7 +89,7 @@ public class UpdateUserCommandTests
         updatedUser!.FirstName.Should().Be("Updated");
         updatedUser.LastName.Should().Be("Name");
         updatedUser.Phone.Should().Be("+5491112345678");
-        updatedUser.RoleId.Should().NotBe(roleId);
+        updatedUser.RoleId.Should().Be(roleId);
         updatedUser.IsActive.Should().BeTrue();
     }
 
@@ -96,7 +121,8 @@ public class UpdateUserCommandTests
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "deactivate@example.com", "Active", "User", "hash", Guid.NewGuid());
+        var roleId = await SeedRoleAsync(context, dealerId);
+        var user = new User(dealerId, "deactivate@example.com", "Active", "User", "hash", roleId);
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -107,7 +133,7 @@ public class UpdateUserCommandTests
             "Active",
             "User",
             null,
-            Guid.NewGuid(),
+            roleId,
             false);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -120,12 +146,13 @@ public class UpdateUserCommandTests
     [Fact]
     public async Task Handle_ActivateUser_SetsIsActiveTrue()
     {
-        using var context = CreateContext();
         var dealerId = Guid.NewGuid();
+        using var context = CreateContext(dealerId);
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "inactive@example.com", "Inactive", "User", "hash", Guid.NewGuid());
+        var roleId = await SeedRoleAsync(context, dealerId);
+        var user = new User(dealerId, "inactive@example.com", "Inactive", "User", "hash", roleId);
         user.Deactivate();
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -137,7 +164,7 @@ public class UpdateUserCommandTests
             "Inactive",
             "User",
             null,
-            Guid.NewGuid(),
+            roleId,
             true);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -150,12 +177,13 @@ public class UpdateUserCommandTests
     [Fact]
     public async Task Handle_ClearPhone_SetsPhoneToNull()
     {
-        using var context = CreateContext();
         var dealerId = Guid.NewGuid();
+        using var context = CreateContext(dealerId);
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "phone@example.com", "Has", "Phone", "hash", Guid.NewGuid());
+        var roleId = await SeedRoleAsync(context, dealerId);
+        var user = new User(dealerId, "phone@example.com", "Has", "Phone", "hash", roleId);
         user.UpdatePhone("+5491112345678");
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -167,7 +195,7 @@ public class UpdateUserCommandTests
             "Has",
             "Phone",
             null,
-            Guid.NewGuid(),
+            roleId,
             true);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -211,12 +239,13 @@ public class UpdateUserCommandTests
     [Fact]
     public async Task Handle_TrimsWhitespace_FromNames()
     {
-        using var context = CreateContext();
         var dealerId = Guid.NewGuid();
+        using var context = CreateContext(dealerId);
         var mockTenantService = new Mock<ICurrentTenantService>();
         mockTenantService.Setup(x => x.DealerId).Returns(dealerId);
 
-        var user = new User(dealerId, "trim@example.com", "Original", "Name", "hash", Guid.NewGuid());
+        var roleId = await SeedRoleAsync(context, dealerId);
+        var user = new User(dealerId, "trim@example.com", "Original", "Name", "hash", roleId);
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -227,7 +256,7 @@ public class UpdateUserCommandTests
             "  John  ",
             "  Doe  ",
             null,
-            Guid.NewGuid(),
+            roleId,
             true);
 
         var result = await handler.Handle(command, CancellationToken.None);

@@ -4,5 +4,5 @@ namespace Domain.Appointments.Events;
 
 public sealed record AppointmentCreatedDomainEvent(
     Guid AppointmentId,
-    Guid AgentId,
+    Guid? AgentId,
     DateTime Start) : IDomainEvent;

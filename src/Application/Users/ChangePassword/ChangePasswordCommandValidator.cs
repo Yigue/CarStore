@@ -1,3 +1,4 @@
+using Application.Common;
 using FluentValidation;
 
 namespace Application.Users.ChangePassword;
@@ -10,10 +11,7 @@ public sealed class ChangePasswordCommandValidator : AbstractValidator<ChangePas
             .NotEmpty()
             .WithMessage("Ingresá tu contraseña actual.");
 
-        RuleFor(x => x.NewPassword)
-            .NotEmpty()
-            .MinimumLength(8)
-            .WithMessage("La contraseña debe tener al menos 8 caracteres.");
+        RuleFor(x => x.NewPassword).MustBeStrongPassword();
 
         // Un "cambio" que deja la misma contraseña no es un cambio, y aceptarlo
         // en silencio le hace creer al usuario que rotó su credencial.

@@ -1,3 +1,4 @@
+using Application.Common;
 using FluentValidation;
 
 namespace Application.Users.Commands.CreateUser;
@@ -11,18 +12,7 @@ internal sealed class CreateUserValidator : AbstractValidator<CreateUserCommand>
             .EmailAddress()
             .WithMessage("El email es requerido y debe ser válido");
 
-        RuleFor(c => c.Password)
-            .NotEmpty()
-            .MinimumLength(8)
-                .WithMessage("La contraseña debe tener al menos 8 caracteres")
-            .Matches("[A-Z]")
-                .WithMessage("La contraseña debe contener al menos una mayúscula")
-            .Matches("[a-z]")
-                .WithMessage("La contraseña debe contener al menos una minúscula")
-            .Matches("[0-9]")
-                .WithMessage("La contraseña debe contener al menos un número")
-            .Matches(@"[@$!%*?&]")
-                .WithMessage("La contraseña debe contener al menos un carácter especial (@$!%*?&)");
+        RuleFor(c => c.Password).MustBeStrongPassword();
 
         RuleFor(c => c.FirstName)
             .NotEmpty()

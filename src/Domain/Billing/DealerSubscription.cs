@@ -6,6 +6,12 @@ namespace Domain.Billing;
 
 public sealed class DealerSubscription : Entity
 {
+    /// <summary>
+    /// spr ADR B1 (D1): "plan único" today — the only sellable plan code. Lives beside <see cref="PlanId"/>
+    /// (the Stripe price id) so multi-plan support can be added later without another migration.
+    /// </summary>
+    public const string DefaultPlanCode = "standard";
+
     private DealerSubscription()
     {
     }
@@ -19,12 +25,22 @@ public sealed class DealerSubscription : Entity
     public DateTime? CancelledAt { get; private set; }
     public string PlanId { get; private set; } = string.Empty;
 
+    /// <summary>spr PR 1.1 (SPR-02/B1): the plan code, independent of the Stripe price id.</summary>
+    public string PlanCode { get; private set; } = DefaultPlanCode;
+
+    /// <summary>
+    /// RN-023: provider timestamp (Stripe <c>evt.created</c>) of the newest state event applied to this row.
+    /// Null until the first provider event is applied.
+    /// </summary>
+    public DateTime? LastProviderEventAtUtc { get; private set; }
+
     public static DealerSubscription Create(
         Guid dealerId,
         string? stripeCustomerId,
         string? stripeSubscriptionId,
         string planId,
-        DateTime? trialEndsAt = null)
+        DateTime? trialEndsAt = null,
+        string planCode = DefaultPlanCode)
     {
         var subscription = new DealerSubscription
         {
@@ -32,6 +48,7 @@ public sealed class DealerSubscription : Entity
             StripeCustomerId = stripeCustomerId,
             StripeSubscriptionId = stripeSubscriptionId,
             PlanId = planId,
+            PlanCode = string.IsNullOrWhiteSpace(planCode) ? DefaultPlanCode : planCode,
             Status = SubscriptionStatus.Trialing,
             TrialEndsAt = trialEndsAt ?? DateTime.UtcNow.AddDays(14),
             CurrentPeriodStart = DateTime.UtcNow,
@@ -39,6 +56,78 @@ public sealed class DealerSubscription : Entity
         };
         subscription.SetDealer(dealerId);
         return subscription;
+    }
+
+    /// <summary>
+    /// spr ADR B8: the row provisioning always creates. Status is <see cref="SubscriptionStatus.Incomplete"/>
+    /// until Stripe confirms a trial or a payment; <paramref name="stripeCustomerId"/> is null when
+    /// Stripe was unreachable during provisioning.
+    /// </summary>
+    public static DealerSubscription CreatePending(Guid dealerId, string? stripeCustomerId, string planId, string planCode = DefaultPlanCode)
+    {
+        var now = DateTime.UtcNow;
+        var subscription = new DealerSubscription
+        {
+            Id = Guid.NewGuid(),
+            StripeCustomerId = stripeCustomerId,
+            PlanId = planId,
+            PlanCode = string.IsNullOrWhiteSpace(planCode) ? DefaultPlanCode : planCode,
+            Status = SubscriptionStatus.Incomplete,
+            CurrentPeriodStart = now,
+            CurrentPeriodEnd = now
+        };
+        subscription.SetDealer(dealerId);
+        return subscription;
+    }
+
+    /// <summary>
+    /// RN-023: registers a provider state event. Returns false (and changes nothing) when the event is
+    /// older than the newest one already applied; an event with the same timestamp is accepted.
+    /// </summary>
+    public bool TryRegisterProviderEvent(DateTime occurredAtUtc)
+    {
+        if (LastProviderEventAtUtc.HasValue && occurredAtUtc < LastProviderEventAtUtc.Value)
+        {
+            return false;
+        }
+
+        LastProviderEventAtUtc = occurredAtUtc;
+        return true;
+    }
+
+    /// <summary>Links the Stripe customer to a pending row. An existing link is never overwritten.</summary>
+    public void AttachStripeCustomer(string stripeCustomerId)
+    {
+        if (string.IsNullOrWhiteSpace(StripeCustomerId))
+        {
+            StripeCustomerId = stripeCustomerId;
+        }
+    }
+
+    /// <summary>Records the plan the dealer actually subscribed to (the Stripe price id).</summary>
+    public void SetPlan(string planId)
+    {
+        if (!string.IsNullOrWhiteSpace(planId))
+        {
+            PlanId = planId;
+        }
+    }
+
+    /// <summary>Stripe confirmed a trial subscription: Incomplete → Trialing.</summary>
+    public void StartTrial(string stripeSubscriptionId, DateTime? trialEndsAt, DateTime periodStart, DateTime periodEnd)
+    {
+        if (Status != SubscriptionStatus.Incomplete)
+        {
+            throw new InvalidSubscriptionTransitionException(Status, SubscriptionStatus.Trialing);
+        }
+
+        Status = SubscriptionStatus.Trialing;
+        StripeSubscriptionId = stripeSubscriptionId;
+        TrialEndsAt = trialEndsAt;
+        CurrentPeriodStart = periodStart;
+        CurrentPeriodEnd = periodEnd;
+        // Reuses the "left a blocked state" event so the status cache is invalidated.
+        Raise(new SubscriptionActivatedDomainEvent(Id, DealerId, stripeSubscriptionId));
     }
 
     public void Activate(string stripeSubscriptionId, DateTime periodStart, DateTime periodEnd)
@@ -56,7 +145,7 @@ public sealed class DealerSubscription : Entity
             return;
         }
 
-        if (Status == SubscriptionStatus.Trialing || Status == SubscriptionStatus.PastDue || Status == SubscriptionStatus.Suspended)
+        if (Status == SubscriptionStatus.Trialing || Status == SubscriptionStatus.PastDue || Status == SubscriptionStatus.Suspended || Status == SubscriptionStatus.Incomplete)
         {
             Status = SubscriptionStatus.Active;
             StripeSubscriptionId = stripeSubscriptionId;
@@ -77,6 +166,12 @@ public sealed class DealerSubscription : Entity
         }
 
         if (Status == SubscriptionStatus.PastDue)
+        {
+            return;
+        }
+
+        // Stripe "incomplete" is the first payment still unconfirmed, not a late renewal.
+        if (Status == SubscriptionStatus.Incomplete)
         {
             return;
         }
@@ -103,7 +198,7 @@ public sealed class DealerSubscription : Entity
             return;
         }
 
-        if (Status == SubscriptionStatus.Active || Status == SubscriptionStatus.PastDue || Status == SubscriptionStatus.Trialing)
+        if (Status == SubscriptionStatus.Active || Status == SubscriptionStatus.PastDue || Status == SubscriptionStatus.Trialing || Status == SubscriptionStatus.Incomplete)
         {
             Status = SubscriptionStatus.Suspended;
             Raise(new SubscriptionSuspendedDomainEvent(Id, DealerId));
@@ -122,7 +217,7 @@ public sealed class DealerSubscription : Entity
 
         Status = SubscriptionStatus.Cancelled;
         CancelledAt = DateTime.UtcNow;
-        Raise(new SubscriptionCancelledDomainEvent(Id, DealerId));
+        Raise(new SubscriptionCancelledDomainEvent(Id, DealerId, CancelledAt.Value));
     }
 
     public void RenewPeriod(DateTime periodStart, DateTime periodEnd)

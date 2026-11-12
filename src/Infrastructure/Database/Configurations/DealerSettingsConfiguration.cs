@@ -36,6 +36,12 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(s => s.BillingEmail)
+            .HasMaxLength(200);
+
+        // sfc A4.3 / C17: explicit account holder; null only on legacy rows. No FK to users (cross-aggregate, avoids a cycle).
+        builder.Property(s => s.OwnerUserId);
+
         builder.Property(s => s.NotificationsEnabled)
             .HasDefaultValue(true);
 
@@ -49,10 +55,39 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
             .HasDefaultValue(0)
             .IsRequired();
 
+        // sfc C2.4: existing dealers get the RN-049 default service cadence.
+        builder.Property(s => s.ServiceReminderMonths)
+            .HasDefaultValue(Domain.DealerSettings.DealerSettings.DefaultServiceReminderMonths)
+            .IsRequired();
+
+        // sfc B6.2: existing dealers get the RN-041 default cadence.
+        builder.Property(s => s.FollowUpCadenceDays)
+            .HasDefaultValue(Domain.DealerSettings.DealerSettings.DefaultFollowUpCadenceDays)
+            .IsRequired();
+
+        // sfc B1.3.1: existing dealers get the D-DEPOSIT default of 7 days.
+        builder.Property(s => s.DepositValidityDays)
+            .HasDefaultValue(Domain.Deposits.Deposit.DefaultValidityDays)
+            .IsRequired();
+
         // Platform suspension columns
         builder.Property(s => s.IsActive)
             .HasDefaultValue(true)
             .IsRequired();
+
+        // RN-013 (A6) tenant retention lifecycle. Existing rows backfill to Active.
+        builder.Property(s => s.LifecycleStatus)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(Domain.DealerSettings.TenantLifecycleStatus.Active)
+            .IsRequired();
+
+        builder.Property(s => s.CancelledAt).IsRequired(false);
+        builder.Property(s => s.PurgeScheduledAt).IsRequired(false);
+
+        builder.HasIndex(s => s.PurgeScheduledAt)
+            .HasDatabaseName("ix_dealer_settings_purge_scheduled_at")
+            .HasFilter("purge_scheduled_at IS NOT NULL");
 
         builder.HasIndex(s => s.IsActive)
             .HasDatabaseName("ix_dealer_settings_is_active");
@@ -86,6 +121,36 @@ internal sealed class DealerSettingsConfiguration : IEntityTypeConfiguration<Dea
 
         builder.Property(s => s.FooterText)
             .HasMaxLength(200)
+            .IsRequired(false);
+
+        // ─── CFG-06 · landing page customization ───────────────────────────────────────────
+        builder.Property(s => s.HistoryText)
+            .HasMaxLength(DealerSettingsEntity.MaxLandingTextLength)
+            .IsRequired(false);
+
+        builder.Property(s => s.MissionText)
+            .HasMaxLength(DealerSettingsEntity.MaxLandingTextLength)
+            .IsRequired(false);
+
+        builder.Property(s => s.VisionText)
+            .HasMaxLength(DealerSettingsEntity.MaxLandingTextLength)
+            .IsRequired(false);
+
+        builder.Property(s => s.ValuesText)
+            .HasMaxLength(DealerSettingsEntity.MaxLandingTextLength)
+            .IsRequired(false);
+
+        // Same convention as Document.OcrRawJson: a raw JSON string column, typed on read
+        // through DealerSettings.GetCarouselSlides() rather than owned/child-table mapped —
+        // see CarouselSlide's doc comment for why.
+        builder.Property(s => s.CarouselSlidesJson)
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
+        // sfc B5.2: same jsonb-raw-string convention as CarouselSlidesJson above — see
+        // DealerSettings.SetBusinessHours/GetBusinessHours and BusinessHoursEntry's doc comment.
+        builder.Property(s => s.BusinessHoursJson)
+            .HasColumnType("jsonb")
             .IsRequired(false);
 
         // ──────────────────────────────────────────────────────────────────────

@@ -59,4 +59,31 @@ public class MinioStorageServiceTests
         fields.Should().ContainKey("Content-Type");
         fields["Content-Type"].Should().Be("image/jpeg");
     }
+
+    [Theory]
+    [InlineData("a/b/img.jpg", "image/jpeg")]
+    [InlineData("a/b/img.PNG", "image/png")]
+    [InlineData("a/b/img.webp", "image/webp")]
+    public async Task GetPresignedUrlAsync_OverridesContentTypeAndDisposition_FromKeyExtension(string key, string type)
+    {
+        MinioStorageService service = CreateService();
+
+        Uri url = await service.GetPresignedUrlAsync(key, TimeSpan.FromMinutes(5), CancellationToken.None);
+
+        var query = System.Web.HttpUtility.ParseQueryString(url.Query);
+        query["response-content-type"].Should().Be(type);
+        query["response-content-disposition"].Should().Be("inline");
+    }
+
+    [Fact]
+    public async Task GetPresignedUrlAsync_ForcesAttachmentOctetStream_ForUnknownExtension()
+    {
+        MinioStorageService service = CreateService();
+
+        Uri url = await service.GetPresignedUrlAsync("a/b/x.html", TimeSpan.FromMinutes(5), CancellationToken.None);
+
+        var query = System.Web.HttpUtility.ParseQueryString(url.Query);
+        query["response-content-type"].Should().Be("application/octet-stream");
+        query["response-content-disposition"].Should().Be("attachment");
+    }
 }

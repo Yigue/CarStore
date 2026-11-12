@@ -3,6 +3,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
+using Application.Common;
 using Application.Documents.DTOs;
 using Domain.Documents;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +47,12 @@ internal sealed class UploadAndVerifyDocumentCommandHandler
         UploadAndVerifyDocumentCommand request,
         CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(_tenant);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<VerifyDocumentResultDto>(guard.Error);
+        }
+
         // 1. Validate extension/content type whitelist.
         if (!AllowedContentTypes.Contains(request.ContentType))
         {

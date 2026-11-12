@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Cars;
 using Domain.Sales;
 using Domain.Sales.Attributes;
@@ -8,11 +10,20 @@ using SharedKernel;
 
 namespace Application.Sales.Delete;
 
-internal sealed class DeleteSaleCommandHandler(IApplicationDbContext context, IDateTimeProvider dateTimeProvider)
+internal sealed class DeleteSaleCommandHandler(
+    IApplicationDbContext context,
+    IDateTimeProvider dateTimeProvider,
+    ICurrentTenantService tenantService)
     : ICommandHandler<DeleteSaleCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(DeleteSaleCommand command, CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+        {
+            return Result.Failure<Guid>(guard.Error);
+        }
+
         Sale? sale = await context.Sales
             .SingleOrDefaultAsync(s => s.Id == command.Id, cancellationToken);
 
@@ -33,8 +44,20 @@ internal sealed class DeleteSaleCommandHandler(IApplicationDbContext context, ID
         // sale outright — unlike Cancel(), which raises SaleCancelledDomainEvent to
         // release it — bypasses that release. Mirror it here so the car doesn't stay
         // stuck as Reservado with no sale referencing it.
-        Car? car = await context.Cars.FindAsync([sale.CarId], cancellationToken);
-        car?.MarkAsAvailable(dateTimeProvider.UtcNow);
+        // Another live sale on the same unit (Pending or Completed) keeps the hold; releasing
+        // here would put that sale's car back on the floor.
+        bool stillHeld = await context.Sales
+            .AnyAsync(
+                s => s.CarId == sale.CarId
+                    && s.Id != sale.Id
+                    && (s.Status == SaleStatus.Pending || s.Status == SaleStatus.Completed),
+                cancellationToken);
+
+        if (!stillHeld)
+        {
+            Car? car = await context.Cars.FindAsync([sale.CarId], cancellationToken);
+            car?.Release(dateTimeProvider.UtcNow);
+        }
 
         context.Sales.Remove(sale);
 

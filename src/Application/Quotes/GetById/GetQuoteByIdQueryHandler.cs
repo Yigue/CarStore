@@ -1,5 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Application.Quotes.Get;
 using Domain.Quotes;
 using Microsoft.EntityFrameworkCore;
@@ -7,11 +9,22 @@ using SharedKernel;
 
 namespace Application.Quotes.GetById;
 
-internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
+internal sealed class GetQuoteByIdQueryHandler(
+    IApplicationDbContext context,
+    ICurrentTenantService? tenantService = null)
     : IQueryHandler<GetQuoteByIdQuery, QuoteResponse>
 {
     public async Task<Result<QuoteResponse>> Handle(GetQuoteByIdQuery query, CancellationToken cancellationToken)
     {
+        if (tenantService is not null)
+        {
+            Result guard = TenantGuard.EnsureHasTenant(tenantService);
+            if (guard.IsFailure)
+            {
+                return Result.Failure<QuoteResponse>(guard.Error);
+            }
+        }
+
         Quote? quote = await context.Quotes
             .Include(q => q.Car)
                 .ThenInclude(c => c.Marca)
@@ -26,6 +39,15 @@ internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
             return Result.Failure<QuoteResponse>(QuoteErrors.NotFound(query.QuoteId));
         }
 
+        if (tenantService is not null)
+        {
+            Result dealerCheck = TenantGuard.EnsureSameDealerOrNotFound(tenantService, quote.DealerId, QuoteErrors.NotFound(query.QuoteId));
+            if (dealerCheck.IsFailure)
+            {
+                return Result.Failure<QuoteResponse>(dealerCheck.Error);
+            }
+        }
+
         var response = new QuoteResponse
         {
             Id = quote.Id,
@@ -33,6 +55,7 @@ internal sealed class GetQuoteByIdQueryHandler(IApplicationDbContext context)
             ClientId = quote.ClientId,
             LeadId = quote.LeadId,
             ProposedPrice = quote.ProposedPrice.Amount,
+            Currency = quote.ProposedPrice.Currency,
             PaymentMethod = quote.PaymentMethod.ToString(),
             Status = quote.Status.ToString(),
             ValidUntil = quote.ValidUntil,

@@ -1,8 +1,9 @@
-﻿using Application.Abstractions.Authentication;
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Cars;
 using Domain.Cars.Attributes;
+using Domain.Sales.Attributes;
 using Domain.Shared.ValueObjects;
 using Application.Abstractions.Caching;
 using Microsoft.EntityFrameworkCore;
@@ -19,12 +20,25 @@ internal sealed class UpdateCarCommandHandler(
 {
     public async Task<Result<Guid>> Handle(UpdateCarCommand command, CancellationToken cancellationToken)
     {
+        // Include the gallery: the cover is part of what an update can change (INV-01), and
+        // reassigning it has to see every sibling to demote the previous one.
         Car? car = await context.Cars
+            .Include(c => c.Images)
             .SingleOrDefaultAsync(c => c.Id == command.Id, cancellationToken);
 
         if (car is null)
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.Id));
+        }
+
+        // Validate unique license plate within tenant for other vehicles
+        var licensePlate = new Domain.Shared.ValueObjects.LicensePlate(command.Patente);
+        var existingCar = await context.Cars
+            .AnyAsync(c => c.Id != command.Id && c.DealerId == car.DealerId && c.Patente == licensePlate, cancellationToken);
+
+        if (existingCar)
+        {
+            return Result.Failure<Guid>(CarErrors.PatenteAlreadyExists(command.Patente));
         }
         
         // Validate existence via the cache (fast path)...
@@ -48,6 +62,16 @@ internal sealed class UpdateCarCommandHandler(
         Modelo modelo = await context.Modelo
             .SingleAsync(m => m.Id == command.Modelo, cancellationToken);
 
+        // RN-006 (sfc B1.1): a sold car with a Completed sale only returns to circulation through
+        // POST /sales/{id}/void. Checked before UpdateDetails, which assigns ServiceCar directly.
+        if (car.ServiceCar == StatusServiceCar.Vendido
+            && command.ServiceCar is not (StatusServiceCar.Vendido or StatusServiceCar.Entregado)
+            && await context.Sales.AnyAsync(
+                s => s.CarId == car.Id && s.Status == SaleStatus.Completed, cancellationToken))
+        {
+            return Result.Failure<Guid>(CarErrors.SaleActiveBlocksStatusChange(car.Id));
+        }
+
         // Update properties that need to be public for EF Core
         // Update properties that need to be public for EF Core
         car.UpdateDetails(
@@ -70,24 +94,75 @@ internal sealed class UpdateCarCommandHandler(
             command.Transmission,
             command.PurchaseCost);
         
-        // Use domain method for price update
-        if (car.Price.Amount != command.Price)
+        // sfc B0.2.3 phase 1: an explicit currency is validated; null keeps the car's current currency.
+        CurrencyCode? priceCurrency = null;
+        if (command.Currency is not null)
         {
-            car.UpdatePrice(command.Price, dateTimeProvider.UtcNow);
+            if (!CurrencyCode.TryParse(command.Currency, out CurrencyCode parsedCurrency))
+            {
+                return Result.Failure<Guid>(Error.Validation(
+                    "Currency.Unsupported", "Unsupported currency. Supported: ARS, USD."));
+            }
+
+            priceCurrency = parsedCurrency;
+        }
+
+        bool currencyChanged = priceCurrency is not null && priceCurrency.Value != car.Price.Currency;
+
+        // Use domain method for price update
+        if (car.Price.Amount != command.Price || currencyChanged)
+        {
+            car.UpdatePrice(command.Price, dateTimeProvider.UtcNow, priceCurrency);
         }
         
-        // Handle service status changes using domain methods
-        if (command.ServiceCar == StatusServiceCar.Vendido && car.ServiceCar != StatusServiceCar.Vendido)
+        // INV-01: the cover travels with the rest of the vehicle's data.
+        //
+        // Until now the only way to reassign it was PATCH cars/{id}/images/{imageId}/cover, a
+        // separate call the edit form never made — so "editar el vehículo" could change fifteen
+        // fields and not the one the buyer sees first. Null leaves the gallery untouched, which
+        // is what every pre-existing caller sends.
+        if (command.CoverImageId is { } coverImageId)
         {
-            car.MarkAsSold(dateTimeProvider.UtcNow);
-        }
-        else if (command.ServiceCar == StatusServiceCar.Disponible && car.ServiceCar != StatusServiceCar.Disponible)
-        {
-            car.MarkAsAvailable(dateTimeProvider.UtcNow);
+            Result coverResult = ApplyCover(car, coverImageId);
+            if (coverResult.IsFailure)
+            {
+                return Result.Failure<Guid>(coverResult.Error);
+            }
         }
 
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Result.Failure<Guid>(CarErrors.PatenteAlreadyExists(command.Patente));
+        }
 
         return Result.Success(car.Id);
+    }
+
+    /// <summary>
+    /// Promotes one image to cover and demotes the rest. Demote-before-promote, like
+    /// <c>SetCoverImageCommandHandler</c>: the partial unique index allows a single cover per
+    /// car, so a moment with two of them fails the constraint mid-transaction.
+    /// </summary>
+    private static Result ApplyCover(Car car, Guid coverImageId)
+    {
+        CarImage? target = car.Images.FirstOrDefault(i => i.Id == coverImageId);
+
+        if (target is null)
+        {
+            return Result.Failure(CarErrors.ImageNotFoundInCar(coverImageId, car.Id));
+        }
+
+        foreach (CarImage image in car.Images.Where(i => i.IsCover && i.Id != target.Id))
+        {
+            image.SetAsCover(false);
+        }
+
+        target.SetAsCover(true);
+
+        return Result.Success();
     }
 }

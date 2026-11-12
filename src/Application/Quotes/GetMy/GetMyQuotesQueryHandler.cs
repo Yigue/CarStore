@@ -40,6 +40,7 @@ internal sealed class GetMyQuotesQueryHandler(
                 ClientId = quote.ClientId,
                 LeadId = quote.LeadId,
                 ProposedPrice = quote.ProposedPrice.Amount,
+                Currency = quote.ProposedPrice.Currency,
                 PaymentMethod = quote.PaymentMethod.ToString(),
                 Status = quote.Status.ToString(),
                 ValidUntil = quote.ValidUntil,

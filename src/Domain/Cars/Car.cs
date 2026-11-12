@@ -73,7 +73,8 @@ public sealed class Car : Entity
         FuelType fuelType = FuelType.Gasolina,
         bool featured = false,
         Transmission transmission = Transmission.Manual,
-        decimal? purchaseCost = null
+        decimal? purchaseCost = null,
+        CurrencyCode? priceCurrency = null
         )
     {
         SetDealer(dealerId);
@@ -96,10 +97,13 @@ public sealed class Car : Entity
         Anio = anio;
         Patente = new LicensePlate(patente);
         Descripcion = descripcion;
-        Price = new Money(price);
+        // Phase 1 (sfc B0.2.3): the price currency is explicit when sent; without it the legacy ARS stays.
+        // The purchase cost keeps ARS on purpose: legacy costs are ARS, and a USD price against an ARS cost is exactly
+        // what the currency review (GET dealer/currency-review) exists to surface.
+        Price = Money.Of(price, priceCurrency ?? CurrencyCode.Ars);
 
         if (purchaseCost.HasValue)
-            PurchaseCost = new Money(purchaseCost.Value);
+            PurchaseCost = Money.Of(purchaseCost.Value, CurrencyCode.Ars);
 
         CreatedAt = date;
         UpdatedAt = date;
@@ -146,7 +150,7 @@ public sealed class Car : Entity
         Patente = new LicensePlate(patente);
         Descripcion = descripcion;
         if (purchaseCost.HasValue)
-            PurchaseCost = new Money(purchaseCost.Value);
+            PurchaseCost = Money.Of(purchaseCost.Value, CurrencyCode.Ars);
         UpdatedAt = updatedAt;
     }
     
@@ -160,7 +164,7 @@ public sealed class Car : Entity
         Raise(new CarSoldDomainEvent(Id));
     }
     
-    public void MarkAsAvailable(DateTime updatedAt)
+    internal void MarkAsAvailable(DateTime updatedAt)
     {
         if (ServiceCar == StatusServiceCar.Disponible)
             return;
@@ -196,20 +200,127 @@ public sealed class Car : Entity
     }
 
     /// <summary>
+    /// sfc B1 / ADR C3 (RN-005, RN-006): guarded status change following <see cref="VehicleLifecycle"/>.
+    /// Vendido can never be left through here (only <see cref="RevertSale"/>, or MarkDelivered
+    /// for Entregado). Same-status is an idempotent success. Existing callers of
+    /// MarkAsSold/MarkAsAvailable/Reserve/Release are unchanged.
+    /// </summary>
+    public Result ChangeStatus(StatusServiceCar target, DateTime updatedAt)
+    {
+        if (VehicleLifecycle.Normalize(ServiceCar) == VehicleLifecycle.Normalize(target))
+            return Result.Success();
+
+        if (ServiceCar == StatusServiceCar.Vendido && target != StatusServiceCar.Entregado)
+            return Result.Failure(CarErrors.SaleActiveBlocksStatusChange(Id));
+
+        if (!VehicleLifecycle.CanTransition(ServiceCar, target))
+            return Result.Failure(CarErrors.InvalidStatusTransition(Id, ServiceCar, target));
+
+        StatusServiceCar normalizedTarget = VehicleLifecycle.Normalize(target);
+        ServiceCar = normalizedTarget;
+        UpdatedAt = updatedAt;
+
+        if (normalizedTarget == StatusServiceCar.Vendido)
+            Raise(new CarSoldDomainEvent(Id));
+
+        return Result.Success();
+    }
+
+    /// <summary>RN-005: Vendido → Entregado once the delivery is confirmed.</summary>
+    public Result MarkDelivered(DateTime updatedAt) => ChangeStatus(StatusServiceCar.Entregado, updatedAt);
+
+    /// <summary>
+    /// RN-006 (ADR C3): the ONLY way back from Vendido to Disponible. Invoked when a sale is
+    /// voided (<c>SaleVoidedDomainEvent</c>); a plain status edit is rejected by <see cref="ChangeStatus"/>.
+    /// </summary>
+    public Result RevertSale(Guid saleId, DateTime updatedAt)
+    {
+        if (ServiceCar != StatusServiceCar.Vendido)
+            return Result.Failure(CarErrors.NotSold(Id));
+
+        ServiceCar = StatusServiceCar.Disponible;
+        UpdatedAt = updatedAt;
+        return Result.Success();
+    }
+
+    /// <summary>
     /// D-1: concreta la venta (Reservado o Disponible -> Vendido). Idempotente si ya está vendido.
     /// </summary>
     public void Sell(DateTime updatedAt) => MarkAsSold(updatedAt);
     
-    public void UpdatePrice(decimal newPrice, DateTime updatedAt)
+    /// <summary>
+    /// sfc B0.2.3: without an explicit currency the car keeps the one it already has. Hard-coding ARS here used to
+    /// convert a USD car to ARS silently on every price edit.
+    /// </summary>
+    /// <summary>sfc B7.4 / RN-039: the supplier the vehicle was bought from (null when unknown).</summary>
+    public Guid? SupplierId { get; private set; }
+
+    public void AssignSupplier(Guid? supplierId) => SupplierId = supplierId;
+
+    /// <summary>sfc C2.1 / RN-048: the branch holding the vehicle (a data scope inside the dealer).</summary>
+    public Guid? BranchId { get; private set; }
+
+    public void AssignBranch(Guid? branchId) => BranchId = branchId;
+
+    /// <summary>sfc B7.1 / RN-036: the third party (a client) that owns a consigned vehicle; null for own stock.</summary>
+    public Guid? ConsignmentOwnerClientId { get; private set; }
+
+    /// <summary>sfc B7.1: the dealer's share of the sale price, between 0 (exclusive) and 1.</summary>
+    public decimal? ConsignmentCommissionRate { get; private set; }
+
+    public bool IsConsigned => ConsignmentOwnerClientId is not null;
+
+    public Result PlaceOnConsignment(Guid ownerClientId, decimal commissionRate)
     {
-        Price = new Money(newPrice);
-        UpdatedAt = updatedAt;
+        if (ownerClientId == Guid.Empty)
+            return Result.Failure(Error.Validation("Car.ConsignmentOwnerRequired", "Indicá el dueño del vehículo en consignación."));
+        if (commissionRate <= 0 || commissionRate > 1)
+            return Result.Failure(Error.Validation("Car.ConsignmentRateInvalid", "La comisión de consignación debe estar entre 0 y 100 %."));
+
+        ConsignmentOwnerClientId = ownerClientId;
+        ConsignmentCommissionRate = commissionRate;
+        return Result.Success();
     }
-    
+
+    public void EndConsignment()
+    {
+        ConsignmentOwnerClientId = null;
+        ConsignmentCommissionRate = null;
+    }
+
+    /// <summary>
+    /// sfc B7.1 / RN-036: what the dealer actually earns from selling this vehicle: the whole price for own stock, only
+    /// the consignment commission (rounded to cents) for a consigned one.
+    /// </summary>
+    public Money DealerIncomeFrom(Money salePrice) =>
+        ConsignmentCommissionRate is { } rate
+            ? Money.Of(Math.Round(salePrice.Amount * rate, 2, MidpointRounding.ToEven), CurrencyCode.Parse(salePrice.Currency))
+            : salePrice;
+
+    public void UpdatePrice(decimal newPrice, DateTime updatedAt, CurrencyCode? currency = null)
+    {
+        Money previous = Price;
+        Price = Money.Of(newPrice, currency ?? CurrencyCode.Parse(Price.Currency));
+        UpdatedAt = updatedAt;
+        RaisePriceChangedIfDifferent(previous);
+    }
+
     public void UpdatePrice(Money newPrice, DateTime updatedAt)
     {
+        Money previous = Price;
         Price = newPrice;
         UpdatedAt = updatedAt;
+        RaisePriceChangedIfDifferent(previous);
+    }
+
+    /// <summary>sfc C1.2 / ADR C25: the MercadoLibre push connector only needs to know a price actually
+    /// moved, not by how much — a no-op update (same amount and currency) stays silent.</summary>
+    private void RaisePriceChangedIfDifferent(Money previous)
+    {
+        if (previous.Amount != Price.Amount || previous.Currency != Price.Currency)
+        {
+            Raise(new CarPriceChangedDomainEvent(Id));
+        }
     }
 
     /// <summary>
@@ -248,7 +359,7 @@ public sealed class Car : Entity
     /// <summary>
     /// Total Cost of Ownership: <see cref="PurchaseCost"/> + sum of cost of all completed
     /// reconditioning tasks (currencies must match). When no purchase cost is set we use
-    /// <see cref="Money.Zero"/> defaulted to the currency of completed tasks (or "USD").
+    /// <see cref="Money.Zero"/> defaulted to the currency of completed tasks (or <see cref="Money.DefaultCurrency"/>).
     /// </summary>
     public Money GetTotalCostOfOwnership()
     {
@@ -258,7 +369,7 @@ public sealed class Car : Entity
 
         string baseCurrency = PurchaseCost?.Currency
             ?? completed.FirstOrDefault()?.Cost.Currency
-            ?? "USD";
+            ?? Money.DefaultCurrency;
 
         Money total = PurchaseCost ?? new Money(0, baseCurrency);
 

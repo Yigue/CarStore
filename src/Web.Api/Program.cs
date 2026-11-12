@@ -8,6 +8,7 @@ using Infrastructure.Middleware;
 using Infrastructure.Billing;
 using Infrastructure.Tenancy;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -54,19 +55,19 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(o =>
     o.JsonSerializerOptions.Converters.Add(new Web.Api.Infrastructure.NullableGuidJsonConverter());
 });
 
-// Rate limiting for login endpoint
+// Rate limiting (API-007). Every policy is partitioned by the caller's IP: one noisy client
+// exhausts only its own bucket, never everyone's. "login" covers the credential endpoints;
+// "public" covers the anonymous write endpoints (register, provisioning, newsletter, inquiry).
+// The store is in-process, so with several replicas the ingress limit is what bounds the total.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    options.AddFixedWindowLimiter("login", limiterOptions =>
-    {
-        var rateLimitConfig = builder.Configuration.GetSection("RateLimiting:Login");
-        limiterOptions.PermitLimit = rateLimitConfig.GetValue("PermitLimit", 10);
-        limiterOptions.Window = TimeSpan.FromSeconds(rateLimitConfig.GetValue("WindowSeconds", 60));
-        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        limiterOptions.QueueLimit = 0;
-    });
+    options.AddPolicy("login", context =>
+        PerIpFixedWindow(context, builder.Configuration.GetSection("RateLimiting:Login"), defaultPermitLimit: 10));
+
+    options.AddPolicy("public", context =>
+        PerIpFixedWindow(context, builder.Configuration.GetSection("RateLimiting:Public"), defaultPermitLimit: 30));
 
     options.OnRejected = async (context, cancellationToken) =>
     {
@@ -76,10 +77,39 @@ builder.Services.AddRateLimiter(options =>
             type = "https://datatracker.ietf.org/doc/html/rfc6585#section-4",
             title = "Too Many Requests",
             status = 429,
-            detail = "Too many login attempts. Please try again later."
+            detail = "Too many requests. Please try again later."
         }, cancellationToken);
     };
 });
+
+// Behind an ingress the socket peer is the proxy, so the real client IP only comes from
+// X-Forwarded-For. Only proxies listed in ForwardedHeaders:KnownProxies are trusted (loopback
+// by default); trusting arbitrary senders would let a client choose its own rate-limit bucket.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    foreach (string proxy in builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
+    {
+        if (System.Net.IPAddress.TryParse(proxy, out var address))
+        {
+            options.KnownProxies.Add(address);
+        }
+    }
+});
+
+static RateLimitPartition<string> PerIpFixedWindow(
+    HttpContext context,
+    IConfigurationSection config,
+    int defaultPermitLimit) =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = config.GetValue("PermitLimit", defaultPermitLimit),
+            Window = TimeSpan.FromSeconds(config.GetValue("WindowSeconds", 60)),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        });
 
 builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
 
@@ -175,6 +205,16 @@ if (string.IsNullOrWhiteSpace(stripeWebhookSecret))
     }
 }
 
+// spr PR 5.1 (OPS-06): a Production boot with billing enforcement disabled means every dealer's
+// subscription gate is effectively off — the same free-ride risk the Incomplete fail-closed (PR 3.1)
+// and the CAPTCHA guard above exist to prevent. Fail fast instead of silently running unmetered.
+if (app.Environment.IsProduction() && !subscriptionEnforcement)
+{
+    throw new InvalidOperationException(
+        "FeatureFlags:SubscriptionEnforcement must be true in Production — running with billing " +
+        "enforcement disabled would let every dealer use the product without a confirmed subscription.");
+}
+
 // PR1 (saas-custom-domains) ADR-1: refuse to start the host if a dev-fallback
 // is configured outside Development. Mirrors the Jwt:Secret fail-fast above.
 // Spec: openspec/changes/saas-custom-domains/specs/tenant-safety-default-deny
@@ -186,6 +226,22 @@ if (fallback.DevFallbackDealerId is not null && !app.Environment.IsDevelopment()
         app.Environment.EnvironmentName + ". " +
         "Remove the key for non-Development environments to prevent cross-tenant data leaks. " +
         "PR1 saas-custom-domains ADR-1 — see openspec/changes/saas-custom-domains/specs/tenant-safety-default-deny.");
+}
+
+// spr PR 3.3 (ADR B10): fail fast if the host would boot in Production with the always-valid
+// NoOpCaptchaVerifier — that would let anyone bypass the CAPTCHA on dealers/provision. Configure
+// Captcha:SecretKey (Infrastructure/DependencyInjection.cs AddCaptcha) to wire up the real
+// TurnstileCaptchaVerifier instead.
+using (IServiceScope captchaScope = app.Services.CreateScope())
+{
+    Application.Abstractions.Security.ICaptchaVerifier? captchaVerifier =
+        captchaScope.ServiceProvider.GetService<Application.Abstractions.Security.ICaptchaVerifier>();
+    if (app.Environment.IsProduction() && captchaVerifier is Infrastructure.Security.NoOpCaptchaVerifier)
+    {
+        throw new InvalidOperationException(
+            "Captcha:SecretKey is not configured. NoOpCaptchaVerifier must never be the active " +
+            "ICaptchaVerifier in Production — configure Captcha:SecretKey to wire up TurnstileCaptchaVerifier.");
+    }
 }
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
@@ -236,6 +292,8 @@ app.UseSerilogRequestLogging();
 
 app.UseExceptionHandler();
 
+app.UseForwardedHeaders();
+
 app.UseRateLimiter();
 
 app.UseAuthentication();
@@ -248,6 +306,12 @@ app.UseTenantResolution();
 app.UseDealerSuspensionCheck();
 
 var flags = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<Web.Api.Infrastructure.FeatureFlagsOptions>>().Value;
+// A0.2: legal acceptance gate (428) — after authentication/tenant resolution, before the subscription guard.
+if (flags.LegalGate)
+{
+    app.UseMiddleware<Web.Api.Infrastructure.LegalAcceptanceGateMiddleware>();
+}
+
 if (flags.SubscriptionEnforcement)
 {
     app.UseSubscriptionGuard();
@@ -278,6 +342,8 @@ app.MapHealthChecks("health", new HealthCheckOptions
 app.Run();
 
 // REMARK: Required for functional and integration tests to work.
+public partial class Program;
+
 namespace Web.Api
 {
     public partial class Program;

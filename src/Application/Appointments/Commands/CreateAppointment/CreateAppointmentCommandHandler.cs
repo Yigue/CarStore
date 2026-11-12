@@ -1,6 +1,7 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Common;
 using Domain.Appointments;
 using Domain.Leads;
 using Microsoft.EntityFrameworkCore;
@@ -11,8 +12,8 @@ namespace Application.Appointments.Commands.CreateAppointment;
 /// <summary>
 /// Conflict-detection algorithm (CRITICAL):
 /// Two half-open intervals [start, end) overlap when <c>existing.Start &lt; new.End AND existing.End &gt; new.Start</c>.
-/// We scope the query to <c>DealerId</c> (tenant isolation) and OR the per-resource collision
-/// on <c>VehicleId</c> or <c>AgentId</c>. Backed by the composite index
+/// The rule lives in <see cref="AppointmentConflictQuery"/> (sfc B5.2.3): tenant-scoped, vehicle OR agent,
+/// cancelled/no-show appointments ignored. Backed by the composite index
 /// <c>ix_appointments_dealer_time_range</c> over <c>(dealer_id, start_date_time, end_date_time)</c>.
 /// </summary>
 internal sealed class CreateAppointmentCommandHandler(
@@ -22,16 +23,20 @@ internal sealed class CreateAppointmentCommandHandler(
 {
     public async Task<Result<Guid>> Handle(CreateAppointmentCommand command, CancellationToken cancellationToken)
     {
+        Result guard = TenantGuard.EnsureHasTenant(tenantService);
+        if (guard.IsFailure)
+            return Result.Failure<Guid>(guard.Error);
+
         Guid dealerId = tenantService.DealerId;
 
-        bool hasConflict = await context.Appointments
-            .AsNoTracking()
-            .AnyAsync(a =>
-                a.DealerId == dealerId &&
-                (a.VehicleId == command.VehicleId || a.AgentId == command.AgentId) &&
-                a.StartDateTime < command.End &&
-                a.EndDateTime > command.Start,
-                cancellationToken);
+        bool hasConflict = await context.Appointments.HasConflictAsync(
+            dealerId,
+            command.VehicleId,
+            command.AgentId,
+            command.Start,
+            command.End,
+            excludeAppointmentId: null,
+            cancellationToken);
 
         if (hasConflict)
             return Result.Failure<Guid>(AppointmentErrors.Conflict);

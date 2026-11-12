@@ -51,11 +51,40 @@ public interface IStorageService
         CancellationToken ct);
 
     /// <summary>
+    /// Opens the object for reading. Returns <c>null</c> when the object does not exist, so callers
+    /// that bundle many objects (tenant export) can report a missing one instead of aborting.
+    /// The caller owns disposal of the returned stream.
+    /// </summary>
+    Task<Stream?> OpenReadAsync(
+        string objectKey,
+        CancellationToken ct);
+
+    /// <summary>
     /// Generates a presigned POST URL and fields for direct client-side upload.
     /// </summary>
     Task<(string Url, IReadOnlyDictionary<string, string> Fields)> GeneratePresignedPostAsync(
         string objectKey,
         string contentType,
         TimeSpan ttl,
+        CancellationToken ct);
+
+    /// <summary>
+    /// Reads up to <paramref name="count"/> leading bytes of the object (used for magic-byte checks).
+    /// Returns <c>null</c> when the object does not exist.
+    /// </summary>
+    Task<byte[]?> ReadHeadAsync(
+        string objectKey,
+        int count,
+        CancellationToken ct);
+
+    /// <summary>
+    /// Security review (sfc A5.1): the actual stored size of the object, read from the storage
+    /// provider itself — never trust a client-asserted size for a resource cap. A presigned POST
+    /// URL only constrains bucket/key/content-type/expiry (see <see cref="GeneratePresignedPostAsync"/>),
+    /// not size, so the confirming side MUST re-check the real object. Returns <c>null</c> when the
+    /// object does not exist.
+    /// </summary>
+    Task<long?> GetObjectSizeAsync(
+        string objectKey,
         CancellationToken ct);
 }

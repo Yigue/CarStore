@@ -41,4 +41,8 @@ internal sealed class UserContext : IUserContext
     /// </summary>
     public bool IsAuthenticated =>
         _httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated == true;
+
+    /// <summary>sfc B6.3 / RN-043: see <see cref="ClaimsPrincipalExtensions.IsPendingDealerSelection"/>.</summary>
+    public bool IsPendingDealerSelection =>
+        _httpContextAccessor.HttpContext?.User?.IsPendingDealerSelection() == true;
 }

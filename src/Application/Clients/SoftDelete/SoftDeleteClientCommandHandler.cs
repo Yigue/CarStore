@@ -1,4 +1,6 @@
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Tenancy;
+using Application.Common;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Clients;
@@ -14,14 +16,15 @@ namespace Application.Clients.SoftDelete;
 internal sealed class SoftDeleteClientCommandHandler(
     IApplicationDbContext context,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ICurrentTenantService tenantService)
     : ICommandHandler<SoftDeleteClientCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(SoftDeleteClientCommand command, CancellationToken cancellationToken)
     {
         // IgnoreQueryFilters to detect already-deleted clients for idempotent behaviour
         Client? client = await context.Clients
-            .IgnoreQueryFilters()
+            .IgnoreQueryFiltersForTenant(tenantService)
             .SingleOrDefaultAsync(c => c.Id == command.Id, cancellationToken);
 
         if (client is null)

@@ -1,6 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
+using Domain.Billing;
 using FluentAssertions;
+using Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using WebApiTests.Fakes;
 
 namespace WebApiTests.Platform;
 
@@ -76,8 +81,20 @@ public class EndpointsTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<MetricsBody>(IntegrationTestHelpers.JsonOptions);
         body.Should().NotBeNull();
-        body!.Mrr.IsStub.Should().BeTrue();
-        body!.Mrr.StubReason.Should().Be("Requires saas-subscription-payments");
+
+        // spr PR 1.3: MRR is computed from DealerSubscription × the plan price, no longer a stub.
+        // The price comes from FakePlanCatalog, so the expected figure is exact.
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var billable = await db.DealerSubscriptions
+            .IgnoreQueryFilters()
+            .CountAsync(s => s.Status == SubscriptionStatus.Active
+                || s.Status == SubscriptionStatus.Trialing
+                || s.Status == SubscriptionStatus.PastDue);
+
+        body!.Mrr.IsStub.Should().BeFalse();
+        body.Mrr.StubReason.Should().BeNull();
+        body.Mrr.Value.Should().Be(billable * (FakePlanCatalog.AmountMinor / 100m));
     }
 
     [Fact]
@@ -98,5 +115,5 @@ public class EndpointsTests
     }
 
     private sealed record MetricsBody(int TotalDealers, int TotalUsers, MrrStubBody Mrr);
-    private sealed record MrrStubBody(decimal Value, string Currency, bool IsStub, string StubReason);
+    private sealed record MrrStubBody(decimal Value, string Currency, bool IsStub, string? StubReason);
 }

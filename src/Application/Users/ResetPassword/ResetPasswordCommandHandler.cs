@@ -16,8 +16,10 @@ internal sealed class ResetPasswordCommandHandler(
     {
         DateTime now = DateTime.UtcNow;
 
+        string tokenHash = PasswordResetTokenHasher.Hash(command.Token);
+
         PasswordResetToken? resetToken = await context.PasswordResetTokens
-            .FirstOrDefaultAsync(t => t.Token == command.Token, cancellationToken);
+            .FirstOrDefaultAsync(t => t.Token == tokenHash, cancellationToken);
 
         if (resetToken is null || !resetToken.IsUsable(now))
         {

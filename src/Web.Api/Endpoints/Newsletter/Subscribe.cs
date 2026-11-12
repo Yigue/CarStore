@@ -1,5 +1,4 @@
-using Application.Clients.Create;
-using Domain.Clients.Attributes;
+using Application.Marketing.Newsletter;
 using MediatR;
 using SharedKernel;
 using Web.Api.Infrastructure;
@@ -12,36 +11,21 @@ internal sealed class Subscribe : IEndpoint
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
+        // sfc B5.1 / RN-019: creates a pending Subscriber (no longer a placeholder Client) and emails the double
+        // opt-in link. The answer is the same whether or not the address was already subscribed.
         app.MapPost("newsletter/subscribe", async (
             Request request,
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.Contains('@'))
-            {
-                return Results.BadRequest(new { error = "Email no es válido." });
-            }
-
-            // qa-p1-integridad D6: named arguments — CreateClientCommand's positional order
-            // (FirstName, LastName, DNI, Email, Phone, Address, Type, ...) previously landed the
-            // subscriber's email in DNI and the literal "N/A" in Email, so new Email("N/A") always
-            // threw. See tests/ArchitectureTests/CommandConstructionTests.cs for the ratchet.
-            var command = new CreateClientCommand(
-                FirstName: "Newsletter",
-                LastName: "Suscriptor",
-                DNI: $"NL-{Guid.NewGuid().ToString()[..8]}",
-                Email: request.Email,
-                Phone: "N/A",
-                Address: "Suscripto via Web",
-                Type: ClientType.Individual); // Newsletter subscribers default to Individual
-
-            Result<Guid> result = await sender.Send(command, cancellationToken);
+            Result result = await sender.Send(new SubscribeCommand(request.Email ?? string.Empty), cancellationToken);
 
             return result.Match(
-                id => Results.Ok(new { success = true, message = "Suscripto exitosamente." }),
+                () => Results.Ok(new { success = true, message = "Revisá tu correo para confirmar la suscripción." }),
                 CustomResults.Problem);
         })
         .AllowAnonymous()
+        .RequireRateLimiting("public")
         .WithTags("Newsletter")
         .WithName("SubscribeNewsletter")
         .Produces(StatusCodes.Status200OK)

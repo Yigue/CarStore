@@ -24,7 +24,7 @@ using Domain.Webhooks;
 
 namespace Infrastructure.Database;
 
-public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
+public sealed class ApplicationDbContext : DbContext, IApplicationDbContext, Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.IDataProtectionKeyContext
 {
     private readonly IPublisher publisher;
     private readonly ICurrentTenantService _tenantService;
@@ -51,6 +51,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Role> Roles { get; set; }
     public DbSet<RolePermission> RolePermissions { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+    public DbSet<UserActionToken> UserActionTokens { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
     public DbSet<CarImage> CarImages { get; set; }
     public DbSet<ReconditioningTask> ReconditioningTasks { get; set; }
@@ -61,10 +62,38 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Appointment> Appointments { get; set; }
     public DbSet<BackfillAudit> BackfillAudits { get; set; }
     public DbSet<DealerSubscription> DealerSubscriptions { get; set; }
+    public DbSet<Domain.Legal.LegalAcceptance> LegalAcceptances { get; set; }
+    public DbSet<Domain.Tenancy.TenantExport> TenantExports { get; set; }
+    public DbSet<Domain.Tenancy.TenantPurgeRecord> TenantPurgeRecords { get; set; }
+    public DbSet<Domain.Tenancy.PendingStorageDeletion> PendingStorageDeletions { get; set; }
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
+    public DbSet<BillingReconciliationFlag> BillingReconciliationFlags { get; set; }
+    public DbSet<BillingRefundRecord> BillingRefundRecords { get; set; }
     public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; }
     public DbSet<WebhookDelivery> WebhookDeliveries { get; set; }
     public DbSet<Domain.Platform.PlatformAuditLogEntry> PlatformAuditLogs { get; set; }
+    public DbSet<Domain.Auditing.DealerAuditLogEntry> DealerAuditLogs { get; set; }
+    public DbSet<Domain.Currency.DealerExchangeRate> DealerExchangeRates { get; set; }
+    public DbSet<Domain.Deposits.Deposit> Deposits { get; set; }
+    public DbSet<Domain.Users.UserPreferences> UserPreferences { get; set; }
+    public DbSet<Domain.Cars.VehicleLien> VehicleLiens { get; set; }
+    public DbSet<Domain.Suppliers.Supplier> Suppliers { get; set; }
+    public DbSet<Domain.Marketing.Subscriber> Subscribers { get; set; }
+    public DbSet<Domain.Integrations.DealerIntegration> DealerIntegrations { get; set; }
+    public DbSet<Domain.Integrations.IntegrationCommand> IntegrationCommands { get; set; }
+    public DbSet<Domain.Integrations.ExternalListing> ExternalListings { get; set; }
+    // sfc C1.4 / B13: Meta Leads Ads webhook idempotency on leadgen_id.
+    public DbSet<Domain.Leads.ProcessedMetaLeadEvent> ProcessedMetaLeadEvents { get; set; }
+    public DbSet<Domain.Commissions.SaleCommission> SaleCommissions { get; set; }
+    public DbSet<Domain.Commissions.CommissionPolicy> CommissionPolicies { get; set; }
+    public DbSet<Domain.Users.UserDealerMembership> UserDealerMemberships { get; set; }
+    // sfc C1.1 / ADR C22: Data Protection key ring (not tenant data).
+    public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
+    public DbSet<Domain.AfterSales.WarrantyRecord> WarrantyRecords { get; set; }
+    public DbSet<Domain.AfterSales.ServiceReminder> ServiceReminders { get; set; }
+    public DbSet<Domain.Branches.Branch> Branches { get; set; }
+    public DbSet<Domain.Branches.UserBranch> UserBranches { get; set; }
+    public DbSet<Domain.Common.DealerSequence> DealerSequences { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -147,8 +176,11 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         // Ignorar DealerId en entidades compartidas (catálogo)
         modelBuilder.Entity<Marca>().Ignore(x => x.DealerId);
         modelBuilder.Entity<Modelo>().Ignore(x => x.DealerId);
-        modelBuilder.Entity<TransactionCategory>().Ignore(x => x.DealerId);
         modelBuilder.Entity<CarImage>().Ignore(x => x.DealerId);
+
+        modelBuilder.Entity<TransactionCategory>()
+            .HasIndex(x => x.DealerId)
+            .HasDatabaseName("ix_transaction_categories_dealer_id");
 
         // User configuration (Email + Role + length constraints) vive en
         // Infrastructure/Database/Configurations/UserConfiguration.cs y se
@@ -177,10 +209,18 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<User>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        // Security review (sfc A3.1): this filter was always assumed to exist — every cross-tenant
+        // Role query in this codebase (BackfillDefaultRoles, DealerAccessResolver,
+        // PermissionCacheInvalidator, RegisterUserCommandHandler) already calls .IgnoreQueryFilters()
+        // on it, and CreateRoleCommandHandler's own comment claims it. It was never actually added,
+        // which left UpdateRoleCommandHandler and DeleteRoleCommandHandler's unscoped role lookups
+        // open to any dealer operating on any OTHER dealer's role by RoleId (cross-tenant IDOR).
+        modelBuilder.Entity<Role>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<DealerSettingsEntity>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Lead>().HasQueryFilter(x =>
-            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+            (!_tenantService.HasTenant || x.DealerId == _tenantService.DealerId) && x.Status != Domain.Leads.LeadStatus.Archivado);
         modelBuilder.Entity<LeadActivity>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<Domain.Documents.Document>().HasQueryFilter(x =>
@@ -193,11 +233,50 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<DealerSubscription>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Tenancy.TenantExport>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<WebhookSubscription>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
         modelBuilder.Entity<WebhookDelivery>().HasQueryFilter(x =>
             !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
-        // Note: Marca, Modelo, TransactionCategory, CarImage are shared across tenants (catalog data)
+        modelBuilder.Entity<Domain.Auditing.DealerAuditLogEntry>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Currency.DealerExchangeRate>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Deposits.Deposit>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Cars.VehicleLien>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Suppliers.Supplier>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Marketing.Subscriber>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Integrations.DealerIntegration>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Integrations.IntegrationCommand>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Integrations.ExternalListing>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Commissions.SaleCommission>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Commissions.CommissionPolicy>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Users.UserDealerMembership>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.AfterSales.WarrantyRecord>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.AfterSales.ServiceReminder>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<Domain.Branches.Branch>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        // sfc B4.3: tenant-scoped like DealerSettings/Branch; the real allocation path bypasses
+        // this filter entirely via raw SQL (DealerSequenceAllocator), so it only matters for the
+        // InMemory fallback and any future admin tooling that queries the DbSet directly.
+        modelBuilder.Entity<Domain.Common.DealerSequence>().HasQueryFilter(x =>
+            !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        modelBuilder.Entity<TransactionCategory>().HasQueryFilter(x =>
+            x.DealerId == Guid.Empty || !_tenantService.HasTenant || x.DealerId == _tenantService.DealerId);
+        // Note: Marca, Modelo, CarImage are shared across tenants (catalog data)
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -205,6 +284,15 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         optionsBuilder.ConfigureWarnings(warnings =>
             warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)
                     .Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    }
+
+    public async Task<bool> TryConsumeUserActionTokenAsync(Guid tokenId, DateTime nowUtc, CancellationToken cancellationToken = default)
+    {
+        int rows = await UserActionTokens
+            .Where(t => t.Id == tokenId && t.ConsumedAtUtc == null && t.ExpiresAtUtc > nowUtc)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.ConsumedAtUtc, (DateTime?)nowUtc), cancellationToken);
+
+        return rows == 1;
     }
 
     public void DetachEntity(object entity)
@@ -215,6 +303,13 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     // Implement interface methods
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        // RN-016: legal acceptance records are append-only audit evidence.
+        if (ChangeTracker.Entries<Domain.Legal.LegalAcceptance>()
+            .Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+        {
+            throw new InvalidOperationException("LegalAcceptance records are append-only and cannot be modified or deleted.");
+        }
+
         var outboxMessages = ChangeTracker
             .Entries<Entity>()
             .Select(entry => entry.Entity)

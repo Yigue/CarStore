@@ -26,7 +26,7 @@ internal sealed class CreateUser : IEndpoint
         {
             if (!Guid.TryParse(request.Role, out var role))
             {
-                return Results.BadRequest(new { error = "Role must be the role identifier (a GUID). Call GET /api/v1/roles to list the roles available for this dealership." });
+                return CustomResults.Problem(Result.Failure(Error.Validation("Users.InvalidRole", "Role must be the role identifier (a GUID). Call GET /api/v1/roles to list the roles available for this dealership.")));
             }
 
             var command = new CreateUserCommand(

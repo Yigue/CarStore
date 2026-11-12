@@ -1,13 +1,17 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Tenancy;
+using Application.Common;
+using Application.Currency;
 using Domain.Cars;
 using Domain.Cars.Attributes;
 using Domain.Clients;
 using Domain.Clients.Attributes;
+using Domain.Currency;
 using Domain.Leads;
 using Domain.Quotes;
 using Domain.Quotes.Attributes;
+using Domain.Shared.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
@@ -16,11 +20,18 @@ namespace Application.Quotes.Create;
 internal sealed class CreateQuoteCommandHandler(
     IApplicationDbContext context,
     IDateTimeProvider dateTimeProvider,
-    ICurrentTenantService tenantService)
+    ICurrentTenantService tenantService,
+    IDealerSequenceAllocator dealerSequenceAllocator)
     : ICommandHandler<CreateQuoteCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateQuoteCommand command, CancellationToken cancellationToken)
     {
+        Result tenantCheck = TenantGuard.EnsureHasTenant(tenantService);
+        if (tenantCheck.IsFailure)
+        {
+            return Result.Failure<Guid>(tenantCheck.Error);
+        }
+
         // Validate ValidUntil is in the future
         if (command.ValidUntil <= dateTimeProvider.UtcNow)
         {
@@ -33,6 +44,12 @@ internal sealed class CreateQuoteCommandHandler(
         if (car is null)
         {
             return Result.Failure<Guid>(CarErrors.NotFound(command.CarId));
+        }
+
+        Result carDealerCheck = TenantGuard.EnsureSameDealerOrNotFound(tenantService, car.DealerId, CarErrors.NotFound(command.CarId));
+        if (carDealerCheck.IsFailure)
+        {
+            return Result.Failure<Guid>(carDealerCheck.Error);
         }
 
         // A quote is an offer, not a commitment. Several buyers asking for a price on the same
@@ -69,6 +86,12 @@ internal sealed class CreateQuoteCommandHandler(
                 return Result.Failure<Guid>(ClientErrors.NotFound(clientId));
             }
 
+            Result clientDealerCheck = TenantGuard.EnsureSameDealerOrNotFound(tenantService, client.DealerId, ClientErrors.NotFound(clientId));
+            if (clientDealerCheck.IsFailure)
+            {
+                return Result.Failure<Guid>(clientDealerCheck.Error);
+            }
+
             // REQ-QT-GATE-001: a Lost client is a commercially dead deal — reject the
             // quote before reserving the car. Use-case precondition, not an aggregate
             // invariant (design.md §1) — the Quote constructor stays untouched.
@@ -79,18 +102,13 @@ internal sealed class CreateQuoteCommandHandler(
         }
         else if (command.LeadId is { } leadId)
         {
-            // IgnoreQueryFilters: bypasses LeadConfiguration's Archivado-hiding filter
-            // so the gate below can return the precise LeadNotQuotable error instead
-            // of a misleading NotFound for a lead that exists but is archived.
-            // IMPORTANT: IgnoreQueryFilters() also strips the tenant (DealerId) query
-            // filter defined on Lead, so the DealerId check below is NOT optional —
-            // without it, a leadId belonging to another dealer would resolve
-            // successfully and get linked into a persisted Quote (cross-tenant leak,
-            // see verify-report crm-cotizaciones-etapa3 CRITICAL-1).
+            // IgnoreQueryFiltersForTenant: bypasses LeadConfiguration's Archivado-hiding filter
+            // while preserving strict tenant isolation so the gate below can return the precise
+            // LeadNotQuotable error instead of a misleading NotFound for an archived lead.
             lead = await context.Leads
-                .IgnoreQueryFilters()
+                .IgnoreQueryFiltersForTenant(tenantService)
                 .SingleOrDefaultAsync(
-                    l => l.Id == leadId && l.DealerId == tenantService.DealerId,
+                    l => l.Id == leadId,
                     cancellationToken);
 
             if (lead is null)
@@ -119,15 +137,69 @@ internal sealed class CreateQuoteCommandHandler(
         if (lead is null && client is { OriginLeadId: { } originLeadId })
         {
             lead = await context.Leads
-                .IgnoreQueryFilters()
+                .IgnoreQueryFiltersForTenant(tenantService)
                 .SingleOrDefaultAsync(
-                    l => l.Id == originLeadId && l.DealerId == tenantService.DealerId,
+                    l => l.Id == originLeadId,
                     cancellationToken);
         }
         else if (client is null && lead is { ConvertedClientId: { } convertedClientId })
         {
             client = await context.Clients
                 .SingleOrDefaultAsync(c => c.Id == convertedClientId, cancellationToken);
+        }
+
+        // LEAD-02: one LIVE offer per car and party. Everything above still lets two different
+        // buyers bid on the same unit — that is the market working. What must not happen is the
+        // same buyer ending up with two standing prices for the same car because the form was
+        // opened twice: a double submit the UI failed to swallow, or an operator going back to
+        // "edit the amount" through a path that only ever creates.
+        //
+        // Scoped to Pending and to offers that have not run out: a rejected, expired or
+        // superseded quote is history, and re-quoting after it lapses is a new negotiation.
+        Guid? partyClientId = client?.Id;
+        Guid? partyLeadId = lead?.Id;
+        DateTime nowUtc = dateTimeProvider.UtcNow;
+
+        Quote? liveQuote = await context.Quotes
+            .Where(q => q.CarId == command.CarId
+                && q.Status == QuoteStatus.Pending
+                && q.ValidUntil > nowUtc
+                && ((partyClientId != null && q.ClientId == partyClientId)
+                    || (partyLeadId != null && q.LeadId == partyLeadId)))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (liveQuote is not null)
+        {
+            return Result.Failure<Guid>(QuoteErrors.ActiveQuoteAlreadyExists(command.CarId, liveQuote.Id));
+        }
+
+        // sfc B0.2.3 / ADR C2: without a currency the quote uses the vehicle's. A different currency needs the dealer's
+        // latest effective manual rate for that pair, frozen into the quote and never recalculated.
+        CurrencyCode carCurrency = CurrencyCode.Parse(car.Price.Currency);
+        CurrencyCode proposedCurrency = carCurrency;
+        if (command.Currency is not null)
+        {
+            if (!CurrencyCode.TryParse(command.Currency, out CurrencyCode parsedCurrency))
+            {
+                return Result.Failure<Guid>(Error.Validation(
+                    "Currency.Unsupported", "Unsupported currency. Supported: ARS, USD."));
+            }
+
+            proposedCurrency = parsedCurrency;
+        }
+
+        DateTime now = dateTimeProvider.UtcNow;
+        DealerExchangeRate? rate = null;
+        if (proposedCurrency != carCurrency)
+        {
+            rate = await context.FindLatestEffectiveRateAsync(
+                tenantService.DealerId, carCurrency, proposedCurrency, now, cancellationToken);
+        }
+
+        Result<ExchangeRateSnapshot?> snapshot = ExchangeRateSnapshot.Capture(carCurrency, proposedCurrency, rate, now);
+        if (snapshot.IsFailure)
+        {
+            return Result.Failure<Guid>(snapshot.Error);
         }
 
         var quote = new Quote(
@@ -139,7 +211,15 @@ internal sealed class CreateQuoteCommandHandler(
             command.PaymentMethod,
             command.ValidUntil,
             command.Comments,
-            dateTimeProvider.UtcNow);
+            now,
+            proposedCurrency,
+            snapshot.Value);
+
+        // sfc B4.3 / RN-018: folio assigned right after the aggregate exists, not inside the
+        // constructor — the sequence value is a DB side effect the constructor cannot own, and
+        // every other call site constructing a Quote would otherwise have had to supply one.
+        long sequenceValue = await dealerSequenceAllocator.NextAsync(tenantService.DealerId, "quote", cancellationToken);
+        quote.AssignNumber(Quote.FormatNumber(now.Year, sequenceValue));
 
         context.Quotes.Add(quote);
 

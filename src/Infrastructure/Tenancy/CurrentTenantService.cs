@@ -1,5 +1,6 @@
 using Application.Abstractions.Tenancy;
 using Application.Abstractions.Data;
+using Infrastructure.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -57,6 +58,15 @@ public class CurrentTenantService : ICurrentTenantService
     {
         get
         {
+            // sfc B6.3 / RN-043 (security review): a password-verified but not-yet-dealer-scoped token
+            // still authenticates (Identity.IsAuthenticated is true), so it would otherwise reach step 2
+            // below and resolve to WHATEVER dealer a spoofed X-Tenant-Host/Origin/Host header names —
+            // before the caller ever proved membership in it. Refuse unconditionally, before any fallback.
+            if (_httpContextAccessor.HttpContext?.User?.IsPendingDealerSelection() == true)
+            {
+                return Guid.Empty;
+            }
+
             // 1. Authenticated user — JWT dealer_id claim wins.
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("dealer_id");
             if (claim is not null && Guid.TryParse(claim.Value, out var dealerIdFromClaim))
@@ -73,7 +83,13 @@ public class CurrentTenantService : ICurrentTenantService
 
             // 3. Development-only convenience fallback. Outside Development this
             //    block is dead — the spec requires default-deny verbatim.
-            if (_env.IsDevelopment() && _fallbackOptions.DevFallbackDealerId is { } configuredFallback)
+            //
+            //    It also requires an HTTP request: the fallback stands in for a request whose host did not
+            //    resolve. Quartz jobs and the outbox have no request, and giving them the demo dealer as
+            //    their tenant made them filter every query to that one dealer (dunning emails skipped
+            //    with "no subscription for provider customer", welcome emails with "user not found").
+            //    Background work must run tenant-less, exactly as it does in Production.
+            if (httpContext is not null && _env.IsDevelopment() && _fallbackOptions.DevFallbackDealerId is { } configuredFallback)
             {
                 _logger.LogInformation(
                     "CurrentTenantService: host miss in Development — using Tenant:DevFallbackDealerId={DealerId}.",
@@ -108,11 +124,16 @@ public class CurrentTenantService : ICurrentTenantService
     {
         get
         {
-            // ADR-1: positive-claim gate. A SuperAdmin JWT carries platform_role=super_admin;
-            // that explicit claim flips HasTenant to false (cross-tenant context).
+            // sfc B6.3: same guard as DealerId above — a pending-dealer-selection token never has a tenant.
+            if (_httpContextAccessor.HttpContext?.User?.IsPendingDealerSelection() == true)
+            {
+                return false;
+            }
+
+            // ADR-1: positive-claim gate. A SuperAdmin JWT carries platform_role=super_admin
+            // AND dealer_id == Guid.Empty; that explicit check flips HasTenant to false (cross-tenant context).
             // The host-header fallback branch MUST NOT execute for SuperAdmin requests.
-            var platformRoleClaim = _httpContextAccessor.HttpContext?.User?.FindFirst("platform_role");
-            if (platformRoleClaim?.Value == "super_admin")
+            if (_httpContextAccessor.HttpContext?.User?.IsPlatformSuperAdmin() == true)
             {
                 return false;
             }

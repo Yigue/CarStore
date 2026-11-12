@@ -1,4 +1,5 @@
 using Domain.DealerSettings.Events;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using SharedKernel;
 
@@ -117,6 +118,18 @@ public sealed class DealerSettings : Entity
     public string ContactEmail { get; private set; }
 
     /// <summary>
+    /// sfc A2.2: optional extra recipient of billing emails (dunning, refunds), besides the owner.
+    /// Cleared by <see cref="Purge"/>.
+    /// </summary>
+    public string? BillingEmail { get; private set; }
+
+    public void SetBillingEmail(string? billingEmail)
+    {
+        BillingEmail = string.IsNullOrWhiteSpace(billingEmail) ? null : billingEmail.Trim();
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
     /// Stable tenant identifier on the public DNS ({slug}.carstore.com).
     /// Nullable pre-PR1; existing rows must be backfilled before a NOT NULL constraint
     /// is enforced at the schema level.
@@ -157,6 +170,32 @@ public sealed class DealerSettings : Entity
     public string? SecondaryColor { get; private set; }
     public string? FooterText { get; private set; }
 
+    // ─── CFG-06 · landing page customization ───────────────────────────────────────────────
+    //
+    // Onboarding writes a dealer's history, mission, vision and hero carousel once and the
+    // landing page has rendered a hardcoded, unrelated BMW dealership's copy ever since —
+    // nothing downstream of onboarding ever read what the dealer actually entered. These are
+    // the fields the landing page (BannerComponent, AboutUsComponent) now reads instead.
+
+    /// <summary>Free text for the "Nuestra Historia" tab. Null renders the built-in placeholder copy.</summary>
+    public string? HistoryText { get; private set; }
+
+    /// <summary>Free text for the "Nuestra Misión" tab.</summary>
+    public string? MissionText { get; private set; }
+
+    /// <summary>Free text for the "Nuestra Visión" tab.</summary>
+    public string? VisionText { get; private set; }
+
+    /// <summary>Free text for the "Nuestros Valores" tab.</summary>
+    public string? ValuesText { get; private set; }
+
+    /// <summary>
+    /// Raw JSON array of <see cref="CarouselSlide"/> for the landing hero. Stored as a jsonb
+    /// column (same convention as <c>Document.OcrRawJson</c>) rather than a child table — see
+    /// <see cref="CarouselSlide"/> for why. Null or empty means "use the built-in default slides".
+    /// </summary>
+    public string? CarouselSlidesJson { get; private set; }
+
     // Platform suspension. Also doubles as the tenant lookup gate (saas-custom-domains
     // PR1): when false, the dealer MUST be excluded from anonymous host lookups
     // (filtered partial index on HostName WHERE IsActive).
@@ -164,7 +203,73 @@ public sealed class DealerSettings : Entity
     public DateTime? SuspendedAt { get; private set; }
     public string? SuspendReason { get; private set; }
 
+    /// <summary>RN-013 tenant retention lifecycle (A6). Independent from <see cref="IsActive"/>.</summary>
+    public TenantLifecycleStatus LifecycleStatus { get; private set; } = TenantLifecycleStatus.Active;
+
+    /// <summary>When the subscription was cancelled; starts the 30-day grace / 90-day purge clock.</summary>
+    public DateTime? CancelledAt { get; private set; }
+
+    /// <summary>CancelledAt + Retention:PurgeAfterDays. Null while the tenant is not under retention.</summary>
+    public DateTime? PurgeScheduledAt { get; private set; }
+
     public string? StripeCustomerId { get; private set; }
+
+    /// <summary>
+    /// sfc A4.3 / C17: the single account holder (the user who may delete the account, receives billing emails and can
+    /// hand the dealership over). Null only on legacy rows; destructive actions fail closed when it is null.
+    /// </summary>
+    public Guid? OwnerUserId { get; private set; }
+
+    /// <summary>sfc B1.3.1 / RN-002 / D-DEPOSIT: calendar days a new seña stays Active; 7 unless the dealer changes it.</summary>
+    public int DepositValidityDays { get; private set; } = Domain.Deposits.Deposit.DefaultValidityDays;
+
+    /// <summary>sfc B6.2 / RN-041: days without activity before an open lead gets a follow-up reminder; 0 turns it off.</summary>
+    public int FollowUpCadenceDays { get; private set; } = DefaultFollowUpCadenceDays;
+
+    public const int DefaultFollowUpCadenceDays = 3;
+    public const int MaxFollowUpCadenceDays = 30;
+
+    public Result SetFollowUpCadenceDays(int days)
+    {
+        if (days < 0 || days > MaxFollowUpCadenceDays)
+            return Result.Failure(Error.Validation(
+                "DealerSettings.InvalidFollowUpCadence", $"La cadencia de seguimiento debe estar entre 0 y {MaxFollowUpCadenceDays} días."));
+
+        FollowUpCadenceDays = days;
+        return Result.Success();
+    }
+
+    /// <summary>sfc C2.4 / RN-049: months between service reminders after delivery; 0 turns them off.</summary>
+    public int ServiceReminderMonths { get; private set; } = DefaultServiceReminderMonths;
+
+    public const int DefaultServiceReminderMonths = 6;
+
+    public Result SetServiceReminderMonths(int months)
+    {
+        if (months < 0 || months > 24)
+            return Result.Failure(Error.Validation("DealerSettings.InvalidServiceCadence", "La cadencia de service debe estar entre 0 y 24 meses."));
+
+        ServiceReminderMonths = months;
+        return Result.Success();
+    }
+
+    public Result SetDepositValidityDays(int days)
+    {
+        if (days <= 0 || days > Domain.Deposits.Deposit.DefaultMaxValidityDays)
+            return Result.Failure(Domain.Deposits.DepositErrors.InvalidValidity(Domain.Deposits.Deposit.DefaultMaxValidityDays));
+
+        DepositValidityDays = days;
+        return Result.Success();
+    }
+
+    public void SetOwner(Guid userId)
+    {
+        if (userId == Guid.Empty)
+            throw new DomainException("OwnerUserId cannot be empty");
+
+        OwnerUserId = userId;
+        UpdatedAt = DateTime.UtcNow;
+    }
 
     /// <summary>
     /// Postgres xmin concurrency token. Populated by EF Core (Npgsql) from the
@@ -185,6 +290,205 @@ public sealed class DealerSettings : Entity
     {
         LastAssignedAgentIndex += 1;
         return LastAssignedAgentIndex;
+    }
+
+    /// <summary>Maximum number of hero-carousel slides a landing page will render.</summary>
+    public const int MaxCarouselSlides = 8;
+
+    /// <summary>Maximum length allowed for each free-text landing section.</summary>
+    public const int MaxLandingTextLength = 4000;
+
+    /// <summary>
+    /// CFG-06: replaces the landing page's editable copy and hero carousel in one call — the
+    /// admin screen edits and saves both together, so there is one moment where all of it has
+    /// to be valid together, not five independent setters that can leave the row half-updated.
+    /// </summary>
+    public void UpdateLanding(
+        string? historyText,
+        string? missionText,
+        string? visionText,
+        string? valuesText,
+        IReadOnlyList<CarouselSlide>? carouselSlides)
+    {
+        // Validate and compute EVERYTHING before touching a single field. A rejected slide
+        // must not leave the aggregate holding the new history text in memory with nothing
+        // written to the database — the caller's transaction rolls back, but this instance
+        // stays live and tracked, and a partially-mutated aggregate is exactly the kind of bug
+        // that only shows up later, when something else reads it within the same request.
+        ValidateLandingText(historyText, nameof(historyText));
+        ValidateLandingText(missionText, nameof(missionText));
+        ValidateLandingText(visionText, nameof(visionText));
+        ValidateLandingText(valuesText, nameof(valuesText));
+
+        string? carouselJson = SerializeCarouselSlides(carouselSlides);
+
+        HistoryText = NullIfWhitespace(historyText);
+        MissionText = NullIfWhitespace(missionText);
+        VisionText = NullIfWhitespace(visionText);
+        ValuesText = NullIfWhitespace(valuesText);
+        CarouselSlidesJson = carouselJson;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static void ValidateLandingText(string? value, string paramName)
+    {
+        if (value is not null && value.Length > MaxLandingTextLength)
+        {
+            throw new DomainException(
+                $"{paramName} exceeds the {MaxLandingTextLength}-character limit.");
+        }
+    }
+
+    private static string? NullIfWhitespace(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// Validates and serializes the carousel. An empty or null list clears it (the landing page
+    /// falls back to its built-in default slides) rather than being rejected — "no custom
+    /// carousel yet" is the normal state for a dealer that has not gotten to it.
+    /// </summary>
+    private static string? SerializeCarouselSlides(IReadOnlyList<CarouselSlide>? slides)
+    {
+        if (slides is null || slides.Count == 0)
+        {
+            return null;
+        }
+
+        if (slides.Count > MaxCarouselSlides)
+        {
+            throw new DomainException(
+                $"A landing carousel can have at most {MaxCarouselSlides} slides.");
+        }
+
+        foreach (CarouselSlide slide in slides)
+        {
+            if (string.IsNullOrWhiteSpace(slide.ImageUrl))
+            {
+                throw new DomainException("Every carousel slide needs an image.");
+            }
+
+            if (string.IsNullOrWhiteSpace(slide.Title))
+            {
+                throw new DomainException("Every carousel slide needs a title.");
+            }
+        }
+
+        return JsonSerializer.Serialize(slides);
+    }
+
+    /// <summary>Deserializes <see cref="CarouselSlidesJson"/> back into typed slides.</summary>
+    public IReadOnlyList<CarouselSlide> GetCarouselSlides()
+    {
+        if (string.IsNullOrWhiteSpace(CarouselSlidesJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<CarouselSlide>>(CarouselSlidesJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            // A row written by a future version of this column, or corrupted by hand, should not
+            // 500 the public landing page — it falls back to the built-in slides instead.
+            return [];
+        }
+    }
+
+    // ─── B5.2 · public test-drive scheduling (B11-ext, RN-044) ─────────────────────────────────
+    //
+    // Locked decision (sfc B5.2, same posture as "Locked decision O5" above): this product ships
+    // exclusively to Argentine car dealerships — ARS pricing, Argentine license plates, Spanish-
+    // only UI — so there is ONE timezone for the whole platform, not one per dealer. It is a fixed
+    // constant, not a per-tenant setting, and nothing downstream (Appointment, this aggregate) ever
+    // converts between UTC and local time: every DateTime the scheduling flow stores or compares is
+    // already wall-clock Argentina time, matching how <see cref="Appointment"/> already behaves.
+    // Do not add a per-dealer timezone field without re-opening this decision.
+    /// <summary>Fixed product-wide timezone. See the locked-decision comment above this constant.</summary>
+    public const string BusinessTimeZoneId = "America/Argentina/Buenos_Aires";
+
+    /// <summary>At most one entry per day of the week.</summary>
+    public const int MaxBusinessHoursEntries = 7;
+
+    /// <summary>
+    /// Raw JSON array of <see cref="BusinessHoursEntry"/>, one per open weekday. Same jsonb-column
+    /// convention as <see cref="CarouselSlidesJson"/>. Null or empty means "no hours configured
+    /// yet" — the public test-drive slot query returns no slots for any day until this is set,
+    /// rather than guessing a default schedule.
+    /// </summary>
+    public string? BusinessHoursJson { get; private set; }
+
+    /// <summary>
+    /// Replaces the whole weekly schedule. Validates every entry before mutating anything (same
+    /// posture as <see cref="UpdateLanding"/>): rejects a day listed twice, and rejects
+    /// <c>OpenTime &gt;= CloseTime</c> when both are set on the same entry. An entry with both times
+    /// null is a valid "explicitly closed" row. A day missing from <paramref name="entries"/> is
+    /// closed by omission — callers do not need to send all 7 days.
+    /// </summary>
+    public void SetBusinessHours(IReadOnlyList<BusinessHoursEntry>? entries)
+    {
+        string? json = SerializeBusinessHours(entries);
+
+        BusinessHoursJson = json;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static string? SerializeBusinessHours(IReadOnlyList<BusinessHoursEntry>? entries)
+    {
+        if (entries is null || entries.Count == 0)
+        {
+            return null;
+        }
+
+        if (entries.Count > MaxBusinessHoursEntries)
+        {
+            throw new DomainException(
+                $"Business hours can have at most {MaxBusinessHoursEntries} entries (one per day of the week).");
+        }
+
+        var seenDays = new HashSet<DayOfWeek>();
+        foreach (BusinessHoursEntry entry in entries)
+        {
+            if (!seenDays.Add(entry.DayOfWeek))
+            {
+                throw new DomainException($"Business hours cannot list {entry.DayOfWeek} more than once.");
+            }
+
+            if (entry.OpenTime is not null && entry.CloseTime is not null && entry.OpenTime >= entry.CloseTime)
+            {
+                throw new DomainException(
+                    $"Business hours for {entry.DayOfWeek}: OpenTime must be earlier than CloseTime.");
+            }
+
+            if (entry.OpenTime is null != entry.CloseTime is null)
+            {
+                throw new DomainException(
+                    $"Business hours for {entry.DayOfWeek}: OpenTime and CloseTime must either both be set or both be null.");
+            }
+        }
+
+        return JsonSerializer.Serialize(entries);
+    }
+
+    /// <summary>Deserializes <see cref="BusinessHoursJson"/> back into typed entries.</summary>
+    public IReadOnlyList<BusinessHoursEntry> GetBusinessHours()
+    {
+        if (string.IsNullOrWhiteSpace(BusinessHoursJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<BusinessHoursEntry>>(BusinessHoursJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            // Same fallback posture as GetCarouselSlides(): never 500 the public scheduler over a
+            // corrupted/future-format row — treat it as "no hours configured" instead.
+            return [];
+        }
     }
 
     public void UpdateVisual(string? logoUrl, string? primaryColor, string? secondaryColor, string? footerText)
@@ -232,6 +536,108 @@ public sealed class DealerSettings : Entity
         InstagramUrl = instagramUrl;
         TwitterUrl = twitterUrl;
         InterestRateTna = interestRateTna;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// RN-013: enters the post-cancellation grace period and schedules the purge.
+    /// Idempotent: a tenant already under retention keeps its original schedule
+    /// (a replayed webhook must not push the purge date forward).
+    /// </summary>
+    public void StartRetention(DateTime cancelledAtUtc, int purgeAfterDays)
+    {
+        if (purgeAfterDays <= 0)
+            throw new DomainException("PurgeAfterDays must be positive");
+
+        if (LifecycleStatus != TenantLifecycleStatus.Active)
+            return;
+
+        LifecycleStatus = TenantLifecycleStatus.CancelledGrace;
+        CancelledAt = cancelledAtUtc;
+        PurgeScheduledAt = cancelledAtUtc.AddDays(purgeAfterDays);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// RN-013: reactivation before the purge clears the schedule. No-op unless the tenant
+    /// is in <see cref="TenantLifecycleStatus.CancelledGrace"/>; purged/locked tenants never resurrect here.
+    /// </summary>
+    public void ClearRetention()
+    {
+        if (LifecycleStatus != TenantLifecycleStatus.CancelledGrace)
+            return;
+
+        LifecycleStatus = TenantLifecycleStatus.Active;
+        CancelledAt = null;
+        PurgeScheduledAt = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// RN-013: ends the read-only grace period. Moves <see cref="TenantLifecycleStatus.CancelledGrace"/> to
+    /// <see cref="TenantLifecycleStatus.Locked"/> once <paramref name="graceDays"/> have elapsed since
+    /// <see cref="CancelledAt"/>. Any other state is left untouched. Returns whether the tenant was locked.
+    /// </summary>
+    public bool LockAfterGrace(DateTime nowUtc, int graceDays)
+    {
+        if (graceDays <= 0)
+            throw new DomainException("GraceDays must be positive");
+
+        if (LifecycleStatus != TenantLifecycleStatus.CancelledGrace || CancelledAt is null)
+            return false;
+
+        if (nowUtc < CancelledAt.Value.AddDays(graceDays))
+            return false;
+
+        LifecycleStatus = TenantLifecycleStatus.Locked;
+        UpdatedAt = nowUtc;
+        return true;
+    }
+
+    /// <summary>
+    /// RN-013: a tenant may be purged only when it is <see cref="TenantLifecycleStatus.Locked"/> and its
+    /// <see cref="PurgeScheduledAt"/> is not in the future. Every other state is not purgeable.
+    /// </summary>
+    public bool IsDueForPurge(DateTime nowUtc) =>
+        LifecycleStatus == TenantLifecycleStatus.Locked
+        && PurgeScheduledAt is not null
+        && PurgeScheduledAt.Value <= nowUtc;
+
+    /// <summary>
+    /// Terminal state set by the purge job after the tenant data was removed. Contact and branding data is
+    /// anonymized; <see cref="DealerName"/> (fiscal name, billing obligation) and the Stripe customer id
+    /// are kept. Throws unless <see cref="IsDueForPurge"/>.
+    /// </summary>
+    public void Purge(DateTime nowUtc)
+    {
+        if (!IsDueForPurge(nowUtc))
+            throw new DomainException("Only a Locked tenant whose purge date has passed can be purged");
+
+        LifecycleStatus = TenantLifecycleStatus.Purged;
+        ContactEmail = $"purged-{DealerId:N}@purged.invalid";
+        BillingEmail = null;
+        Address = null;
+        PhoneNumber = null;
+        FacebookUrl = null;
+        InstagramUrl = null;
+        TwitterUrl = null;
+        LogoUrl = null;
+        FooterText = null;
+        HistoryText = null;
+        MissionText = null;
+        VisionText = null;
+        ValuesText = null;
+        CarouselSlidesJson = null;
+        IsActive = false;
+        SuspendedAt ??= nowUtc;
+        SuspendReason ??= "Tenant purged";
+        UpdatedAt = nowUtc;
+    }
+
+    /// <summary>Test/legacy helper: marks the tenant purged without the eligibility check. Use <see cref="Purge"/> in the job.</summary>
+    public void MarkPurged()
+    {
+        LifecycleStatus = TenantLifecycleStatus.Purged;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -349,4 +755,13 @@ public sealed class DealerSettings : Entity
             ValidateRfc1035Label(label, paramName);
         }
     }
+}
+
+/// <summary>RN-013 retention lifecycle of a tenant after its subscription is cancelled.</summary>
+public enum TenantLifecycleStatus
+{
+    Active = 0,
+    CancelledGrace = 1,
+    Locked = 2,
+    Purged = 3
 }

@@ -2,6 +2,8 @@ using Application.Abstractions.Storage;
 using Application.Cars.Search;
 using Domain.Cars;
 using Domain.Cars.Attributes;
+using Domain.Financial.Attributes;
+using Domain.Sales;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -102,6 +104,55 @@ public class SearchCarsAvailabilityFilterTests
 
         var result = await CreateHandler(context).Handle(
             new SearchCarsQuery(),
+            CancellationToken.None);
+
+        result.Value.Cars.Should().HaveCount(2);
+    }
+
+    // CAT-01: the column says what the dealership intends, the sale says what happened. Rows
+    // written before the in-transaction sync — and any window where the outbox is behind or its
+    // message errored — have a completed sale against a car still flagged Disponible. The
+    // catalogue must believe the sale.
+    [Fact]
+    public async Task Handle_Should_HideACarWithACompletedSale_EvenWhenItsStatusWasNeverSynced()
+    {
+        using var context = CreateContext();
+        Car available = SeedCar(context, "AVA444", StatusServiceCar.Disponible);
+        Car soldButUnsynced = SeedCar(context, "STA111", StatusServiceCar.Disponible);
+        await context.SaveChangesAsync();
+
+        var sale = new Sale(
+            DealerId, soldButUnsynced.Id, Guid.NewGuid(), 15000m,
+            PaymentMethod.Cash, "C-1", "", DateTime.UtcNow);
+        sale.Complete();
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var result = await CreateHandler(context).Handle(
+            new SearchCarsQuery { OnlyPurchasable = true },
+            CancellationToken.None);
+
+        result.Value.Cars.Select(c => c.Id).Should().ContainSingle().And.Contain(available.Id);
+        result.Value.TotalResults.Should().Be(1);
+    }
+
+    // A pending sale is a draft, not a delivery: the unit stays published while the deal can
+    // still fall through, exactly like a Reservado one.
+    [Fact]
+    public async Task Handle_Should_KeepACarWithAPendingSale_InTheCatalogue()
+    {
+        using var context = CreateContext();
+        SeedCar(context, "AVA555", StatusServiceCar.Disponible);
+        Car reserved = SeedCar(context, "PEN001", StatusServiceCar.Reservado);
+        await context.SaveChangesAsync();
+
+        context.Sales.Add(new Sale(
+            DealerId, reserved.Id, Guid.NewGuid(), 15000m,
+            PaymentMethod.Cash, "C-2", "", DateTime.UtcNow));
+        await context.SaveChangesAsync();
+
+        var result = await CreateHandler(context).Handle(
+            new SearchCarsQuery { OnlyPurchasable = true },
             CancellationToken.None);
 
         result.Value.Cars.Should().HaveCount(2);

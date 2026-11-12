@@ -148,4 +148,21 @@ public class FinancialReportJsonShapeTests
         var body = await response.Content.ReadAsStringAsync();
         body.Should().Contain("INVALID_GROUP_BY");
     }
+
+    [Theory]
+    [InlineData("from=2050-01-01&to=2051-03-01")]
+    [InlineData("from=2050-06-10&to=2050-06-01")]
+    public async Task GetFinancialsReport_InvalidRange_ReturnsBadRequestWithRangeCode(string query)
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        var token = await IntegrationTestHelpers.GetAdminTokenAsync(factory);
+        var client = factory.CreateClient();
+        IntegrationTestHelpers.SetAuthToken(client, token);
+
+        var response = await client.GetAsync($"/api/v1/reports/financials?{query}&groupBy=Month");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("REPORT_RANGE_INVALID");
+    }
 }

@@ -69,7 +69,20 @@ public sealed class User : Entity
     public string? Phone { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
-    // Navigation property for permissions (configured in EF Core)
+    /// <summary>sfc A4.1 / RN-030: when the user proved control of the address. Null = not verified.</summary>
+    public DateTime? EmailVerifiedAtUtc { get; private set; }
+
+    public bool IsEmailVerified => EmailVerifiedAtUtc is not null;
+
+    /// <summary>
+    /// Indicates whether the user is a platform-level SuperAdmin.
+    /// SuperAdmin users are defined exclusively by DealerId == Guid.Empty.
+    /// </summary>
+    public bool IsPlatformAdmin => DealerId == Guid.Empty;
+
+    // spr PR 4.2 / H9: this legacy grant table has no write path left for a tenant user (AddPermission/
+    // RemovePermission were removed as dead code) — it is always empty for one. UsersSeeder still writes
+    // to it directly, bypassing this aggregate, for the platform SuperAdmin's platform:* permissions.
     private readonly List<UserPermission> _permissions;
     public IReadOnlyCollection<UserPermission> Permissions => _permissions;
 
@@ -79,6 +92,12 @@ public sealed class User : Entity
             throw new DomainException("Password hash cannot be empty");
 
         PasswordHash = passwordHash;
+    }
+
+    /// <summary>Idempotent: the first verification timestamp is kept.</summary>
+    public void MarkEmailVerified(DateTime nowUtc)
+    {
+        EmailVerifiedAtUtc ??= nowUtc;
     }
 
     public void UpdatePhone(string? phone)
@@ -113,20 +132,4 @@ public sealed class User : Entity
         IsActive = true;
     }
 
-    public void AddPermission(string permission, Guid? grantedBy = null)
-    {
-        if (_permissions.Any(p => p.Permission == permission))
-            return;
-
-        _permissions.Add(new UserPermission(Id, permission, grantedBy));
-    }
-
-    public void RemovePermission(string permission)
-    {
-        var existing = _permissions.Find(p => p.Permission == permission);
-        if (existing is not null)
-        {
-            _permissions.Remove(existing);
-        }
-    }
 }

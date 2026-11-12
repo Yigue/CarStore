@@ -1,8 +1,10 @@
 using Application.Abstractions.Data;
+using Application.Common;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
 using Domain.Cars;
 using Domain.Cars.Attributes;
+using Domain.Sales.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
@@ -43,6 +45,14 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
             // Reservado se sigue publicando: la reserva puede caerse, y esconderlo perderia
             // interesados por una operacion que todavia no se cerro.
             carsQuery = carsQuery.Where(c => c.ServiceCar != StatusServiceCar.Vendido);
+
+            // CAT-01: el estado del vehiculo es la intencion, la venta es el hecho. Una venta
+            // completada es una unidad entregada aunque su ServiceCar todavia no lo diga —
+            // pasaba cada vez que el outbox se atrasaba o fallaba, y tambien con los registros
+            // viejos anteriores a la sincronizacion en transaccion. Consultar las ventas cierra
+            // ese hueco sin depender de que la columna este al dia.
+            carsQuery = carsQuery.Where(c =>
+                !_context.Sales.Any(s => s.CarId == c.Id && s.Status == SaleStatus.Completed));
         }
 
         if (query.Featured.HasValue)
@@ -155,7 +165,7 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
 
         // Paginación en memoria sobre el conjunto ya filtrado
         var page = query.Page > 0 ? query.Page : 1;
-        var pageSize = query.PageSize > 0 ? query.PageSize : 10;
+        var pageSize = Pagination.ClampPageSize(query.PageSize > 0 ? query.PageSize : 10);
 
         var cars = allFiltered
             .Skip((page - 1) * pageSize)
@@ -175,6 +185,7 @@ internal sealed class SearchCarsQueryHandler : IQueryHandler<SearchCarsQuery, Se
                 Modelo = c.Modelo?.Nombre ?? "N/A",
                 Anio = c.Anio,
                 Precio = c.Price?.Amount ?? 0,
+                Currency = c.Price?.Currency ?? "ARS",
                 Descripcion = c.Descripcion ?? string.Empty,
                 ImagenPrincipal = await GetPrimaryImageUrl(c, cancellationToken),
                 CantidadPuertas = c.CantidadPuertas,

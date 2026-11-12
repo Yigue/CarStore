@@ -39,6 +39,7 @@ public class GetAgentsEndpointTests
             FirstName = "No",
             LastName = "Access",
             Password = "Password1!",
+            AcceptedTermsVersion = "2026-10-01",
             DealerId = System.Guid.Parse(CustomWebApplicationFactory.AdminDealerId)
         };
         await client.PostAsJsonAsync("/api/v1/users/register", register);

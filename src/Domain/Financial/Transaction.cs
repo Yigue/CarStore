@@ -1,6 +1,7 @@
 using SharedKernel;
 using Domain.Cars;
 using Domain.Clients;
+using Domain.Currency;
 using Domain.Sales;
 using Domain.Financial.Attributes;
 using Domain.Financial.Events;
@@ -17,6 +18,9 @@ public sealed class FinancialTransaction : Entity
     public PaymentMethod PaymentMethod { get; private set; }
     public string? ReferenceNumber { get; private set; }
     public DateTime TransactionDate { get; private set; }
+
+    // sfc B0.3.1 / ADR C2: rate frozen by the originating sale/deposit; null for manual transactions and history.
+    public ExchangeRateSnapshot? ExchangeRate { get; private set; }
 
     // Claves externas
     public Guid CategoryId { get; private set; }
@@ -57,7 +61,7 @@ public sealed class FinancialTransaction : Entity
     {
         SetDealer(dealerId);
         Type = type;
-        Amount = new Money(amount);
+        Amount = Money.Of(amount, CurrencyCode.Ars);
         Description = description;
         PaymentMethod = paymentMethod;
         Category = category;
@@ -94,7 +98,8 @@ public sealed class FinancialTransaction : Entity
         Sale? sale = null,
         DateTime transactionDate = default,
         Guid? reconditioningTaskId = null,
-        Guid? sourceId = null)
+        Guid? sourceId = null,
+        ExchangeRateSnapshot? exchangeRate = null)
     {
         SetDealer(dealerId);
         Type = type;
@@ -121,6 +126,7 @@ public sealed class FinancialTransaction : Entity
         TransactionDate = transactionDate == default ? DateTime.UtcNow : transactionDate;
         ReconditioningTaskId = reconditioningTaskId;
         SourceId = sourceId;
+        ExchangeRate = exchangeRate;
     }
 
     // Métodos para actualizar propiedades
@@ -137,7 +143,7 @@ public sealed class FinancialTransaction : Entity
         Guid? saleId)
     {
         Type = type;
-        Amount = new Money(amount);
+        Amount = Money.Of(amount, CurrencyCode.Ars);
         Description = description;
         PaymentMethod = paymentMethod;
         ReferenceNumber = referenceNumber;

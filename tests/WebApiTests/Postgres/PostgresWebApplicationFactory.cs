@@ -33,27 +33,34 @@ public sealed class PostgresWebApplicationFactory : WebApplicationFactory<Progra
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        Environment.SetEnvironmentVariable("UseInMemoryDatabase", "false");
-        Environment.SetEnvironmentVariable("Jwt__Secret", "SecretKeyForTestingPurposesOnly1234567890");
-        Environment.SetEnvironmentVariable("Jwt__Issuer", "CarStore");
-        Environment.SetEnvironmentVariable("Jwt__Audience", "CarStore");
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", "");
+        builder.UseSetting("UseInMemoryDatabase", "false");
+        // spr PR 5.1 (OPS-07): AddBackgroundJobs now reads ConnectionStrings:Database directly
+        // from IConfiguration for Quartz's clustered ADO job store (not just via the DbContext
+        // DI override below), so it must point at this fixture's Testcontainers Postgres too —
+        // otherwise Quartz's hosted service tries to connect with whatever default connection
+        // string is in appsettings and the whole host fails to start under "Testing".
+        builder.UseSetting("ConnectionStrings:Database", _connectionString);
+        builder.UseSetting("Jwt:Secret", "SecretKeyForTestingPurposesOnly1234567890");
+        builder.UseSetting("Jwt:Issuer", "CarStore");
+        builder.UseSetting("Jwt:Audience", "CarStore");
+        builder.UseSetting("ConnectionStrings:Redis", "");
 
-        Environment.SetEnvironmentVariable("Storage__Minio__InternalEndpoint", "http://minio:9000");
-        Environment.SetEnvironmentVariable("Storage__Minio__PublicEndpoint", "http://localhost:9000");
-        Environment.SetEnvironmentVariable("Storage__Minio__AccessKey", "minioadmin");
-        Environment.SetEnvironmentVariable("Storage__Minio__SecretKey", "minioadmin123");
-        Environment.SetEnvironmentVariable("Storage__Minio__BucketName", "cars");
+        builder.UseSetting("Storage:Minio:InternalEndpoint", "http://minio:9000");
+        builder.UseSetting("Storage:Minio:PublicEndpoint", "http://localhost:9000");
+        builder.UseSetting("Storage:Minio:AccessKey", "minioadmin");
+        builder.UseSetting("Storage:Minio:SecretKey", "minioadmin123");
+        builder.UseSetting("Storage:Minio:BucketName", "cars");
 
-        Environment.SetEnvironmentVariable("Stripe__SecretKey", "sk_test_mock");
-        Environment.SetEnvironmentVariable("Stripe__WebhookSecret", "whsec_mock");
-        Environment.SetEnvironmentVariable("Stripe__PriceId", "price_mock");
+        builder.UseSetting("Stripe:SecretKey", "sk_test_mock");
+        builder.UseSetting("Stripe:WebhookSecret", "whsec_mock");
+        builder.UseSetting("Stripe:PriceId", "price_mock");
 
         builder.UseEnvironment("Testing");
 
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
+            services.RemoveAll<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<ApplicationDbContext>>();
             services.RemoveAll<ApplicationDbContext>();
             services.RemoveAll<IApplicationDbContext>();
 

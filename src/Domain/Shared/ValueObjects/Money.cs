@@ -7,17 +7,28 @@ public sealed record Money : IComparable<Money>
     public decimal Amount { get; init; }
     public string Currency { get; init; }
 
+    /// <summary>
+    /// Currency assumed when a caller does not state one. ARS: it is what every amount read back
+    /// from the database has always been rehydrated as, and what the currency columns were
+    /// backfilled with (ADR C1). Explicit currency per operation arrives with B0.2.
+    /// Domain code must not rely on it: use <see cref="Of"/> (enforced by an architecture ratchet).
+    /// </summary>
+    public const string DefaultCurrency = "ARS";
+
     private Money() { } // Para EF Core
 
 #pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
-    public Money(decimal amount, string currency = "USD")
+    public Money(decimal amount, string currency = DefaultCurrency)
     {
         if (amount < 0)
             throw new DomainException("Money amount cannot be negative");
         
         Amount = amount;
-        Currency = currency;
+        Currency = CurrencyCode.Parse(currency).Value;
     }
+
+    /// <summary>Preferred factory: the currency is stated explicitly and is always a supported one.</summary>
+    public static Money Of(decimal amount, CurrencyCode currency) => new(amount, currency.Value);
 
     public static Money Zero => new(0);
     

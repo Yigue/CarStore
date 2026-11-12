@@ -2,11 +2,16 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using Application.Abstractions.Tenancy;
 using Application.Sales.Update;
+using Domain.Cars;
+using Domain.Cars.Attributes;
 using Domain.Financial.Attributes;
 using Domain.Sales;
 using Domain.Sales.Attributes;
 using Microsoft.EntityFrameworkCore;
+using Moq;
+using SharedKernel;
 
 namespace Application.UnitTests.Sales;
 
@@ -21,6 +26,17 @@ public class UpdateSaleCommandHandlerTests
             .Options;
         return new TestApplicationDbContext(options);
     }
+
+    private static ICurrentTenantService CreateTenantService(bool hasTenant = true, Guid? dealerId = null)
+    {
+        var mock = new Mock<ICurrentTenantService>();
+        mock.SetupGet(t => t.HasTenant).Returns(hasTenant);
+        mock.SetupGet(t => t.DealerId).Returns(dealerId ?? DealerId);
+        return mock.Object;
+    }
+
+    private static UpdateSaleCommandHandler CreateHandler(TestApplicationDbContext context, IDateTimeProvider? dateProvider = null) =>
+        new(context, dateProvider ?? new FakeDateTimeProvider(), CreateTenantService());
 
     private static Sale NewPendingSale() =>
         new Sale(
@@ -37,7 +53,7 @@ public class UpdateSaleCommandHandlerTests
     public async Task Handle_Should_ReturnNotFound_When_SaleDoesNotExist()
     {
         using var context = CreateContext();
-        var handler = new UpdateSaleCommandHandler(context);
+        var handler = CreateHandler(context);
         var missingId = Guid.NewGuid();
         var command = new UpdateSaleCommand(missingId, 5000m, PaymentMethod.Cash, SaleStatus.Pending, "CN-2", "x");
 
@@ -55,7 +71,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context);
+        var handler = CreateHandler(context);
         var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending, "CN-UPDATED", "updated");
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -77,7 +93,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context);
+        var handler = CreateHandler(context);
         var command = new UpdateSaleCommand(sale.Id, 999m, PaymentMethod.Cash, SaleStatus.Pending, "CN-3", "y");
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -96,7 +112,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context);
+        var handler = CreateHandler(context);
         var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -117,7 +133,7 @@ public class UpdateSaleCommandHandlerTests
         await context.SaveChangesAsync();
 
         var salespersonId = Guid.NewGuid();
-        var handler = new UpdateSaleCommandHandler(context);
+        var handler = CreateHandler(context);
         var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending, SalespersonId: salespersonId);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -137,7 +153,7 @@ public class UpdateSaleCommandHandlerTests
         context.Sales.Add(sale);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateSaleCommandHandler(context);
+        var handler = CreateHandler(context);
         var command = new UpdateSaleCommand(sale.Id, 12345m, PaymentMethod.BankTransfer, SaleStatus.Pending);
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -145,5 +161,111 @@ public class UpdateSaleCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         var updated = await context.Sales.FirstAsync(s => s.Id == sale.Id);
         updated.SalespersonId.Should().Be(originalSalespersonId);
+    }
+
+    // ── CAT-01: the unit's service status moves with the sale, in the same transaction ───────
+
+    private static Car SeedCar(TestApplicationDbContext context, string patente, StatusServiceCar status)
+    {
+        var marca = new Marca($"Marca{patente}");
+        var modelo = new Modelo($"Modelo{patente}", marca.Id);
+        var car = new Car(
+            DealerId, marca, modelo, Color.Black, TypeCar.Sedan, StatusCar.New, status,
+            4, 5, 2000, 0, 2024, patente, "sale sync test car", 15000m, DateTime.UtcNow);
+        context.Marca.Add(marca);
+        context.Modelo.Add(modelo);
+        context.Cars.Add(car);
+        return car;
+    }
+
+    private static Sale NewPendingSaleFor(Guid carId) =>
+        new Sale(DealerId, carId, Guid.NewGuid(), 10000m, PaymentMethod.Cash, "CN-1", "sync", DateTime.UtcNow);
+
+    [Fact]
+    public async Task Handle_Should_MarkTheCarSold_When_TheSaleIsCompleted()
+    {
+        using var context = CreateContext();
+        Car car = SeedCar(context, "UPD001", StatusServiceCar.Reservado);
+        var sale = NewPendingSaleFor(car.Id);
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var handler = CreateHandler(context);
+        var result = await handler.Handle(
+            new UpdateSaleCommand(sale.Id, 10000m, PaymentMethod.Cash, SaleStatus.Completed, "CN-1", "done"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var persisted = await context.Cars.AsNoTracking().FirstAsync(c => c.Id == car.Id);
+        persisted.ServiceCar.Should().Be(
+            StatusServiceCar.Vendido,
+            "the catalogue reads this column — waiting for the outbox keeps a sold unit on sale");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReleaseTheCar_When_TheSaleIsCancelled()
+    {
+        using var context = CreateContext();
+        Car car = SeedCar(context, "UPD002", StatusServiceCar.Reservado);
+        var sale = NewPendingSaleFor(car.Id);
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var handler = CreateHandler(context);
+        await handler.Handle(
+            new UpdateSaleCommand(sale.Id, 10000m, PaymentMethod.Cash, SaleStatus.Cancelled, "CN-1", "no deal"),
+            CancellationToken.None);
+
+        var persisted = await context.Cars.AsNoTracking().FirstAsync(c => c.Id == car.Id);
+        persisted.ServiceCar.Should().Be(StatusServiceCar.Disponible);
+    }
+
+    [Fact]
+    public async Task Handle_Should_NotReleaseTheCar_When_AnotherSaleStillHoldsIt()
+    {
+        using var context = CreateContext();
+        Car car = SeedCar(context, "UPD003", StatusServiceCar.Reservado);
+        var cancelled = NewPendingSaleFor(car.Id);
+        var surviving = NewPendingSaleFor(car.Id);
+        context.Sales.AddRange(cancelled, surviving);
+        await context.SaveChangesAsync();
+
+        var handler = CreateHandler(context);
+        await handler.Handle(
+            new UpdateSaleCommand(cancelled.Id, 10000m, PaymentMethod.Cash, SaleStatus.Cancelled, "CN-1", "no deal"),
+            CancellationToken.None);
+
+        var persisted = await context.Cars.AsNoTracking().FirstAsync(c => c.Id == car.Id);
+        persisted.ServiceCar.Should().Be(
+            StatusServiceCar.Reservado,
+            "cancelling one draft must not hand back a unit another live sale is holding");
+    }
+
+    [Theory]
+    [InlineData(SaleStatus.Pending)]
+    [InlineData(SaleStatus.Cancelled)]
+    [InlineData(SaleStatus.Completed)]
+    public async Task Handle_Should_ReturnConflict_And_KeepSoldCar_When_SaleIsCompleted(SaleStatus target)
+    {
+        using var context = CreateContext();
+        var marca = new Marca("Toyota");
+        var modelo = new Modelo("Corolla", marca.Id);
+        var car = new Car(DealerId, marca, modelo, Color.Red, TypeCar.Sedan, StatusCar.New,
+            StatusServiceCar.Vendido, 4, 5, 1600, 1000, 2020, "AB123CD", "desc", 10000m, DateTime.UtcNow);
+        context.Marca.Add(marca);
+        context.Modelo.Add(modelo);
+        context.Cars.Add(car);
+        var sale = new Sale(DealerId, car.Id, Guid.NewGuid(), 10000m, PaymentMethod.Cash, "CN-1", "initial", DateTime.UtcNow);
+        sale.Complete();
+        context.Sales.Add(sale);
+        await context.SaveChangesAsync();
+
+        var result = await CreateHandler(context).Handle(
+            new UpdateSaleCommand(sale.Id, 999m, PaymentMethod.Cash, target, "CN-3", "y"), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be(SalesErrors.CannotEditNonPending(sale.Id));
+        (await context.Sales.FirstAsync(s => s.Id == sale.Id)).Status.Should().Be(SaleStatus.Completed);
+        car.ServiceCar.Should().Be(StatusServiceCar.Vendido);
     }
 }

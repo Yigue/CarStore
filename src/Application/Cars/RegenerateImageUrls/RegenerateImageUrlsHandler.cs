@@ -17,7 +17,8 @@ internal sealed class RegenerateImageUrlsHandler(
         RegenerateImageUrlsCommand request,
         CancellationToken cancellationToken)
     {
-        var images = await context.CarImages
+        var images = await context.Cars
+            .SelectMany(c => c.Images)
             .ToListAsync(cancellationToken);
 
         if (images.Count == 0)

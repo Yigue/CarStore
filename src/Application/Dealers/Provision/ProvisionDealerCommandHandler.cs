@@ -2,6 +2,8 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Billing;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.TenantUrl;
+using Domain.Billing;
 using Domain.DealerSettings;
 using Domain.DealerSettings.Events;
 using Domain.Users;
@@ -40,15 +42,43 @@ internal sealed class ProvisionDealerCommandHandler(
     IPasswordHasher passwordHasher,
     IPublisher publisher,
     ISubscriptionGateway subscriptionGateway,
-    ILogger<ProvisionDealerCommandHandler> logger)
+    ILogger<ProvisionDealerCommandHandler> logger,
+    Application.Legal.LegalAcceptanceRecorder legalRecorder,
+    IPlanCatalog planCatalog,
+    /// <summary>
+    /// spr PR 3.3 (ADR B11): optional so existing direct-construction unit tests keep compiling
+    /// unchanged. When omitted, <see cref="FallbackTenantUrlBuilder"/> reproduces the previous
+    /// hardcoded "carstore.com" behavior; production DI always supplies the real
+    /// <c>ConfigurationTenantUrlBuilder</c> (config-driven, see <c>Frontend:TenantUrlTemplate</c>/<c>Frontend:BaseUrl</c>).
+    /// </summary>
+    ITenantUrlBuilder? tenantUrlBuilder = null)
     : ICommandHandler<ProvisionDealerCommand, ProvisionDealerResponse>
 {
-    private const string DashboardBaseUrl = "carstore.com";
+    private static readonly ITenantUrlBuilder FallbackTenantUrlBuilder = new DefaultTenantUrlBuilder();
+
+    private readonly ITenantUrlBuilder _tenantUrlBuilder = tenantUrlBuilder ?? FallbackTenantUrlBuilder;
 
     public async Task<Result<ProvisionDealerResponse>> Handle(
         ProvisionDealerCommand command,
         CancellationToken cancellationToken)
     {
+        // RN-016: the admin must have accepted the currently published T&C version.
+        Result termsCheck = legalRecorder.EnsureCurrentVersion(command.AcceptedTermsVersion);
+        if (termsCheck.IsFailure)
+        {
+            return Result.Failure<ProvisionDealerResponse>(termsCheck.Error);
+        }
+
+        // spr PR 1.1 (ADR B1, D1): never trust a caller-supplied plan code without checking it against the
+        // catalog first — validate BEFORE any write (Stripe customer, DealerSettings, User, subscription row).
+        // IsSellable is a pure config lookup (no provider call): provisioning must never fail because the
+        // payment provider is briefly unreachable — ADR B8 already makes provisioning resilient to that.
+        string planCode = command.PlanCode ?? DealerSubscription.DefaultPlanCode;
+        if (!planCatalog.IsSellable(planCode))
+        {
+            return Result.Failure<ProvisionDealerResponse>(DealerSubscriptionErrors.UnknownPlanCode);
+        }
+
         // REQ: subdomain must be stored lowercase (TenantResolutionMiddleware
         // matches lowercase against the Host header).
         var subdomain = command.Subdomain.Trim().ToLowerInvariant();
@@ -90,31 +120,12 @@ internal sealed class ProvisionDealerCommandHandler(
 
             context.DealerSettings.Add(settings);
 
-            var adminRole = new Role(dealerId, "Admin", "Administrador del Sistema");
-            var defaultPermissions = new[]
-            {
-                "cars:read", "cars:create", "cars:update", "cars:delete",
-                "clients:read", "clients:write", "clients:delete",
-                "sales:read", "sales:create", "sales:update", "sales:delete",
-                "quotes:read", "quotes:create", "quotes:update", "quotes:delete", "quotes:accept", "quotes:reject",
-                "financial:read", "financial:create", "financial:update", "financial:delete",
-                "users:read", "users:create", "users:access", "CanManageUsers", "CanManageRoles",
-                "CanManageSettings",
-                "leads:read", "leads:create", "leads:update", "leads:delete",
-                "leads:write", "leads:archive",
-                "appointments:read", "appointments:create", "appointments:update", "appointments:delete",
-                "admin:backfill",
-                "webhooks:manage",
-                // qa-p1-integridad PR6 (D7): grant at both seed sites — see UsersSeeder.cs.
-                "documents:read", "documents:create"
-            };
-
-            foreach (var permission in defaultPermissions)
-            {
-                adminRole.AddPermission(permission);
-            }
-
+            // spr PR 4.1 (SPR-18): the permission set lives once in DefaultRoleCatalog, not inlined here.
+            var adminRole = DefaultRoleCatalog.BuildRole(dealerId, DefaultRoleCatalog.Admin);
             context.Roles.Add(adminRole);
+
+            var clienteRole = DefaultRoleCatalog.BuildRole(dealerId, DefaultRoleCatalog.Cliente);
+            context.Roles.Add(clienteRole);
 
             user = new User(
                 dealerId,
@@ -125,6 +136,18 @@ internal sealed class ProvisionDealerCommandHandler(
                 adminRole.Id);
 
             context.Users.Add(user);
+
+            // sfc A4.3 / C17: the first administrator is the owner from the very first row.
+            settings.SetOwner(user.Id);
+
+            legalRecorder.RecordTermsAcceptance(dealerId, user.Id, command.AcceptanceIp, command.AcceptanceUserAgent);
+
+            // spr ADR B8: a dealer NEVER exists without a subscription row. It is created in the
+            // same transaction as the dealer, with or without a Stripe customer, as Incomplete:
+            // SubscriptionGuardMiddleware blocks it (402) until Stripe confirms a trial/payment, so
+            // the product is not usable for free while checkout is pending.
+            context.DealerSubscriptions.Add(
+                DealerSubscription.CreatePending(dealerId, stripeCustomerId, planId: string.Empty, planCode: planCode));
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -160,7 +183,7 @@ internal sealed class ProvisionDealerCommandHandler(
             }
         }
 
-        var dashboardUrl = $"https://{subdomain}.{DashboardBaseUrl}/dashboard";
+        var dashboardUrl = _tenantUrlBuilder.BuildDashboardUrl(subdomain);
 
         await publisher.Publish(
             new DealerProvisionedDomainEvent(dealerId, user.Id, command.AdminEmail, subdomain, dashboardUrl),
@@ -169,7 +192,12 @@ internal sealed class ProvisionDealerCommandHandler(
         string? checkoutUrl = null;
         try
         {
-            checkoutUrl = await subscriptionGateway.CreateCheckoutSessionAsync(dealerId, command.AdminEmail, cancellationToken);
+            checkoutUrl = await subscriptionGateway.CreateCheckoutSessionAsync(
+                dealerId,
+                command.AdminEmail,
+                planCode,
+                new CheckoutReturn(SuccessUrl: _tenantUrlBuilder.BuildCheckoutSuccessUrl()),
+                cancellationToken);
         }
         catch (Exception ex)
         {
@@ -191,5 +219,18 @@ internal sealed class ProvisionDealerCommandHandler(
         return message.Contains("HostName", StringComparison.OrdinalIgnoreCase)
             || message.Contains("host_name", StringComparison.OrdinalIgnoreCase)
             || message.Contains("dealer_settings", StringComparison.OrdinalIgnoreCase) && message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// spr PR 3.3 (ADR B11): reproduces the previous hardcoded "carstore.com" behavior for the handful
+    /// of pre-existing unit tests that construct <see cref="ProvisionDealerCommandHandler"/> directly
+    /// without supplying an <see cref="ITenantUrlBuilder"/>. Production DI never resolves this —
+    /// see <c>ConfigurationTenantUrlBuilder</c> in Infrastructure.
+    /// </summary>
+    private sealed class DefaultTenantUrlBuilder : ITenantUrlBuilder
+    {
+        public string BuildDashboardUrl(string slug) => $"https://{slug}.carstore.com/dashboard";
+
+        public string BuildCheckoutSuccessUrl() => "https://carstore-app.com/saas/felicitaciones?session_id={CHECKOUT_SESSION_ID}";
     }
 }

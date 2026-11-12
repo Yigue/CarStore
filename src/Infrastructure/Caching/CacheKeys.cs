@@ -5,8 +5,8 @@ namespace Infrastructure.Caching;
 /// </summary>
 public static class CacheKeys
 {
-    // Permisos
-    public static string UserPermissions(Guid userId) => $"permissions:user:{userId}";
+    // Permisos (sfc B6.3: dealer-scoped — the same user can hold a different role per dealer).
+    public static string UserPermissions(Guid userId, Guid dealerId) => $"permissions:user:{userId}:dealer:{dealerId}";
     
     // Marcas
     public static string AllBrands() => "brands:all";
@@ -20,9 +20,26 @@ public static class CacheKeys
     
     // Categorías de transacciones
     public static string AllTransactionCategories() => "transaction-categories:all";
+    public static string AllTransactionCategories(Guid? dealerId) =>
+        dealerId.HasValue && dealerId.Value != Guid.Empty
+            ? $"transaction-categories:all:{dealerId.Value}"
+            : "transaction-categories:all";
+
     public static string TransactionCategoryById(Guid id) => $"transaction-categories:id:{id}";
+    public static string TransactionCategoryById(Guid id, Guid? dealerId) =>
+        dealerId.HasValue && dealerId.Value != Guid.Empty
+            ? $"transaction-categories:id:{id}:{dealerId.Value}"
+            : $"transaction-categories:id:{id}";
+
     public static string TransactionCategoryByName(string name) => $"transaction-categories:name:{name.ToLowerInvariant()}";
+    public static string TransactionCategoryByName(string name, Guid? dealerId) =>
+        dealerId.HasValue && dealerId.Value != Guid.Empty
+            ? $"transaction-categories:name:{name.ToLowerInvariant()}:{dealerId.Value}"
+            : $"transaction-categories:name:{name.ToLowerInvariant()}";
     
+    // Billing (spr PR 1.1, ADR B1): plan details read from the payment provider.
+    public static string BillingPlan(string code) => $"billing:plan:{code.ToLowerInvariant()}";
+
     // Patrones para invalidación
     public static string BrandsPattern() => "brands:*";
     public static string ModelsPattern() => "models:*";
@@ -43,5 +60,8 @@ public static class CacheTTL
     
     // Categorías: 2 horas (cambian muy raramente)
     public static TimeSpan TransactionCategories => TimeSpan.FromHours(2);
+
+    // Planes de Stripe (spr PR 1.1): 1 hora (ADR B1 / IPlanCatalog).
+    public static TimeSpan BillingPlan => TimeSpan.FromHours(1);
 }
 

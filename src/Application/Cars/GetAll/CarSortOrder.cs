@@ -77,10 +77,10 @@ internal static class CarSortOrder
 
         IOrderedQueryable<Car> ordered = field switch
         {
-            // Price is a Money value object behind a ValueConverter over a single decimal
-            // column, so the property itself (not Price.Amount, which does not translate)
-            // is what relational providers turn into ORDER BY price.
-            "price" => Order(query, c => c.Price, descending),
+            // Price is an owned Money (amount + currency columns, ADR C1); the sort key is the
+            // amount column. Orders by amount only — mixing currencies in one listing is a
+            // separate concern (B0.3).
+            "price" => Order(query, c => c.Price.Amount, descending),
             "year" => Order(query, c => c.Anio, descending),
             "kilometraje" => Order(query, c => c.Kilometraje, descending),
             "fueltype" => Order(query, c => c.FuelType, descending),

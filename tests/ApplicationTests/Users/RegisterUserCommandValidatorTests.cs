@@ -21,7 +21,7 @@ public class RegisterUserCommandValidatorTests
     [Fact]
     public void Validate_ShouldPass_ForValidValues()
     {
-        var command = new RegisterUserCommand("user@mail.com", "First", "Last", "Pass123!");
+        var command = new RegisterUserCommand("user@mail.com", "First", "Last", "Password123");
 
         var result = _validator.Validate(command);
 

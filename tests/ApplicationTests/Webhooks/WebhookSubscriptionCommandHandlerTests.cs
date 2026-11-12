@@ -1,4 +1,5 @@
 using Application.Abstractions.Tenancy;
+using Application.Billing.Entitlements;
 using Application.UnitTests;
 using Application.Webhooks.Create;
 using Application.Webhooks.Delete;
@@ -28,11 +29,20 @@ public class WebhookSubscriptionCommandHandlerTests
     private static ICurrentTenantService TenantService() =>
         Mock.Of<ICurrentTenantService>(t => t.DealerId == DealerId && t.HasTenant == true);
 
+    /// <summary>sfc A3.1: these tests exercise pre-existing webhook CRUD behavior, not entitlements — always allow.</summary>
+    private static IEntitlementService AlwaysAllowEntitlements()
+    {
+        var mock = new Mock<IEntitlementService>();
+        mock.Setup(s => s.EnsureCanAddAsync(It.IsAny<Guid>(), It.IsAny<PlanResource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        return mock.Object;
+    }
+
     [Fact]
     public async Task Create_ShouldGenerateSecret_AndPersistSubscription()
     {
         var context = CreateContext();
-        var handler = new CreateWebhookSubscriptionCommandHandler(context, TenantService(), new FakeDateTimeProvider());
+        var handler = new CreateWebhookSubscriptionCommandHandler(context, context, TenantService(), new FakeDateTimeProvider(), AlwaysAllowEntitlements());
 
         var result = await handler.Handle(
             new CreateWebhookSubscriptionCommand("https://example.com/hook", [WebhookEventCatalog.SaleCreated]),
@@ -51,7 +61,7 @@ public class WebhookSubscriptionCommandHandlerTests
     public async Task Create_ShouldReturnValidationFailure_ForUnknownEventType()
     {
         var context = CreateContext();
-        var handler = new CreateWebhookSubscriptionCommandHandler(context, TenantService(), new FakeDateTimeProvider());
+        var handler = new CreateWebhookSubscriptionCommandHandler(context, context, TenantService(), new FakeDateTimeProvider(), AlwaysAllowEntitlements());
 
         var result = await handler.Handle(
             new CreateWebhookSubscriptionCommand("https://example.com/hook", ["not.a.real.event"]),
@@ -65,7 +75,7 @@ public class WebhookSubscriptionCommandHandlerTests
     public async Task GetAll_ShouldMaskSecret()
     {
         var context = CreateContext();
-        var createHandler = new CreateWebhookSubscriptionCommandHandler(context, TenantService(), new FakeDateTimeProvider());
+        var createHandler = new CreateWebhookSubscriptionCommandHandler(context, context, TenantService(), new FakeDateTimeProvider(), AlwaysAllowEntitlements());
         var created = await createHandler.Handle(
             new CreateWebhookSubscriptionCommand("https://example.com/hook", [WebhookEventCatalog.SaleCreated]),
             CancellationToken.None);

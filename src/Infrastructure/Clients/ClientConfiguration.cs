@@ -25,7 +25,9 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
             .HasMaxLength(20)
             .IsRequired();
 
-        builder.HasIndex(c => c.DNI)
+        builder.HasIndex(c => new { c.DealerId, c.DNI })
+            .HasFilter("is_deleted = false")
+            .HasDatabaseName("ix_clients_dealer_dni")
             .IsUnique();
 
         builder.Property(c => c.Email)

@@ -61,9 +61,20 @@ public class DealerSubscriptionConfiguration : IEntityTypeConfiguration<DealerSu
             .HasColumnName("cancelled_at")
             .IsRequired(false);
 
+        builder.Property(x => x.LastProviderEventAtUtc)
+            .HasColumnName("last_provider_event_at_utc")
+            .IsRequired(false);
+
         builder.Property(x => x.PlanId)
             .HasColumnName("plan_id")
             .HasMaxLength(64)
             .IsRequired();
+
+        // spr PR 1.1 (SPR-02/B1): nullable at the DB level on purpose — migration AddSubscriptionPlanCode
+        // backfills existing rows to "standard" but this PR does not promote the column to NOT NULL.
+        builder.Property(x => x.PlanCode)
+            .HasColumnName("plan_code")
+            .HasMaxLength(32)
+            .IsRequired(false);
     }
 }

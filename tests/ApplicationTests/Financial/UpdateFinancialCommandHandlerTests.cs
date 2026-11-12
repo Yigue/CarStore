@@ -42,7 +42,7 @@ public class UpdateFinancialCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_CrossTenantUpdate_ReturnsForbidden_AndNeverSaves()
+    public async Task Handle_CrossTenantUpdate_ReturnsNotFound_AndNeverSaves()
     {
         // Arrange: seed a transaction belonging to DealerA
         var (seededCtx, txId) = SeedTransaction();
@@ -84,7 +84,8 @@ public class UpdateFinancialCommandHandlerTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Type.Should().Be(ErrorType.Forbidden);
+        result.Error.Type.Should().Be(ErrorType.NotFound);
+        result.Error.Code.Should().Be(FinancialErrors.NotFound(txId).Code);
 
         // Verify SaveChanges was NEVER called by the rejected handler
         saveCalls.Should().Be(0);

@@ -1,10 +1,19 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Application.Abstractions;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
+using Application.Abstractions.Integrations;
+using Domain.Cars.Events;
+using Infrastructure.Integrations;
+using Infrastructure.Integrations.MercadoLibre;
+using Infrastructure.Integrations.WhatsApp;
+using MediatR;
 using Application.Abstractions.Storage;
 using Application.Abstractions.Tenancy;
+using Application.Abstractions.Webhooks;
 using Application.Users.Register;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
@@ -18,6 +27,7 @@ using Infrastructure.Services;
 using Infrastructure.Tenancy;
 using Infrastructure.Time;
 using Infrastructure.Users;
+using Infrastructure.Webhooks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -26,6 +36,10 @@ using Minio;
 using Stripe;
 using Application.Abstractions.Billing;
 using Infrastructure.Billing;
+using Application.Abstractions.Security;
+using Infrastructure.Security;
+using Application.Abstractions.TenantUrl;
+using Infrastructure.TenantUrl;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
@@ -59,13 +73,84 @@ public static class DependencyInjection
             .AddAuthenticationInternal(configuration)
             .AddAuthorizationInternal()
             .ConfigureOpenTelemetry()
-            .AddBackgroundJobs()
-            .AddBilling(configuration);
+            .AddBackgroundJobs(configuration)
+            .AddBilling(configuration)
+            .AddCaptcha(configuration)
+            .AddIntegrations(configuration, environment);
+
+    /// <summary>sfc C1.1 / ADR C22: encrypted credentials, command queue dispatcher and rate limiter.
+    /// sfc C1.2 / C1.3 (ADR C25): adds the MercadoLibre push client/webhook processor and its domain-event
+    /// handlers — registered here (not auto-scanned) because MediatR only scans the Application assembly.</summary>
+    private static IServiceCollection AddIntegrations(
+        this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment? environment)
+    {
+        services.AddIntegrationDataProtection(configuration);
+        if (environment?.IsProduction() == true)
+        {
+            services.AddTransient<IStartupFilter, DataProtectionProductionGuard>();
+        }
+
+        services.AddSingleton<Application.Abstractions.Pricing.IMoneyPolicy, Infrastructure.Pricing.ConfigurationMoneyPolicy>();
+        services.AddSingleton<ICredentialProtector, DataProtectionCredentialProtector>();
+        services.AddSingleton<IIntegrationProviderSettings, IntegrationProviderSettings>();
+
+        var rateLimit = (configuration.GetSection(RateLimiterOptions.SectionName).Get<RateLimiterOptions>() ?? new RateLimiterOptions()).Validate();
+        services.AddSingleton(rateLimit);
+
+        string? redisConnectionString = configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrEmpty(redisConnectionString))
+        {
+            services.AddSingleton<IConnectionMultiplexer>(_ =>
+            {
+                ConfigurationOptions options = ConfigurationOptions.Parse(redisConnectionString);
+                options.AbortOnConnectFail = false;
+                return ConnectionMultiplexer.Connect(options);
+            });
+            services.AddSingleton<IRateLimiter, RedisRateLimiter>();
+            services.AddSingleton<IWhatsAppContactStateStore, RedisWhatsAppContactStateStore>();
+        }
+        else
+        {
+            services.AddSingleton<IRateLimiter, InMemoryRateLimiter>();
+            services.AddSingleton<IWhatsAppContactStateStore, InMemoryWhatsAppContactStateStore>();
+        }
+
+        services.AddScoped<IntegrationCommandDispatcher>();
+
+        services.AddOptions<MercadoLibreOptions>()
+            .BindConfiguration(MercadoLibreOptions.SectionName);
+        services.AddHttpClient(MercadoLibreClient.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddScoped<MercadoLibreClient>();
+        services.AddScoped<IIntegrationClient, MercadoLibreClient>(sp => sp.GetRequiredService<MercadoLibreClient>());
+        services.AddScoped<MercadoLibreWebhookProcessor>();
+        services.AddScoped<INotificationHandler<CarPriceChangedDomainEvent>, MercadoLibreListingSyncHandlers>();
+        services.AddScoped<INotificationHandler<Domain.Cars.Events.CarSoldDomainEvent>, MercadoLibreListingSyncHandlers>();
+        services.AddScoped<INotificationHandler<Domain.Cars.Events.CarDeleteDomainEvent>, MercadoLibreListingSyncHandlers>();
+
+        // sfc C0.4 (RN-046): WhatsApp Cloud API connector. IWhatsAppContactStateStore is registered
+        // above alongside IRateLimiter (same Redis-vs-InMemory branch); the webhook endpoint resolves
+        // IWhatsAppCredentialResolver/IWhatsAppContactStateStore directly via [FromServices].
+        services.AddHttpClient(WhatsAppCloudApiClient.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddScoped<IWhatsAppCredentialResolver, WhatsAppCredentialResolver>();
+        services.AddScoped<WhatsAppCloudApiClient>();
+        services.AddScoped<IIntegrationClient, WhatsAppCloudApiClient>(sp => sp.GetRequiredService<WhatsAppCloudApiClient>());
+
+        return services;
+    }
 
     private static IServiceCollection AddBilling(this IServiceCollection services, IConfiguration configuration)
     {
         var stripe = services.AddOptions<StripeOptions>()
             .BindConfiguration(StripeOptions.SectionName);
+
+        // spr PR 1.1 (ADR B1, D1): "plan único" is validated whenever Stripe is actually wired up.
+        services.AddSingleton<IValidateOptions<StripeOptions>, StripeOptionsValidator>();
 
         var billingEnabled = configuration.GetValue<bool?>("Stripe:Enabled") ?? !string.IsNullOrWhiteSpace(configuration["Stripe:SecretKey"]);
         if (billingEnabled)
@@ -74,15 +159,57 @@ public static class DependencyInjection
             stripe.ValidateOnStart();
             services.AddSingleton<IStripeClient>(new StripeClient(configuration["Stripe:SecretKey"]));
             services.AddScoped<ISubscriptionGateway, StripeSubscriptionGateway>();
+            services.AddScoped<IPlanCatalog, StripePlanCatalog>();
         }
         else
         {
             services.AddScoped<ISubscriptionGateway, NoOpSubscriptionGateway>();
+            services.AddScoped<IPlanCatalog, NoOpPlanCatalog>();
         }
 
+        // Pure translation (no I/O): needed even when billing is disabled so queued events can still be applied.
+        services.AddSingleton<IBillingEventTranslator, StripeBillingEventTranslator>();
+
         services.AddScoped<ISubscriptionStatusCache, RedisSubscriptionStatusCache>();
+        // Short-TTL (30s) cache over the lifecycle read: the guard hits it on every authenticated request.
+        // IMemoryCache is a singleton, so invalidation from the retention handler reaches every scoped reader.
+        services.AddMemoryCache();
+        services.AddScoped<Infrastructure.Tenancy.EfTenantLifecycleReader>();
+        services.AddScoped<Infrastructure.Tenancy.CachedTenantLifecycleReader>(sp => new Infrastructure.Tenancy.CachedTenantLifecycleReader(
+            sp.GetRequiredService<Infrastructure.Tenancy.EfTenantLifecycleReader>(),
+            sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>()));
+        services.AddScoped<Application.Abstractions.Tenancy.ITenantLifecycleReader>(sp => sp.GetRequiredService<Infrastructure.Tenancy.CachedTenantLifecycleReader>());
+        services.AddScoped<Application.Abstractions.Tenancy.ITenantLifecycleCache>(sp => sp.GetRequiredService<Infrastructure.Tenancy.CachedTenantLifecycleReader>());
         services.AddScoped<IDealerSubscriptionRepository, DealerSubscriptionRepository>();
         services.AddScoped<ProcessedStripeEventRepository>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// spr PR 3.3 (ADR B10): mirrors the <c>AddBilling</c> optional-service pattern — real Turnstile
+    /// wiring when <c>Captcha:SecretKey</c> is configured, otherwise the always-valid
+    /// <see cref="NoOpCaptchaVerifier"/>. <c>Program.cs</c> asserts at startup that the NoOp verifier
+    /// is never resolved in a Production environment.
+    /// </summary>
+    private static IServiceCollection AddCaptcha(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<CaptchaOptions>().BindConfiguration(CaptchaOptions.SectionName);
+
+        bool captchaConfigured = !string.IsNullOrWhiteSpace(configuration[$"{CaptchaOptions.SectionName}:SecretKey"]);
+        if (captchaConfigured)
+        {
+            // Security review: AddScoped<ICaptchaVerifier, TurnstileCaptchaVerifier>() would resolve its
+            // own HttpClient constructor param from the DEFAULT unnamed client (100s timeout), not the one
+            // configured below — only resolving TurnstileCaptchaVerifier itself goes through the typed-client
+            // factory. Resolving it here and handing that instance to ICaptchaVerifier keeps the 3s timeout real.
+            services.AddHttpClient<TurnstileCaptchaVerifier>(client => client.Timeout = TimeSpan.FromSeconds(3));
+            services.AddScoped<ICaptchaVerifier>(sp => sp.GetRequiredService<TurnstileCaptchaVerifier>());
+        }
+        else
+        {
+            services.AddScoped<ICaptchaVerifier, NoOpCaptchaVerifier>();
+        }
 
         return services;
     }
@@ -114,6 +241,14 @@ public static class DependencyInjection
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+        services.AddSingleton<Application.Legal.ILegalTermsProvider, Infrastructure.Legal.ConfigurationLegalTermsProvider>();
+
+        // spr PR 3.3 (ADR B11): tenant-aware dashboard/checkout URLs (Frontend:TenantUrlTemplate, Frontend:BaseUrl).
+        services.AddScoped<ITenantUrlBuilder, ConfigurationTenantUrlBuilder>();
+
+        // sfc B3.1 / B8: QuestPDF-backed document renderer. License is set once via a
+        // static constructor on QuestPdfRenderer (see that class), not here.
+        services.AddSingleton<Application.Abstractions.Documents.IDocumentRenderer, Infrastructure.Documents.QuestPdfRenderer>();
 
         // PHASE-2 (Inventario-Overhaul): MinIO-backed storage for the Cars aggregate.
         // ADR-3: single production implementation (no factory, no multi-binding).
@@ -171,6 +306,8 @@ public static class DependencyInjection
         services.AddScoped<IUserNotificationService, UserNotificationService>();
         services.AddScoped<IDealerNotificationService, DealerNotificationService>();
         services.AddScoped<IRoundRobinLeadAllocator, RoundRobinLeadAllocator>();
+        // sfc B4.3 / RN-018: per-dealer quote folios.
+        services.AddScoped<Application.Abstractions.Data.IDealerSequenceAllocator, Common.DealerSequenceAllocator>();
 
         // REQ-FIN-LEDGER-001: real EF-backed ledger. Replaces NoOpFinancialLedgerService
         // (deleted with this change). Idempotency is enforced via the partial
@@ -235,13 +372,19 @@ public static class DependencyInjection
                 provider.GetRequiredService<ILogger<NoOpEmailService>>());
         });
 
+        // sfc A2.3 / A18: template catalog on top of the IEmailService transport.
+        services.AddScoped<Application.Abstractions.Email.ITransactionalEmailSender, TransactionalEmail.TransactionalEmailSender>();
+        // sfc B5.1: anonymous endpoints queue their emails so the response time does not reveal whether one was sent.
+        services.AddSingleton<TransactionalEmail.BackgroundEmailQueue>();
+        services.AddSingleton<Application.Abstractions.Email.IBackgroundEmailQueue>(sp => sp.GetRequiredService<TransactionalEmail.BackgroundEmailQueue>());
+        services.AddHostedService<TransactionalEmail.BackgroundEmailWorker>();
+
         return services;
     }
 
     private static IServiceCollection AddDatabase(this IServiceCollection services, IConfiguration configuration)
     {
-        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase") || 
-                          Environment.GetEnvironmentVariable("UseInMemoryDatabase") == "true";
+        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase");
 
         if (useInMemory)
         {
@@ -251,8 +394,12 @@ public static class DependencyInjection
 
         string? connectionString = configuration.GetConnectionString("Database") ?? throw new ArgumentNullException(nameof(configuration));
 
-services.AddDbContext<ApplicationDbContext>(
-                options => options
+            // sfc B2.2: the interceptor writes the DealerAuditLogEntry rows inside the same SaveChanges.
+            services.AddScoped<Database.Interceptors.TenantAuditInterceptor>();
+
+            services.AddDbContext<ApplicationDbContext>(
+                (serviceProvider, options) => options
+                    .AddInterceptors(serviceProvider.GetRequiredService<Database.Interceptors.TenantAuditInterceptor>())
                     .UseNpgsql(connectionString, npgsqlOptions =>
                     {
                         npgsqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Default);
@@ -306,8 +453,7 @@ services.AddDbContext<ApplicationDbContext>(
     {
         var healthChecksBuilder = services.AddHealthChecks();
 
-        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase") || 
-                          Environment.GetEnvironmentVariable("UseInMemoryDatabase") == "true";
+        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase");
 
         if (!useInMemory)
         {
@@ -348,6 +494,8 @@ services.AddDbContext<ApplicationDbContext>(
 
         services.AddHttpContextAccessor();
         services.AddScoped<IUserContext, UserContext>();
+        // sfc B2.2: carries the business reason of the current scope (also registered when the DB is replaced in tests).
+        services.AddScoped<Application.Abstractions.Auditing.IAuditContext, Auditing.AuditContext>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<ITokenProvider, TokenProvider>();
 
@@ -359,6 +507,13 @@ services.AddDbContext<ApplicationDbContext>(
         services.AddAuthorization();
 
         services.AddScoped<PermissionProvider>();
+        // sfc C2.2 / ADR C26: branch data scope for listings.
+        services.AddScoped<Application.Abstractions.Branches.IBranchScope, BranchScope>();
+
+        // Without this, a permission change waits out PermissionProvider's 30-minute cache: a
+        // granted permission looks ignored, and a REVOKED one keeps working.
+        services.AddScoped<Application.Abstractions.Authorization.IPermissionCacheInvalidator,
+            Infrastructure.Authorization.PermissionCacheInvalidator>();
 
         services.AddTransient<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
@@ -384,23 +539,92 @@ services.AddDbContext<ApplicationDbContext>(
 
         return services;
     }
-    private static IServiceCollection AddBackgroundJobs(this IServiceCollection services)
+    private static IServiceCollection AddBackgroundJobs(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton<IWebhookDestinationGuard, WebhookDestinationGuard>();
+
+        // Named client for outgoing webhook deliveries — anti-SSRF SocketsHttpHandler validates
+        // resolved IPs in ConnectCallback, connects directly to the validated IP to defeat DNS rebinding,
+        // and refuses auto-redirects. Short 10s timeout prevents slow endpoints from stalling dispatch.
+        services.AddHttpClient(DispatchWebhookDeliveriesJob.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        })
+        .ConfigurePrimaryHttpMessageHandler(sp =>
+        {
+            var guard = sp.GetRequiredService<IWebhookDestinationGuard>();
+            return new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                ConnectCallback = async (context, cancellationToken) =>
+                {
+                    IPAddress[] entry = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
+                    if (entry is null || entry.Length == 0)
+                    {
+                        throw new HttpRequestException("Destination blocked: unable to resolve host.");
+                    }
+
+                    IPAddress? targetIp = null;
+                    foreach (var ip in entry)
+                    {
+                        if (guard.IsBlocked(ip))
+                        {
+                            throw new HttpRequestException($"Destination blocked: resolved IP '{ip}' is in a restricted range.");
+                        }
+
+                        targetIp ??= ip;
+                    }
+
+                    var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                    try
+                    {
+                        await socket.ConnectAsync(new IPEndPoint(targetIp!, context.DnsEndPoint.Port), cancellationToken);
+                        return new NetworkStream(socket, ownsSocket: true);
+                    }
+                    catch
+                    {
+                        socket.Dispose();
+                        throw;
+                    }
+                }
+            };
+        });
+
+        // Crm:Reengagement:Enabled defaults to false — see CrmReengagementOptions.
+        services.AddOptions<CrmReengagementOptions>()
+            .BindConfiguration(CrmReengagementOptions.SectionName);
+
+        services.AddOptions<BillingReconciliationOptions>()
+            .BindConfiguration(BillingReconciliationOptions.SectionName);
+
         // Skip background jobs when using in-memory database (integration tests)
-        bool useInMemory = Environment.GetEnvironmentVariable("UseInMemoryDatabase") == "true";
+        bool useInMemory = configuration.GetValue<bool>("UseInMemoryDatabase");
         if (useInMemory)
         {
             return services;
         }
 
+        // spr PR 5.1 (OPS-07): same Postgres used by EF Core, read from the connection string
+        // key already used by AddDbContext/UseNpgsql below (never a separate config key).
+        string quartzConnectionString = configuration.GetConnectionString("Database")
+            ?? throw new InvalidOperationException("Missing ConnectionStrings:Database for Quartz's clustered job store.");
+
         services.AddQuartz(configure =>
         {
+            // spr PR 5.1 (OPS-07): stable scheduler name shared by every node so they form one
+            // cluster against the persistent store below; SchedulerId stays "AUTO" so each node
+            // gets its own unique instance id (required by UseClustering, see docs/runbooks/
+            // quartz-clustering-y-multi-instancia.md).
+            configure.SchedulerName = "CarStoreScheduler";
+            configure.SchedulerId = "AUTO";
+
             // Job 1: Process Outbox Messages
             var outboxJobKey = new JobKey(nameof(ProcessOutboxMessagesJob));
             configure
-                .AddJob<ProcessOutboxMessagesJob>(opts => opts.WithIdentity(outboxJobKey))
+                .AddJob<ProcessOutboxMessagesJob>(opts => opts.WithIdentity(outboxJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(outboxJobKey)
+                        .WithIdentity($"{outboxJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(10)
                                 .RepeatForever()));
@@ -408,9 +632,10 @@ services.AddDbContext<ApplicationDbContext>(
             // Job 2: Mark Expired Quotes
             var expiredQuotesJobKey = new JobKey(nameof(MarkExpiredQuotesJob));
             configure
-                .AddJob<MarkExpiredQuotesJob>(opts => opts.WithIdentity(expiredQuotesJobKey))
+                .AddJob<MarkExpiredQuotesJob>(opts => opts.WithIdentity(expiredQuotesJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(expiredQuotesJobKey)
+                        .WithIdentity($"{expiredQuotesJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInMinutes(5) // Check every 5 minutes
                                 .RepeatForever()));
@@ -418,9 +643,10 @@ services.AddDbContext<ApplicationDbContext>(
             // Job 3: Process Stripe Webhooks
             var stripeJobKey = new JobKey(nameof(ProcessStripeWebhooksJob));
             configure
-                .AddJob<ProcessStripeWebhooksJob>(opts => opts.WithIdentity(stripeJobKey))
+                .AddJob<ProcessStripeWebhooksJob>(opts => opts.WithIdentity(stripeJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(stripeJobKey)
+                        .WithIdentity($"{stripeJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(5)
                                 .RepeatForever()));
@@ -429,36 +655,137 @@ services.AddDbContext<ApplicationDbContext>(
             // WebhookDelivery rows — see Domain.Webhooks.WebhookRetryPolicy).
             var webhookDispatchJobKey = new JobKey(nameof(DispatchWebhookDeliveriesJob));
             configure
-                .AddJob<DispatchWebhookDeliveriesJob>(opts => opts.WithIdentity(webhookDispatchJobKey))
+                .AddJob<DispatchWebhookDeliveriesJob>(opts => opts.WithIdentity(webhookDispatchJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(webhookDispatchJobKey)
+                        .WithIdentity($"{webhookDispatchJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInSeconds(15)
+                                .RepeatForever()));
+
+            // sfc C1.1 / ADR C22: integration command queue (providers opt in via Integrations:{Provider}:Enabled).
+            var integrationJobKey = new JobKey(nameof(DispatchIntegrationCommandsJob));
+            configure
+                .AddJob<DispatchIntegrationCommandsJob>(opts => opts.WithIdentity(integrationJobKey).StoreDurably())
+                .AddTrigger(trigger =>
+                    trigger.ForJob(integrationJobKey)
+                        .WithIdentity($"{integrationJobKey.Name}-trigger")
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInSeconds(10)
                                 .RepeatForever()));
 
             // Job 5: Lost-lead re-engagement (disabled by default — Crm:Reengagement:Enabled).
             var reengagementJobKey = new JobKey(nameof(LeadReengagementJob));
             configure
-                .AddJob<LeadReengagementJob>(opts => opts.WithIdentity(reengagementJobKey))
+                .AddJob<LeadReengagementJob>(opts => opts.WithIdentity(reengagementJobKey).StoreDurably())
                 .AddTrigger(trigger =>
                     trigger.ForJob(reengagementJobKey)
+                        .WithIdentity($"{reengagementJobKey.Name}-trigger")
                         .WithSimpleSchedule(schedule =>
                             schedule.WithIntervalInHours(24)
                                 .RepeatForever()));
+
+            // Job 7: Tenant data exports (RN-014): builds pending ZIPs and expires old ones.
+            var exportJobKey = new JobKey(nameof(BuildTenantExportJob));
+            configure
+                .AddJob<BuildTenantExportJob>(opts => opts.WithIdentity(exportJobKey).StoreDurably())
+                .AddTrigger(trigger =>
+                    trigger.ForJob(exportJobKey)
+                        .WithIdentity($"{exportJobKey.Name}-trigger")
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInSeconds(30)
+                                .RepeatForever()));
+
+            // Job 8: Tenant purge (RN-013, A1.4): daily at 03:00 UTC. Dry run unless Retention:PurgeEnabled=true.
+            var purgeJobKey = new JobKey(nameof(PurgeTenantDataJob));
+            configure
+                .AddJob<PurgeTenantDataJob>(opts => opts.WithIdentity(purgeJobKey).StoreDurably())
+                .AddTrigger(trigger =>
+                    trigger.ForJob(purgeJobKey)
+                        .WithIdentity($"{purgeJobKey.Name}-trigger")
+                        .WithCronSchedule("0 0 3 * * ?"));
+
+            // sfc C2.4: after-sales reminders (RN-049), daily at 10:30 UTC.
+            var serviceReminderJobKey = new JobKey(nameof(ServiceReminderJob));
+            configure
+                .AddJob<ServiceReminderJob>(opts => opts.WithIdentity(serviceReminderJobKey).StoreDurably())
+                .AddTrigger(trigger =>
+                    trigger.ForJob(serviceReminderJobKey)
+                        .WithIdentity($"{serviceReminderJobKey.Name}-trigger")
+                        .WithCronSchedule("0 30 10 * * ?"));
+
+            // sfc B6.2: follow-up reminders (RN-041), daily at 11:00 UTC (08:00 in Argentina).
+            var followUpJobKey = new JobKey(nameof(FollowUpCadenceJob));
+            configure
+                .AddJob<FollowUpCadenceJob>(opts => opts.WithIdentity(followUpJobKey).StoreDurably())
+                .AddTrigger(trigger =>
+                    trigger.ForJob(followUpJobKey)
+                        .WithIdentity($"{followUpJobKey.Name}-trigger")
+                        .WithCronSchedule("0 0 11 * * ?"));
+
+            // sfc B1.3.3: deposit sweep (RN-002/RN-003), hourly at minute 5.
+            var depositJobKey = new JobKey(nameof(ExpireDepositsJob));
+            configure
+                .AddJob<ExpireDepositsJob>(opts => opts.WithIdentity(depositJobKey).StoreDurably())
+                .AddTrigger(trigger =>
+                    trigger.ForJob(depositJobKey)
+                        .WithIdentity($"{depositJobKey.Name}-trigger")
+                        .WithCronSchedule("0 5 * * * ?"));
+
+            // Job 9: retries storage deletes parked by the tenant purge (every 15 minutes). No feature flag: it only
+            // deletes objects of tenants already purged.
+            var storageRetryJobKey = new JobKey(nameof(StorageDeletionRetryJob));
+            configure
+                .AddJob<StorageDeletionRetryJob>(opts => opts.WithIdentity(storageRetryJobKey).StoreDurably())
+                .AddTrigger(trigger =>
+                    trigger.ForJob(storageRetryJobKey)
+                        .WithIdentity($"{storageRetryJobKey.Name}-trigger")
+                        .WithSimpleSchedule(schedule =>
+                            schedule.WithIntervalInMinutes(15)
+                                .RepeatForever()));
+
+            // Job 6: Billing reconciliation (spr ADR B9) — flags dealers without a confirmed
+            // subscription past the grace window; never deletes. Billing:Reconciliation:Enabled
+            // turns it off entirely; the interval is read here because Quartz fixes it at startup.
+            var reconciliation = configuration.GetSection(BillingReconciliationOptions.SectionName)
+                .Get<BillingReconciliationOptions>() ?? new BillingReconciliationOptions();
+            if (reconciliation.Enabled)
+            {
+                var reconcileJobKey = new JobKey(nameof(ReconcileSubscriptionsJob));
+                configure
+                    .AddJob<ReconcileSubscriptionsJob>(opts => opts.WithIdentity(reconcileJobKey).StoreDurably())
+                    .AddTrigger(trigger =>
+                        trigger.ForJob(reconcileJobKey)
+                            .WithIdentity($"{reconcileJobKey.Name}-trigger")
+                            .WithSimpleSchedule(schedule =>
+                                schedule.WithIntervalInMinutes(Math.Max(1, reconciliation.IntervalMinutes))
+                                    .RepeatForever()));
+            }
+
+            // spr PR 5.1 (OPS-07): clustered ADO job store on the app's own Postgres so only one
+            // node in the cluster fires each trigger — see docs/runbooks/
+            // quartz-clustering-y-multi-instancia.md ("Opción A"). Table schema/prefix are
+            // Quartz's own defaults (qrtz_*, lowercase, already consistent with this repo's
+            // snake_case convention once Postgres folds the unquoted identifiers).
+            configure.UsePersistentStore(store =>
+            {
+                store.UseProperties = true;
+                store.UsePostgres(quartzConnectionString);
+                store.UseClustering(cluster =>
+                {
+                    cluster.CheckinInterval = TimeSpan.FromSeconds(10);
+                    cluster.CheckinMisfireThreshold = TimeSpan.FromSeconds(15);
+                });
+
+                // Runbook pseudocode said UseSystemTextJsonSerializer(); Quartz.Serialization.Json
+                // 3.15.1 actually exposes it as UseJsonSerializer() (System.Text.Json-backed) vs.
+                // UseNewtonsoftJsonSerializer() — confirmed via reflection against the installed
+                // package, not assumed from the runbook's literal pseudocode.
+                store.UseJsonSerializer();
+            });
         });
 
         services.AddQuartzHostedService();
-
-        // Named client for outgoing webhook deliveries — short timeout so a slow/unreachable
-        // tenant endpoint can never stall the dispatcher job.
-        services.AddHttpClient(DispatchWebhookDeliveriesJob.HttpClientName, client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(10);
-        });
-
-        // Crm:Reengagement:Enabled defaults to false — see CrmReengagementOptions.
-        services.AddOptions<CrmReengagementOptions>()
-            .BindConfiguration(CrmReengagementOptions.SectionName);
 
         return services;
     }

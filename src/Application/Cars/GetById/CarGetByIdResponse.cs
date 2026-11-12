@@ -25,5 +25,7 @@ public sealed record CarGetByIdResponse(
     DateTime UpdatedAt,
     List<CarImageResponse> Images,
     bool Featured,
-    decimal? PurchaseCost
+    decimal? PurchaseCost,
+    // sfc B0.3.3: ISO code of Precio (ARS, USD).
+    string Currency = "ARS"
 );

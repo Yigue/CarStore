@@ -5,6 +5,7 @@ using Infrastructure.Database;
 using System.Net.Http.Json;
 using System.Net;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Threading.Tasks;
@@ -34,10 +35,8 @@ public class CarsEndpointsTests
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var marca = new Marca("Toyota");
-        var modelo = new Modelo("Corolla", marca.Id) { Marca = marca };
-        context.AddRange(marca, modelo);
-        await context.SaveChangesAsync();
+        var marca = await context.Marca.FirstAsync(m => m.Nombre == "Toyota");
+        var modelo = await context.Modelo.FirstAsync(m => m.MarcaId == marca.Id && m.Nombre == "Corolla");
 
         var client = factory.CreateClient();
         IntegrationTestHelpers.SetAuthToken(client, token);
@@ -76,10 +75,8 @@ public class CarsEndpointsTests
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var marca = new Marca("Toyota");
-        var modelo = new Modelo("Corolla", marca.Id) { Marca = marca };
-        context.AddRange(marca, modelo);
-        await context.SaveChangesAsync();
+        var marca = await context.Marca.FirstAsync(m => m.Nombre == "Toyota");
+        var modelo = await context.Modelo.FirstAsync(m => m.MarcaId == marca.Id && m.Nombre == "Corolla");
 
         var client = factory.CreateClient();
         IntegrationTestHelpers.SetAuthToken(client, token);
@@ -114,12 +111,12 @@ public class CarsEndpointsTests
 
         using var scope = factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var marca = new Marca("Ford");
-        var modelo = new Modelo("Fiesta", marca.Id) { Marca = marca };
+        var marca = await context.Marca.FirstAsync(m => m.Nombre == "Ford");
+        var modelo = await context.Modelo.FirstAsync(m => m.MarcaId == marca.Id && m.Nombre == "Fiesta");
 
         var dealerId = Guid.Parse(CustomWebApplicationFactory.AdminDealerId);
         var car = new Car(dealerId, marca, modelo, Color.Blue, TypeCar.Sedan, StatusCar.New, StatusServiceCar.Disponible, 4,5,1600,5000,2019,"GET777","desc",15000m, DateTime.UtcNow);
-        context.AddRange(marca, modelo, car);
+        context.Cars.Add(car);
         await context.SaveChangesAsync();
 
         var client = factory.CreateClient();

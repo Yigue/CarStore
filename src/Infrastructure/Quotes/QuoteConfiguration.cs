@@ -11,10 +11,14 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
     {
         builder.HasKey(q => q.Id);
 
-        builder.Property(q => q.ProposedPrice)
-            .HasConversion(new MoneyValueConverter())
-            .HasColumnName("proposed_price")
-            .IsRequired();
+        // sfc B4.3 / RN-018: per-dealer folio. Null until AssignNumber runs (new quotes) or the
+        // AddQuoteNumbers migration backfills it (pre-existing quotes).
+        builder.Property(q => q.Number)
+            .HasColumnName("number")
+            .HasMaxLength(20);
+
+        builder.OwnsRequiredMoney(q => q.ProposedPrice, "proposed_price", "proposed_price_currency");
+        builder.OwnsOptionalExchangeRate(q => q.ExchangeRate);
 
         builder.Property(q => q.Status)
             .HasConversion<string>();
@@ -74,5 +78,12 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
             .IsUnique()
             .HasDatabaseName("ux_quotes_one_accepted_per_car")
             .HasFilter("status = 'Accepted' AND is_deleted = false");
+
+        // sfc B4.3 / RN-018: folios are unique per dealer, not globally; NULL (not-yet-numbered
+        // legacy rows mid-backfill) is excluded so the partial index never blocks that migration.
+        builder.HasIndex(q => new { q.DealerId, q.Number }, "ux_quotes_dealer_id_number")
+            .IsUnique()
+            .HasDatabaseName("ux_quotes_dealer_id_number")
+            .HasFilter("number IS NOT NULL");
     }
 }

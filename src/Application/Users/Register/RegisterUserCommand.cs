@@ -1,6 +1,9 @@
-﻿using Application.Abstractions.Messaging;
+using Application.Abstractions.Messaging;
 
 namespace Application.Users.Register;
 
-public sealed record RegisterUserCommand(string Email, string FirstName, string LastName, string Password, Guid? DealerId = null)
+public sealed record RegisterUserCommand(string Email, string FirstName, string LastName, string Password,
+    string? AcceptedTermsVersion = null,
+    string? AcceptanceIp = null,
+    string? AcceptanceUserAgent = null)
     : ICommand<Guid>;

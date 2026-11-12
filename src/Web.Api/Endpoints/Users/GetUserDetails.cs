@@ -20,14 +20,21 @@ public sealed class GetUserDetails : IEndpoint
         {
             var result = await sender.Send(new GetRolesQuery(), cancellationToken);
 
+            // Envelope, not a bare array. RolesResponse/PermissionsResponse exist precisely to
+            // name the collection, every other RBAC read on this API answers with one
+            // (GET users/{id}/permissions returns UserPermissionsResponse), and the frontend's
+            // rbacService reads response.roles. Unwrapping here shipped a third shape nobody
+            // declared: the endpoint advertised RoleResponse, returned RoleResponse[], and the
+            // client read .roles off an array — undefined, so the user form had no role to post
+            // and POST /users answered 400 for every role in the list (CFG-01).
             return result.Match(
-                data => Results.Ok(data.Roles),
+                data => Results.Ok(data),
                 CustomResults.Problem);
         })
         .HasPermission(Permissions.CanManageRoles)
         .WithTags(Tags.Users)
         .WithName("GetRoles")
-        .Produces<RoleResponse>()
+        .Produces<RolesResponse>()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
@@ -40,13 +47,13 @@ public sealed class GetUserDetails : IEndpoint
             var result = await sender.Send(new GetPermissionsQuery(), cancellationToken);
 
             return result.Match(
-                data => Results.Ok(data.Permissions),
+                data => Results.Ok(data),
                 CustomResults.Problem);
         })
         .HasPermission(Permissions.CanManageRoles)
         .WithTags(Tags.Users)
         .WithName("GetPermissions")
-        .Produces<PermissionResponse>()
+        .Produces<PermissionsResponse>()
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status500InternalServerError);

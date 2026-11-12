@@ -11,8 +11,11 @@ namespace Application.Abstractions.Billing;
 /// </summary>
 public interface ISubscriptionGateway
 {
-    /// <summary>Returns a hosted checkout URL for the given dealer. Trial per StripeOptions.TrialDays.</summary>
-    Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail,
+    /// <summary>
+    /// Returns a hosted checkout URL for the given dealer and plan. Trial per StripeOptions.TrialDays.
+    /// spr PR 1.1 (ADR B1): the session's metadata MUST carry <c>planCode</c> so the webhook can persist it.
+    /// </summary>
+    Task<string> CreateCheckoutSessionAsync(Guid dealerId, string dealerEmail, string planCode, CheckoutReturn checkoutReturn,
         CancellationToken ct = default);
 
     /// <summary>Probes Stripe for the current subscription status (used only as a reconciliation
@@ -25,7 +28,43 @@ public interface ISubscriptionGateway
     Task CancelSubscriptionAsync(string stripeSubscriptionId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Cancels the subscription immediately (no period-end grace), e.g. for account self-deletion (RN-015).
+    /// Must be idempotent: an already-cancelled subscription is not an error.
+    /// </summary>
+    Task CancelNowAsync(string stripeSubscriptionId,
+        CancellationToken ct = default);
+
+    /// <summary>Updates the billing email of the provider customer (invoices and dunning go there). Idempotent.</summary>
+    Task UpdateCustomerEmailAsync(string stripeCustomerId, string email,
+        CancellationToken ct = default);
+
     /// <summary>Creates a Stripe customer for a new dealer. Idempotent on StripeCustomerId.</summary>
     Task<string> CreateCustomerAsync(Guid dealerId, string email,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// spr ADR B9 / C14: looks the provider up for a live (non-cancelled) subscription that belongs to
+    /// the dealer, by the <c>dealer_id</c> metadata. Used by the reconciliation job to heal a pending
+    /// row before flagging it. Returns null when the provider has nothing for that dealer.
+    /// </summary>
+    Task<ExternalSubscription?> FindSubscriptionForDealerAsync(Guid dealerId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// spr PR 1.3 (D2): returns a Stripe-hosted billing portal session URL for an existing customer, so
+    /// the dealer can update their card and see invoices without CarStore handling payment data directly.
+    /// </summary>
+    Task<string> CreatePortalSessionAsync(string stripeCustomerId,
+        CancellationToken ct = default);
 }
+
+/// <summary>Provider-agnostic snapshot of a subscription held by the payment provider.</summary>
+public sealed record ExternalSubscription(
+    string CustomerId,
+    string SubscriptionId,
+    SubscriptionStatus Status,
+    DateTime PeriodStart,
+    DateTime PeriodEnd,
+    DateTime? TrialEnd,
+    string? PriceId);

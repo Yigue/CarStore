@@ -17,7 +17,9 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
             .HasMaxLength(10)
             .IsRequired();
 
-        builder.HasIndex(c => c.Patente)
+        builder.HasIndex(c => new { c.DealerId, c.Patente })
+            .HasFilter("is_deleted = false")
+            .HasDatabaseName("ix_cars_dealer_patente")
             .IsUnique();
 
         builder.Property(c => c.Descripcion)
@@ -61,10 +63,7 @@ public class CarConfiguration : IEntityTypeConfiguration<Car>
             .HasDefaultValue(false)
             .IsRequired();
 
-        builder.Property(c => c.Price)
-            .HasConversion(new MoneyValueConverter())
-            .HasColumnName("price")
-            .IsRequired();
+        builder.OwnsRequiredMoney(c => c.Price, "price", "price_currency");
 
         // PHASE-4: PurchaseCost mapped as owned value object (Amount + Currency columns).
         // The OWNED REFERENCE is optional (navigation IsRequired(false)) so the whole

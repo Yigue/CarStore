@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using Application.Abstractions.Webhooks;
 using Application.UnitTests;
 using Domain.Webhooks;
 using Infrastructure.BackgroundJobs;
@@ -48,7 +49,8 @@ public class DispatchWebhookDeliveriesJobTests
     private static (DispatchWebhookDeliveriesJob Job, StubHttpMessageHandler Handler) CreateJob(
         TestApplicationDbContext context,
         FakeDateTimeProvider dateTimeProvider,
-        Func<HttpRequestMessage, HttpResponseMessage> responder)
+        Func<HttpRequestMessage, HttpResponseMessage> responder,
+        IWebhookDestinationGuard? destinationGuard = null)
     {
         var handler = new StubHttpMessageHandler(responder);
         var httpClient = new HttpClient(handler);
@@ -60,7 +62,8 @@ public class DispatchWebhookDeliveriesJobTests
             context,
             factory.Object,
             dateTimeProvider,
-            NullLogger<DispatchWebhookDeliveriesJob>.Instance);
+            NullLogger<DispatchWebhookDeliveriesJob>.Instance,
+            destinationGuard);
 
         return (job, handler);
     }
@@ -222,5 +225,56 @@ public class DispatchWebhookDeliveriesJobTests
         var unchanged = await context.WebhookDeliveries.FirstAsync(d => d.Id == delivery.Id);
         unchanged.Status.Should().Be(WebhookDeliveryStatus.Pending);
         unchanged.AttemptCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRecordFailure_DestinationBlocked_WhenDestinationGuardRejectsUrl()
+    {
+        var now = DateTime.UtcNow;
+        var context = CreateContext();
+        var dateTimeProvider = new FakeDateTimeProvider { UtcNow = now };
+        var subscription = SeedSubscription(context, now);
+        var delivery = SeedDelivery(context, subscription, now);
+
+        var guardMock = new Mock<IWebhookDestinationGuard>();
+        guardMock.Setup(g => g.ValidateDestinationAsync(subscription.Url, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        bool handlerInvoked = false;
+        var (job, _) = CreateJob(context, dateTimeProvider, _ =>
+        {
+            handlerInvoked = true;
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }, guardMock.Object);
+
+        await job.Execute(new Mock<IJobExecutionContext>().Object);
+
+        handlerInvoked.Should().BeFalse();
+        var updated = await context.WebhookDeliveries.FirstAsync(d => d.Id == delivery.Id);
+        updated.Status.Should().Be(WebhookDeliveryStatus.Pending);
+        updated.AttemptCount.Should().Be(1);
+        updated.LastError.Should().Be("Destination blocked");
+        updated.LastStatusCode.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRecordFailure_DestinationBlocked_WhenHttpClientThrowsDestinationBlocked()
+    {
+        var now = DateTime.UtcNow;
+        var context = CreateContext();
+        var dateTimeProvider = new FakeDateTimeProvider { UtcNow = now };
+        var subscription = SeedSubscription(context, now);
+        var delivery = SeedDelivery(context, subscription, now);
+
+        var (job, _) = CreateJob(context, dateTimeProvider, _ =>
+            throw new HttpRequestException("Destination blocked: resolved IP '127.0.0.1' is in a restricted range."));
+
+        await job.Execute(new Mock<IJobExecutionContext>().Object);
+
+        var updated = await context.WebhookDeliveries.FirstAsync(d => d.Id == delivery.Id);
+        updated.Status.Should().Be(WebhookDeliveryStatus.Pending);
+        updated.AttemptCount.Should().Be(1);
+        updated.LastError.Should().Be("Destination blocked");
+        updated.LastStatusCode.Should().BeNull();
     }
 }
