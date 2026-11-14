@@ -5,6 +5,10 @@
   </PropertyGroup>
   <!--.NET 9 packages. Most of them will work on .NET 8. If you need to, make the updates here individually.-->
   <ItemGroup>
+    <!-- Transitive pins (CentralPackageTransitivePinningEnabled): 9.0.2 carries HIGH CVEs flagged by the Trivy gate
+         (CVE-2026-84008, CVE-2026-26171, CVE-2026-96958 and others). Keep on the latest 9.0.x patch. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="9.0.23" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="9.0.23" />
     <!-- Static code analysis -->
     <PackageVersion Include="Asp.Versioning.Http" Version="8.1.1" />
     <PackageVersion Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.1" />
